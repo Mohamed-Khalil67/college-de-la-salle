@@ -1,0 +1,39 @@
+{
+  "name": "exam-platform",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-exam-rules \"vitest run --config vitest.rules.config.mts\"",
+    "test:all": "ng test --watch=false && npm run test:rules",
+    "functions:build": "npm --prefix functions run build",
+    "emulators": "npm run functions:build && firebase emulators:start --project demo-exam-platform"
+  },
+  "private": true,
+  "packageManager": "npm@12.0.2",
+  "dependencies": {
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/forms": "^22.2.0",
+    "@angular/platform-browser": "^22.2.0",
+    "@angular/router": "^22.2.0",
+    "firebase": "^12.19.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.3",
+    "@angular/cli": "^22.2.3",
+    "@angular/compiler-cli": "^22.2.0",
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase-tools": "^15.34.0",
+    "jsdom": "^30.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.0"
+  }
+}

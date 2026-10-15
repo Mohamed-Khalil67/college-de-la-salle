@@ -1,0 +1,123 @@
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Examiner · {{ auth.displayName() }}</p>
+    <h1>Exams &amp; live results</h1>
+  </div>
+  <div class="header-actions">
+    <a class="button primary" routerLink="/examiner/new">New exam</a>
+    <button type="button" (click)="signOut()">Sign out</button>
+  </div>
+</header>
+
+@if (store.error(); as error) {
+  <p class="form-error" role="alert">Couldn't load data: {{ error.message }}</p>
+}
+
+<div class="layout">
+  <nav class="exam-list" aria-label="Your exams">
+    @if (store.examsLoading() && store.exams().length === 0) {
+      <p class="muted" aria-busy="true">Loading exams…</p>
+    }
+    @for (exam of store.exams(); track exam.id) {
+      <button
+        type="button"
+        class="exam-item"
+        [attr.aria-current]="store.selectedExamId() === exam.id ? 'true' : null"
+        (click)="store.selectedExamId.set(exam.id)"
+      >
+        <span class="exam-name">{{ exam.title }}</span>
+        <span class="exam-meta">
+          <code>{{ exam.accessCode }}</code> · {{ exam.durationSeconds / 60 }} min ·
+          {{ exam.questionCount }} q
+        </span>
+      </button>
+    } @empty {
+      @if (!store.examsLoading()) {
+        <div class="empty">
+          <p>No exams yet.</p>
+          <a routerLink="/examiner/new">Create your first exam</a>
+        </div>
+      }
+    }
+  </nav>
+
+  <section class="detail" aria-live="polite">
+    @if (store.selectedExam(); as exam) {
+      <div class="panel exam-head">
+        <div>
+          <h2>{{ exam.title }}</h2>
+          <p class="muted">
+            Open {{ exam.window.opensAt | date: 'short' }} – {{ exam.window.closesAt | date: 'short' }}
+            · max score {{ exam.maxScore }}
+          </p>
+        </div>
+        <div class="share">
+          <span class="label">Candidate link</span>
+          <code>{{ origin }}/take/{{ exam.accessCode }}</code>
+        </div>
+      </div>
+
+      @let stats = store.stats();
+      <dl class="stats">
+        <div class="panel"><dt>In progress</dt><dd>{{ stats.inProgress }}</dd></div>
+        <div class="panel"><dt>Graded</dt><dd>{{ stats.graded }}</dd></div>
+        <div class="panel"><dt>Expired, no submission</dt><dd>{{ stats.expired }}</dd></div>
+        <div class="panel">
+          <dt>Average score</dt>
+          <dd>{{ stats.averageScore === null ? '—' : (stats.averageScore | number: '1.0-1') + ' / ' + exam.maxScore }}</dd>
+        </div>
+      </dl>
+
+      <div class="panel table-wrap">
+        <table>
+          <caption class="visually-hidden">Candidates for {{ exam.title }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Candidate</th>
+              <th scope="col">Status</th>
+              <th scope="col">Started</th>
+              <th scope="col">Time left</th>
+              <th scope="col">Score</th>
+              <th scope="col">Completed by</th>
+              <th scope="col">Tab switches</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of store.rows(); track row.sessionId) {
+              <tr>
+                <th scope="row">{{ row.candidateName }}</th>
+                <td><exam-status-badge [status]="row.status" /></td>
+                <td>{{ row.startedAt | date: 'mediumTime' }}</td>
+                <td class="mono">
+                  {{ row.status === 'IN_PROGRESS' ? formatRemaining(row.remainingMs) : '—' }}
+                </td>
+                <td class="mono">
+                  @if (row.submission?.score !== null && row.submission?.score !== undefined) {
+                    <strong>{{ row.submission!.score }}</strong> / {{ row.submission!.maxScore }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  @switch (row.submission?.completedBy) {
+                    @case ('CANDIDATE') { Candidate }
+                    @case ('AUTO_TIMER') { Timer }
+                    @case ('AUTO_INTEGRITY') { Integrity policy }
+                    @default { — }
+                  }
+                </td>
+                <td class="mono">{{ row.submission?.integrity?.visibilityLossCount ?? '—' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="muted empty-row">
+                  Nobody has started yet. Share code <code>{{ exam.accessCode }}</code> — rows appear live.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>

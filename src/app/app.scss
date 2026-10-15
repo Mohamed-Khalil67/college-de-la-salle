@@ -1,0 +1,14 @@
+:host { display: block; min-height: 100dvh; }
+
+.app-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.85rem clamp(1rem, 4vw, 2rem); border-bottom: 1px solid var(--border); background: var(--surface);
+}
+.brand { font-weight: 800; font-size: 1.1rem; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+.brand span { color: var(--accent-strong); }
+nav { display: flex; gap: 1rem; }
+
+main { padding: 1.5rem clamp(1rem, 4vw, 2rem); max-width: 72rem; margin: 0 auto; outline: none; }
+
+.skip-link { position: absolute; left: -999px; top: 0.5rem; padding: 0.5rem 0.75rem; background: var(--surface); border-radius: var(--radius); z-index: 10; }
+.skip-link:focus { left: 0.5rem; }

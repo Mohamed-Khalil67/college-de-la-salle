@@ -1,0 +1,141 @@
+@let state = store.state();
+
+@switch (state.phase) {
+  @case ('LOADING') {
+    <section class="panel" aria-busy="true">
+      <p>Looking up exam <code>{{ code() }}</code>…</p>
+    </section>
+  }
+
+  @case ('FAILED') {
+    <section class="panel" role="alert">
+      <h1>Can't open this exam</h1>
+      <p>{{ state.message }}</p>
+      <a routerLink="/">Try another code</a>
+    </section>
+  }
+
+  @case ('LOBBY') {
+    <section class="panel lobby">
+      <p class="eyebrow">Exam lobby · code <code>{{ state.lobby.code }}</code></p>
+      <h1>{{ state.lobby.title }}</h1>
+      @if (state.lobby.description) {
+        <p class="description">{{ state.lobby.description }}</p>
+      }
+      <dl class="facts">
+        <div><dt>Duration</dt><dd>{{ state.lobby.durationSeconds / 60 }} min</dd></div>
+        <div><dt>Questions</dt><dd>{{ state.lobby.questionCount }}</dd></div>
+        <div><dt>Closes</dt><dd>{{ state.lobby.window.closesAt | date: 'medium' }}</dd></div>
+      </dl>
+      <ul class="rules">
+        <li>The timer starts on the server the moment you press <strong>Start</strong> and cannot be paused.</li>
+        <li>Your answers are submitted automatically when time runs out.</li>
+        <li>Leaving this tab is recorded and may end the exam early.</li>
+      </ul>
+
+      <form [formRoot]="candidateForm" (submit)="start($event)" class="start-form">
+        <label for="candidate-name">Your full name</label>
+        <input
+          id="candidate-name"
+          autocomplete="name"
+          [formField]="candidateForm.name"
+          [attr.aria-invalid]="candidateForm.name().touched() && candidateForm.name().invalid()"
+          aria-describedby="candidate-name-error"
+        />
+        <p id="candidate-name-error" class="field-error" aria-live="polite">
+          @if (candidateForm.name().touched()) {
+            @for (error of candidateForm.name().errors(); track error.kind) {
+              {{ error.message ?? 'Invalid value' }}
+            }
+          }
+        </p>
+        @if (state.error) {
+          <p class="form-error" role="alert">{{ state.error }}</p>
+        }
+        <button type="submit" class="primary">Start exam</button>
+      </form>
+    </section>
+  }
+
+  @case ('STARTING') {
+    <section class="panel" aria-busy="true">
+      <p>Starting your session on the server…</p>
+    </section>
+  }
+
+  @case ('SUBMITTED') {
+    <section class="panel done" role="status">
+      <h1>Answers received</h1>
+      <p>
+        Your submission for <strong>{{ state.session.examTitle }}</strong> was recorded by the server.
+        @if (state.reason === 'AUTO_TIMER') {
+          Time ran out, so it was submitted automatically.
+        } @else if (state.reason === 'AUTO_INTEGRITY') {
+          It was submitted automatically after you left the exam tab too many times.
+        }
+      </p>
+      <p>You can close this tab.</p>
+    </section>
+  }
+
+  @case ('EXPIRED') {
+    <section class="panel" role="alert">
+      <h1>Exam closed</h1>
+      <p>{{ state.message }}</p>
+      <p class="muted">Session ended {{ state.session.expiresAt | date: 'medium' }}.</p>
+    </section>
+  }
+
+  @default {
+    @if (store.active(); as ctx) {
+      <header class="exam-bar">
+        <div>
+          <p class="eyebrow">{{ ctx.session.candidateName }}</p>
+          <h1 class="exam-title">{{ ctx.session.examTitle }}</h1>
+          <p class="progress">{{ store.answeredCount() }} / {{ ctx.paper.questions.length }} answered</p>
+        </div>
+        <exam-countdown [remainingMs]="store.remainingMs()" [totalMs]="store.totalMs()" />
+      </header>
+
+      @if (ctx.integrity.visibilityLossCount > 0) {
+        <p class="integrity" role="status">
+          You left this tab {{ ctx.integrity.visibilityLossCount }} time(s).
+          @if (ctx.session.integrity.maxVisibilityLosses !== null) {
+            The exam auto-submits after {{ ctx.session.integrity.maxVisibilityLosses }}.
+          }
+        </p>
+      }
+      @if (ctx.lastError) {
+        <p class="form-error" role="alert">Submission failed: {{ ctx.lastError }}</p>
+      }
+
+      <ol class="questions">
+        @for (question of ctx.paper.questions; track question.id; let i = $index) {
+          <li>
+            <exam-question-card
+              [question]="question"
+              [index]="i"
+              [selected]="ctx.answers[question.id]"
+              [disabled]="state.phase === 'SUBMITTING'"
+              (answered)="store.answer($event.questionId, $event.option)"
+            />
+          </li>
+        }
+      </ol>
+
+      <footer class="submit-bar">
+        @if (state.phase === 'SUBMITTING') {
+          <p aria-live="polite">Submitting…</p>
+        } @else {
+          @if (confirmingSubmit()) {
+            <p>Submit now? You can't change answers afterwards.</p>
+            <button type="button" (click)="confirmingSubmit.set(false)">Keep working</button>
+          }
+          <button type="button" class="primary" (click)="requestSubmit()">
+            {{ confirmingSubmit() ? 'Yes, submit' : 'Submit answers' }}
+          </button>
+        }
+      </footer>
+    }
+  }
+}

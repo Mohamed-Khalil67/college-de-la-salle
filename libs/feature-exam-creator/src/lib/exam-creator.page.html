@@ -1,0 +1,178 @@
+@if (created(); as exam) {
+  <section class="panel created" role="status">
+    <p class="eyebrow">Exam published</p>
+    <h1>Share this with candidates</h1>
+    <div class="share">
+      <div>
+        <span class="label">Access code</span>
+        <code class="code">{{ exam.accessCode }}</code>
+      </div>
+      <div class="link">
+        <span class="label">Direct link</span>
+        <code>{{ shareUrl() }}</code>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" (click)="copyLink()">Copy link</button>
+      <a class="button primary" routerLink="/examiner" [queryParams]="{ exam: exam.examId }">
+        Watch live results
+      </a>
+      <button type="button" (click)="startOver()">Create another</button>
+    </div>
+  </section>
+} @else {
+  <form [formRoot]="examForm" (submit)="save($event)" class="creator" novalidate>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">New exam</p>
+        <h1>Build an exam</h1>
+      </div>
+      <a routerLink="/examiner">Back to dashboard</a>
+    </header>
+
+    <section class="panel grid">
+      <div class="field span-2">
+        <label for="title">Title</label>
+        <input id="title" [formField]="examForm.title" aria-describedby="title-errors" />
+        <exam-field-errors id="title-errors" [field]="examForm.title" [force]="attempted()" />
+      </div>
+
+      <div class="field span-2">
+        <label for="description">Instructions <span class="optional">(optional)</span></label>
+        <textarea id="description" rows="2" [formField]="examForm.description"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="duration">Duration (minutes)</label>
+        <input
+          id="duration"
+          type="number"
+          inputmode="numeric"
+          [formField]="examForm.durationMinutes"
+          aria-describedby="duration-errors"
+        />
+        <exam-field-errors id="duration-errors" [field]="examForm.durationMinutes" [force]="attempted()" />
+      </div>
+
+      <div class="field">
+        <label for="integrity">Auto-submit after tab switches</label>
+        <input
+          id="integrity"
+          type="number"
+          inputmode="numeric"
+          placeholder="Never"
+          [formField]="examForm.maxVisibilityLosses"
+          aria-describedby="integrity-hint"
+        />
+        <p id="integrity-hint" class="hint">Leave empty to only record tab switches.</p>
+      </div>
+
+      <div class="field">
+        <label for="opens">Opens</label>
+        <input id="opens" type="datetime-local" [formField]="examForm.opensAt" aria-describedby="opens-errors" />
+        <exam-field-errors id="opens-errors" [field]="examForm.opensAt" [force]="attempted()" />
+      </div>
+
+      <div class="field">
+        <label for="closes">Closes</label>
+        <input id="closes" type="datetime-local" [formField]="examForm.closesAt" aria-describedby="closes-errors" />
+        <exam-field-errors id="closes-errors" [field]="examForm.closesAt" [force]="attempted()" />
+      </div>
+    </section>
+
+    <section class="questions" aria-labelledby="questions-heading">
+      <div class="section-head">
+        <h2 id="questions-heading">Questions</h2>
+        <span class="muted">{{ model().questions.length }} questions · {{ totalPoints() }} points</span>
+      </div>
+      <exam-field-errors id="questions-errors" [field]="examForm.questions" [force]="attempted()" />
+
+      @for (question of examForm.questions; track question; let qi = $index) {
+        <fieldset class="panel question">
+          <legend>Question {{ qi + 1 }}</legend>
+
+          <div class="field">
+            <label [for]="'prompt-' + qi">Prompt</label>
+            <textarea
+              [id]="'prompt-' + qi"
+              rows="2"
+              [formField]="question.prompt"
+              [attr.aria-describedby]="'prompt-errors-' + qi"
+            ></textarea>
+            <exam-field-errors [id]="'prompt-errors-' + qi" [field]="question.prompt" [force]="attempted()" />
+          </div>
+
+          <div class="options" role="group" [attr.aria-label]="'Options for question ' + (qi + 1)">
+            <p class="hint">Select the radio button next to the correct answer. It is stored separately and never sent to candidates.</p>
+            @for (option of question.options; track $index; let oi = $index) {
+              <div class="option-row">
+                <input
+                  type="radio"
+                  [id]="'correct-' + qi + '-' + oi"
+                  [name]="'correct-' + qi"
+                  [checked]="question.correctIndex().value() === oi"
+                  (change)="markCorrect(qi, oi)"
+                  [attr.aria-label]="'Mark option ' + (oi + 1) + ' as correct'"
+                />
+                <input
+                  class="option-text"
+                  [formField]="option"
+                  [attr.aria-label]="'Option ' + (oi + 1) + ' text'"
+                  [attr.aria-describedby]="'option-errors-' + qi + '-' + oi"
+                />
+                <button
+                  type="button"
+                  class="icon"
+                  (click)="removeOption(qi, oi)"
+                  [disabled]="question.options().value().length <= limits.minOptions"
+                  [attr.aria-label]="'Remove option ' + (oi + 1)"
+                >
+                  ✕
+                </button>
+                <exam-field-errors class="span-row" [id]="'option-errors-' + qi + '-' + oi" [field]="option" [force]="attempted()" />
+              </div>
+            }
+            <exam-field-errors [id]="'correct-errors-' + qi" [field]="question.correctIndex" [force]="attempted()" />
+          </div>
+
+          <div class="question-footer">
+            <button
+              type="button"
+              (click)="addOption(qi)"
+              [disabled]="question.options().value().length >= limits.maxOptions"
+            >
+              Add option
+            </button>
+            <label class="points">
+              Points
+              <input type="number" inputmode="numeric" [formField]="question.points" />
+            </label>
+            <button
+              type="button"
+              class="danger"
+              (click)="removeQuestion(qi)"
+              [disabled]="model().questions.length <= 1"
+            >
+              Remove question
+            </button>
+          </div>
+          <exam-field-errors [id]="'points-errors-' + qi" [field]="question.points" [force]="attempted()" />
+        </fieldset>
+      }
+
+      <button type="button" class="add-question" (click)="addQuestion()">+ Add question</button>
+    </section>
+
+    <footer class="save-bar">
+      @if (saveError()) {
+        <p class="form-error" role="alert">{{ saveError() }}</p>
+      }
+      @if (attempted() && examForm().invalid()) {
+        <p class="form-error" role="alert">Fix the highlighted fields before publishing.</p>
+      }
+      <button type="submit" class="primary" [disabled]="examForm().submitting()">
+        {{ examForm().submitting() ? 'Publishing…' : 'Publish exam' }}
+      </button>
+    </footer>
+  </form>
+}

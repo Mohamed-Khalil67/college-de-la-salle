@@ -1,0 +1,267 @@
+rules_version = '2';
+
+// =================================================================================================
+//  Exam Platform — zero-trust Firestore security model
+//
+//  Data layout (see libs/contracts/src/exam.contracts.ts):
+//    exams/{examId}                     metadata ............ owner only
+//    exams/{examId}/paper/current       questions, NO keys .. owner + candidate with a LIVE session
+//    exams/{examId}/private/answerKey   correct answers ..... owner only (grader uses Admin SDK)
+//    accessCodes/{code}                 lobby card .......... any signed-in user, exact get only
+//    sessions/{examId_uid}              authoritative timer . read: candidate/owner, write: NOBODY
+//    submissions/{examId_uid}           answers + score ..... create once by candidate before expiry
+//
+//  Principles:
+//    1. Deny by default. Every allow below is an explicit, minimal grant.
+//    2. Field-level secrecy is impossible in Firestore rules, so secrets live in separate documents.
+//    3. Time is authoritative only when it comes from the server: `request.time` or values minted
+//       by the Admin SDK. Client clocks are never trusted.
+//    4. Server-owned fields (session timer, score) are unwritable by any client.
+// =================================================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------------------------------
+    //  Identity helpers
+    // ---------------------------------------------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    // Examiners must hold a real (non-anonymous) identity. Candidates may be anonymous.
+    function isExaminer() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Document helpers
+    // ---------------------------------------------------------------------------------------------
+
+    function examPath(examId) {
+      return /databases/$(database)/documents/exams/$(examId);
+    }
+
+    function sessionPath(sessionId) {
+      return /databases/$(database)/documents/sessions/$(sessionId);
+    }
+
+    // Ownership as currently stored (reads, deletes).
+    function ownsExam(examId) {
+      return signedIn()
+        && exists(examPath(examId))
+        && get(examPath(examId)).data.ownerId == uid();
+    }
+
+    // Ownership as it will be after this request/batch commits (creates & updates). This lets an
+    // examiner write the exam + paper + answer key + access code in a single atomic batch.
+    function ownsExamAfter(examId) {
+      return isExaminer()
+        && existsAfter(examPath(examId))
+        && getAfter(examPath(examId)).data.ownerId == uid();
+    }
+
+    // A candidate holds a live session for `examId`: minted by the server, still ACTIVE, and the
+    // server clock has not passed its expiry.
+    function hasLiveSession(examId) {
+      let path = sessionPath(examId + '_' + uid());
+      return signedIn()
+        && exists(path)
+        && get(path).data.candidateId == uid()
+        && get(path).data.status == 'ACTIVE'
+        && request.time <= get(path).data.expiresAt;
+    }
+
+    function unchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Shape validators
+    // ---------------------------------------------------------------------------------------------
+
+    function isAccessCode(code) {
+      // Matches ACCESS_CODE_ALPHABET (no 0/O, 1/I/L) and LIMITS.accessCodeLength.
+      return code is string && code.matches('^[A-HJKMNP-Z2-9]{6}$');
+    }
+
+    function isWindow(w) {
+      return w is map
+        && w.keys().hasOnly(['opensAt', 'closesAt'])
+        && w.opensAt is timestamp
+        && w.closesAt is timestamp
+        && w.closesAt > w.opensAt;
+    }
+
+    function isIntegrityPolicy(p) {
+      return p is map
+        && p.keys().hasOnly(['maxVisibilityLosses'])
+        && (p.maxVisibilityLosses == null
+            || (p.maxVisibilityLosses is int && p.maxVisibilityLosses >= 0 && p.maxVisibilityLosses <= 50));
+    }
+
+    function isExamMeta(d) {
+      let fields = ['ownerId', 'title', 'description', 'durationSeconds', 'window', 'accessCode',
+                    'integrity', 'questionCount', 'maxScore', 'createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.ownerId == uid()
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.description is string && d.description.size() <= 2000
+        && d.durationSeconds is int && d.durationSeconds >= 60 && d.durationSeconds <= 14400
+        && isWindow(d.window)
+        && isAccessCode(d.accessCode)
+        && isIntegrityPolicy(d.integrity)
+        && d.questionCount is int && d.questionCount >= 1 && d.questionCount <= 100
+        && d.maxScore is int && d.maxScore >= 1
+        && d.createdAt is timestamp;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Exams (examiner isolation: only the owner can read or write)
+    // ---------------------------------------------------------------------------------------------
+
+    match /exams/{examId} {
+      // `list` is safe: Firestore rejects any query that is not constrained to ownerId == uid.
+      allow read: if signedIn() && resource.data.ownerId == uid();
+
+      allow create: if isExaminer()
+        && isExamMeta(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isExaminer()
+        && resource.data.ownerId == uid()
+        && isExamMeta(request.resource.data)
+        && unchanged('ownerId')
+        && unchanged('accessCode')
+        && unchanged('createdAt');
+
+      allow delete: if isExaminer() && resource.data.ownerId == uid();
+
+      // Question paper: never contains answers. Readable by a candidate only while their
+      // server-minted session is live — not before it starts and not after it expires.
+      match /paper/{docId} {
+        allow read: if ownsExam(examId) || hasLiveSession(examId);
+
+        allow create, update: if ownsExamAfter(examId)
+          && docId == 'current'
+          && request.resource.data.keys().hasOnly(['ownerId', 'questions'])
+          && request.resource.data.ownerId == uid()
+          && request.resource.data.questions is list
+          && request.resource.data.questions.size() >= 1
+          && request.resource.data.questions.size() <= 100;
+
+        allow delete: if ownsExam(examId);
+      }
+
+      // Answer key: owner only. Candidates can NEVER read it — not even during a live session.
+      match /private/{docId} {
+        allow read: if ownsExam(examId);
+
+        allow create, update: if ownsExamAfter(examId)
+          && docId == 'answerKey'
+          && request.resource.data.keys().hasOnly(['ownerId', 'answers'])
+          && request.resource.data.ownerId == uid()
+          && request.resource.data.answers is map;
+
+        allow delete: if ownsExam(examId);
+      }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Access codes (public lobby lookup by exact code; enumeration is blocked)
+    // ---------------------------------------------------------------------------------------------
+
+    match /accessCodes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+
+      // A code can only be claimed once (create fails on an existing doc, and update requires the
+      // existing owner), and only for an exam the caller owns whose accessCode matches.
+      allow create: if isExaminer()
+        && isAccessCode(code)
+        && request.resource.data.keys().hasOnly(['code', 'examId', 'ownerId', 'title', 'description',
+                                                 'durationSeconds', 'questionCount', 'window'])
+        && request.resource.data.code == code
+        && request.resource.data.ownerId == uid()
+        && ownsExamAfter(request.resource.data.examId)
+        && getAfter(examPath(request.resource.data.examId)).data.accessCode == code
+        && isWindow(request.resource.data.window);
+
+      allow update: if isExaminer()
+        && resource.data.ownerId == uid()
+        && unchanged('code') && unchanged('examId') && unchanged('ownerId')
+        && isWindow(request.resource.data.window);
+
+      allow delete: if isExaminer() && resource.data.ownerId == uid();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Sessions (the authoritative timer)
+    // ---------------------------------------------------------------------------------------------
+
+    match /sessions/{sessionId} {
+      allow read: if signedIn()
+        && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid());
+
+      // startedAt / expiresAt / status are minted and advanced ONLY by Cloud Functions (Admin SDK
+      // bypasses rules). No client can create, extend, reset, or delete a session.
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Submissions
+    // ---------------------------------------------------------------------------------------------
+
+    function isIntegrityReport(r) {
+      return r is map
+        && r.keys().hasAll(['visibilityLossCount', 'hiddenMs'])
+        && r.keys().hasOnly(['visibilityLossCount', 'hiddenMs'])
+        && r.visibilityLossCount is int && r.visibilityLossCount >= 0
+        && r.hiddenMs is int && r.hiddenMs >= 0;
+    }
+
+    function isValidSubmissionCreate(sessionId) {
+      let session = get(sessionPath(sessionId)).data;
+      let s = request.resource.data;
+      let fields = ['sessionId', 'examId', 'examOwnerId', 'candidateId', 'candidateName', 'answers',
+                    'integrity', 'completedBy', 'expiresAt', 'submittedAt'];
+      return signedIn()
+        && exists(sessionPath(sessionId))
+        // Ownership: only the session's candidate, only for their own session.
+        && session.candidateId == uid()
+        && session.status == 'ACTIVE'
+        // Strict deadline. `expiresAt` is pinned to the server-minted value, so the effective rule is
+        // "reject when request.time > expiresAt" with no client-controlled input anywhere in it.
+        && s.expiresAt == session.expiresAt
+        && request.time <= s.expiresAt
+        // Completion timestamp must be the server's clock, not the client's.
+        && s.submittedAt == request.time
+        // Exact shape — `score`, `maxScore`, `gradedAt` etc. are server-only and cannot be forged.
+        && s.keys().hasAll(fields) && s.keys().hasOnly(fields)
+        && s.sessionId == sessionId
+        && s.examId == session.examId
+        && s.examOwnerId == session.examOwnerId
+        && s.candidateId == uid()
+        && s.candidateName == session.candidateName
+        && s.answers is map && s.answers.size() <= 100
+        && isIntegrityReport(s.integrity)
+        && s.completedBy in ['CANDIDATE', 'AUTO_TIMER', 'AUTO_INTEGRITY'];
+    }
+
+    match /submissions/{sessionId} {
+      // Candidates see only their own; examiners see only submissions to exams they own.
+      allow read: if signedIn()
+        && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid());
+
+      allow create: if isValidSubmissionCreate(sessionId);
+
+      // Final once written. Grading writes go through the Admin SDK.
+      allow update, delete: if false;
+    }
+  }
+}

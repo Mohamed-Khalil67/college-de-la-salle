@@ -1,0 +1,14 @@
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="app-header">
+  <a routerLink="/" class="brand">Exam<span>Platform</span></a>
+  <nav aria-label="Primary">
+    @if (auth.isExaminer()) {
+      <a routerLink="/examiner">Dashboard</a>
+    } @else {
+      <a routerLink="/sign-in">Examiner sign-in</a>
+    }
+  </nav>
+</header>
+<main id="main" tabindex="-1">
+  <router-outlet />
+</main>
