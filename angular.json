@@ -30,15 +30,6 @@
               }
             ],
             "styles": [
-              "node_modules/@fontsource/cairo/arabic-400.css",
-              "node_modules/@fontsource/cairo/arabic-600.css",
-              "node_modules/@fontsource/cairo/arabic-700.css",
-              "node_modules/@fontsource/cairo/latin-400.css",
-              "node_modules/@fontsource/cairo/latin-600.css",
-              "node_modules/@fontsource/cairo/latin-700.css",
-              "node_modules/@fontsource-variable/inter/wght.css",
-              "node_modules/@fontsource/noto-naskh-arabic/400.css",
-              "node_modules/@fontsource/noto-naskh-arabic/600.css",
               "src/tailwind.css",
               "src/styles.scss"
             ],
@@ -59,13 +50,7 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all",
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.production.ts"
-                }
-              ]
+              "outputHashing": "all"
             },
             "development": {
               "optimization": false,
@@ -90,7 +75,10 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "include": ["**/*.spec.ts", "../libs/**/*.spec.ts"]
+            "include": [
+              "**/*.spec.ts",
+              "../libs/**/*.spec.ts"
+            ]
           }
         }
       }

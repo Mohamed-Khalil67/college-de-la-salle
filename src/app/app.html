@@ -1,71 +1,71 @@
-<div class="shell" [dir]="pageLang.dir()">
-  <a class="skip-link" href="#main" [attr.lang]="pageLang.lang()">{{ fr() ? 'Aller au contenu principal' : 'تخطَّ إلى المحتوى الرئيس' }}</a>
+<a class="skip-link" href="#main">Aller au contenu principal</a>
 
-  <header class="sticky top-0 z-30 border-b-2 border-gold bg-navy-900 text-cream shadow-md" [attr.lang]="pageLang.lang()">
-    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5">
-      <a routerLink="/" class="brand group grid no-underline" data-testid="brand">
-        <span class="text-xl font-bold leading-tight text-cream md:text-2xl"><portal-school-name /></span>
-        <span class="text-xs font-semibold text-gold">الثانوية العامة · القسم العربي</span>
-      </a>
+<header class="sticky top-0 z-30 border-b-2 border-gold bg-navy-900 text-cream shadow-md">
+  <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
+    <a routerLink="/" class="grid no-underline" data-testid="brand">
+      <span class="text-xl font-bold leading-tight text-white md:text-2xl">{{ school.name }}</span>
+      <span class="text-xs font-semibold tracking-wide text-gold">{{ school.district }} · {{ school.city }} · depuis {{ year }}</span>
+    </a>
 
-      <button
-        type="button"
-        class="menu-button md:hidden"
-        [attr.aria-expanded]="menuOpen()"
-        aria-controls="primary-nav"
-        (click)="menuOpen.set(!menuOpen())"
-      >
-        <span aria-hidden="true">{{ menuOpen() ? '✕' : '☰' }}</span>
-        <span class="visually-hidden">{{ fr() ? 'Menu' : 'القائمة' }}</span>
-      </button>
+    <button
+      type="button"
+      class="menu-button md:hidden"
+      [attr.aria-expanded]="menuOpen()"
+      aria-controls="primary-nav"
+      (click)="menuOpen.set(!menuOpen())"
+    >
+      <span aria-hidden="true">{{ menuOpen() ? '✕' : '☰' }}</span>
+      <span>Menu</span>
+    </button>
 
-      <nav
-        id="primary-nav"
-        class="w-full flex-col gap-1 md:flex md:w-auto md:flex-row md:flex-wrap md:items-center md:gap-x-1"
-        [class.flex]="menuOpen()"
-        [class.hidden]="!menuOpen()"
-        [attr.aria-label]="fr() ? 'Navigation principale' : 'التنقّل الرئيس'"
-      >
+    <nav
+      id="primary-nav"
+      aria-label="Navigation principale"
+      class="w-full md:flex md:w-auto"
+      [class.hidden]="!menuOpen()"
+    >
+      <ul class="m-0 flex list-none flex-col gap-1 p-0 md:flex-row md:items-center">
         @for (item of nav; track item.link) {
-          <a
-            class="nav-link"
-            [routerLink]="item.link"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: !!item.exact }"
-            [attr.lang]="item.lang"
-            [attr.dir]="item.lang === 'fr' ? 'ltr' : 'rtl'"
-          >{{ item.label }}</a>
+          <li>
+            <a
+              class="nav-link"
+              [routerLink]="item.link"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: item.exact }"
+              ariaCurrentWhenActive="page"
+            >{{ item.label }}</a>
+          </li>
         }
+      </ul>
+    </nav>
+  </div>
+</header>
 
-        @if (auth.isTeacher()) {
-          <a class="nav-link" routerLink="/examiner" routerLinkActive="active">{{ fr() ? 'Tableau de bord' : 'لوحة المعلّم' }}</a>
-        }
-        @if (auth.isSuperAdmin()) {
-          <a class="nav-link" routerLink="/admin" routerLinkActive="active">{{ fr() ? 'Accès' : 'إدارة الصلاحيات' }}</a>
-        }
-        @if (!auth.hasAccount()) {
-          <a class="nav-link teacher-link" routerLink="/sign-in" [queryParams]="{ returnUrl: here() }" lang="fr" dir="ltr" data-testid="teacher-login">Mode Enseignant</a>
-        }
-      </nav>
+<main id="main" tabindex="-1">
+  <router-outlet />
+</main>
 
-      <div class="flex flex-wrap items-center gap-3">
-        @if (auth.hasAccount()) {
-          <span class="hidden max-w-[10rem] truncate text-sm text-cream/80 2xl:inline"><bdi>{{ auth.displayName() }}</bdi></span>
-          <button type="button" class="signout" (click)="signOut()">{{ fr() ? 'Se déconnecter' : 'تسجيل الخروج' }}</button>
-        }
-        <exam-theme-toggle />
-      </div>
+<footer class="bg-navy-900 text-cream">
+  <div class="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-3">
+    <div class="grid content-start gap-1">
+      <p class="m-0 text-lg font-bold text-white">{{ school.name }}</p>
+      <p class="m-0 text-sm text-cream/80">{{ school.district }}, {{ school.city }} — fondé en {{ year }}</p>
+      <p class="m-0 text-sm text-cream/80">{{ school.section }}</p>
     </div>
-  </header>
-
-  <main id="main" tabindex="-1" [attr.lang]="pageLang.lang()">
-    <router-outlet />
-  </main>
-
-  <footer class="app-footer" [attr.lang]="pageLang.lang()">
-    <p><portal-school-name /> · الظاهر · القاهرة</p>
-    <p class="muted">الثانوية العامة — القسم العربي · <span lang="fr" dir="ltr">Section arabe du lycée</span></p>
-  </footer>
-
-  <portal-teacher-bar />
-</div>
+    <nav aria-label="Pages du site">
+      <p class="m-0 mb-2 text-sm font-semibold text-gold">Pages</p>
+      <ul class="m-0 grid list-none gap-1 p-0 text-sm">
+        @for (item of nav; track item.link) {
+          <li><a class="footer-link" [routerLink]="item.link">{{ item.label }}</a></li>
+        }
+      </ul>
+    </nav>
+    <div class="grid content-start gap-1 text-sm text-cream/80">
+      <p class="m-0 font-semibold text-gold">Crédits photographiques</p>
+      <p class="m-0">
+        Archives des Frères des Écoles Chrétiennes – Proche-Orient,
+        <a class="footer-link" href="https://lasalle-po.org/" target="_blank" rel="noopener noreferrer">lasalle-po.org</a>.
+      </p>
+    </div>
+  </div>
+</footer>

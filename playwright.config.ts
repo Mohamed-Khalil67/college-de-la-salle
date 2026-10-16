@@ -1,18 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * End-to-end suite. Needs the Firebase emulators (auth, firestore, functions):
+ * End-to-end suite for the static site (no backend needed):
  *
- *   npm run test:e2e          # starts emulators + dev server, runs, tears down
- *
- * or, with `npm run emulators` already running: npx playwright test
+ *   npm run test:e2e          # starts the dev server if needed, runs on desktop and mobile
  */
 /** Override to test a dev server on another port, e.g. E2E_BASE_URL=http://localhost:4201. */
 const baseURL = process.env['E2E_BASE_URL'] ?? 'http://localhost:4200';
 
 export default defineConfig({
   testDir: 'e2e',
-  globalSetup: './e2e/global-setup.ts',
   timeout: 120_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,

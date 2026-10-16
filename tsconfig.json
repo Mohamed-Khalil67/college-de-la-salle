@@ -1,5 +1,3 @@
-/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
-/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
 {
   "compileOnSave": false,
   "compilerOptions": {
@@ -14,22 +12,13 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
-    /* Module boundaries. Features may import data-access and contracts through these public APIs
-       only — never each other, never deep paths. */
     "paths": {
-      "@exam/contracts": ["./libs/contracts/src/index.ts"],
-      "@exam/ui-arabic": ["./libs/ui-arabic/src/index.ts"],
-      "@exam/data-access-curriculum/practice": ["./libs/data-access-curriculum/src/practice.ts"],
-      "@exam/data-access-auth/data": ["./libs/data-access-auth/src/data.ts"],
-      "@exam/data-access-curriculum": ["./libs/data-access-curriculum/src/index.ts"],
-      "@exam/feature-portal/practice": ["./libs/feature-portal/src/practice.ts"],
-      "@exam/feature-portal": ["./libs/feature-portal/src/index.ts"],
-      "@exam/data-access-auth": ["./libs/data-access-auth/src/index.ts"],
-      "@exam/feature-admin-panel": ["./libs/feature-admin-panel/src/index.ts"],
-      "@exam/data-access-exams": ["./libs/data-access-exams/src/index.ts"],
-      "@exam/feature-exam-creator": ["./libs/feature-exam-creator/src/index.ts"],
-      "@exam/feature-exam-runner": ["./libs/feature-exam-runner/src/index.ts"],
-      "@exam/feature-exam-history": ["./libs/feature-exam-history/src/index.ts"]
+      "@site/content": [
+        "./libs/site-content/src/index.ts"
+      ],
+      "@site/pages": [
+        "./libs/site-pages/src/index.ts"
+      ]
     }
   },
   "angularCompilerOptions": {

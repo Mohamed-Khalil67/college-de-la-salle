@@ -1,12 +1,10 @@
 /*
- * Tailwind CSS v4 — theme + utilities only. Preflight (the CSS reset) is deliberately NOT imported:
- * the exam runner, creator and dashboards ship their own base styles in styles.scss and must not
- * change underneath them.
+ * Tailwind CSS v4: theme + utilities only. Preflight (the CSS reset) is not imported; element
+ * defaults live in styles.scss (base layer).
  *
- * Utilities are logical-property based: use the ms-, me-, ps-, pe-, start-, end-, text-start and
- * text-end families; never ml-, mr-, pl-, pr-, left-, right-, text-left or text-right (they break RTL).
- *
- * Colours come from the CSS custom properties in styles.scss, so utilities follow the light/dark theme.
+ * Use the logical utilities (ms-, me-, ps-, pe-, start-, end-, text-start, text-end, border-s, border-e),
+ * never the physical ml-, mr-, pl-, pr-, left-, right-, text-left or text-right families: the
+ * Arabic page is RTL inside the LTR site and must mirror correctly.
  */
 @layer theme, base, components, utilities;
 @import 'tailwindcss/theme.css' layer(theme);
@@ -18,29 +16,22 @@
   --color-current: currentColor;
   --color-white: #fff;
 
-  /* Fixed brand colours (the same in light and dark) */
-  --color-navy-900: #0a192f;
-  --color-navy-700: #0f2c59;
-  --color-gold: #c5a880;
-  --color-cream: #f5ebe0;
-
-  /* Semantic colours (switch with the theme) */
+  --color-navy-900: var(--navy-900);
+  --color-navy-700: var(--navy-700);
+  --color-navy-100: var(--navy-100);
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-cream: var(--cream);
   --color-page: var(--bg);
   --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
   --color-line: var(--border);
   --color-ink: var(--text);
   --color-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-accent-strong: var(--accent-strong);
-  --color-accent-soft: var(--accent-soft);
-  --color-primary: var(--primary);
-  --color-on-primary: var(--on-primary);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
-  --color-warn-strong: var(--warn-strong);
 
-  --font-sans: var(--font-ui);
-  --font-display: var(--font-display);
-  --font-arabic: 'Cairo', system-ui, 'Segoe UI', Tahoma, sans-serif;
-  --font-french: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
+  --font-sans: var(--font-sans);
+  --font-arabic: var(--font-arabic);
 }

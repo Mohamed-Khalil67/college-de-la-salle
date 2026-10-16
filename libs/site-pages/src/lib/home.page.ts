@@ -1,0 +1,126 @@
+import { NgOptimizedImage } from '@angular/common';
+import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { KEY_FIGURES, MILESTONES, photo, SCHOOL, SUBJECTS } from '@site/content';
+import { SitePhoto } from './ui/site-photo';
+
+/** `/` — Accueil. */
+@Component({
+  selector: 'site-home-page',
+  imports: [NgOptimizedImage, RouterLink, SitePhoto],
+  template: `
+    <!-- Hero: the campus from the air, under a navy veil so the text keeps AA contrast -->
+    <section class="relative isolate overflow-hidden bg-navy-900 text-cream" aria-labelledby="hero-title">
+      <img
+        fill
+        priority
+        [ngSrc]="hero.src"
+        alt=""
+        sizes="100vw"
+        class="-z-10 object-cover opacity-60"
+      />
+      <div class="absolute inset-0 -z-10 bg-linear-to-r from-navy-900 via-navy-900/80 to-navy-900/20" aria-hidden="true"></div>
+      <div class="on-dark mx-auto grid max-w-6xl gap-5 px-4 py-20 md:py-28">
+        <p class="kicker">{{ school.section }}</p>
+        <h1 id="hero-title" class="m-0 max-w-3xl text-4xl font-bold leading-tight text-white md:text-6xl">
+          {{ school.name }} <span class="text-gold">— {{ school.district }}</span>
+        </h1>
+        <p class="m-0 max-w-2xl text-lg text-cream/90 md:text-xl">
+          {{ school.tagline }} Histoire, patrimoine et programmes détaillés des matières de la section arabe.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a class="btn btn-gold" href="#matieres">Découvrir les matières</a>
+          <a class="btn btn-outline-light" routerLink="/histoire">Histoire &amp; Patrimoine</a>
+        </div>
+      </div>
+      <p class="absolute bottom-2 end-3 m-0 text-xs text-cream/70">{{ hero.credit }}</p>
+    </section>
+
+    <!-- Key figures -->
+    <section class="border-b border-line bg-surface" aria-label="Le collège en chiffres">
+      <dl class="mx-auto m-0 grid max-w-6xl grid-cols-2 gap-6 px-4 py-8 md:grid-cols-4">
+        @for (f of figures; track f.label) {
+          <div class="border-s-2 border-gold ps-4">
+            <dt class="text-sm text-muted">{{ f.label }}</dt>
+            <dd class="m-0 text-3xl font-bold text-navy-900">{{ f.value }}</dd>
+          </div>
+        }
+      </dl>
+    </section>
+
+    <!-- Subjects -->
+    <section id="matieres" class="mx-auto grid max-w-6xl gap-8 px-4 py-16" aria-labelledby="subjects-title">
+      <div class="grid gap-2">
+        <p class="kicker">Section arabe</p>
+        <h2 id="subjects-title" class="m-0 text-3xl">Les matières</h2>
+        <p class="m-0 max-w-2xl text-muted">
+          Pour chaque matière : le programme chapitre par chapitre, les notions et formules clés, des exercices types corrigés,
+          des conseils de méthode et le statut d’avancement du programme.
+        </p>
+      </div>
+      <ul class="m-0 grid list-none gap-6 p-0 md:grid-cols-3">
+        @for (s of subjects; track s.slug) {
+          <li>
+            <a
+              [routerLink]="['/matiere', s.slug]"
+              class="group grid h-full overflow-hidden rounded-2xl border border-line bg-surface no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              [attr.data-testid]="'subject-card-' + s.slug"
+            >
+              <site-photo [photo]="photoOf(s.photo)" aspect="16 / 9" [caption]="false" rounded="rounded-none" sizes="(max-width: 768px) 100vw, 33vw" />
+              <div class="grid gap-2 p-5" [attr.lang]="s.lang" [attr.dir]="s.lang === 'ar' ? 'rtl' : 'ltr'">
+                <span class="text-2xl font-bold text-navy-900">{{ s.title }}</span>
+                <span class="text-sm text-gold-ink">{{ s.kicker }}</span>
+                <span class="line-clamp-3 text-sm text-muted">{{ s.intro }}</span>
+              </div>
+              <span class="mt-auto px-5 pb-5 text-sm font-semibold text-navy-700 group-hover:underline">Voir la matière →</span>
+            </a>
+          </li>
+        }
+      </ul>
+    </section>
+
+    <!-- Heritage teaser -->
+    <section class="bg-navy-900 text-cream" aria-labelledby="heritage-title">
+      <div class="on-dark mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 md:grid-cols-2">
+        <site-photo [photo]="inauguration" aspect="4 / 3" class="[&_figcaption]:text-cream/80" />
+        <div class="grid gap-4">
+          <p class="kicker">Histoire &amp; Patrimoine</p>
+          <h2 id="heritage-title" class="m-0 text-3xl text-white">Plus d’un siècle à Daher</h2>
+          <p class="m-0 text-cream/90">
+            Du bâtiment en briques rouges à l’inauguration des nouveaux bâtiments en 1955 et de la chapelle en 1958 :
+            les grandes étapes du collège, illustrées par les archives des Frères.
+          </p>
+          <ol class="m-0 flex list-none flex-wrap gap-2 p-0" aria-label="Dates clés">
+            @for (m of milestones; track m.year) {
+              <li class="rounded-full border border-gold/60 px-3 py-1 text-sm font-semibold text-gold">{{ m.year }}</li>
+            }
+          </ol>
+          <div><a class="btn btn-gold" routerLink="/histoire">Lire l’histoire du collège</a></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Archive strip -->
+    <section class="mx-auto grid max-w-6xl gap-6 px-4 py-16" aria-labelledby="archives-title">
+      <div class="grid gap-2">
+        <p class="kicker">Archives photographiques</p>
+        <h2 id="archives-title" class="m-0 text-3xl">Le collège en images</h2>
+      </div>
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        @for (p of archive; track p.id) {
+          <site-photo [photo]="p" aspect="4 / 3" sizes="(max-width: 640px) 100vw, 25vw" />
+        }
+      </div>
+    </section>
+  `,
+})
+export class HomePage {
+  protected readonly school = SCHOOL;
+  protected readonly figures = KEY_FIGURES;
+  protected readonly subjects = SUBJECTS;
+  protected readonly milestones = MILESTONES;
+  protected readonly hero = photo('campus-aerien');
+  protected readonly inauguration = photo('inauguration-1955');
+  protected readonly archive = [photo('batiment-brique'), photo('freres-1926'), photo('construction-1954'), photo('inauguration-1955-discours')];
+  protected readonly photoOf = photo;
+}

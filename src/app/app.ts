@@ -1,68 +1,46 @@
-import { Dir } from '@angular/cdk/bidi';
-import { Component, afterNextRender, computed, effect, inject, signal } from '@angular/core';
+import { DOCUMENT, ViewportScroller } from '@angular/common';
+import { Component, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { filter } from 'rxjs';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { AuthStore } from '@exam/data-access-auth';
-import { ContentStore } from '@exam/data-access-curriculum';
-import { SchoolName, TeacherBar } from '@exam/feature-portal';
-import { PageLanguage, ThemeToggle } from '@exam/ui-arabic';
+import { SCHOOL, SUBJECTS } from '@site/content';
+import { filter } from 'rxjs';
 
 interface NavLink {
   readonly label: string;
   readonly link: string;
-  /** Language of the label itself: French destinations keep their French name in the Arabic bar. */
-  readonly lang: 'ar' | 'fr';
-  readonly exact?: boolean;
+  readonly exact: boolean;
 }
 
-/** Flat primary navigation (no nested menus). */
-const NAV: readonly NavLink[] = [
-  { label: 'الرئيسية', link: '/', lang: 'ar', exact: true },
-  { label: 'عن المدرسة وتاريخها', link: '/ar/histoire', lang: 'ar' },
-  { label: 'اللغة العربية', link: '/ar/matiere/arabe', lang: 'ar' },
-  { label: 'Mathématiques', link: '/fr/matiere/mathematiques', lang: 'fr' },
-  { label: 'Physique-Chimie', link: '/fr/matiere/physique-chimie', lang: 'fr' },
-  { label: 'بنك الامتحانات', link: '/exams', lang: 'ar' },
-];
-
+/** The site shell: French, left-to-right, standard header (brand left, navigation right). */
 @Component({
   selector: 'app-root',
-  // `Dir` gives the CDK `Directionality` of the current page (RTL for Arabic, LTR for French) to
-  // the whole tree, so overlays, menus and drag-drop mirror correctly without extra configuration.
-  imports: [Dir, RouterOutlet, RouterLink, RouterLinkActive, ThemeToggle, SchoolName, TeacherBar],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
-  protected readonly auth = inject(AuthStore);
-  protected readonly pageLang = inject(PageLanguage);
   readonly #router = inject(Router);
-  readonly #content = inject(ContentStore);
 
-  protected readonly nav = NAV;
-  readonly #navigated = toSignal(this.#router.events.pipe(filter((e) => e instanceof NavigationEnd)));
+  protected readonly school = SCHOOL;
+  protected readonly year = 1898;
+  protected readonly nav: readonly NavLink[] = [
+    { label: 'Accueil', link: '/', exact: true },
+    { label: 'Histoire & Patrimoine', link: '/histoire', exact: false },
+    ...SUBJECTS.map((s) => ({ label: s.navLabel, link: `/matiere/${s.slug}`, exact: false })),
+  ];
+
   protected readonly menuOpen = signal(false);
-  /** Current path, so «Mode Enseignant» brings a teacher back to the page they were reading. */
-  protected readonly here = computed(() => {
-    this.#navigated();
-    return this.#router.url.split(/[?#]/)[0] || '/';
-  });
-  protected readonly fr = computed(() => this.pageLang.lang() === 'fr');
+  readonly #navigated = toSignal(this.#router.events.pipe(filter((e) => e instanceof NavigationEnd)));
 
   constructor() {
-    // Public pages are prerendered from bundled content; once the page is interactive, start the
-    // live content listener (browser only). Teacher edits then appear for everyone.
-    afterNextRender(() => void this.#content.connect());
-    // A selected link closes the mobile menu.
+    // In-page links (« Sur cette page ») must land below the sticky header, not under it. The router's
+    // anchor scrolling ignores CSS scroll-padding, so give it the header's height as an offset.
+    const document = inject(DOCUMENT);
+    inject(ViewportScroller).setOffset(() => [0, (document.querySelector('app-root > header')?.getBoundingClientRect().height ?? 0) + 16]);
+    // Choosing a page closes the mobile menu.
     effect(() => {
       this.#navigated();
       this.menuOpen.set(false);
     });
-  }
-
-  protected async signOut(): Promise<void> {
-    await this.auth.signOut();
-    await this.#router.navigateByUrl('/');
   }
 }

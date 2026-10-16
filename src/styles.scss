@@ -1,119 +1,84 @@
 /* =================================================================================================
- * Theme: Lasallian — deep navy, antique gold and cream on crisp slate-white. Academic and editorial,
- * in the spirit of a French lycée.
+ * Collège de la Salle — Daher. Editorial, academic look: Lasallian navy, antique gold and cream on
+ * crisp white. Layout is done with Tailwind utilities in the templates; this file holds the design
+ * tokens and element defaults (in cascade layers, so utilities always win).
  *
- * Two scripts, two faces:
- *   - Arabic pages (`html[lang=ar]`, dir=rtl): Cairo.
- *   - French pages (`html[lang=fr]`, dir=ltr): Inter.
- * Exam question text keeps Noto Naskh (best diacritic legibility) wherever it appears.
- *
- * Direction rules for this codebase:
- *  - Logical properties only: margin-inline, padding-block, inset-inline-start, border-inline-end,
- *    text-align: start/end. Never left/right — `dir` decides the physical side.
- *  - Never letter-spacing on Arabic text: it breaks the cursive joins between letters.
- *  - Generous line-height for Arabic (tall ascenders plus tashkeel); tighter for French.
- * All text colour pairs meet WCAG AA (≥ 4.5:1).
+ * The site is French (LTR). Only the Arabic subject page marks its content `lang="ar" dir="rtl"`:
+ * it switches to Cairo with generous leading for diacritics; the header and footer never move.
+ * Logical properties only (margin-inline, padding-block, inset-inline-start…).
+ * All text colour pairs meet WCAG AA.
  * ================================================================================================= */
 
-:root {
-  color-scheme: light dark;
-
-  /* Typography — Arabic (default) */
-  --font-display: 'Cairo', system-ui, 'Segoe UI', Tahoma, sans-serif;
-  --font-ui: 'Cairo', system-ui, 'Segoe UI', Tahoma, sans-serif;
-  --font-text: 'Noto Naskh Arabic', 'Cairo', serif; /* exam question text: legible tashkeel */
-  /* Latin institutional branding (« Collège de la Salle ») and formulas. */
-  --font-latin: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
-  --mono: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
-
-  --leading-ui: 1.75;
-  --leading-text: 2.15; /* room for fatha/kasra/shadda stacks without clipping */
-  --leading-display: 1.5;
-
-  --radius: 10px;
-
-  /* Lasallian palette — light */
-  --bg: #f4f6fa; /* crisp slate-white */
-  --surface: #ffffff;
-  --surface-2: #f5ebe0; /* cream */
-  --border: #d5dce8;
-  --text: #0a192f;
-  --muted: #4a5b76;
-
-  --accent: #0f2c59; /* Lasallian navy: links, headings */
-  --accent-strong: #0a192f;
-  --accent-soft: #e8eef8;
-  --primary: #0f2c59; /* primary buttons */
-  --primary-strong: #0a192f;
-  --primary-soft: #e8eef8;
-  --on-primary: #f5ebe0;
-  --gold: #c5a880; /* antique gold: rules and ornaments — never text */
-  --gold-soft: #f5ebe0;
-
-  --ok: #2f6b3a;
-  --ok-strong: #24552d;
-  --ok-soft: #e3efdf;
-  --warn: #8a5a12;
-  --warn-strong: #6e470d;
-  --warn-soft: #f6ebcf;
-  --danger: #a12a1f;
-  --focus: #0f2c59;
+/* -------------------------------------------------------------------------------------------------
+ * Self-hosted fonts (SIL Open Font License — see public/fonts/OFL-*.txt). Fixed URLs so the critical
+ * file can be preloaded from index.html, and a fallback with Inter's metrics so that, if the web font
+ * arrives after first paint, the text does not move (no layout shift).
+ * ---------------------------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/inter-latin-wght.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
-
-/* French pages: Inter, and the tighter leading Latin needs. */
-:root:lang(fr) {
-  --font-display: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
-  --font-ui: 'Inter Variable', system-ui, 'Segoe UI', sans-serif;
-  --leading-ui: 1.6;
-  --leading-display: 1.25;
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/inter-latin-ext-wght.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
-
-/* Same palette by night: navy paper, cream ink, gold accents. */
-@mixin dark-theme {
-  --bg: #0a192f;
-  --surface: #10264a;
-  --surface-2: #15305c;
-  --border: #2b4570;
-  --text: #f5ebe0;
-  --muted: #b9c4d8;
-
-  --accent: #d8bf96;
-  --accent-strong: #ecdcc0;
-  --accent-soft: #17325f;
-  --primary: #c5a880;
-  --primary-strong: #d8bf96;
-  --primary-soft: #17325f;
-  --on-primary: #0a192f;
-  --gold: #c5a880;
-  --gold-soft: #1d3764;
-
-  --ok: #7fd18c;
-  --ok-strong: #a6e3ae;
-  --ok-soft: #1a3320;
-  --warn: #e8c062;
-  --warn-strong: #f2d48a;
-  --warn-soft: #33291a;
-  --danger: #f08b7f;
-  --focus: #d8bf96;
+/* Arial resized to Inter's metrics: the swap to Inter keeps line breaks and line heights. */
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  ascent-override: 90.2%;
+  descent-override: 22.48%;
+  line-gap-override: 0%;
+  size-adjust: 107.4%;
 }
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    @include dark-theme;
+@each $weight in (400, 600, 700) {
+  @font-face {
+    font-family: 'Cairo';
+    font-style: normal;
+    font-display: swap;
+    font-weight: $weight;
+    src: url('/fonts/cairo-arabic-#{$weight}.woff2') format('woff2');
+    unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
   }
 }
-:root[data-theme='dark'] {
-  @include dark-theme;
-}
-/*
- * Cascade layers: element and component defaults live in `base` / `components` so Tailwind
- * utilities (the `utilities` layer, declared in tailwind.css) can always override them.
- */
-@layer base {
-  /* ------------------------------------------------------------------------------------------------
-   * Base
-   * ---------------------------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
 
+  --font-sans: 'Inter Variable', 'Inter Fallback', system-ui, 'Segoe UI', sans-serif;
+  /* Latin characters inside Arabic text (digits in formulas, names) fall through to Inter. */
+  --font-arabic: 'Cairo', 'Inter Variable', 'Inter Fallback', Tahoma, sans-serif;
+
+  --navy-900: #0a192f;
+  --navy-700: #0f2c59;
+  --navy-100: #e8eef8;
+  --gold: #c5a880; /* rules and ornaments only — never body text on white */
+  --gold-ink: #7a5a2c; /* gold-toned text with AA contrast on white */
+  --cream: #f5ebe0;
+
+  --bg: #f6f7fa;
+  --surface: #ffffff;
+  --border: #dde3ec;
+  --text: #0a192f;
+  --muted: #4a5b76;
+  --focus: #0f2c59;
+
+  --ok: #24552d;
+  --ok-soft: #e3efdf;
+  --warn: #6e470d;
+  --warn-soft: #f6ebcf;
+
+  --radius: 12px;
+}
+
+@layer base {
   *,
   *::before,
   *::after {
@@ -125,217 +90,113 @@
     margin: 0;
   }
 
+  html {
+    scroll-padding-block-start: 5rem; /* in-page anchors land below the sticky header */
+  }
+
   body {
-    font: 400 1rem / var(--leading-ui) var(--font-ui);
+    font: 400 1rem / 1.65 var(--font-sans);
     color: var(--text);
-    background-color: var(--bg);
-    text-rendering: optimizeLegibility;
+    background: var(--bg);
     -webkit-font-smoothing: antialiased;
-    font-kerning: normal;
-    font-feature-settings: 'kern', 'liga', 'calt';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Arabic content: Cairo, roomier leading for tashkeel, no letter-spacing (it breaks cursive joins). */
+  :lang(ar) {
+    font-family: var(--font-arabic);
     letter-spacing: 0;
+    line-height: 1.9;
   }
 
   h1,
   h2,
   h3 {
-    font-family: var(--font-display);
+    color: var(--navy-900);
     font-weight: 700;
-    line-height: var(--leading-display);
-    color: var(--accent-strong);
-    margin-block: 0.25rem 0.5rem;
+    line-height: 1.2;
+    margin-block: 0 0.5rem;
+    letter-spacing: -0.01em;
   }
-  h1 {
-    font-size: clamp(1.9rem, 4vw, 2.6rem);
-  }
-  h2 {
-    font-size: 1.55rem;
-  }
-  h3 {
-    font-size: 1.3rem;
-  }
-  h4 {
-    font-weight: 600;
-    font-size: 1.05rem;
-    margin: 0;
+  :lang(ar) h1,
+  :lang(ar) h2,
+  :lang(ar) h3 {
+    line-height: 1.6;
+    letter-spacing: 0;
   }
 
   a {
-    color: var(--accent);
-    text-underline-offset: 0.35em; /* clears descenders and kasra marks */
+    color: var(--navy-700);
+    text-underline-offset: 0.25em;
   }
   a:hover {
-    color: var(--accent-strong);
-  }
-
-  code,
-  .code {
-    font-family: var(--mono);
-  }
-
-  /* ------------------------------------------------------------------------------------------------
-   * Bidi isolation (see libs/ui-arabic/src/lib/bidi-isolate.ts)
-   * ---------------------------------------------------------------------------------------------- */
-
-  bdi,
-  .isolate {
-    unicode-bidi: isolate;
-  }
-  .bidi-isolate {
-    unicode-bidi: plaintext;
-    text-align: start;
-  }
-  /* Latin-only identifiers (access codes, links) always read left-to-right. */
-  .ltr {
-    direction: ltr;
-    unicode-bidi: isolate;
-  }
-
-  /* User-authored exam text: Naskh face with diacritic-safe leading. */
-  .exam-text {
-    font-family: var(--font-text);
-    font-size: 1.15rem;
-    line-height: var(--leading-text);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    color: var(--navy-900);
   }
 
   :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 3px;
   }
+
+  bdi {
+    unicode-bidi: isolate;
+  }
 }
 
 @layer components {
-  /* ------------------------------------------------------------------------------------------------
-   * Controls
-   * ---------------------------------------------------------------------------------------------- */
-
-  input,
-  textarea,
-  select {
-    max-inline-size: 100%; /* a long Arabic option label must never widen the page */
-    font: inherit;
-    line-height: var(--leading-ui);
-    color: inherit;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: calc(var(--radius) - 3px);
-    padding-block: 0.5rem;
-    padding-inline: 0.75rem;
-  }
-  textarea {
-    resize: vertical;
-    line-height: var(--leading-text);
-  }
-  input[type='number'],
-  input[type='datetime-local'] {
-    font-variant-numeric: tabular-nums;
-  }
-  input[aria-invalid='true'],
-  .ng-invalid.ng-touched:not(form):not(fieldset):not(exam-field-errors) {
-    border-color: var(--danger);
-  }
-  label {
-    font-weight: 600;
-    font-size: 0.95rem;
-  }
-
-  button,
-  .button {
+  .btn {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 0.45rem;
-    font: inherit;
+    gap: 0.5rem;
+    padding-block: 0.65rem;
+    padding-inline: 1.25rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
     font-weight: 600;
-    line-height: 1.6;
-    color: var(--accent-strong);
     text-decoration: none;
-    cursor: pointer;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: calc(var(--radius) - 3px);
-    padding-block: 0.5rem;
-    padding-inline: 1.1rem;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
   }
-  button:hover:not(:disabled),
-  .button:hover {
-    border-color: var(--accent);
-    background: var(--accent-soft);
+  .btn-gold {
+    background: var(--gold);
+    color: var(--navy-900);
   }
-  button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
+  .btn-gold:hover {
+    background: #d8bf96;
+    color: var(--navy-900);
   }
-  button.primary,
-  .button.primary {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: var(--on-primary);
+  .btn-outline-light {
+    border-color: rgb(245 235 224 / 0.7);
+    color: var(--cream);
   }
-  button.primary:hover:not(:disabled),
-  .button.primary:hover {
-    background: var(--primary-strong);
-    border-color: var(--primary-strong);
-    color: var(--on-primary);
-  }
-  button.danger {
-    color: var(--danger);
-  }
-  button.icon {
-    padding-block: 0.3rem;
-    padding-inline: 0.6rem;
+  .btn-outline-light:hover {
+    background: rgb(245 235 224 / 0.12);
+    color: #fff;
   }
 
-  /* ------------------------------------------------------------------------------------------------
-   * Surfaces & helpers
-   * ---------------------------------------------------------------------------------------------- */
-
-  /* Panel: white card with a fine gold rule on its leading edge. */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-inline-start: 3px solid var(--gold);
-    border-radius: var(--radius);
-    padding-block: 1.25rem;
-    padding-inline: 1.5rem;
-  }
-
-  /* Section kicker preceded by a short gold rule. */
-  .eyebrow {
+  /* Section kicker with a short gold rule (mirrors automatically in RTL). */
+  .kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    color: var(--primary-strong);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold-ink);
   }
-  .eyebrow::before {
+  .kicker::before {
     content: '';
-    display: inline-block;
-    inline-size: 1.4em;
+    inline-size: 1.75rem;
     block-size: 2px;
     background: var(--gold);
-    vertical-align: middle;
-    margin-inline-end: 0.5em;
   }
-
-  .muted {
-    color: var(--muted);
+  :lang(ar) .kicker {
+    letter-spacing: 0;
+    text-transform: none;
   }
-  .hint {
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin: 0;
-  }
-  .field-error {
-    color: var(--danger);
-    font-size: 0.9rem;
-    min-block-size: 1.4em;
-    margin: 0;
-  }
-  .form-error {
-    color: var(--danger);
-    font-weight: 600;
+  .on-dark .kicker {
+    color: var(--gold);
   }
 
   .visually-hidden {
@@ -346,11 +207,12 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    * {
-      transition: none !important;
-      animation: none !important;
-    }
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -1,20 +1,18 @@
 import { RenderMode, type ServerRoute } from '@angular/ssr';
+import { SUBJECTS } from '@site/content';
 
 /**
- * Render strategy per route (outputMode "static": deployable to plain Firebase Hosting).
- *
- *  - The public school pages are PRERENDERED at build time: complete HTML (with the right
- *    `<html lang dir>` for Arabic or French) for search engines and an instant first paint, then
- *    hydrated.
- *  - The exam engine, sign-in and dashboards are CLIENT-rendered: they depend on the signed-in
- *    user and live Firestore data, so there is nothing useful to render ahead of time. They are
- *    served by the CSR shell (index.csr.html) and lazy-loaded.
+ * Every page is static content, so every page is PRERENDERED at build time (complete HTML for
+ * search engines and an instant first paint, then hydrated). `outputMode: "static"` makes the
+ * build deployable to plain Firebase Hosting.
  */
 export const serverRoutes: ServerRoute[] = [
   { path: '', renderMode: RenderMode.Prerender },
-  { path: 'ar/histoire', renderMode: RenderMode.Prerender },
-  { path: 'ar/matiere/arabe', renderMode: RenderMode.Prerender },
-  { path: 'fr/matiere/mathematiques', renderMode: RenderMode.Prerender },
-  { path: 'fr/matiere/physique-chimie', renderMode: RenderMode.Prerender },
+  { path: 'histoire', renderMode: RenderMode.Prerender },
+  {
+    path: 'matiere/:slug',
+    renderMode: RenderMode.Prerender,
+    getPrerenderParams: async () => SUBJECTS.map((s) => ({ slug: s.slug })),
+  },
   { path: '**', renderMode: RenderMode.Client },
 ];
