@@ -36,6 +36,11 @@
             >{{ item.label }}</a>
           </li>
         }
+        <li class="md:ms-2">
+          <a class="account-link" routerLink="/espace-eleve" routerLinkActive="active" data-testid="account-link">
+            {{ student.firstName() ? 'Mon espace · ' + student.firstName() : 'Espace élève' }}
+          </a>
+        </li>
       </ul>
     </nav>
   </div>

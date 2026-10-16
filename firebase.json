@@ -1,4 +1,7 @@
 {
+  "firestore": {
+    "rules": "firestore.rules"
+  },
   "hosting": {
     "public": "dist/exam-platform/browser",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
@@ -10,5 +13,11 @@
       }
     ],
     "rewrites": [{ "source": "**", "destination": "/index.csr.html" }]
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "ui": { "enabled": true, "port": 4000 },
+    "singleProjectMode": true
   }
 }

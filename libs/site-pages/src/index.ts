@@ -58,6 +58,27 @@ export const SITE_ROUTES: Routes = [
     loadComponent: () => import('./lib/history.page').then((m) => m.HistoryPage),
   },
   {
+    path: 'section-nationale',
+    title: 'Section nationale',
+    data: { section: 'nationale', description: 'Section nationale du Collège de la Salle, Daher : programme du ministère égyptien, Thanaweya Amma, matières détaillées, application du collège et inscription.' },
+    resolve: { meta: description },
+    loadComponent: () => import('./lib/section.page').then((m) => m.SectionPage),
+  },
+  {
+    path: 'bac',
+    title: 'Section Bac français',
+    data: { section: 'bac', description: 'Section française du Collège de la Salle, Daher : baccalauréat français, homologation AEFE, pédagogie, orientation, effectifs et inscription.' },
+    resolve: { meta: description },
+    loadComponent: () => import('./lib/section.page').then((m) => m.SectionPage),
+  },
+  {
+    path: 'contact',
+    title: 'Contact',
+    data: { description: 'Adresse, e-mail et numéros de téléphone du Collège de la Salle, Daher, par service et par cycle.' },
+    resolve: { meta: description },
+    loadComponent: () => import('./lib/contact.page').then((m) => m.ContactPage),
+  },
+  {
     path: 'matiere/:slug',
     title: subjectTitle,
     resolve: { meta: description, fonts: arabicFonts },

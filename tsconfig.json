@@ -18,6 +18,12 @@
       ],
       "@site/pages": [
         "./libs/site-pages/src/index.ts"
+      ],
+      "@site/student": [
+        "./libs/student-space/src/index.ts"
+      ],
+      "@site/student/account": [
+        "./libs/student-space/src/account.ts"
       ]
     }
   },

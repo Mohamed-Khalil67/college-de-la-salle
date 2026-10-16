@@ -1,6 +1,7 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { type Chapter, type ChapterStatus, type Lang, photo, subjectBySlug } from '@site/content';
+import { favouriteId, progressPercent, StudentService } from '@site/student';
 import { SitePhoto } from './ui/site-photo';
 
 const LABELS = {
@@ -22,6 +23,13 @@ const LABELS = {
     chapter: 'Chapitre',
     progress: (done: number, total: number) => `${done} chapitre${done > 1 ? 's' : ''} terminé${done > 1 ? 's' : ''} sur ${total}`,
     statusNote: 'Le statut de chaque chapitre est mis à jour par les enseignants au fil de l’année scolaire.',
+    revised: 'J’ai révisé ce chapitre',
+    save: 'Enregistrer',
+    saved: 'Enregistré',
+    loginPrompt: 'Connectez-vous à l’espace élève pour suivre votre progression et enregistrer vos favoris.',
+    loginLink: 'Espace élève',
+    mine: 'Ma progression',
+    mineText: (done: number, total: number) => `${done} chapitre${done > 1 ? 's' : ''} révisé${done > 1 ? 's' : ''} sur ${total}`,
   },
   ar: {
     onThisPage: 'في هذه الصفحة',
@@ -41,6 +49,13 @@ const LABELS = {
     chapter: 'الوحدة',
     progress: (done: number, total: number) => `أُنجز ${toArabicDigits(done)} من ${toArabicDigits(total)} وحدات`,
     statusNote: 'يحدّث المعلّمون حالة كل وحدة على مدار العام الدراسي.',
+    revised: 'راجعتُ هذه الوحدة',
+    save: 'حفظ',
+    saved: 'محفوظ',
+    loginPrompt: 'سجّل الدخول إلى فضاء الطالب لمتابعة تقدّمك وحفظ مفضّلاتك.',
+    loginLink: 'فضاء الطالب',
+    mine: 'تقدّمي',
+    mineText: (done: number, total: number) => `راجعتَ ${toArabicDigits(done)} من ${toArabicDigits(total)} وحدات`,
   },
 } as const;
 
@@ -103,6 +118,12 @@ function toArabicDigits(n: number): string {
                 <li><a class="block rounded-md px-3 py-1.5 no-underline hover:bg-navy-100" [routerLink]="[]" [fragment]="item.id">{{ item.label }}</a></li>
               }
             </ol>
+            <!-- In this column (desktop only) the hint can appear after Firebase loads without moving any content. -->
+            @if (student.enabled && student.ready() && !student.signedIn()) {
+              <p class="mt-4 hidden rounded-xl bg-navy-100 p-3 text-sm lg:block" data-testid="login-prompt">
+                {{ L.loginPrompt }} <a routerLink="/espace-eleve" class="font-semibold">{{ L.loginLink }}</a>
+              </p>
+            }
           </nav>
 
           <div class="grid min-w-0 gap-14">
@@ -132,6 +153,12 @@ function toArabicDigits(n: number): string {
                         <span [class]="chipClass(c.status)" data-testid="chapter-status">{{ statusLabel(c.status) }}</span>
                       </div>
                       <p class="mb-4 mt-2 text-muted">{{ c.summary }}</p>
+                      @if (student.profile()) {
+                        <label class="mb-4 inline-flex cursor-pointer items-center gap-2 font-semibold" [attr.data-testid]="'revise-' + c.id">
+                          <input type="checkbox" class="size-5 accent-navy-700" [checked]="student.isChapterRevised(s.slug, c.id)" (change)="toggleChapter(c.id)" />
+                          {{ L.revised }}
+                        </label>
+                      }
                       <div class="grid gap-6 md:grid-cols-2">
                         <div>
                           <p class="mb-2 mt-0 text-sm font-semibold">{{ L.objectives }}</p>
@@ -160,9 +187,14 @@ function toArabicDigits(n: number): string {
               <section id="formules" aria-labelledby="formules-title" class="grid gap-4">
                 <h2 id="formules-title" class="m-0 text-3xl">{{ L.formulas }}</h2>
                 <dl class="m-0 grid gap-3 sm:grid-cols-2">
-                  @for (f of s.formulas; track f.label) {
+                  @for (f of s.formulas; track f.label; let fi = $index) {
                     <div class="rounded-xl border border-line bg-surface p-4">
-                      <dt class="text-sm text-muted">{{ f.label }}</dt>
+                      <dt class="flex items-start justify-between gap-2 text-sm text-muted">
+                        <span>{{ f.label }}</span>
+                        @if (student.profile()) {
+                          <button type="button" class="fav" [attr.aria-pressed]="student.isFavourite(fav(s.slug, 'fo', fi))" [attr.aria-label]="L.save + ' : ' + f.label" (click)="toggleFavourite(fav(s.slug, 'fo', fi))" [attr.data-testid]="'fav-fo-' + fi">{{ student.isFavourite(fav(s.slug, 'fo', fi)) ? '★' : '☆' }}</button>
+                        }
+                      </dt>
                       <dd class="m-0 mt-1 text-lg font-semibold text-navy-900"><bdi dir="ltr" data-testid="formula">{{ f.expression }}</bdi></dd>
                       @if (f.note) {
                         <dd class="m-0 text-xs text-muted">{{ f.note }}</dd>
@@ -177,7 +209,14 @@ function toArabicDigits(n: number): string {
               <h2 id="exercices-title" class="m-0 text-3xl">{{ L.examples }}</h2>
               @for (e of s.examples; track e.title; let i = $index) {
                 <article class="rounded-2xl border border-line bg-surface p-6" data-testid="example">
-                  <h3 class="m-0 text-lg">{{ i + 1 }}. {{ e.title }}</h3>
+                  <div class="flex items-start justify-between gap-3">
+                    <h3 class="m-0 text-lg">{{ i + 1 }}. {{ e.title }}</h3>
+                    @if (student.profile()) {
+                      <button type="button" class="fav" [attr.aria-pressed]="student.isFavourite(fav(s.slug, 'ex', i))" (click)="toggleFavourite(fav(s.slug, 'ex', i))" [attr.data-testid]="'fav-ex-' + i">
+                        {{ student.isFavourite(fav(s.slug, 'ex', i)) ? '★ ' + L.saved : '☆ ' + L.save }}
+                      </button>
+                    }
+                  </div>
                   <p class="mb-3 mt-2">{{ e.statement }}</p>
                   <details class="group rounded-xl bg-page p-4">
                     <summary class="cursor-pointer font-semibold text-navy-700">{{ L.solution }}</summary>
@@ -226,6 +265,14 @@ function toArabicDigits(n: number): string {
             <section id="statut" aria-labelledby="statut-title" class="grid gap-4" data-testid="status">
               <h2 id="statut-title" class="m-0 text-3xl">{{ L.status }}</h2>
               <p class="m-0 font-semibold">{{ progressText() }}</p>
+              @if (student.profile()) {
+                <div class="grid gap-2 rounded-xl bg-navy-100 p-4" data-testid="my-progress">
+                  <p class="m-0 font-semibold">{{ L.mine }} : {{ myText() }}</p>
+                  <div class="h-3 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="myPercent()" [attr.aria-label]="L.mine">
+                    <div class="h-full rounded-full bg-navy-700" [style.inline-size.%]="myPercent()"></div>
+                  </div>
+                </div>
+              }
               <div
                 class="h-3 overflow-hidden rounded-full bg-navy-100"
                 role="progressbar"
@@ -266,8 +313,13 @@ function toArabicDigits(n: number): string {
       </section>
     }
   `,
+  styles: `
+    .fav { flex-shrink: 0; padding: 0.2rem 0.7rem; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-size: 0.85rem; font-weight: 600; color: var(--navy-700); cursor: pointer; }
+    .fav[aria-pressed='true'] { background: var(--navy-100); border-color: var(--navy-700); }
+  `,
 })
 export class SubjectPage {
+  protected readonly student = inject(StudentService);
   /** Bound from the `:slug` route parameter. */
   readonly slug = input.required<string>();
 
@@ -304,6 +356,25 @@ export class SubjectPage {
     return total ? Math.round((this.done() / total) * 100) : 0;
   });
   protected readonly progressText = computed(() => this.labels().progress(this.done(), this.subject()?.chapters.length ?? 0));
+
+  protected readonly myIds = computed(() => this.student.profile()?.progress[this.slug()] ?? []);
+  protected readonly myPercent = computed(() => progressPercent(this.myIds(), (this.subject()?.chapters ?? []).map((c) => c.id)));
+  protected readonly myText = computed(() => {
+    const ids = (this.subject()?.chapters ?? []).map((c) => c.id);
+    return this.labels().mineText(this.myIds().filter((id) => ids.includes(id)).length, ids.length);
+  });
+
+  protected fav(slug: string, kind: 'ex' | 'fo', index: number): string {
+    return favouriteId(slug, kind, index);
+  }
+
+  protected toggleChapter(chapterId: string): void {
+    void this.student.toggleChapter(this.slug(), chapterId).catch(() => undefined);
+  }
+
+  protected toggleFavourite(id: string): void {
+    void this.student.toggleFavourite(id).catch(() => undefined);
+  }
 
   protected statusLabel(status: ChapterStatus): string {
     return STATUS[this.lang()][status];

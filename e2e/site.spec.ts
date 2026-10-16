@@ -90,11 +90,14 @@ test('French site with a flat navigation; only the Arabic subject reads right-to
 
   // Flat navigation, in French, with no Teacher Mode and no exam pages.
   await openNav(page);
-  await expect(nav(page).getByRole('link')).toHaveText(['Accueil', 'Histoire & Patrimoine', 'Langue arabe', 'Mathématiques', 'Physique-Chimie']);
+  await expect(nav(page).getByRole('link')).toHaveText(['Accueil', 'Histoire & Patrimoine', 'Section nationale', 'Bac français', 'Contact', 'Espace élève']);
   await expect(page.getByText(/Mode Enseignant|bank|Banque|examens/i)).toHaveCount(0);
 
-  // Arabic subject: RTL Arabic article, while the header and breadcrumb stay French and LTR.
-  await nav(page).getByRole('link', { name: 'Langue arabe' }).click();
+  // Arabic subject (reached from the national section's subject cards): RTL Arabic article, while
+  // the header and breadcrumb stay French and LTR.
+  await nav(page).getByRole('link', { name: 'Section nationale' }).click();
+  await expect(page).toHaveURL(/\/section-nationale$/);
+  await page.getByRole('link', { name: /اللغة العربية/ }).first().click();
   await expect(page).toHaveURL(/\/matiere\/arabe$/);
   const article = page.getByTestId('subject');
   await expect(article).toHaveAttribute('lang', 'ar');
@@ -110,14 +113,12 @@ test('French site with a flat navigation; only the Arabic subject reads right-to
   await checkPage(page);
 
   // French subjects: LTR, Inter.
-  await openNav(page);
-  await nav(page).getByRole('link', { name: 'Mathématiques' }).click();
+  await page.goto('/matiere/mathematiques');
   await expect(page.getByTestId('subject')).toHaveAttribute('dir', 'ltr');
   await expect(page.getByTestId('subject-title')).toHaveText('Mathématiques');
   await checkPage(page);
 
-  await openNav(page);
-  await nav(page).getByRole('link', { name: 'Physique-Chimie' }).click();
+  await page.goto('/matiere/physique-chimie');
   await expect(page.getByTestId('subject-title')).toHaveText('Physique-Chimie');
   await expect(page.getByTestId('formula').first()).toHaveText('U = R · I');
   await checkPage(page);
@@ -125,7 +126,7 @@ test('French site with a flat navigation; only the Arabic subject reads right-to
 
 test('no layout shift on any page (fonts preloaded with metric fallback, photos in reserved boxes)', async ({ page }, testInfo) => {
   await trackLayoutShift(page);
-  for (const path of ['/', '/histoire', '/matiere/arabe', '/matiere/mathematiques', '/matiere/physique-chimie']) {
+  for (const path of ['/', '/histoire', '/section-nationale', '/bac', '/contact', '/matiere/arabe', '/matiere/mathematiques', '/matiere/physique-chimie']) {
     await page.goto(path);
     const cls = await layoutShift(page);
     testInfo.annotations.push({ type: `CLS ${path}`, description: cls.toFixed(4) });
@@ -137,6 +138,9 @@ test('every page is prerendered with its content, French metadata and real schoo
   for (const [path, text] of [
     ['/', 'Les matières'],
     ['/histoire', 'Les grandes étapes'],
+    ['/section-nationale', 'Un collège bilingue, ouvert à tous'],
+    ['/bac', 'L’homologation AEFE'],
+    ['/contact', 'Standard'],
     ['/matiere/arabe', 'تاريخ اللغة العربية في مصر'],
     ['/matiere/mathematiques', 'Calcul intégral'],
     ['/matiere/physique-chimie', 'Induction électromagnétique'],
@@ -145,12 +149,16 @@ test('every page is prerendered with its content, French metadata and real schoo
     expect(html, `${path} is prerendered`).toContain(text);
     expect(html).toMatch(/<html[^>]*lang="fr"[^>]*dir="ltr"/);
     expect(html).toContain('name="description"');
-    expect(html).toContain('/images/school/');
+    if (path !== '/contact') expect(html, `${path} has photos`).toMatch(/\/images\/(school|archives)\//);
   }
 
   // The photos are served, and credited on the page.
-  for (const file of ['campus-aerien', 'batiment-brique', 'construction-1954', 'inauguration-1955', 'inauguration-1955-discours', 'freres-1926']) {
-    const res = await request.get(`/images/school/${file}.jpg`);
+  const files = [
+    ...['campus-aerien', 'batiment-brique', 'construction-1954', 'inauguration-1955', 'inauguration-1955-discours', 'freres-1926'].map((f) => `school/${f}`),
+    ...['campus-1907', 'campus-1954', 'chantier-batiments-1', 'chantier-batiments-2', 'chantier-batiments-3', 'chantier-batiments-4', 'chapelle-chantier-1', 'chapelle-chantier-2', 'chapelle-chantier-3', 'chapelle-coupole', 'chapelle-facade', 'automobile', 'salle-de-classe', 'bureau', 'nef-archive', 'entree-1', 'entree-2', 'entree-3', 'batiment-ancien', 'terrain'].map((f) => `archives/${f}`),
+  ];
+  for (const file of files) {
+    const res = await request.get(`/images/${file}.jpg`);
     expect(res.status(), file).toBe(200);
     expect(res.headers()['content-type']).toContain('image/jpeg');
   }
@@ -162,7 +170,11 @@ test('every page is prerendered with its content, French metadata and real schoo
 test('history: milestones in order with archive photos and sources', async ({ page }) => {
   await page.goto('/histoire');
   const years = page.getByTestId('timeline').locator('li > article p.text-4xl');
-  await expect(years).toHaveText(['1898', '1905', '1926', '1954', '1955', '1957', '1958']);
+  await expect(years).toHaveText(['1898', '1905', '1907', '1926', '1954', '1955', '1957', '1958', '2009', '2013']);
+  await expect(page.getByTestId('founder-dates')).toContainText('30 avril 1651');
+  await expect(page.getByTestId('directors-freres').locator('tbody tr')).toHaveCount(22);
+  await expect(page.getByTestId('directors-laics').locator('tbody tr')).toHaveCount(4);
+  await expect(page.getByTestId('gallery').locator('img')).toHaveCount(26);
   await expect(page.getByText('26 novembre 1955', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('Source : Archives lasalliennes (lasalle-po.org)').first()).toBeVisible();
   await checkPage(page);

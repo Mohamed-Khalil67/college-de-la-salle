@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// =================================================================================================
+//  Student space — the only data in this project. Everything else is static.
+//
+//    students/{uid}   one document per student: profile, chapter progress, favourites.
+//
+//  A student can read and write ONLY their own document (the document id is their auth uid), and
+//  only in the exact shape below. Nobody can list the collection. Deny by default.
+// =================================================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    function isStudentDoc(d) {
+      let fields = ['displayName', 'section', 'classe', 'progress', 'favourites', 'createdAt', 'updatedAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.displayName is string && d.displayName.size() >= 1 && d.displayName.size() <= 80
+        && d.section in ['nationale', 'bac']
+        && d.classe is string && d.classe.size() >= 1 && d.classe.size() <= 40
+        && d.progress is map && d.progress.size() <= 10
+        && d.favourites is list && d.favourites.size() <= 200
+        && d.createdAt is timestamp
+        && d.updatedAt == request.time;
+    }
+
+    match /students/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+
+      allow create: if signedIn() && request.auth.uid == uid
+        && isStudentDoc(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+
+      // createdAt can never change.
+      allow update: if signedIn() && request.auth.uid == uid
+        && isStudentDoc(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+  }
+}

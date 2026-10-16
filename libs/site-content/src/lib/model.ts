@@ -13,7 +13,27 @@ export type PhotoId =
   | 'construction-1954'
   | 'inauguration-1955'
   | 'inauguration-1955-discours'
-  | 'freres-1926';
+  | 'freres-1926'
+  | 'campus-1907'
+  | 'campus-1954'
+  | 'chantier-batiments-1'
+  | 'chantier-batiments-2'
+  | 'chantier-batiments-3'
+  | 'chantier-batiments-4'
+  | 'chapelle-chantier-1'
+  | 'chapelle-chantier-2'
+  | 'chapelle-chantier-3'
+  | 'chapelle-coupole'
+  | 'chapelle-facade'
+  | 'automobile'
+  | 'salle-de-classe'
+  | 'bureau'
+  | 'nef-archive'
+  | 'entree-1'
+  | 'entree-2'
+  | 'entree-3'
+  | 'batiment-ancien'
+  | 'terrain';
 
 export interface Photo {
   readonly id: PhotoId;
@@ -39,6 +59,55 @@ export interface Milestone {
 export interface KeyFigure {
   readonly value: string;
   readonly label: string;
+}
+
+/** A head of the college, from the school's own list. */
+export interface Director {
+  readonly name: string;
+  readonly period: string;
+  /** « Frère » or « Laïc ». */
+  readonly kind: 'frere' | 'laic';
+  readonly role?: string;
+}
+
+export interface ContactLine {
+  readonly label: string;
+  readonly phones: readonly string[];
+}
+
+export interface ExternalLink {
+  readonly label: string;
+  readonly url: string;
+  readonly note: string;
+}
+
+/** A titled block of a section page: paragraphs, then optional bullet points. */
+export interface InfoBlock {
+  readonly id: string;
+  readonly title: string;
+  readonly paragraphs: readonly string[];
+  readonly items: readonly string[];
+}
+
+/** One row of the Bac section's headcount table. */
+export interface LevelCount {
+  readonly cycle: string;
+  readonly levels: readonly { readonly level: string; readonly students: number }[];
+}
+
+/** The two sections of the college: national (Egyptian programme) and French Baccalauréat. */
+export interface SectionPage {
+  readonly slug: 'nationale' | 'bac';
+  readonly title: string;
+  readonly kicker: string;
+  readonly intro: string;
+  readonly photo: PhotoId;
+  readonly facts: readonly KeyFigure[];
+  readonly blocks: readonly InfoBlock[];
+  readonly links: readonly ExternalLink[];
+  /** Headcount by level (Bac section only). */
+  readonly counts: readonly LevelCount[];
+  readonly countsNote: string;
 }
 
 /**

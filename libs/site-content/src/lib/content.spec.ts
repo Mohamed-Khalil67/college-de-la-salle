@@ -79,9 +79,9 @@ describe('school history and photos', () => {
     for (const m of MILESTONES) if (m.photo) expect(ids.has(m.photo)).toBe(true);
     for (const s of SUBJECTS) expect(ids.has(s.photo)).toBe(true);
     for (const p of Object.values(PHOTOS)) {
-      expect(p.src).toMatch(/^\/images\/school\/[a-z0-9-]+\.jpg$/);
-      expect(p.credit).toContain('Frères des Écoles Chrétiennes');
-      expect(p.sourceUrl).toMatch(/^https:\/\/lasalle-po\.org\//);
+      expect(p.src).toMatch(/^\/images\/(school|archives)\/[a-z0-9-]+\.jpg$/);
+      expect(p.credit).toMatch(/Frères des Écoles Chrétiennes|Collège De La Salle/);
+      expect(p.sourceUrl).toMatch(/^https?:\/\/(www\.)?lasalle-(po\.org|eg\.net)\//);
       expect(p.alt.length).toBeGreaterThan(20);
       expect(p.width).toBeGreaterThan(0);
       expect(p.height).toBeGreaterThan(0);
