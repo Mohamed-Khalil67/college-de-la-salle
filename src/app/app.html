@@ -1,14 +1,23 @@
-<a class="skip-link" href="#main">Skip to content</a>
-<header class="app-header">
-  <a routerLink="/" class="brand">Exam<span>Platform</span></a>
-  <nav aria-label="Primary">
-    @if (auth.isExaminer()) {
-      <a routerLink="/examiner">Dashboard</a>
-    } @else {
-      <a routerLink="/sign-in">Examiner sign-in</a>
-    }
-  </nav>
-</header>
-<main id="main" tabindex="-1">
-  <router-outlet />
-</main>
+<div dir="rtl" lang="ar" class="shell">
+  <a class="skip-link" href="#main">تخطَّ إلى المحتوى الرئيس</a>
+  <exam-frieze [size]="34" />
+  <header class="app-header">
+    <a routerLink="/" class="brand" aria-label="منصّة الاختبارات — الصفحة الرئيسة">
+      <span class="brand-title">مِنَصَّةُ الاخْتِبَارَاتِ</span>
+      <span class="brand-tagline">اختباراتٌ مؤقَّتةٌ آمنةٌ عادلة</span>
+    </a>
+    <nav aria-label="التنقّل الرئيس">
+      @if (auth.isExaminer()) {
+        <a routerLink="/examiner">لوحة المُمتحِن</a>
+      } @else {
+        <a routerLink="/sign-in">دخول المُمتحِنين</a>
+      }
+    </nav>
+  </header>
+  <main id="main" tabindex="-1">
+    <router-outlet />
+  </main>
+  <footer class="app-footer">
+    <span>الوقت يحدِّده الخادم، والتصحيح لا يطَّلع عليه المُختبَر.</span>
+  </footer>
+</div>

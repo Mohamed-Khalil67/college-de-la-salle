@@ -2,6 +2,7 @@ import { Component, effect, inject, input, signal, untracked } from '@angular/co
 import { email, form, FormField, FormRoot, required, submit } from '@angular/forms/signals';
 import { Router } from '@angular/router';
 import { AuthStore } from '@exam/data-access-exams';
+import { arabicErrorMessage } from '@exam/ui-arabic';
 
 const RETURN_URL_KEY = 'exam-platform:return-url';
 
@@ -10,50 +11,47 @@ const RETURN_URL_KEY = 'exam-platform:return-url';
   imports: [FormField, FormRoot],
   template: `
     <section class="panel narrow">
-      <p class="eyebrow">Examiners</p>
-      <h1>Sign in to create and grade exams</h1>
+      <p class="eyebrow">المُمتحِنون</p>
+      <h1>سجِّل الدخول لإنشاء الاختبارات وتصحيحها</h1>
       <p class="muted">
-        Candidates don't need an account. They join with an access code and get an anonymous,
-        exam-scoped identity.
+        لا يحتاج المُختبَرون إلى حساب؛ إذ ينضمّون برمز الاختبار، ويُمنَح كلٌّ منهم هويةً مجهولةً مقصورةً على الاختبار.
       </p>
       @if (auth.user()?.isAnonymous) {
         <p class="hint" role="note">
-          You're currently signed in as an anonymous candidate. Signing in as an examiner replaces it.
+          أنت مسجَّل حاليًّا بوصفك مُختبَرًا مجهول الهوية، وسيحلّ حساب المُمتحِن محلَّه عند تسجيل الدخول.
         </p>
       }
       @if (error() ?? auth.redirectError(); as message) {
         <p class="form-error" role="alert">{{ message }}</p>
       }
       <button type="button" class="primary" [disabled]="busy()" (click)="signIn()">
-        {{ busy() ? 'Signing in…' : 'Continue with Google' }}
+        {{ busy() ? 'جارٍ تسجيل الدخول…' : 'المتابعة بحساب Google' }}
       </button>
 
       @if (auth.emulatorSignInAvailable) {
         <form [formRoot]="devForm" (submit)="devSignIn($event)" class="dev">
-          <h2>Local emulator sign-in</h2>
+          <h2>الدخول عبر المحاكي المحلي</h2>
           <p class="hint">
-            Development only — uses an unsigned test credential accepted by the Auth emulator. Use
-            different emails to act as different examiners.
+            لبيئة التطوير فقط: يستعمل اعتمادًا تجريبيًّا غير موقَّع يقبله محاكي المصادقة. استعمل بريدًا مختلفًا
+            لتمثيل مُمتحِنين مختلفين.
           </p>
-          <label for="dev-email">Examiner email</label>
+          <label for="dev-email">بريد المُمتحِن</label>
           <div class="row">
-            <input id="dev-email" type="email" [formField]="devForm.email" />
-            <button type="submit" [disabled]="busy()">Sign in</button>
+            <input id="dev-email" type="email" class="ltr" [formField]="devForm.email" />
+            <button type="submit" [disabled]="busy()">دخول</button>
           </div>
         </form>
       }
     </section>
   `,
   styles: `
-    .narrow { max-width: 30rem; margin: 3rem auto; }
-    .dev { display: grid; gap: 0.4rem; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px dashed var(--border); }
-    .dev h2 { margin: 0; font-size: 1rem; }
-    .hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
+    .narrow { max-inline-size: 34rem; margin-block: 2rem; margin-inline: auto; }
+    .dev { display: grid; gap: 0.4rem; margin-block-start: 2rem; padding-block-start: 1.25rem; border-block-start: 1px dashed var(--border); }
+    .dev h2 { margin: 0; font-size: 1.2rem; }
     .row { display: flex; gap: 0.5rem; }
     .row input { flex: 1; }
   `,
-})
-export class SignInPage {
+})export class SignInPage {
   readonly returnUrl = input<string | undefined>();
 
   protected readonly auth = inject(AuthStore);
@@ -63,8 +61,8 @@ export class SignInPage {
 
   protected readonly devModel = signal({ email: 'examiner@example.test' });
   protected readonly devForm = form(this.devModel, (p) => {
-    required(p.email);
-    email(p.email);
+    required(p.email, { message: 'أدخِل البريد الإلكتروني.' });
+    email(p.email, { message: 'صيغة البريد الإلكتروني غير صحيحة.' });
   });
 
   constructor() {
@@ -95,7 +93,7 @@ export class SignInPage {
       if (this.auth.user()?.isAnonymous) await this.auth.signOut();
       await signIn();
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : 'Sign-in failed.');
+      this.error.set(arabicErrorMessage(error));
     } finally {
       this.busy.set(false);
     }

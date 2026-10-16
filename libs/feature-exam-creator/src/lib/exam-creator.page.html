@@ -1,49 +1,49 @@
 @if (created(); as exam) {
   <section class="panel created" role="status">
-    <p class="eyebrow">Exam published</p>
-    <h1>Share this with candidates</h1>
+    <p class="eyebrow">نُشِر الاختبار</p>
+    <h1>شارِك الاختبار مع المُختبَرين</h1>
     <div class="share">
       <div>
-        <span class="label">Access code</span>
-        <code class="code">{{ exam.accessCode }}</code>
+        <span class="label">رمز الاختبار</span>
+        <code class="code ltr">{{ exam.accessCode }}</code>
       </div>
       <div class="link">
-        <span class="label">Direct link</span>
-        <code>{{ shareUrl() }}</code>
+        <span class="label">الرابط المباشر</span>
+        <code class="ltr" data-testid="share-url">{{ shareUrl() }}</code>
       </div>
     </div>
     <div class="actions">
-      <button type="button" (click)="copyLink()">Copy link</button>
+      <button type="button" (click)="copyLink()">{{ copied() ? 'نُسِخ الرابط' : 'نسخ الرابط' }}</button>
       <a class="button primary" routerLink="/examiner" [queryParams]="{ exam: exam.examId }">
-        Watch live results
+        متابعة النتائج مباشرةً
       </a>
-      <button type="button" (click)="startOver()">Create another</button>
+      <button type="button" (click)="startOver()">إنشاء اختبار آخر</button>
     </div>
   </section>
 } @else {
   <form [formRoot]="examForm" (submit)="save($event)" class="creator" novalidate>
     <header class="page-header">
       <div>
-        <p class="eyebrow">New exam</p>
-        <h1>Build an exam</h1>
+        <p class="eyebrow">اختبار جديد</p>
+        <h1>إعداد اختبار</h1>
       </div>
-      <a routerLink="/examiner">Back to dashboard</a>
+      <a routerLink="/examiner">العودة إلى اللوحة</a>
     </header>
 
     <section class="panel grid">
       <div class="field span-2">
-        <label for="title">Title</label>
-        <input id="title" [formField]="examForm.title" aria-describedby="title-errors" />
+        <label for="title">عنوان الاختبار</label>
+        <input id="title" dir="auto" placeholder="اختبار الأنظمة الموزَّعة — الفصل الأول" [formField]="examForm.title" aria-describedby="title-errors" />
         <exam-field-errors id="title-errors" [field]="examForm.title" [force]="attempted()" />
       </div>
 
       <div class="field span-2">
-        <label for="description">Instructions <span class="optional">(optional)</span></label>
-        <textarea id="description" rows="2" [formField]="examForm.description"></textarea>
+        <label for="description">تعليمات للمُختبَرين <span class="optional">(اختياري)</span></label>
+        <textarea id="description" rows="2" dir="auto" [formField]="examForm.description"></textarea>
       </div>
 
       <div class="field">
-        <label for="duration">Duration (minutes)</label>
+        <label for="duration">المدة (بالدقائق)</label>
         <input
           id="duration"
           type="number"
@@ -55,26 +55,26 @@
       </div>
 
       <div class="field">
-        <label for="integrity">Auto-submit after tab switches</label>
+        <label for="integrity">التسليم التلقائي بعد مغادرة الصفحة</label>
         <input
           id="integrity"
           type="number"
           inputmode="numeric"
-          placeholder="Never"
+          placeholder="لا يُسلَّم تلقائيًّا"
           [formField]="examForm.maxVisibilityLosses"
           aria-describedby="integrity-hint"
         />
-        <p id="integrity-hint" class="hint">Leave empty to only record tab switches.</p>
+        <p id="integrity-hint" class="hint">اتركه فارغًا لتسجيل مرات المغادرة فقط دون تسليم تلقائي.</p>
       </div>
 
       <div class="field">
-        <label for="opens">Opens</label>
+        <label for="opens">يُتاح من</label>
         <input id="opens" type="datetime-local" [formField]="examForm.opensAt" aria-describedby="opens-errors" />
         <exam-field-errors id="opens-errors" [field]="examForm.opensAt" [force]="attempted()" />
       </div>
 
       <div class="field">
-        <label for="closes">Closes</label>
+        <label for="closes">يُغلَق في</label>
         <input id="closes" type="datetime-local" [formField]="examForm.closesAt" aria-describedby="closes-errors" />
         <exam-field-errors id="closes-errors" [field]="examForm.closesAt" [force]="attempted()" />
       </div>
@@ -82,35 +82,37 @@
 
     <section class="questions" aria-labelledby="questions-heading">
       <div class="section-head">
-        <h2 id="questions-heading">Questions</h2>
-        <span class="muted">{{ model().questions.length }} questions · {{ totalPoints() }} points</span>
+        <h2 id="questions-heading">الأسئلة</h2>
+        <span class="muted">{{ model().questions.length | arCount: 'question' }} · {{ totalPoints() | arCount: 'point' }}</span>
       </div>
       <exam-field-errors id="questions-errors" [field]="examForm.questions" [force]="attempted()" />
 
       @for (question of examForm.questions; track question; let qi = $index) {
         <fieldset class="panel question">
-          <legend>Question {{ qi + 1 }}</legend>
+          <legend>السؤال {{ qi + 1 | arNumber }}</legend>
 
           <div class="question-head">
             <div class="field">
-              <label [for]="'type-' + qi">Answer type</label>
+              <label [for]="'type-' + qi">نوع الإجابة</label>
               <select [id]="'type-' + qi" [formField]="question.type">
-                <option value="CHOICE">Multiple choice (auto-graded)</option>
-                <option value="TEXT">Written answer (you grade, AI can suggest)</option>
+                <option value="CHOICE">اختيار من متعدِّد (يُصحَّح آليًّا)</option>
+                <option value="TEXT">إجابة مقالية (تُصحِّحها أنت، ويقترح الذكاء الاصطناعي)</option>
               </select>
             </div>
             <label class="points">
-              Points
+              الدرجة
               <input type="number" inputmode="numeric" [formField]="question.points" />
             </label>
           </div>
           <exam-field-errors [id]="'points-errors-' + qi" [field]="question.points" [force]="attempted()" />
 
           <div class="field">
-            <label [for]="'prompt-' + qi">Prompt</label>
+            <label [for]="'prompt-' + qi">نصّ السؤال</label>
             <textarea
               [id]="'prompt-' + qi"
               rows="2"
+              dir="auto"
+              class="exam-text"
               [formField]="question.prompt"
               [attr.aria-describedby]="'prompt-errors-' + qi"
             ></textarea>
@@ -118,8 +120,8 @@
           </div>
 
           @if (question.type().value() === 'CHOICE') {
-            <div class="options" role="group" [attr.aria-label]="'Options for question ' + (qi + 1)">
-              <p class="hint">Select the radio button next to the correct answer. It is stored separately and never sent to candidates.</p>
+            <div class="options" role="group" [attr.aria-label]="'خيارات السؤال ' + (qi + 1)">
+              <p class="hint">اختر الزرّ المجاور للإجابة الصحيحة؛ تُحفَظ الإجابة منفصلةً ولا تُرسَل إلى المُختبَرين أبدًا.</p>
               @for (option of question.options; track $index; let oi = $index) {
                 <div class="option-row">
                   <input
@@ -128,12 +130,13 @@
                     [name]="'correct-' + qi"
                     [checked]="question.correctIndex().value() === oi"
                     (change)="markCorrect(qi, oi)"
-                    [attr.aria-label]="'Mark option ' + (oi + 1) + ' as correct'"
+                    [attr.aria-label]="'تحديد الخيار ' + (oi + 1) + ' إجابةً صحيحة'"
                   />
                   <input
                     class="option-text"
+                    dir="auto"
                     [formField]="option"
-                    [attr.aria-label]="'Option ' + (oi + 1) + ' text'"
+                    [attr.aria-label]="'نصّ الخيار ' + (oi + 1)"
                     [attr.aria-describedby]="'option-errors-' + qi + '-' + oi"
                   />
                   <button
@@ -141,7 +144,7 @@
                     class="icon"
                     (click)="removeOption(qi, oi)"
                     [disabled]="question.options().value().length <= limits.minOptions"
-                    [attr.aria-label]="'Remove option ' + (oi + 1)"
+                    [attr.aria-label]="'حذف الخيار ' + (oi + 1)"
                   >
                     ✕
                   </button>
@@ -154,26 +157,27 @@
           } @else {
             <div class="text-config">
               <p class="hint">
-                Candidates answer in a text box. The criteria and model answer are stored with the answer
-                key: candidates never see them, and they guide your grading and the optional AI suggestion.
+                يكتب المُختبَر إجابته في مربّع نصّي. تُحفَظ المعايير والإجابة النموذجية مع مفتاح الإجابات، فلا يراها
+                المُختبَرون، وتُرشِد تصحيحك واقتراح الذكاء الاصطناعي الاختياري.
               </p>
               <div class="field">
-                <label [for]="'criteria-' + qi">Grading criteria</label>
+                <label [for]="'criteria-' + qi">معايير التصحيح</label>
                 <textarea
                   [id]="'criteria-' + qi"
                   rows="3"
-                  placeholder="e.g. 2 pts: defines a term. 2 pts: explains how terms reject stale leaders. 1 pt: example."
+                  dir="auto"
+                  placeholder="درجتان: تعريف المفهوم. درجتان: شرح آلية العمل. درجة: مثال تطبيقي."
                   [formField]="question.criteria"
                   [attr.aria-describedby]="'criteria-errors-' + qi"
                 ></textarea>
                 <exam-field-errors [id]="'criteria-errors-' + qi" [field]="question.criteria" [force]="attempted()" />
               </div>
               <div class="field">
-                <label [for]="'model-' + qi">Model answer <span class="optional">(optional)</span></label>
-                <textarea [id]="'model-' + qi" rows="3" [formField]="question.modelAnswer"></textarea>
+                <label [for]="'model-' + qi">الإجابة النموذجية <span class="optional">(اختياري)</span></label>
+                <textarea [id]="'model-' + qi" rows="3" dir="auto" [formField]="question.modelAnswer"></textarea>
               </div>
               <div class="field narrow">
-                <label [for]="'maxlen-' + qi">Max answer length (characters)</label>
+                <label [for]="'maxlen-' + qi">الطول الأقصى للإجابة (بالأحرف)</label>
                 <input
                   [id]="'maxlen-' + qi"
                   type="number"
@@ -193,7 +197,7 @@
                 (click)="addOption(qi)"
                 [disabled]="question.options().value().length >= limits.maxOptions"
               >
-                Add option
+                إضافة خيار
               </button>
             }
             <button
@@ -202,15 +206,15 @@
               (click)="removeQuestion(qi)"
               [disabled]="model().questions.length <= 1"
             >
-              Remove question
+              حذف السؤال
             </button>
           </div>
         </fieldset>
       }
 
       <div class="add-row">
-        <button type="button" (click)="addQuestion('CHOICE')">+ Multiple choice</button>
-        <button type="button" (click)="addQuestion('TEXT')">+ Written answer</button>
+        <button type="button" (click)="addQuestion('CHOICE')">+ سؤال اختيار من متعدِّد</button>
+        <button type="button" (click)="addQuestion('TEXT')">+ سؤال مقالي</button>
       </div>
     </section>
     <footer class="save-bar">
@@ -218,10 +222,10 @@
         <p class="form-error" role="alert">{{ saveError() }}</p>
       }
       @if (attempted() && examForm().invalid()) {
-        <p class="form-error" role="alert">Fix the highlighted fields before publishing.</p>
+        <p class="form-error" role="alert">صحِّح الحقول المُشار إليها قبل النشر.</p>
       }
       <button type="submit" class="primary" [disabled]="examForm().submitting()">
-        {{ examForm().submitting() ? 'Publishing…' : 'Publish exam' }}
+        {{ examForm().submitting() ? 'جارٍ النشر…' : 'نشر الاختبار' }}
       </button>
     </footer>
   </form>

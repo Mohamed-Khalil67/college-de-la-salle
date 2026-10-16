@@ -39,11 +39,11 @@ export function geminiGrader(apiKey: string, model: string): TextGrader {
       });
 
       if (response.status === 429) {
-        throw new Error('AI grading quota reached (free tier). Try again in a minute.');
+        throw new Error('بلغتَ حدَّ الاستعمال المجاني للذكاء الاصطناعي. أعد المحاولة بعد دقيقة.');
       }
       if (!response.ok) {
         logger.error('gemini.error', { status: response.status, body: await response.text() });
-        throw new Error(`AI grader request failed (${response.status}).`);
+        throw new Error(`تعذَّر طلب التصحيح من الذكاء الاصطناعي (${response.status}).`);
       }
 
       const body = (await response.json()) as {
@@ -68,7 +68,7 @@ export function emulatorMockGrader(): TextGrader {
       const points = Math.min(maxPoints, Math.round((words / 40) * maxPoints * 2) / 2);
       return {
         points,
-        rationale: `[Emulator mock — no AI was called] ${words} words; suggestion scales with length only. Set GEMINI_API_KEY for real grading.`,
+        rationale: `[محاكاة محلية — لم يُستدعَ أيُّ ذكاء اصطناعي] عدد الكلمات ${words}؛ يعتمد الاقتراح على الطول فقط. اضبط GEMINI_API_KEY للتصحيح الفعلي.`,
       };
     },
   };

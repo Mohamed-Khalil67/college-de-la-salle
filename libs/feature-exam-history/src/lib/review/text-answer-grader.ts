@@ -8,6 +8,13 @@ import {
   type TextRubric,
 } from '@exam/contracts';
 import { SubmissionReviewService } from '@exam/data-access-exams';
+import {
+  ArCountPipe,
+  ArNumberPipe,
+  ArScorePipe,
+  arabicErrorMessage,
+  BidiIsolate,
+} from '@exam/ui-arabic';
 
 /**
  * Grades one written answer. The AI suggestion only pre-fills the form; nothing is recorded until
@@ -15,64 +22,66 @@ import { SubmissionReviewService } from '@exam/data-access-exams';
  */
 @Component({
   selector: 'exam-text-answer-grader',
-  imports: [FormField, FormRoot],
+  imports: [FormField, FormRoot, ArCountPipe, ArNumberPipe, ArScorePipe, BidiIsolate],
   template: `
     @let q = question();
     <article class="grader" [attr.aria-labelledby]="'grader-' + q.id">
       <header>
-        <h4 [id]="'grader-' + q.id">{{ label() }} · written answer · {{ q.points }} pts</h4>
+        <h4 [id]="'grader-' + q.id">{{ label() }} · إجابة مقالية · {{ q.points | arCount: 'point' }}</h4>
         @if (grade(); as g) {
-          <span class="saved">Graded {{ g.points }} / {{ q.points }}{{ g.source === 'AI_ACCEPTED' ? ' (AI accepted)' : '' }}</span>
+          <span class="saved">
+            صُحِّح: {{ g.points | arScore: q.points }}{{ g.source === 'AI_ACCEPTED' ? ' (باقتراح الذكاء الاصطناعي)' : '' }}
+          </span>
         } @else {
-          <span class="pending">Needs grading</span>
+          <span class="pending">بانتظار التصحيح</span>
         }
       </header>
-      <p class="prompt">{{ q.prompt }}</p>
+      <p class="prompt exam-text" examIsolate>{{ q.prompt }}</p>
 
       <details>
-        <summary>Rubric &amp; model answer</summary>
-        <p><strong>Criteria:</strong> {{ rubric()?.criteria || '—' }}</p>
-        <p><strong>Model answer:</strong> {{ rubric()?.modelAnswer || '—' }}</p>
+        <summary>معايير التصحيح والإجابة النموذجية</summary>
+        <p><strong>المعايير:</strong> <span examIsolate>{{ rubric()?.criteria || '—' }}</span></p>
+        <p><strong>الإجابة النموذجية:</strong> <span examIsolate>{{ rubric()?.modelAnswer || '—' }}</span></p>
       </details>
 
-      <div class="answer" [attr.aria-label]="'Candidate answer to ' + label()">
+      <div class="answer exam-text" examIsolate [attr.aria-label]="'إجابة المُختبَر عن ' + label()">
         @if (answer().trim()) {
           {{ answer() }}
         } @else {
-          <em class="muted">No answer submitted.</em>
+          <em class="muted">لم تُقدَّم إجابة.</em>
         }
       </div>
 
       <section class="ai" aria-live="polite">
         @if (suggestion(); as s) {
           <p class="ai-result">
-            <strong>AI suggests {{ s.points }} / {{ q.points }}</strong>
-            <span class="muted"> · {{ s.model }}</span>
+            <strong>يقترح الذكاء الاصطناعي: {{ s.points | arScore: q.points }}</strong>
+            <span class="muted"> · <bdi>{{ s.model }}</bdi></span>
           </p>
-          <p class="rationale">{{ s.rationale }}</p>
+          <p class="rationale" examIsolate>{{ s.rationale }}</p>
         }
         @if (aiError()) {
           <p class="form-error" role="alert">{{ aiError() }}</p>
         }
         <button type="button" (click)="askAi()" [disabled]="aiBusy()">
-          {{ aiBusy() ? 'Asking AI…' : suggestion() ? 'Ask AI again' : 'Suggest grade with AI' }}
+          {{ aiBusy() ? 'جارٍ سؤال الذكاء الاصطناعي…' : suggestion() ? 'اطلب اقتراحًا جديدًا' : 'اقتراح درجة بالذكاء الاصطناعي' }}
         </button>
         @if (suggestion() && !grade()) {
-          <button type="button" (click)="useSuggestion()">Use suggestion</button>
+          <button type="button" (click)="useSuggestion()">اعتماد الاقتراح</button>
         }
       </section>
 
       <form [formRoot]="gradeForm" (submit)="save($event)" class="grade-form">
         <div class="field">
-          <label [for]="'pts-' + q.id">Points (0–{{ q.points }})</label>
+          <label [for]="'pts-' + q.id">الدرجة (من ٠ إلى {{ q.points | arNumber }})</label>
           <input [id]="'pts-' + q.id" type="number" step="0.5" inputmode="decimal" [formField]="gradeForm.points" />
         </div>
         <div class="field grow">
-          <label [for]="'fb-' + q.id">Feedback <span class="muted">(optional)</span></label>
-          <textarea [id]="'fb-' + q.id" rows="2" [formField]="gradeForm.feedback"></textarea>
+          <label [for]="'fb-' + q.id">ملاحظات للمُختبَر <span class="muted">(اختياري)</span></label>
+          <textarea [id]="'fb-' + q.id" rows="2" dir="auto" [formField]="gradeForm.feedback"></textarea>
         </div>
         <button type="submit" class="primary" [disabled]="gradeForm().submitting()">
-          {{ grade() ? 'Update grade' : 'Save grade' }}
+          {{ grade() ? 'تحديث الدرجة' : 'حفظ الدرجة' }}
         </button>
       </form>
       <p class="field-error" aria-live="polite">
@@ -84,26 +93,30 @@ import { SubmissionReviewService } from '@exam/data-access-exams';
     </article>
   `,
   styles: `
-    .grader { display: grid; gap: 0.6rem; padding: 1rem 0; border-top: 1px solid var(--border); }
+    .grader { display: grid; gap: 0.6rem; padding-block: 1rem; border-block-start: 1px solid var(--border); }
     header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: baseline; }
-    h4 { margin: 0; font-size: 1rem; }
+    h4 { margin: 0; font-family: var(--font-display); font-size: 1.15rem; color: var(--accent-strong); }
     .saved { color: var(--ok-strong); font-weight: 600; font-size: 0.9rem; }
     .pending { color: var(--warn-strong); font-weight: 600; font-size: 0.9rem; }
-    .prompt { margin: 0; white-space: pre-wrap; }
-    details { font-size: 0.9rem; color: var(--muted); }
-    details p { margin: 0.35rem 0; white-space: pre-wrap; }
-    .answer { white-space: pre-wrap; padding: 0.75rem 0.9rem; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 4px; }
+    .prompt { margin: 0; }
+    details { font-size: 0.95rem; color: var(--muted); }
+    summary { cursor: pointer; font-weight: 600; }
+    details p { margin-block: 0.35rem; white-space: pre-wrap; }
+    /* Accent rule on the reading-start edge: right in RTL, left in LTR. */
+    .answer {
+      padding-block: 0.75rem; padding-inline: 0.9rem; background: var(--surface-2);
+      border-inline-start: 3px solid var(--accent); border-radius: 0;
+    }
     .ai { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .ai p { margin: 0; flex-basis: 100%; }
-    .rationale { font-size: 0.9rem; white-space: pre-wrap; }
+    .rationale { font-size: 0.95rem; white-space: pre-wrap; }
     .grade-form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
     .field { display: grid; gap: 0.25rem; }
-    .field input { width: 7rem; }
-    .grow { flex: 1; min-width: 14rem; }
-    .grow textarea { width: 100%; }
+    .field input { inline-size: 7rem; }
+    .grow { flex: 1; min-inline-size: 14rem; }
+    .grow textarea { inline-size: 100%; }
   `,
-})
-export class TextAnswerGrader {
+})export class TextAnswerGrader {
   readonly sessionId = input.required<string>();
   readonly question = input.required<TextQuestion>();
   readonly label = input.required<string>();
@@ -126,15 +139,15 @@ export class TextAnswerGrader {
     feedback: this.grade()?.feedback ?? '',
   }));
   protected readonly gradeForm = form(this.gradeModel, (p) => {
-    required(p.points, { message: 'Enter points.' });
-    min(p.points, 0, { message: 'Points cannot be negative.' });
-    max(p.points, () => this.question().points, { message: 'More than this question is worth.' });
+    required(p.points, { message: 'أدخِل الدرجة.' });
+    min(p.points, 0, { message: 'لا يمكن أن تكون الدرجة سالبة.' });
+    max(p.points, () => this.question().points, { message: 'الدرجة أعلى من درجة السؤال.' });
     validate(p.points, ({ value }) =>
       value() === null || Number.isInteger((value() as number) * 2)
         ? null
-        : { kind: 'half', message: 'Use whole or half points.' },
+        : { kind: 'half', message: 'استعمل درجات صحيحة أو أنصاف درجات.' },
     );
-    maxLength(p.feedback, LIMITS.maxFeedbackLength);
+    maxLength(p.feedback, LIMITS.maxFeedbackLength, { message: 'الملاحظات أطول من المسموح.' });
   });
 
   /** Whether the current form values are exactly the AI suggestion. */
@@ -154,7 +167,7 @@ export class TextAnswerGrader {
         }),
       );
     } catch (error) {
-      this.aiError.set(error instanceof Error ? error.message : 'AI suggestion failed.');
+      this.aiError.set(arabicErrorMessage(error));
     } finally {
       this.aiBusy.set(false);
     }
@@ -178,7 +191,7 @@ export class TextAnswerGrader {
           source: this.#matchesSuggestion() ? 'AI_ACCEPTED' : 'MANUAL',
         });
       } catch (error) {
-        this.saveError.set(error instanceof Error ? error.message : 'Could not save the grade.');
+        this.saveError.set(arabicErrorMessage(error));
       }
       return undefined;
     });

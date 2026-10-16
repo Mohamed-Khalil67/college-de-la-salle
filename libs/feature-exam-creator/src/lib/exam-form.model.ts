@@ -8,6 +8,7 @@ import {
   validate,
 } from '@angular/forms/signals';
 import { LIMITS, type QuestionType } from '@exam/contracts';
+import { formatCount } from '@exam/ui-arabic';
 import type { NewExamInput } from '@exam/data-access-exams';
 
 /**
@@ -66,75 +67,76 @@ export function initialExamModel(nowMs: number): ExamFormModel {
 }
 
 export const examFormSchema = schema<ExamFormModel>((p) => {
-  required(p.title, { message: 'Give the exam a title.' });
-  maxLength(p.title, 200, { message: 'Keep the title under 200 characters.' });
-  maxLength(p.description, 2000);
+  required(p.title, { message: 'أدخِل عنوانًا للاختبار.' });
+  maxLength(p.title, 200, { message: 'ينبغي ألّا يتجاوز العنوان ٢٠٠ حرف.' });
+  maxLength(p.description, 2000, { message: 'ينبغي ألّا تتجاوز التعليمات ٢٠٠٠ حرف.' });
 
-  required(p.durationMinutes, { message: 'Set a duration.' });
-  min(p.durationMinutes, LIMITS.minDurationSeconds / 60, { message: 'At least 1 minute.' });
-  max(p.durationMinutes, LIMITS.maxDurationSeconds / 60, { message: 'At most 4 hours.' });
+  required(p.durationMinutes, { message: 'حدِّد مدة الاختبار.' });
+  min(p.durationMinutes, LIMITS.minDurationSeconds / 60, { message: 'أقلّ مدة دقيقة واحدة.' });
+  max(p.durationMinutes, LIMITS.maxDurationSeconds / 60, { message: 'أقصى مدة أربع ساعات.' });
   validate(p.durationMinutes, ({ value }) =>
-    Number.isInteger(value()) ? null : { kind: 'integer', message: 'Use whole minutes.' },
+    Number.isInteger(value()) ? null : { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الدقائق.' },
   );
 
-  required(p.opensAt, { message: 'Choose when the exam opens.' });
-  required(p.closesAt, { message: 'Choose when the exam closes.' });
+  required(p.opensAt, { message: 'حدِّد موعد بدء إتاحة الاختبار.' });
+  required(p.closesAt, { message: 'حدِّد موعد إغلاق الاختبار.' });
   validate(p.closesAt, ({ value, valueOf }) =>
     fromLocalInput(value()) > fromLocalInput(valueOf(p.opensAt))
       ? null
-      : { kind: 'window', message: 'The exam must close after it opens.' },
+      : { kind: 'window', message: 'يجب أن يكون موعد الإغلاق بعد موعد البدء.' },
   );
 
-  min(p.maxVisibilityLosses, 0);
-  max(p.maxVisibilityLosses, 50);
+  min(p.maxVisibilityLosses, 0, { message: 'لا يمكن أن يكون العدد سالبًا.' });
+  max(p.maxVisibilityLosses, 50, { message: 'الحدّ الأقصى ٥٠ مرة.' });
 
   validate(p.questions, ({ value }) => {
-    if (value().length === 0) return { kind: 'minQuestions', message: 'Add at least one question.' };
+    if (value().length === 0) return { kind: 'minQuestions', message: 'أضِف سؤالًا واحدًا على الأقل.' };
     if (value().length > LIMITS.maxQuestions) {
-      return { kind: 'maxQuestions', message: `At most ${LIMITS.maxQuestions} questions.` };
+      return { kind: 'maxQuestions', message: `الحدّ الأقصى ${formatCount(LIMITS.maxQuestions, 'question')}.` };
     }
     return null;
   });
 
   applyEach(p.questions, (q) => {
-    required(q.prompt, { message: 'Write the question.' });
-    required(q.points);
-    min(q.points, 1, { message: 'At least 1 point.' });
-    max(q.points, 100);
+    required(q.prompt, { message: 'اكتب نصّ السؤال.' });
+    required(q.points, { message: 'حدِّد درجة السؤال.' });
+    min(q.points, 1, { message: 'أقلّ درجة للسؤال درجة واحدة.' });
+    max(q.points, 100, { message: 'الحدّ الأقصى ١٠٠ درجة.' });
     validate(q.points, ({ value }) =>
-      Number.isInteger(value()) ? null : { kind: 'integer', message: 'Whole points only.' },
+      Number.isInteger(value()) ? null : { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الدرجات.' },
     );
 
     // Multiple choice
     validate(q.options, ({ value, valueOf }) =>
       valueOf(q.type) === 'CHOICE' && value().length < LIMITS.minOptions
-        ? { kind: 'minOptions', message: `At least ${LIMITS.minOptions} options.` }
+        ? { kind: 'minOptions', message: 'أضِف خيارين على الأقل.' }
         : null,
     );
     applyEach(q.options, (option) =>
-      required(option, { message: 'Option text is required.', when: ({ valueOf }) => valueOf(q.type) === 'CHOICE' }),
+      required(option, { message: 'نصّ الخيار مطلوب.', when: ({ valueOf }) => valueOf(q.type) === 'CHOICE' }),
     );
     validate(q.correctIndex, ({ value, valueOf }) =>
       valueOf(q.type) !== 'CHOICE' || (value() >= 0 && value() < valueOf(q.options).length)
         ? null
-        : { kind: 'correct', message: 'Mark the correct option.' },
+        : { kind: 'correct', message: 'حدِّد الخيار الصحيح.' },
     );
 
     // Written answer
-    required(q.maxLength, { when: ({ valueOf }) => valueOf(q.type) === 'TEXT' });
-    min(q.maxLength, 50, { message: 'Allow at least 50 characters.', when: ({ valueOf }) => valueOf(q.type) === 'TEXT' });
+    required(q.maxLength, { message: 'حدِّد الطول الأقصى للإجابة.', when: ({ valueOf }) => valueOf(q.type) === 'TEXT' });
+    min(q.maxLength, 50, { message: 'اسمح بخمسين حرفًا على الأقل.', when: ({ valueOf }) => valueOf(q.type) === 'TEXT' });
     max(q.maxLength, LIMITS.maxTextAnswerLength, {
-      message: `At most ${LIMITS.maxTextAnswerLength} characters.`,
+      message: `الحدّ الأقصى ${formatCount(LIMITS.maxTextAnswerLength, 'character')}.`,
       when: ({ valueOf }) => valueOf(q.type) === 'TEXT',
     });
     required(q.criteria, {
-      message: 'Describe how points are awarded — graders (human or AI) rely on it.',
+      message: 'صِف معايير منح الدرجات؛ إذ يعتمد عليها المُصحِّح، بشرًا كان أو ذكاءً اصطناعيًّا.',
       when: ({ valueOf }) => valueOf(q.type) === 'TEXT',
     });
-    maxLength(q.criteria, LIMITS.maxRubricLength);
-    maxLength(q.modelAnswer, LIMITS.maxRubricLength);
+    maxLength(q.criteria, LIMITS.maxRubricLength, { message: 'المعايير أطول من المسموح.' });
+    maxLength(q.modelAnswer, LIMITS.maxRubricLength, { message: 'الإجابة النموذجية أطول من المسموح.' });
   });
 });
+
 export function toNewExamInput(model: ExamFormModel): NewExamInput {
   return {
     title: model.title,

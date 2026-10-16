@@ -49,7 +49,7 @@ export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextA
       const submissionSnap = await tx.get(submissionRef);
       const submission = requireOwnedSubmission(submissionSnap, uid);
       if (!submission['gradingStatus']) {
-        throw new HttpsError('failed-precondition', 'Automatic grading has not finished yet.');
+        throw new HttpsError('failed-precondition', 'لم يكتمل التصحيح الآلي بعد.');
       }
 
       const paperSnap = await tx.get(paperRef(submission['examId']));
@@ -60,7 +60,7 @@ export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextA
       if (!isValidManualPoints(points, question.points)) {
         throw new HttpsError(
           'invalid-argument',
-          `Points must be between 0 and ${question.points}, in half-point steps.`,
+          `يجب أن تكون الدرجة بين ٠ و${question.points}، بدرجات صحيحة أو أنصاف درجات.`,
         );
       }
 
@@ -113,7 +113,7 @@ export const suggestTextGrade = onCall<SuggestTextGradeRequest, Promise<AiSugges
 
     let parsed;
     if (typeof answer !== 'string' || !answer.trim()) {
-      parsed = { points: 0, rationale: 'No answer was submitted for this question.' };
+      parsed = { points: 0, rationale: 'لم تُقدَّم إجابة عن هذا السؤال.' };
     } else {
       try {
         parsed = await grader.grade(buildAiGradePrompt(question, rubric, answer), question.points);
@@ -137,14 +137,14 @@ function selectGrader(): TextGrader {
   const key = GEMINI_API_KEY.value();
   if (key) return geminiGrader(key, GEMINI_MODEL.value());
   if (isEmulator) return emulatorMockGrader();
-  throw new Error('AI grading is not configured: set the GEMINI_API_KEY secret.');
+  throw new Error('التصحيح بالذكاء الاصطناعي غير مُهيَّأ: اضبط المفتاح السرّي GEMINI_API_KEY.');
 }
 
 function requireExaminer(request: CallableRequest): string {
   const auth = request.auth;
-  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  if (!auth) throw new HttpsError('unauthenticated', 'سجِّل الدخول أولًا.');
   if (auth.token.firebase?.sign_in_provider === 'anonymous') {
-    throw new HttpsError('permission-denied', 'Only examiners can grade.');
+    throw new HttpsError('permission-denied', 'التصحيح مقصور على المُمتحِنين.');
   }
   return auth.uid;
 }
@@ -152,10 +152,10 @@ function requireExaminer(request: CallableRequest): string {
 function requireIds(data: unknown): { sessionId: string; questionId: string } {
   const { sessionId, questionId } = (data ?? {}) as Record<string, unknown>;
   if (typeof sessionId !== 'string' || !sessionId || typeof questionId !== 'string' || !questionId) {
-    throw new HttpsError('invalid-argument', 'sessionId and questionId are required.');
+    throw new HttpsError('invalid-argument', 'معرِّف الجلسة ومعرِّف السؤال مطلوبان.');
   }
   if (sessionId.includes('/') || questionId.includes('.') || questionId.includes('/')) {
-    throw new HttpsError('invalid-argument', 'Malformed id.');
+    throw new HttpsError('invalid-argument', 'معرِّف غير صالح.');
   }
   return { sessionId, questionId };
 }
@@ -166,7 +166,7 @@ function requireOwnedSubmission(
 ): FirebaseFirestore.DocumentData {
   // Same error for "missing" and "not yours": don't reveal which submissions exist.
   if (!snap.exists || snap.get('examOwnerId') !== uid) {
-    throw new HttpsError('not-found', 'Submission not found.');
+    throw new HttpsError('not-found', 'لم يُعثَر على الإجابات المطلوبة.');
   }
   return snap.data()!;
 }
@@ -174,7 +174,7 @@ function requireOwnedSubmission(
 function requireTextQuestion(questions: readonly Question[], questionId: string): TextQuestion {
   const question = questions.find((q) => q.id === questionId);
   if (!question || question.type !== 'TEXT') {
-    throw new HttpsError('invalid-argument', 'That question is not a written-answer question.');
+    throw new HttpsError('invalid-argument', 'هذا السؤال ليس سؤالًا مقاليًّا.');
   }
   return question;
 }

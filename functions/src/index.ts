@@ -36,18 +36,18 @@ const db = getFirestore();
 export const startSession = onCall<StartSessionRequest, Promise<StartSessionResponse>>(
   async (request) => {
     const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError('unauthenticated', 'Sign in before starting an exam.');
+    if (!uid) throw new HttpsError('unauthenticated', 'سجِّل الدخول قبل بدء الاختبار.');
 
     const code = normalizeAccessCode(String(request.data?.accessCode ?? ''));
-    if (!isValidAccessCode(code)) throw new HttpsError('invalid-argument', 'Invalid access code.');
+    if (!isValidAccessCode(code)) throw new HttpsError('invalid-argument', 'رمز الاختبار غير صالح.');
 
     const candidateName = String(request.data?.candidateName ?? '')
       .trim()
       .slice(0, LIMITS.maxCandidateNameLength);
-    if (!candidateName) throw new HttpsError('invalid-argument', 'A name is required.');
+    if (!candidateName) throw new HttpsError('invalid-argument', 'الاسم مطلوب.');
 
     const codeSnap = await db.collection(COLLECTIONS.accessCodes).doc(code).get();
-    if (!codeSnap.exists) throw new HttpsError('not-found', 'No exam uses this access code.');
+    if (!codeSnap.exists) throw new HttpsError('not-found', 'لا يوجد اختبار بهذا الرمز.');
     const examId = codeSnap.get('examId') as string;
 
     const examRef = db.collection(COLLECTIONS.exams).doc(examId);
@@ -66,16 +66,16 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
         return current;
       }
 
-      if (!examSnap.exists) throw new HttpsError('not-found', 'Exam no longer exists.');
+      if (!examSnap.exists) throw new HttpsError('not-found', 'لم يعد هذا الاختبار موجودًا.');
       const exam = examSnap.data()!;
       const opensAt = exam['window'].opensAt as Timestamp;
       const closesAt = exam['window'].closesAt as Timestamp;
 
       if (now.toMillis() < opensAt.toMillis()) {
-        throw new HttpsError('failed-precondition', 'This exam has not opened yet.');
+        throw new HttpsError('failed-precondition', 'لم يُتَح هذا الاختبار بعد.');
       }
       if (now.toMillis() >= closesAt.toMillis()) {
-        throw new HttpsError('failed-precondition', 'This exam window has closed.');
+        throw new HttpsError('failed-precondition', 'انتهت مدة إتاحة هذا الاختبار.');
       }
 
       // The exam window is a hard stop: a late starter gets less time, never more.

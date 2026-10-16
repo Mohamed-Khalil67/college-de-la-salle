@@ -1,6 +1,14 @@
 import { Component, inject, input, output, resource } from '@angular/core';
 import type { ChoiceQuestion, Submission } from '@exam/contracts';
 import { SubmissionReviewService } from '@exam/data-access-exams';
+import {
+  ArCountPipe,
+  ArNumberPipe,
+  ArScorePipe,
+  arabicErrorMessage,
+  BidiIsolate,
+  formatNumber,
+} from '@exam/ui-arabic';
 import { TextAnswerGrader } from './text-answer-grader';
 
 /**
@@ -10,29 +18,30 @@ import { TextAnswerGrader } from './text-answer-grader';
  */
 @Component({
   selector: 'exam-submission-review-panel',
-  imports: [TextAnswerGrader],
+  imports: [TextAnswerGrader, ArCountPipe, ArNumberPipe, ArScorePipe, BidiIsolate],
   template: `
     @let s = submission();
     <section class="panel review" aria-labelledby="review-title">
       <header>
         <div>
-          <p class="eyebrow">Review submission</p>
-          <h3 id="review-title">{{ s.candidateName }}</h3>
+          <p class="eyebrow">استعراض الإجابات</p>
+          <h3 id="review-title"><bdi>{{ s.candidateName }}</bdi></h3>
           <p class="muted">
             @if (s.gradingStatus === 'GRADED') {
-              Final score <strong>{{ s.score }} / {{ s.maxScore }}</strong>
+              الدرجة النهائية <strong>{{ s.score | arScore: s.maxScore }}</strong>
             } @else if (s.gradingStatus === 'NEEDS_REVIEW') {
-              Auto-graded {{ s.autoScore }} pts · {{ s.pendingReview.length }} written answer(s) to grade
+              الدرجة الآلية {{ s.autoScore | arNumber }} ·
+              {{ s.pendingReview.length | arCount: 'answer' }} مقالية بانتظار التصحيح
             } @else {
-              Automatic grading in progress…
+              جارٍ التصحيح الآلي…
             }
           </p>
         </div>
-        <button type="button" (click)="closed.emit()">Close</button>
+        <button type="button" (click)="closed.emit()">إغلاق</button>
       </header>
 
       @if (context.error(); as error) {
-        <p class="form-error" role="alert">Couldn't load exam content: {{ error.message }}</p>
+        <p class="form-error" role="alert">تعذَّر تحميل محتوى الاختبار: {{ errorText(error) }}</p>
       } @else if (context.value(); as ctx) {
         @for (q of ctx.paper.questions; track q.id; let i = $index) {
           @switch (q.type) {
@@ -40,7 +49,7 @@ import { TextAnswerGrader } from './text-answer-grader';
               <exam-text-answer-grader
                 [sessionId]="s.id"
                 [question]="q"
-                [label]="'Q' + (i + 1)"
+                [label]="questionLabel(i)"
                 [rubric]="ctx.key.rubrics[q.id]"
                 [answer]="asText(s.answers[q.id])"
                 [grade]="s.manualScores[q.id]"
@@ -51,14 +60,14 @@ import { TextAnswerGrader } from './text-answer-grader';
               @let given = s.answers[q.id];
               @let correct = ctx.key.answers[q.id];
               <div class="choice">
-                <h4>Q{{ i + 1 }} · multiple choice · {{ q.points }} pts</h4>
-                <p class="prompt">{{ q.prompt }}</p>
+                <h4>{{ questionLabel(i) }} · اختيار من متعدِّد · {{ q.points | arCount: 'point' }}</h4>
+                <p class="prompt exam-text" examIsolate>{{ q.prompt }}</p>
                 <p>
-                  Answered: <strong>{{ optionText(q, given) }}</strong>
+                  إجابة المُختبَر: <strong><bdi>{{ optionText(q, given) }}</bdi></strong>
                   @if (given === correct) {
-                    <span class="ok">✓ correct</span>
+                    <span class="ok">✓ صحيحة</span>
                   } @else {
-                    <span class="bad">✗ correct answer: {{ optionText(q, correct) }}</span>
+                    <span class="bad">✗ الإجابة الصحيحة: <bdi>{{ optionText(q, correct) }}</bdi></span>
                   }
                 </p>
               </div>
@@ -66,21 +75,20 @@ import { TextAnswerGrader } from './text-answer-grader';
           }
         }
       } @else {
-        <p class="muted" aria-busy="true">Loading questions…</p>
+        <p class="muted" aria-busy="true">جارٍ تحميل الأسئلة…</p>
       }
     </section>
   `,
   styles: `
     .review { display: grid; gap: 0.25rem; }
     .review header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
-    h3 { margin: 0.15rem 0; }
+    h3 { margin-block: 0.15rem; }
     header p { margin: 0; }
-    .choice { padding: 1rem 0; border-top: 1px solid var(--border); }
-    .choice h4 { margin: 0 0 0.25rem; font-size: 1rem; }
-    .choice p { margin: 0.25rem 0; }
-    .prompt { white-space: pre-wrap; }
-    .ok { color: var(--ok-strong); font-weight: 600; margin-left: 0.5rem; }
-    .bad { color: var(--danger); font-weight: 600; margin-left: 0.5rem; }
+    .choice { padding-block: 1rem; border-block-start: 1px solid var(--border); }
+    .choice h4 { margin-block: 0 0.25rem; font-family: var(--font-display); font-size: 1.15rem; color: var(--accent-strong); }
+    .choice p { margin-block: 0.25rem; }
+    .ok { color: var(--ok-strong); font-weight: 600; margin-inline-start: 0.5rem; }
+    .bad { color: var(--danger); font-weight: 600; margin-inline-start: 0.5rem; }
   `,
 })
 export class SubmissionReviewPanel {
@@ -95,11 +103,21 @@ export class SubmissionReviewPanel {
     loader: ({ params }) => this.#review.loadGradingContext(params),
   });
 
+  protected questionLabel(index: number): string {
+    return `السؤال ${formatNumber(index + 1)}`;
+  }
+
   protected asText(value: unknown): string {
     return typeof value === 'string' ? value : '';
   }
 
   protected optionText(q: ChoiceQuestion, index: unknown): string {
-    return typeof index === 'number' && q.options[index] !== undefined ? q.options[index] : '— no answer —';
+    return typeof index === 'number' && q.options[index] !== undefined
+      ? q.options[index]
+      : '— لم يُجِب —';
+  }
+
+  protected errorText(error: unknown): string {
+    return arabicErrorMessage(error);
   }
 }

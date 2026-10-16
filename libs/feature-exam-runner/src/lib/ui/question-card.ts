@@ -1,21 +1,26 @@
 import { Component, input, output } from '@angular/core';
 import type { ChoiceQuestion } from '@exam/contracts';
+import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
 
 export interface AnswerChange {
   readonly questionId: string;
   readonly option: number;
 }
 
+/** Abjad letters label options in Arabic exams: أ ب ج د هـ و ز ح. */
+const ABJAD = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح'];
+
 /** One multiple-choice question as a native radio group (keyboard + screen-reader friendly). */
 @Component({
   selector: 'exam-question-card',
+  imports: [ArNumberPipe, ArCountPipe, BidiIsolate],
   template: `
     <fieldset class="card" [disabled]="disabled()">
       <legend>
-        <span class="index">Question {{ index() + 1 }}</span>
-        <span class="points">{{ question().points }} pt{{ question().points === 1 ? '' : 's' }}</span>
+        <span class="index">السؤال {{ index() + 1 | arNumber }}</span>
+        <span class="points">{{ question().points | arCount: 'point' }}</span>
       </legend>
-      <p class="prompt">{{ question().prompt }}</p>
+      <p class="prompt exam-text" examIsolate>{{ question().prompt }}</p>
       <div class="options">
         @for (option of question().options; track $index) {
           <label class="option" [class.selected]="selected() === $index">
@@ -26,23 +31,30 @@ export interface AnswerChange {
               [checked]="selected() === $index"
               (change)="answered.emit({ questionId: question().id, option: $index })"
             />
-            <span>{{ option }}</span>
+            <span class="letter" aria-hidden="true">{{ abjad[$index] }}</span>
+            <span class="text" examIsolate>{{ option }}</span>
           </label>
         }
       </div>
     </fieldset>
   `,
   styles: `
-    .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin: 0; background: var(--surface); }
-    legend { display: flex; gap: 0.75rem; align-items: baseline; padding: 0 0.25rem; }
-    .index { font-weight: 600; }
-    .points { font-size: 0.8rem; color: var(--muted); }
-    .prompt { margin: 0.25rem 0 1rem; font-size: 1.05rem; white-space: pre-wrap; }
-    .options { display: grid; gap: 0.5rem; }
-    .option { display: flex; gap: 0.75rem; align-items: center; padding: 0.65rem 0.85rem; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); cursor: pointer; }
+    .card { border: 1px solid var(--border); border-radius: var(--radius); padding-block: 1.1rem 1.35rem; padding-inline: 1.35rem; margin: 0; background: var(--surface); }
+    legend { display: flex; gap: 0.75rem; align-items: baseline; padding-inline: 0.4rem; }
+    .index { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--accent-strong); }
+    .points { font-size: 0.85rem; color: var(--muted); }
+    .prompt { margin-block: 0.25rem 1rem; }
+    .options { display: grid; gap: 0.55rem; }
+    .option {
+      display: flex; gap: 0.75rem; align-items: center; font-weight: 400; font-size: 1.05rem;
+      padding-block: 0.6rem; padding-inline: 0.85rem; cursor: pointer;
+      border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px);
+    }
     .option.selected { border-color: var(--accent); background: var(--accent-soft); }
     .option:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
-    input { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; }
+    .letter { font-family: var(--font-display); font-weight: 700; color: var(--terracotta-strong); min-inline-size: 1.5em; text-align: center; }
+    .text { font-family: var(--font-text); line-height: var(--leading-text); flex: 1; }
+    input { accent-color: var(--accent); inline-size: 1.1rem; block-size: 1.1rem; margin: 0; }
   `,
 })
 export class QuestionCard {
@@ -51,4 +63,6 @@ export class QuestionCard {
   readonly selected = input<number | undefined>(undefined);
   readonly disabled = input(false);
   readonly answered = output<AnswerChange>();
+
+  protected readonly abjad = ABJAD;
 }

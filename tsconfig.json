@@ -18,6 +18,7 @@
        only — never each other, never deep paths. */
     "paths": {
       "@exam/contracts": ["./libs/contracts/src/index.ts"],
+      "@exam/ui-arabic": ["./libs/ui-arabic/src/index.ts"],
       "@exam/data-access-exams": ["./libs/data-access-exams/src/index.ts"],
       "@exam/feature-exam-creator": ["./libs/feature-exam-creator/src/index.ts"],
       "@exam/feature-exam-runner": ["./libs/feature-exam-runner/src/index.ts"],

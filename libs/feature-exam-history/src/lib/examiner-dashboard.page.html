@@ -1,22 +1,22 @@
 <header class="page-header">
   <div>
-    <p class="eyebrow">Examiner · {{ auth.displayName() }}</p>
-    <h1>Exams &amp; live results</h1>
+    <p class="eyebrow">المُمتحِن · <bdi>{{ auth.displayName() }}</bdi></p>
+    <h1>الاختبارات والنتائج المباشرة</h1>
   </div>
   <div class="header-actions">
-    <a class="button primary" routerLink="/examiner/new">New exam</a>
-    <button type="button" (click)="signOut()">Sign out</button>
+    <a class="button primary" routerLink="/examiner/new">اختبار جديد</a>
+    <button type="button" (click)="signOut()">تسجيل الخروج</button>
   </div>
 </header>
 
 @if (store.error(); as error) {
-  <p class="form-error" role="alert">Couldn't load data: {{ error.message }}</p>
+  <p class="form-error" role="alert">تعذَّر تحميل البيانات: {{ errorText(error) }}</p>
 }
 
 <div class="layout">
-  <nav class="exam-list" aria-label="Your exams">
+  <nav class="exam-list" aria-label="اختباراتك">
     @if (store.examsLoading() && store.exams().length === 0) {
-      <p class="muted" aria-busy="true">Loading exams…</p>
+      <p class="muted" aria-busy="true">جارٍ تحميل الاختبارات…</p>
     }
     @for (exam of store.exams(); track exam.id) {
       <button
@@ -25,17 +25,17 @@
         [attr.aria-current]="store.selectedExamId() === exam.id ? 'true' : null"
         (click)="store.selectedExamId.set(exam.id)"
       >
-        <span class="exam-name">{{ exam.title }}</span>
+        <span class="exam-name" examIsolate>{{ exam.title }}</span>
         <span class="exam-meta">
-          <code>{{ exam.accessCode }}</code> · {{ exam.durationSeconds / 60 }} min ·
-          {{ exam.questionCount }} q
+          <code class="ltr">{{ exam.accessCode }}</code> · {{ exam.durationSeconds / 60 | arCount: 'minute' }} ·
+          {{ exam.questionCount | arCount: 'question' }}
         </span>
       </button>
     } @empty {
       @if (!store.examsLoading()) {
         <div class="empty">
-          <p>No exams yet.</p>
-          <a routerLink="/examiner/new">Create your first exam</a>
+          <p>لم تُنشئ أيَّ اختبار بعد.</p>
+          <a routerLink="/examiner/new">أنشئ اختبارك الأول</a>
         </div>
       }
     }
@@ -45,72 +45,72 @@
     @if (store.selectedExam(); as exam) {
       <div class="panel exam-head">
         <div>
-          <h2>{{ exam.title }}</h2>
+          <h2 examIsolate>{{ exam.title }}</h2>
           <p class="muted">
-            Open {{ exam.window.opensAt | date: 'short' }} – {{ exam.window.closesAt | date: 'short' }}
-            · max score {{ exam.maxScore }}
+            مُتاح من {{ exam.window.opensAt | arDate: 'short' }} إلى {{ exam.window.closesAt | arDate: 'short' }}
+            · الدرجة العظمى {{ exam.maxScore | arCount: 'point' }}
           </p>
         </div>
         <div class="share">
-          <span class="label">Candidate link</span>
-          <code>{{ origin }}/take/{{ exam.accessCode }}</code>
+          <span class="label">رابط المُختبَرين</span>
+          <code class="ltr">{{ origin }}/take/{{ exam.accessCode }}</code>
         </div>
       </div>
 
       @let stats = store.stats();
       <dl class="stats">
-        <div class="panel"><dt>In progress</dt><dd>{{ stats.inProgress }}</dd></div>
-        <div class="panel"><dt>Needs review</dt><dd>{{ stats.needsReview }}</dd></div>
-        <div class="panel"><dt>Graded</dt><dd>{{ stats.graded }}</dd></div>
-        <div class="panel"><dt>Expired, no submission</dt><dd>{{ stats.expired }}</dd></div>
+        <div class="panel"><dt>قيد الأداء</dt><dd>{{ stats.inProgress | arNumber }}</dd></div>
+        <div class="panel"><dt>بانتظار التصحيح</dt><dd>{{ stats.needsReview | arNumber }}</dd></div>
+        <div class="panel"><dt>صُحِّحت</dt><dd>{{ stats.graded | arNumber }}</dd></div>
+        <div class="panel"><dt>انتهى وقتها دون تسليم</dt><dd>{{ stats.expired | arNumber }}</dd></div>
         <div class="panel">
-          <dt>Average score</dt>
-          <dd>{{ stats.averageScore === null ? '—' : (stats.averageScore | number: '1.0-1') + ' / ' + exam.maxScore }}</dd>
+          <dt>متوسط الدرجات</dt>
+          <dd>{{ stats.averageScore | arScore: exam.maxScore }}</dd>
         </div>
       </dl>
 
       <div class="panel table-wrap">
-        <table>
-          <caption class="visually-hidden">Candidates for {{ exam.title }}</caption>
+        <table data-testid="candidates">
+          <caption class="visually-hidden">المُختبَرون في <bdi>{{ exam.title }}</bdi></caption>
           <thead>
             <tr>
-              <th scope="col">Candidate</th>
-              <th scope="col">Status</th>
-              <th scope="col">Started</th>
-              <th scope="col">Time left</th>
-              <th scope="col">Score</th>
-              <th scope="col">Completed by</th>
-              <th scope="col">Tab switches</th>
-              <th scope="col"><span class="visually-hidden">Actions</span></th>
+              <th scope="col">المُختبَر</th>
+              <th scope="col">الحالة</th>
+              <th scope="col">وقت البدء</th>
+              <th scope="col">الوقت المتبقّي</th>
+              <th scope="col">الدرجة</th>
+              <th scope="col">طريقة التسليم</th>
+              <th scope="col">مرات المغادرة</th>
+              <th scope="col"><span class="visually-hidden">إجراءات</span></th>
             </tr>
           </thead>
           <tbody>
             @for (row of store.rows(); track row.sessionId) {
               <tr>
-                <th scope="row">{{ row.candidateName }}</th>
+                <th scope="row"><bdi data-testid="candidate-name">{{ row.candidateName }}</bdi></th>
                 <td><exam-status-badge [status]="row.status" /></td>
-                <td>{{ row.startedAt | date: 'mediumTime' }}</td>
-                <td class="mono">
-                  {{ row.status === 'IN_PROGRESS' ? formatRemaining(row.remainingMs) : '—' }}
+                <td>{{ row.startedAt | arDate: 'time' }}</td>
+                <td class="num">
+                  {{ row.status === 'IN_PROGRESS' ? (row.remainingMs | arClock) : '—' }}
                 </td>
-                <td class="mono">
+                <td class="num" data-testid="score">
                   @if (row.submission?.score !== null && row.submission?.score !== undefined) {
-                    <strong>{{ row.submission!.score }}</strong> / {{ row.submission!.maxScore }}
+                    <strong>{{ row.submission!.score | arScore: row.submission!.maxScore }}</strong>
                   } @else if (row.status === 'NEEDS_REVIEW') {
-                    {{ row.submission!.autoScore }} + ? / {{ row.submission!.maxScore }}
+                    {{ row.submission!.autoScore | arNumber }} + ؟ من {{ row.submission!.maxScore | arNumber }}
                   } @else {
                     —
                   }
                 </td>
                 <td>
                   @switch (row.submission?.completedBy) {
-                    @case ('CANDIDATE') { Candidate }
-                    @case ('AUTO_TIMER') { Timer }
-                    @case ('AUTO_INTEGRITY') { Integrity policy }
+                    @case ('CANDIDATE') { المُختبَر }
+                    @case ('AUTO_TIMER') { انتهاء الوقت }
+                    @case ('AUTO_INTEGRITY') { سياسة النزاهة }
                     @default { — }
                   }
                 </td>
-                <td class="mono">{{ row.submission?.integrity?.visibilityLossCount ?? '—' }}</td>
+                <td class="num">{{ row.submission?.integrity?.visibilityLossCount | arNumber }}</td>
                 <td>
                   @if (row.submission) {
                     <button
@@ -119,8 +119,8 @@
                       [attr.aria-pressed]="store.reviewingSessionId() === row.sessionId"
                       (click)="store.reviewingSessionId.set(row.sessionId)"
                     >
-                      {{ row.status === 'NEEDS_REVIEW' ? 'Grade' : 'Review' }}
-                      <span class="visually-hidden">{{ row.candidateName }}</span>
+                      {{ row.status === 'NEEDS_REVIEW' ? 'صحِّح' : 'استعراض' }}
+                      <span class="visually-hidden"><bdi>{{ row.candidateName }}</bdi></span>
                     </button>
                   }
                 </td>
@@ -128,7 +128,7 @@
             } @empty {
               <tr>
                 <td colspan="8" class="muted empty-row">
-                  Nobody has started yet. Share code <code>{{ exam.accessCode }}</code> — rows appear live.
+                  لم يبدأ أحدٌ بعد. شارِك الرمز <code class="ltr">{{ exam.accessCode }}</code>، وستظهر الصفوف فور بدء المُختبَرين.
                 </td>
               </tr>
             }

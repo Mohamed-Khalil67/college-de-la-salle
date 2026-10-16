@@ -1,12 +1,20 @@
+import { registerLocaleData } from '@angular/common';
+import localeAr from '@angular/common/locales/ar';
 import {
   ApplicationConfig,
+  LOCALE_ID,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding } from '@angular/router';
+import { provideRouter, TitleStrategy, withComponentInputBinding } from '@angular/router';
 import { provideFirebasePlatform } from '@exam/data-access-exams';
 import { environment } from '../environments/environment';
 import { routes } from './app.routes';
+import { ArabicTitleStrategy } from './shell/arabic-title.strategy';
+
+// Angular's own locale data (used by any built-in pipe or i18n API). App formatting itself goes
+// through the Intl-based helpers in @exam/ui-arabic.
+registerLocaleData(localeAr);
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -16,6 +24,8 @@ export const appConfig: ApplicationConfig = {
     // change detection is driven purely by signals.
     provideZonelessChangeDetection(),
     provideRouter(routes, withComponentInputBinding()),
+    { provide: TitleStrategy, useClass: ArabicTitleStrategy },
+    { provide: LOCALE_ID, useValue: 'ar' },
     provideFirebasePlatform(environment),
   ],
 };

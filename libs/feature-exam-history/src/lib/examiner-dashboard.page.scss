@@ -1,38 +1,43 @@
 :host { display: block; }
 
-.page-header { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.page-header { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; margin-block-end: 1.25rem; }
 .page-header h1 { margin: 0; }
 .header-actions { display: flex; gap: 0.5rem; }
 
 .layout { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 1.25rem; align-items: start; }
-@media (max-width: 52rem) { .layout { grid-template-columns: 1fr; } }
+@media (max-width: 52rem) { .layout { grid-template-columns: minmax(0, 1fr); } }
 
 .exam-list { display: grid; gap: 0.5rem; }
 .exam-item {
-  display: grid; gap: 0.2rem; text-align: left; width: 100%;
-  padding: 0.75rem 0.9rem; background: var(--surface); border: 1px solid var(--border);
+  display: grid; gap: 0.2rem; text-align: start; inline-size: 100%; justify-content: stretch; justify-items: start;
+  padding-block: 0.75rem; padding-inline: 0.9rem; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-weight: 400;
 }
 .exam-item[aria-current='true'] { border-color: var(--accent); background: var(--accent-soft); }
-.exam-name { font-weight: 600; }
-.exam-meta { font-size: 0.8rem; color: var(--muted); }
+.exam-name { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; color: var(--accent-strong); }
+.exam-meta { font-size: 0.85rem; color: var(--muted); }
 .empty { padding: 1rem; border: 1px dashed var(--border); border-radius: var(--radius); }
 
-.detail { display: grid; gap: 1rem; }
+/* min-inline-size: 0 lets the wide table scroll inside .table-wrap instead of widening the page. */
+.detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-inline-size: 0; }
 .exam-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.exam-head h2 { margin: 0 0 0.25rem; }
-.share .label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.exam-head h2 { margin-block: 0 0.25rem; }
+.share .label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 .share code { word-break: break-all; }
 
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; margin: 0; }
-.stats .panel { padding: 0.85rem 1rem; }
-.stats dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.stats dd { margin: 0.25rem 0 0; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stats .panel { padding-block: 0.85rem; padding-inline: 1rem; }
+.stats dt { font-size: 0.85rem; color: var(--muted); }
+.stats dd { margin-block: 0.25rem 0; font-size: 1.6rem; font-weight: 600; color: var(--accent-strong); font-variant-numeric: tabular-nums; }
 
-.table-wrap { padding: 0; overflow-x: auto; }
+/*
+ * position: relative makes this the containing block for the screen-reader-only labels in the
+ * cells; otherwise those absolutely-positioned spans escape the scroller and, in RTL, widen the page.
+ */
+.table-wrap { position: relative; padding: 0; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-th, td { padding: 0.65rem 0.9rem; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
-thead th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+th, td { padding-block: 0.65rem; padding-inline: 0.9rem; text-align: start; border-block-end: 1px solid var(--border); white-space: nowrap; }
+thead th { font-size: 0.85rem; color: var(--muted); font-weight: 600; background: var(--surface-2); }
 tbody th { font-weight: 600; }
-tbody tr:last-child > * { border-bottom: none; }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+tbody tr:last-child > * { border-block-end: none; }
+.num { font-variant-numeric: tabular-nums; }
 .empty-row { text-align: center; padding: 2rem; white-space: normal; }

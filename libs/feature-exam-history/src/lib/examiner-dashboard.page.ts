@@ -1,13 +1,32 @@
-import { DatePipe, DecimalPipe, DOCUMENT } from '@angular/common';
+import { DOCUMENT } from '@angular/common';
 import { Component, effect, inject, input, untracked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthStore, ExaminerDashboardStore } from '@exam/data-access-exams';
 import { SubmissionReviewPanel } from './review/submission-review-panel';
 import { StatusBadge } from './status-badge';
+import {
+  ArClockPipe,
+  ArCountPipe,
+  ArDatePipe,
+  ArNumberPipe,
+  ArScorePipe,
+  arabicErrorMessage,
+  BidiIsolate,
+} from '@exam/ui-arabic';
 
 @Component({
   selector: 'exam-examiner-dashboard-page',
-  imports: [RouterLink, DatePipe, DecimalPipe, StatusBadge, SubmissionReviewPanel],
+  imports: [
+    RouterLink,
+    StatusBadge,
+    SubmissionReviewPanel,
+    ArClockPipe,
+    ArCountPipe,
+    ArDatePipe,
+    ArNumberPipe,
+    ArScorePipe,
+    BidiIsolate,
+  ],
   providers: [ExaminerDashboardStore],
   templateUrl: './examiner-dashboard.page.html',
   styleUrl: './examiner-dashboard.page.scss',
@@ -33,8 +52,7 @@ export class ExaminerDashboardPage {
     await this.#router.navigateByUrl('/');
   }
 
-  protected formatRemaining(ms: number): string {
-    const total = Math.ceil(ms / 1000);
-    return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  protected errorText(error: unknown): string {
+    return arabicErrorMessage(error);
   }
 }

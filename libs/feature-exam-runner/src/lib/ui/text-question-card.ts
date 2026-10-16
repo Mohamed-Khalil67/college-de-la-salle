@@ -1,19 +1,23 @@
 import { Component, computed, input, output } from '@angular/core';
 import type { TextQuestion } from '@exam/contracts';
+import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
 
 /** One written-answer question: a labelled textarea with a live character budget. */
 @Component({
   selector: 'exam-text-question-card',
+  imports: [ArNumberPipe, ArCountPipe, BidiIsolate],
   template: `
     <div class="card" role="group" [attr.aria-labelledby]="'tq-label-' + question().id">
       <div class="head" [id]="'tq-label-' + question().id">
-        <span class="index">Question {{ index() + 1 }}</span>
-        <span class="points">{{ question().points }} pt{{ question().points === 1 ? '' : 's' }} · written answer</span>
+        <span class="index">السؤال {{ index() + 1 | arNumber }}</span>
+        <span class="points">{{ question().points | arCount: 'point' }} · إجابة مقالية</span>
       </div>
-      <label class="prompt" [for]="'tq-' + question().id">{{ question().prompt }}</label>
+      <label class="prompt exam-text" [for]="'tq-' + question().id" examIsolate>{{ question().prompt }}</label>
       <textarea
         [id]="'tq-' + question().id"
         rows="6"
+        dir="auto"
+        placeholder="اكتب إجابتك هنا…"
         [value]="value()"
         [attr.maxlength]="question().maxLength"
         [disabled]="disabled()"
@@ -22,18 +26,18 @@ import type { TextQuestion } from '@exam/contracts';
         (change)="typed.emit($any($event.target).value)"
       ></textarea>
       <p class="count" [id]="'tq-count-' + question().id" [class.near]="nearLimit()">
-        {{ value().length }} / {{ question().maxLength }} characters
+        {{ value().length | arNumber }} من {{ question().maxLength | arCount: 'character' }}
       </p>
     </div>
   `,
   styles: `
-    .card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; background: var(--surface); display: grid; gap: 0.5rem; }
+    .card { border: 1px solid var(--border); border-radius: var(--radius); padding-block: 1.1rem 1.35rem; padding-inline: 1.35rem; background: var(--surface); display: grid; gap: 0.5rem; }
     .head { display: flex; gap: 0.75rem; align-items: baseline; }
-    .index { font-weight: 600; }
-    .points { font-size: 0.8rem; color: var(--muted); }
-    .prompt { font-size: 1.05rem; font-weight: 400; white-space: pre-wrap; }
-    textarea { width: 100%; min-height: 8rem; line-height: 1.5; }
-    .count { margin: 0; font-size: 0.8rem; color: var(--muted); text-align: right; }
+    .index { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--accent-strong); }
+    .points { font-size: 0.85rem; color: var(--muted); }
+    .prompt { font-weight: 400; }
+    textarea { inline-size: 100%; min-block-size: 9rem; font-family: var(--font-text); font-size: 1.1rem; }
+    .count { margin: 0; font-size: 0.85rem; color: var(--muted); text-align: end; }
     .count.near { color: var(--warn-strong); font-weight: 600; }
   `,
 })

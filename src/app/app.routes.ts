@@ -4,12 +4,11 @@ import { examinerGuard } from './shell/examiner.guard';
 export const routes: Routes = [
   {
     path: '',
-    title: 'Exam Platform',
     loadComponent: () => import('./shell/home.page').then((m) => m.HomePage),
   },
   {
     path: 'sign-in',
-    title: 'Examiner sign-in',
+    title: 'دخول المُمتحِنين',
     loadComponent: () => import('./shell/sign-in.page').then((m) => m.SignInPage),
   },
   {

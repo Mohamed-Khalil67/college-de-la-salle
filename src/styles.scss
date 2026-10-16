@@ -1,100 +1,345 @@
-/* Design tokens. All colour pairs meet WCAG AA (≥ 4.5:1 for text). */
+/* =================================================================================================
+ * Theme: Andalusian zellige (ivory paper, teal, terracotta, gold; eight-pointed-star frieze, round
+ * gold medallions) with Naskh display lettering (Amiri) for titles.
+ *
+ * RTL rules for this codebase:
+ *  - Logical properties only: margin-inline, padding-block, inset-inline-start, border-inline-end,
+ *    text-align: start/end. Never left/right — `dir` decides the physical side.
+ *  - Never letter-spacing on Arabic text: it breaks the cursive joins between letters.
+ *  - Generous line-height: Arabic has tall ascenders plus tashkeel above and below the line.
+ * All text colour pairs meet WCAG AA (≥ 4.5:1).
+ * ================================================================================================= */
+
 :root {
   color-scheme: light dark;
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Typography */
+  --font-display: 'Amiri', 'Noto Naskh Arabic', serif; /* titles: classical Naskh, renders tashkeel beautifully */
+  --font-text: 'Noto Naskh Arabic', 'Amiri', serif; /* question text: highest legibility with diacritics */
+  --font-ui: 'IBM Plex Sans Arabic', system-ui, 'Segoe UI', Tahoma, sans-serif; /* controls & chrome */
+  --mono: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
+
+  --leading-ui: 1.75;
+  --leading-text: 2.15; /* room for fatha/kasra/shadda stacks without clipping */
+  --leading-display: 1.6;
+
   --radius: 10px;
 
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --surface-2: #eceef2;
-  --border: #d6dae1;
-  --text: #15181e;
-  --muted: #545b67;
-  --focus: #1d4ed8;
+  /* Andalusian palette — light */
+  --bg: #f7f1e3; /* ivory paper */
+  --surface: #fffcf4;
+  --surface-2: #f1e7d0;
+  --border: #dccba6;
+  --text: #2b2118;
+  --muted: #6b5440;
 
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
-  --accent-soft: #e8efff;
-  --ok: #15803d;
-  --ok-strong: #166534;
-  --ok-soft: #e3f6e9;
-  --warn: #b45309;
-  --warn-strong: #92400e;
-  --warn-soft: #fdf2df;
-  --danger: #b91c1c;
+  --accent: #0f5c5a; /* zellige teal */
+  --accent-strong: #0b4746;
+  --accent-soft: #e2eee9;
+  --terracotta: #a64a28;
+  --terracotta-strong: #8a3b1f;
+  --terracotta-soft: #f6e3d8;
+  --on-terracotta: #fff8ec;
+  --gold: #b8892f; /* ornament only — never text */
+  --gold-soft: #f1e2bd;
+
+  --ok: #2f6b3a;
+  --ok-strong: #24552d;
+  --ok-soft: #e3efdf;
+  --warn: #8a5a12;
+  --warn-strong: #6e470d;
+  --warn-soft: #f6ebcf;
+  --danger: #a12a1f;
+  --focus: #0f5c5a;
+
+  --frieze-bg: var(--accent);
+  --frieze-star: var(--gold);
+  --frieze-heart: var(--terracotta);
+
+  --page-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cg fill='none' stroke='%23B8892F' stroke-opacity='.18'%3E%3Cg transform='translate(36 36)'%3E%3Crect x='-12' y='-12' width='24' height='24'/%3E%3Crect x='-12' y='-12' width='24' height='24' transform='rotate(45)'/%3E%3Ccircle r='5'/%3E%3C/g%3E%3Cpath d='M0 36H19M53 36H72M36 0V19M36 53V72'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Same palette by night: ink-teal paper, gold leaf. */
+@mixin dark-theme {
+  --bg: #0f201f;
+  --surface: #162a28;
+  --surface-2: #1f3633;
+  --border: #35514b;
+  --text: #f1e8d4;
+  --muted: #c3b79d;
+
+  --accent: #6dbfb3;
+  --accent-strong: #9ad6cc;
+  --accent-soft: #1c3b37;
+  --terracotta: #e08a62;
+  --terracotta-strong: #f0a582;
+  --terracotta-soft: #3a2519;
+  --on-terracotta: #1b0f08;
+  --gold: #d4ae5a;
+  --gold-soft: #2b3324;
+
+  --ok: #7fd18c;
+  --ok-strong: #a6e3ae;
+  --ok-soft: #1a3320;
+  --warn: #e8c062;
+  --warn-strong: #f2d48a;
+  --warn-soft: #33291a;
+  --danger: #f08b7f;
+  --focus: #9ad6cc;
+
+  --frieze-bg: #123d3a;
+
+  --page-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cg fill='none' stroke='%23D4AE5A' stroke-opacity='.10'%3E%3Cg transform='translate(36 36)'%3E%3Crect x='-12' y='-12' width='24' height='24'/%3E%3Crect x='-12' y='-12' width='24' height='24' transform='rotate(45)'/%3E%3Ccircle r='5'/%3E%3C/g%3E%3Cpath d='M0 36H19M53 36H72M36 0V19M36 53V72'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1115;
-    --surface: #171a20;
-    --surface-2: #232730;
-    --border: #2f3541;
-    --text: #e9ecf1;
-    --muted: #a5adba;
-    --focus: #8ab4ff;
-
-    --accent: #6c9cff;
-    --accent-strong: #a8c4ff;
-    --accent-soft: #1b2741;
-    --ok: #4ade80;
-    --ok-strong: #86efac;
-    --ok-soft: #13291c;
-    --warn: #f59e0b;
-    --warn-strong: #fcd34d;
-    --warn-soft: #2e2310;
-    --danger: #f87171;
+  :root:not([data-theme='light']) {
+    @include dark-theme;
   }
 }
-
-*, *::before, *::after { box-sizing: border-box; }
-
-html, body { margin: 0; }
-body { font: 16px/1.5 var(--font); background: var(--bg); color: var(--text); }
-
-h1 { font-size: clamp(1.5rem, 3vw, 2rem); line-height: 1.2; letter-spacing: -0.015em; }
-h2 { font-size: 1.25rem; }
-a { color: var(--accent-strong); }
-code { font-family: var(--mono); }
-
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-
-input, textarea, select {
-  font: inherit; color: inherit; background: var(--surface);
-  border: 1px solid var(--border); border-radius: calc(var(--radius) - 3px); padding: 0.55rem 0.7rem;
-}
-input[aria-invalid='true'], .ng-invalid.ng-touched:not(form):not(fieldset) { border-color: var(--danger); }
-textarea { resize: vertical; }
-label { font-weight: 600; font-size: 0.92rem; }
-
-button, .button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
-  font: inherit; font-weight: 600; color: var(--text); text-decoration: none; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--border); border-radius: calc(var(--radius) - 3px);
-  padding: 0.55rem 1rem;
-}
-button:hover:not(:disabled), .button:hover { border-color: var(--accent); }
-button:disabled { opacity: 0.55; cursor: not-allowed; }
-button.primary, .button.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
-button.danger { color: var(--danger); }
-button.icon { padding: 0.35rem 0.6rem; }
-
-@media (prefers-color-scheme: dark) {
-  button.primary, .button.primary { background: var(--accent-strong); color: #0b1020; }
+:root[data-theme='dark'] {
+  @include dark-theme;
 }
 
-.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem 1.5rem; }
-.eyebrow { margin: 0; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-strong); }
-.muted { color: var(--muted); }
-.field-error { color: var(--danger); font-size: 0.85rem; min-height: 1.2em; margin: 0; }
-.form-error { color: var(--danger); font-weight: 600; }
+/* ------------------------------------------------------------------------------------------------
+ * Base
+ * ---------------------------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  font: 400 1rem / var(--leading-ui) var(--font-ui);
+  color: var(--text);
+  background-color: var(--bg);
+  background-image: var(--page-pattern);
+  background-attachment: fixed;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+  font-feature-settings: 'kern', 'liga', 'calt';
+  letter-spacing: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: var(--leading-display);
+  color: var(--accent-strong);
+  margin-block: 0.25rem 0.5rem;
+}
+h1 {
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+}
+h2 {
+  font-size: 1.55rem;
+}
+h3 {
+  font-size: 1.3rem;
+}
+h4 {
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.35em; /* clears descenders and kasra marks */
+}
+a:hover {
+  color: var(--accent-strong);
+}
+
+code,
+.code {
+  font-family: var(--mono);
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Bidi isolation (see libs/ui-arabic/src/lib/bidi-isolate.ts)
+ * ---------------------------------------------------------------------------------------------- */
+
+bdi,
+.isolate {
+  unicode-bidi: isolate;
+}
+.bidi-isolate {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+/* Latin-only identifiers (access codes, links) always read left-to-right. */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* User-authored exam text: Naskh face with diacritic-safe leading. */
+.exam-text {
+  font-family: var(--font-text);
+  font-size: 1.15rem;
+  line-height: var(--leading-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Controls
+ * ---------------------------------------------------------------------------------------------- */
+
+input,
+textarea,
+select {
+  max-inline-size: 100%; /* a long Arabic option label must never widen the page */
+  font: inherit;
+  line-height: var(--leading-ui);
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  padding-block: 0.5rem;
+  padding-inline: 0.75rem;
+}
+textarea {
+  resize: vertical;
+  line-height: var(--leading-text);
+}
+input[type='number'],
+input[type='datetime-local'] {
+  font-variant-numeric: tabular-nums;
+}
+input[aria-invalid='true'],
+.ng-invalid.ng-touched:not(form):not(fieldset):not(exam-field-errors) {
+  border-color: var(--danger);
+}
+label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--accent-strong);
+  text-decoration: none;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  padding-block: 0.5rem;
+  padding-inline: 1.1rem;
+}
+button:hover:not(:disabled),
+.button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+button.primary,
+.button.primary {
+  background: var(--terracotta);
+  border-color: var(--terracotta);
+  color: var(--on-terracotta);
+}
+button.primary:hover:not(:disabled),
+.button.primary:hover {
+  background: var(--terracotta-strong);
+  border-color: var(--terracotta-strong);
+  color: var(--on-terracotta);
+}
+button.danger {
+  color: var(--danger);
+}
+button.icon {
+  padding-block: 0.3rem;
+  padding-inline: 0.6rem;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Surfaces & helpers
+ * ---------------------------------------------------------------------------------------------- */
+
+/* Manuscript panel: solid paper with a gold inner frame. */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding-block: 1.25rem;
+  padding-inline: 1.5rem;
+  box-shadow:
+    inset 0 0 0 4px var(--surface),
+    inset 0 0 0 5px var(--gold-soft);
+}
+
+/* Section kicker preceded by the rub el hizb ornament (U+06DE). */
+.eyebrow {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--terracotta-strong);
+}
+.eyebrow::before {
+  content: '۞';
+  font-family: var(--font-display);
+  color: var(--gold);
+  margin-inline-end: 0.4em;
+}
+
+.muted {
+  color: var(--muted);
+}
+.hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+.field-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+  min-block-size: 1.4em;
+  margin: 0;
+}
+.form-error {
+  color: var(--danger);
+  font-weight: 600;
+}
 
 .visually-hidden {
-  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
-  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  position: absolute !important;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

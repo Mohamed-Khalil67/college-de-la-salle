@@ -1,55 +1,66 @@
 import { Component, computed, input } from '@angular/core';
+import { formatClock, formatCount } from '@exam/ui-arabic';
 
-/** Presentational countdown. Pure function of its inputs; knows nothing about time sources. */
+/**
+ * Presentational countdown: a round gold medallion whose ring drains as time passes. Pure
+ * function of its inputs; knows nothing about time sources. Digits come from the central Arabic
+ * formatter, which wraps the clock in an LTR isolate so "٠٤:٥٧" never renders as "٥٧:٠٤".
+ */
 @Component({
   selector: 'exam-countdown',
   template: `
-    <div class="countdown" [class.warn]="warn()" [class.critical]="critical()">
-      <span class="label">Time left</span>
-      <span class="clock" role="timer" aria-live="off">{{ display() }}</span>
-      <div
-        class="bar"
-        role="progressbar"
-        aria-label="Time remaining"
-        [attr.aria-valuenow]="percent()"
-        aria-valuemin="0"
-        aria-valuemax="100"
-      >
-        <div class="fill" [style.width.%]="percent()"></div>
+    <div
+      class="ring"
+      [class.warn]="warn()"
+      [class.critical]="critical()"
+      [style.--p]="percent()"
+      role="progressbar"
+      aria-label="نسبة الوقت المتبقّي"
+      [attr.aria-valuenow]="percent()"
+      aria-valuemin="0"
+      aria-valuemax="100"
+    >
+      <div class="medallion">
+        <span class="label">الوقت المتبقّي</span>
+        <span class="clock" role="timer" aria-live="off" data-testid="clock">{{ display() }}</span>
       </div>
-      <!-- Screen readers get an announcement once per minute, not every tick. -->
-      <span class="visually-hidden" aria-live="polite">{{ announcement() }}</span>
     </div>
+    <!-- Screen readers hear one announcement per minute, not every tick. -->
+    <span class="visually-hidden" aria-live="polite">{{ announcement() }}</span>
   `,
   styles: `
-    .countdown { display: grid; gap: 0.25rem; min-width: 10rem; }
-    .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-    .clock { font: 600 1.75rem/1 var(--mono); font-variant-numeric: tabular-nums; }
-    .bar { height: 0.375rem; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-    .fill { height: 100%; background: var(--accent); transition: width 250ms linear; }
-    .warn .fill { background: var(--warn); }
+    :host { display: block; }
+    .ring {
+      --ring: var(--accent);
+      inline-size: 7.5rem; block-size: 7.5rem; border-radius: 50%; padding: 5px;
+      /* Starts at the top and drains toward the reading start. */
+      background: conic-gradient(var(--ring) calc(var(--p) * 1%), var(--gold-soft) 0);
+      transition: background 250ms linear;
+    }
+    .medallion {
+      inline-size: 100%; block-size: 100%; border-radius: 50%;
+      display: grid; place-content: center; text-align: center;
+      background: var(--surface); border: 1.5px solid var(--gold);
+    }
+    .label { font-size: 0.75rem; color: var(--muted); }
+    .clock { font: 600 1.6rem/1.3 var(--font-ui); font-variant-numeric: tabular-nums; color: var(--terracotta-strong); }
+    .warn { --ring: var(--warn); }
+    .critical { --ring: var(--danger); }
     .critical .clock { color: var(--danger); }
-    .critical .fill { background: var(--danger); }
   `,
 })
 export class Countdown {
   readonly remainingMs = input.required<number>();
   readonly totalMs = input.required<number>();
 
-  protected readonly display = computed(() => {
-    const total = Math.ceil(this.remainingMs() / 1000);
-    const m = Math.floor(total / 60);
-    const s = total % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  });
+  protected readonly display = computed(() => formatClock(this.remainingMs()));
   protected readonly percent = computed(() =>
     this.totalMs() > 0 ? Math.round((this.remainingMs() / this.totalMs()) * 100) : 0,
   );
   protected readonly warn = computed(() => this.remainingMs() <= 60_000);
   protected readonly critical = computed(() => this.remainingMs() <= 15_000);
   protected readonly announcement = computed(() => {
-    const minutes = Math.ceil(this.remainingMs() / 60_000);
-    if (this.remainingMs() <= 15_000) return 'Less than 15 seconds remaining';
-    return `${minutes} minute${minutes === 1 ? '' : 's'} remaining`;
+    if (this.remainingMs() <= 15_000) return 'تبقّى أقلّ من خمس عشرة ثانية';
+    return `تبقّى ${formatCount(Math.ceil(this.remainingMs() / 60_000), 'minute')}`;
   });
 }

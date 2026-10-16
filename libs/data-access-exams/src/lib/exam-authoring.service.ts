@@ -65,7 +65,7 @@ export class ExamAuthoringService {
    */
   async createExam(input: NewExamInput): Promise<CreatedExam> {
     const ownerId = this.#auth.uid();
-    if (!ownerId || !this.#auth.isExaminer()) throw new Error('Sign in as an examiner first.');
+    if (!ownerId || !this.#auth.isExaminer()) throw new Error('سجِّل الدخول بوصفك مُمتحِنًا أولًا.');
 
     // Split the authored questions by audience: the paper (candidates) never sees answers or
     // rubrics; those go to the owner-only answer key document.

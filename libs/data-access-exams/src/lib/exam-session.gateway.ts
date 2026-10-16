@@ -53,7 +53,7 @@ export class ExamSessionGateway {
   async loadPaper(examId: string): Promise<ExamPaper> {
     const ref = doc(this.#db, COLLECTIONS.exams, examId, COLLECTIONS.paper, PAPER_DOC_ID);
     const snap = await getDocFromServer(ref.withConverter(examPaperConverter));
-    if (!snap.exists()) throw new Error('The question paper is unavailable.');
+    if (!snap.exists()) throw new Error('ورقة الأسئلة غير متاحة.');
     return snap.data();
   }
 

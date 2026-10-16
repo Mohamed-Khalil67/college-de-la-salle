@@ -13,10 +13,11 @@ import {
   toNewExamInput,
 } from './exam-form.model';
 import { FieldErrors } from './field-errors';
+import { ArCountPipe, ArNumberPipe, arabicErrorMessage } from '@exam/ui-arabic';
 
 @Component({
   selector: 'exam-creator-page',
-  imports: [FormField, FormRoot, RouterLink, FieldErrors],
+  imports: [FormField, FormRoot, RouterLink, FieldErrors, ArCountPipe, ArNumberPipe],
   templateUrl: './exam-creator.page.html',
   styleUrl: './exam-creator.page.scss',
 })
@@ -31,6 +32,7 @@ export class ExamCreatorPage {
   protected readonly attempted = signal(false);
   protected readonly saveError = signal<string | null>(null);
   protected readonly created = signal<CreatedExam | null>(null);
+  protected readonly copied = signal(false);
 
   protected readonly totalPoints = computed(() =>
     this.model().questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0),
@@ -48,7 +50,7 @@ export class ExamCreatorPage {
       try {
         this.created.set(await this.#authoring.createExam(toNewExamInput(this.model())));
       } catch (error) {
-        this.saveError.set(error instanceof Error ? error.message : 'Could not save the exam.');
+        this.saveError.set(arabicErrorMessage(error));
       }
       return undefined;
     });
@@ -84,12 +86,14 @@ export class ExamCreatorPage {
 
   protected startOver(): void {
     this.created.set(null);
+    this.copied.set(false);
     this.attempted.set(false);
     this.model.set(initialExamModel(Date.now()));
   }
 
   protected async copyLink(): Promise<void> {
     await navigator.clipboard?.writeText(this.shareUrl());
+    this.copied.set(true);
   }
 
   #updateQuestions(fn: (qs: QuestionModel[]) => QuestionModel[]): void {

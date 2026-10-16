@@ -36,7 +36,7 @@ export class SubmissionReviewService {
       getDoc(doc(examRef, COLLECTIONS.paper, PAPER_DOC_ID).withConverter(examPaperConverter)),
       getDoc(doc(examRef, COLLECTIONS.private, ANSWER_KEY_DOC_ID).withConverter(answerKeyConverter)),
     ]);
-    if (!paperSnap.exists() || !keySnap.exists()) throw new Error('Exam content is missing.');
+    if (!paperSnap.exists() || !keySnap.exists()) throw new Error('محتوى الاختبار غير موجود.');
     return { paper: paperSnap.data(), key: keySnap.data() };
   }
 

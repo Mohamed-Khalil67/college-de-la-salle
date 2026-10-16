@@ -156,7 +156,7 @@ export function transition(state: RunnerState, event: RunnerEvent): RunnerState 
             return {
               phase: 'EXPIRED',
               session: ctx.session,
-              message: 'Time ran out before your answers could be recorded.',
+              message: 'انتهى الوقت قبل أن تُسجَّل إجاباتك.',
             };
           }
           // Still inside the window: back to ACTIVE. If we are in the auto-submit lead zone the
@@ -258,7 +258,7 @@ function closedSession(session: ExamSession): RunnerState {
   return {
     phase: 'EXPIRED',
     session,
-    message: 'This exam session has already closed.',
+    message: 'أُغلِقت جلسة هذا الاختبار من قبل.',
   };
 }
 

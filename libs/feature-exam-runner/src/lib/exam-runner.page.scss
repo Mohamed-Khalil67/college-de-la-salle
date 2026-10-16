@@ -1,23 +1,28 @@
-:host { display: block; max-width: 48rem; margin: 0 auto; }
+:host { display: block; max-inline-size: 50rem; margin-inline: auto; }
 
-.lobby h1 { margin: 0.25rem 0 0.5rem; }
+.lobby h1 { margin-block: 0.25rem 0.5rem; }
 .description { color: var(--muted); }
-.facts { display: flex; flex-wrap: wrap; gap: 1.5rem; margin: 1.25rem 0; }
-.facts dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
-.facts dd { margin: 0; font-weight: 600; }
-.rules { padding-left: 1.1rem; color: var(--muted); line-height: 1.6; }
-.start-form { display: grid; gap: 0.4rem; margin-top: 1.5rem; max-width: 24rem; }
+.facts { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-block: 1.25rem; padding-block: 0.75rem; border-block: 1px solid var(--border); }
+.facts dt { font-size: 0.85rem; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; color: var(--accent-strong); }
+.rules { padding-inline-start: 1.25rem; color: var(--muted); }
+.rules li::marker { color: var(--gold); }
+.start-form { display: grid; gap: 0.4rem; margin-block-start: 1.5rem; max-inline-size: 26rem; }
 
 .exam-bar {
-  position: sticky; top: 0; z-index: 1;
+  position: sticky; inset-block-start: 0; z-index: 1;
   display: flex; justify-content: space-between; align-items: center; gap: 1rem;
-  padding: 1rem 0; background: var(--bg); border-bottom: 1px solid var(--border);
+  padding-block: 1rem; background: var(--bg); border-block-end: 1px solid var(--border);
 }
-.exam-title { margin: 0; font-size: 1.25rem; }
-.progress { margin: 0.2rem 0 0; color: var(--muted); font-size: 0.9rem; }
+.exam-title { margin: 0; font-size: 1.5rem; }
+.progress { margin: 0; color: var(--muted); font-size: 0.95rem; }
 
-.integrity { margin: 1rem 0 0; padding: 0.6rem 0.9rem; border-radius: var(--radius); background: var(--warn-soft); }
-.questions { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; gap: 1rem; }
-.submit-bar { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding-bottom: 3rem; }
-.submit-bar p { margin: 0; margin-right: auto; }
-.done h1 { color: var(--ok); }
+.integrity {
+  margin-block-start: 1rem; padding-block: 0.6rem; padding-inline: 0.9rem;
+  border-radius: var(--radius); background: var(--warn-soft); color: var(--warn-strong);
+}
+.questions { list-style: none; padding: 0; margin-block: 1.5rem; display: grid; gap: 1rem; }
+.submit-bar { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding-block-end: 3rem; }
+.submit-bar p { margin: 0; margin-inline-end: auto; }
+.done { text-align: center; }
+.done h1 { color: var(--ok-strong); }

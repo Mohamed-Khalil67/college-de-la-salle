@@ -1,8 +1,8 @@
-import { DatePipe } from '@angular/common';
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { form, FormField, FormRoot, maxLength, required, submit } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
 import { LIMITS } from '@exam/contracts';
+import { ArCountPipe, ArDatePipe, ArNumberPipe, BidiIsolate, Star } from '@exam/ui-arabic';
 import { ExamRunnerStore } from './exam-runner.store';
 import { Countdown } from './ui/countdown';
 import { QuestionCard } from './ui/question-card';
@@ -10,7 +10,19 @@ import { TextQuestionCard } from './ui/text-question-card';
 
 @Component({
   selector: 'exam-runner-page',
-  imports: [Countdown, QuestionCard, TextQuestionCard, DatePipe, FormField, FormRoot, RouterLink],
+  imports: [
+    Countdown,
+    QuestionCard,
+    TextQuestionCard,
+    FormField,
+    FormRoot,
+    RouterLink,
+    ArCountPipe,
+    ArDatePipe,
+    ArNumberPipe,
+    BidiIsolate,
+    Star,
+  ],
   providers: [ExamRunnerStore],
   templateUrl: './exam-runner.page.html',
   styleUrl: './exam-runner.page.scss',
@@ -24,8 +36,8 @@ export class ExamRunnerPage {
 
   protected readonly candidate = signal({ name: '' });
   protected readonly candidateForm = form(this.candidate, (p) => {
-    required(p.name, { message: 'Enter your name so the examiner can identify you.' });
-    maxLength(p.name, LIMITS.maxCandidateNameLength);
+    required(p.name, { message: 'أدخِل اسمك ليتعرَّف عليك المُمتحِن.' });
+    maxLength(p.name, LIMITS.maxCandidateNameLength, { message: 'الاسم أطول من المسموح.' });
   });
 
   constructor() {

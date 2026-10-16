@@ -3,41 +3,43 @@
 @switch (state.phase) {
   @case ('LOADING') {
     <section class="panel" aria-busy="true">
-      <p>Looking up exam <code>{{ code() }}</code>…</p>
+      <p>جارٍ البحث عن الاختبار ذي الرمز <code class="ltr">{{ code() }}</code>…</p>
     </section>
   }
 
   @case ('FAILED') {
     <section class="panel" role="alert">
-      <h1>Can't open this exam</h1>
+      <h1>تعذَّر فتح الاختبار</h1>
       <p>{{ state.message }}</p>
-      <a routerLink="/">Try another code</a>
+      <a routerLink="/">جرِّب رمزًا آخر</a>
     </section>
   }
 
   @case ('LOBBY') {
     <section class="panel lobby">
-      <p class="eyebrow">Exam lobby · code <code>{{ state.lobby.code }}</code></p>
-      <h1>{{ state.lobby.title }}</h1>
+      <p class="eyebrow">قاعة الانتظار · الرمز <code class="ltr">{{ state.lobby.code }}</code></p>
+      <h1 examIsolate>{{ state.lobby.title }}</h1>
       @if (state.lobby.description) {
-        <p class="description">{{ state.lobby.description }}</p>
+        <p class="description exam-text" examIsolate>{{ state.lobby.description }}</p>
       }
       <dl class="facts">
-        <div><dt>Duration</dt><dd>{{ state.lobby.durationSeconds / 60 }} min</dd></div>
-        <div><dt>Questions</dt><dd>{{ state.lobby.questionCount }}</dd></div>
-        <div><dt>Closes</dt><dd>{{ state.lobby.window.closesAt | date: 'medium' }}</dd></div>
+        <div><dt>المدة</dt><dd>{{ state.lobby.durationSeconds / 60 | arCount: 'minute' }}</dd></div>
+        <div><dt>عدد الأسئلة</dt><dd>{{ state.lobby.questionCount | arCount: 'question' }}</dd></div>
+        <div><dt>يُغلَق في</dt><dd>{{ state.lobby.window.closesAt | arDate: 'datetime' }}</dd></div>
       </dl>
       <ul class="rules">
-        <li>The timer starts on the server the moment you press <strong>Start</strong> and cannot be paused.</li>
-        <li>Your answers are submitted automatically when time runs out.</li>
-        <li>Leaving this tab is recorded and may end the exam early.</li>
+        <li>يبدأ التوقيت على الخادم لحظة الضغط على <strong>«ابدأ الاختبار»</strong>، ولا يمكن إيقافه مؤقتًا.</li>
+        <li>تُسلَّم إجاباتك تلقائيًّا عند انتهاء الوقت.</li>
+        <li>تُسجَّل مغادرتك لصفحة الاختبار، وقد تؤدّي إلى إنهائه مبكرًا.</li>
       </ul>
 
       <form [formRoot]="candidateForm" (submit)="start($event)" class="start-form">
-        <label for="candidate-name">Your full name</label>
+        <label for="candidate-name">اسمك الكامل</label>
         <input
           id="candidate-name"
           autocomplete="name"
+          dir="auto"
+          placeholder="محمد عادل"
           [formField]="candidateForm.name"
           [attr.aria-invalid]="candidateForm.name().touched() && candidateForm.name().invalid()"
           aria-describedby="candidate-name-error"
@@ -45,44 +47,45 @@
         <p id="candidate-name-error" class="field-error" aria-live="polite">
           @if (candidateForm.name().touched()) {
             @for (error of candidateForm.name().errors(); track error.kind) {
-              {{ error.message ?? 'Invalid value' }}
+              {{ error.message ?? 'قيمة غير صالحة.' }}
             }
           }
         </p>
         @if (state.error) {
           <p class="form-error" role="alert">{{ state.error }}</p>
         }
-        <button type="submit" class="primary">Start exam</button>
+        <button type="submit" class="primary">ابدأ الاختبار</button>
       </form>
     </section>
   }
 
   @case ('STARTING') {
     <section class="panel" aria-busy="true">
-      <p>Starting your session on the server…</p>
+      <p>جارٍ بدء جلستك على الخادم…</p>
     </section>
   }
 
   @case ('SUBMITTED') {
     <section class="panel done" role="status">
-      <h1>Answers received</h1>
+      <exam-star [size]="30" />
+      <h1>تسلَّمنا إجاباتك</h1>
       <p>
-        Your submission for <strong>{{ state.session.examTitle }}</strong> was recorded by the server.
+        سجَّل الخادم إجاباتك في اختبار <strong><bdi>{{ state.session.examTitle }}</bdi></strong>.
         @if (state.reason === 'AUTO_TIMER') {
-          Time ran out, so it was submitted automatically.
+          انتهى الوقت فسُلِّمت الإجابات تلقائيًّا.
         } @else if (state.reason === 'AUTO_INTEGRITY') {
-          It was submitted automatically after you left the exam tab too many times.
+          سُلِّمت الإجابات تلقائيًّا لتكرار مغادرتك صفحة الاختبار.
         }
       </p>
-      <p>You can close this tab.</p>
+      <p class="muted">يمكنك إغلاق هذه الصفحة الآن.</p>
     </section>
   }
 
   @case ('EXPIRED') {
     <section class="panel" role="alert">
-      <h1>Exam closed</h1>
+      <h1>أُغلِق الاختبار</h1>
       <p>{{ state.message }}</p>
-      <p class="muted">Session ended {{ state.session.expiresAt | date: 'medium' }}.</p>
+      <p class="muted">انتهت الجلسة في {{ state.session.expiresAt | arDate: 'datetime' }}.</p>
     </section>
   }
 
@@ -90,23 +93,25 @@
     @if (store.active(); as ctx) {
       <header class="exam-bar">
         <div>
-          <p class="eyebrow">{{ ctx.session.candidateName }}</p>
-          <h1 class="exam-title">{{ ctx.session.examTitle }}</h1>
-          <p class="progress">{{ store.answeredCount() }} / {{ ctx.paper.questions.length }} answered</p>
+          <p class="eyebrow"><bdi>{{ ctx.session.candidateName }}</bdi></p>
+          <h1 class="exam-title" examIsolate>{{ ctx.session.examTitle }}</h1>
+          <p class="progress" data-testid="progress">
+            الأسئلة المُجاب عنها: {{ store.answeredCount() | arNumber }} من {{ ctx.paper.questions.length | arNumber }}
+          </p>
         </div>
         <exam-countdown [remainingMs]="store.remainingMs()" [totalMs]="store.totalMs()" />
       </header>
 
       @if (ctx.integrity.visibilityLossCount > 0) {
         <p class="integrity" role="status">
-          You left this tab {{ ctx.integrity.visibilityLossCount }} time(s).
+          غادرتَ صفحة الاختبار {{ ctx.integrity.visibilityLossCount | arCount: 'time' }}.
           @if (ctx.session.integrity.maxVisibilityLosses !== null) {
-            The exam auto-submits after {{ ctx.session.integrity.maxVisibilityLosses }}.
+            يُسلَّم الاختبار تلقائيًّا بعد تجاوز {{ ctx.session.integrity.maxVisibilityLosses | arCount: 'time' }}.
           }
         </p>
       }
       @if (ctx.lastError) {
-        <p class="form-error" role="alert">Submission failed: {{ ctx.lastError }}</p>
+        <p class="form-error" role="alert">تعذَّر التسليم: {{ ctx.lastError }}</p>
       }
 
       <ol class="questions">
@@ -138,14 +143,14 @@
 
       <footer class="submit-bar">
         @if (state.phase === 'SUBMITTING') {
-          <p aria-live="polite">Submitting…</p>
+          <p aria-live="polite">جارٍ التسليم…</p>
         } @else {
           @if (confirmingSubmit()) {
-            <p>Submit now? You can't change answers afterwards.</p>
-            <button type="button" (click)="confirmingSubmit.set(false)">Keep working</button>
+            <p>هل تريد التسليم الآن؟ لن تتمكَّن من تعديل إجاباتك بعد ذلك.</p>
+            <button type="button" (click)="confirmingSubmit.set(false)">متابعة الحلّ</button>
           }
           <button type="button" class="primary" (click)="requestSubmit()">
-            {{ confirmingSubmit() ? 'Yes, submit' : 'Submit answers' }}
+            {{ confirmingSubmit() ? 'نعم، سلِّم الآن' : 'تسليم الإجابات' }}
           </button>
         }
       </footer>

@@ -2,6 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import type { QuestionId } from '@exam/contracts';
 import { ExamSessionGateway, ServerClock } from '@exam/data-access-exams';
+import { arabicErrorMessage } from '@exam/ui-arabic';
 import {
   type ActiveContext,
   initialRunnerState,
@@ -73,7 +74,7 @@ export class ExamRunnerStore {
       this.dispatch(
         lobby
           ? { type: 'LOBBY_LOADED', lobby }
-          : { type: 'LOBBY_FAILED', message: 'No exam matches this access code.' },
+          : { type: 'LOBBY_FAILED', message: 'لا يوجد اختبار بهذا الرمز. تحقَّق منه ثم أعد المحاولة.' },
       );
     } catch (error) {
       this.dispatch({ type: 'LOBBY_FAILED', message: describe(error) });
@@ -218,8 +219,5 @@ export class ExamRunnerStore {
 }
 
 function describe(error: unknown): string {
-  if (error && typeof error === 'object' && 'message' in error) {
-    return String((error as { message: unknown }).message);
-  }
-  return 'Something went wrong. Please try again.';
+  return arabicErrorMessage(error);
 }

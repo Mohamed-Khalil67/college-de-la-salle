@@ -38,7 +38,7 @@ export class AuthStore {
     onAuthStateChanged(this.#auth, (user) => this.#user.set(user));
     // Completes a redirect sign-in (no-op otherwise) and surfaces its failure.
     getRedirectResult(this.#auth).catch((error: unknown) =>
-      this.#redirectError.set(error instanceof Error ? error.message : 'Sign-in failed.'),
+      this.#redirectError.set('تعذَّر إتمام تسجيل الدخول. أعد المحاولة.'),
     );
   }
 
@@ -68,7 +68,7 @@ export class AuthStore {
    * the platform is configured for emulators, so it can never work against production.
    */
   async signInExaminerOnEmulator(email: string): Promise<void> {
-    if (!this.emulatorSignInAvailable) throw new Error('Emulator sign-in is disabled.');
+    if (!this.emulatorSignInAvailable) throw new Error('الدخول عبر المحاكي معطَّل في هذه البيئة.');
     const fakeIdToken = JSON.stringify({ sub: email, email, email_verified: true, name: email });
     await signInWithCredential(this.#auth, GoogleAuthProvider.credential(fakeIdToken));
   }

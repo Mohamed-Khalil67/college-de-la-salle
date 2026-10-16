@@ -20,7 +20,10 @@ export const AI_GRADE_JSON_SCHEMA = {
   type: 'object',
   properties: {
     points: { type: 'number', description: 'Points awarded, in half-point steps.' },
-    rationale: { type: 'string', description: 'Two to four sentences, addressed to the examiner.' },
+    rationale: {
+      type: 'string',
+      description: 'Two to four sentences in Modern Standard Arabic, addressed to the examiner.',
+    },
   },
   required: ['points', 'rationale'],
 } as const;
@@ -34,6 +37,7 @@ const SYSTEM = [
   'Award points in half-point steps between 0 and the maximum. An empty or off-topic answer scores 0.',
   'Respond only with JSON: {"points": number, "rationale": string}. The rationale is for the',
   'examiner: name what the answer got right and what it missed, in at most four sentences.',
+  'Write the rationale in clear Modern Standard Arabic (العربية الفصحى), whatever the answer language.',
 ].join('\n');
 
 export function buildAiGradePrompt(
@@ -64,13 +68,13 @@ export function parseAiGrade(raw: string, maxPoints: number): ParsedAiGrade {
   try {
     data = JSON.parse(stripCodeFence(raw));
   } catch {
-    throw new Error('The AI grader returned malformed output.');
+    throw new Error('أعاد مُصحِّح الذكاء الاصطناعي ردًّا غير صالح.');
   }
-  if (!data || typeof data !== 'object') throw new Error('The AI grader returned no grade.');
+  if (!data || typeof data !== 'object') throw new Error('لم يُعِد مُصحِّح الذكاء الاصطناعي أيَّ درجة.');
   const { points, rationale } = data as Record<string, unknown>;
   const numeric = typeof points === 'string' ? Number(points) : points;
   if (typeof numeric !== 'number' || !Number.isFinite(numeric)) {
-    throw new Error('The AI grader returned no numeric score.');
+    throw new Error('لم يُعِد مُصحِّح الذكاء الاصطناعي درجةً رقمية.');
   }
   return {
     points: Math.min(maxPoints, Math.max(0, Math.round(numeric * 2) / 2)),

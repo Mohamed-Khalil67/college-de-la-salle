@@ -11,7 +11,7 @@ import type { FieldTree } from '@angular/forms/signals';
   template: `
     @if (visible()) {
       @for (error of field()().errors(); track $index) {
-        <span>{{ error.message ?? 'Invalid value.' }}</span>
+        <span>{{ error.message ?? 'قيمة غير صالحة.' }}</span>
       }
     }
   `,

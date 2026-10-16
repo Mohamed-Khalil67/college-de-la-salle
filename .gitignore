@@ -53,3 +53,8 @@ functions/src/contracts/
 functions/node_modules/
 functions/.env.local
 functions/.secret.local
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/

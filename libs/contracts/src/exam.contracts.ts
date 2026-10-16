@@ -221,6 +221,9 @@ export interface Submission extends SubmissionDraft {
   readonly gradedAt: EpochMillis | null;
 }
 
+/** Spec name for the candidate's response document (`submissions/{sessionId}`). */
+export type ExamSubmission = Submission;
+
 /** Fields only the server may write onto a submission. */
 export const SERVER_ONLY_SUBMISSION_FIELDS = [
   'gradingStatus',
