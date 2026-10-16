@@ -5,6 +5,7 @@ import {
   COLLECTIONS,
   type ExamWindow,
   type IntegrityPolicy,
+  type ScoringPolicy,
   LIMITS,
   PAPER_DOC_ID,
   type Question,
@@ -43,6 +44,7 @@ export interface NewExamInput {
   readonly durationSeconds: number;
   readonly window: ExamWindow;
   readonly integrity: IntegrityPolicy;
+  readonly scoring: ScoringPolicy;
   readonly questions: readonly NewQuestionInput[];
 }
 
@@ -101,6 +103,8 @@ export class ExamAuthoringService {
         window,
         accessCode,
         integrity: input.integrity,
+        scoring: input.scoring,
+        resultsPublished: false,
         questionCount: questions.length,
         maxScore,
         createdAt: serverTimestamp(),

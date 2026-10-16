@@ -7,7 +7,7 @@ import {
   schema,
   validate,
 } from '@angular/forms/signals';
-import { LIMITS, type QuestionType } from '@exam/contracts';
+import { LIMITS, type QuestionType, type ResultRelease } from '@exam/contracts';
 import { formatCount } from '@exam/ui-arabic';
 import type { NewExamInput } from '@exam/data-access-exams';
 
@@ -37,6 +37,9 @@ export interface ExamFormModel {
   closesAt: string;
   /** `null` = record tab switches but never auto-submit. */
   maxVisibilityLosses: number | null;
+  /** Minimum percentage to pass; `null` = score only, no pass/fail verdict. */
+  passPercent: number | null;
+  resultRelease: ResultRelease;
   questions: QuestionModel[];
 }
 
@@ -62,6 +65,8 @@ export function initialExamModel(nowMs: number): ExamFormModel {
     opensAt: toLocalInput(nowMs),
     closesAt: toLocalInput(nowMs + 24 * 60 * 60 * 1000),
     maxVisibilityLosses: 3,
+    passPercent: 50,
+    resultRelease: 'ON_GRADED',
     questions: [blankQuestion()],
   };
 }
@@ -88,6 +93,9 @@ export const examFormSchema = schema<ExamFormModel>((p) => {
 
   min(p.maxVisibilityLosses, 0, { message: 'لا يمكن أن يكون العدد سالبًا.' });
   max(p.maxVisibilityLosses, 50, { message: 'الحدّ الأقصى ٥٠ مرة.' });
+
+  min(p.passPercent, 0, { message: 'لا يمكن أن تكون درجة النجاح سالبة.' });
+  max(p.passPercent, 100, { message: 'درجة النجاح نسبة مئوية لا تتجاوز ١٠٠.' });
 
   validate(p.questions, ({ value }) => {
     if (value().length === 0) return { kind: 'minQuestions', message: 'أضِف سؤالًا واحدًا على الأقل.' };
@@ -144,6 +152,7 @@ export function toNewExamInput(model: ExamFormModel): NewExamInput {
     durationSeconds: (model.durationMinutes ?? 0) * 60,
     window: { opensAt: fromLocalInput(model.opensAt), closesAt: fromLocalInput(model.closesAt) },
     integrity: { maxVisibilityLosses: model.maxVisibilityLosses },
+    scoring: { passPercent: model.passPercent, resultRelease: model.resultRelease },
     questions: model.questions.map((q) =>
       q.type === 'TEXT'
         ? {

@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { form, FormField, FormRoot, maxLength, required, submit } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
@@ -7,6 +8,8 @@ import { ExamRunnerStore } from './exam-runner.store';
 import { Countdown } from './ui/countdown';
 import { QuestionCard } from './ui/question-card';
 import { TextQuestionCard } from './ui/text-question-card';
+import { QuestionNavigator } from './ui/question-navigator';
+import { ResultCard } from './ui/result-card';
 
 @Component({
   selector: 'exam-runner-page',
@@ -14,6 +17,8 @@ import { TextQuestionCard } from './ui/text-question-card';
     Countdown,
     QuestionCard,
     TextQuestionCard,
+    QuestionNavigator,
+    ResultCard,
     FormField,
     FormRoot,
     RouterLink,
@@ -33,6 +38,7 @@ export class ExamRunnerPage {
 
   protected readonly store = inject(ExamRunnerStore);
   protected readonly confirmingSubmit = signal(false);
+  readonly #document = inject(DOCUMENT);
 
   protected readonly candidate = signal({ name: '' });
   protected readonly candidateForm = form(this.candidate, (p) => {
@@ -62,5 +68,19 @@ export class ExamRunnerPage {
     } else {
       this.confirmingSubmit.set(true);
     }
+  }
+
+  /** Scrolls to a question and moves keyboard focus into it (sticky header accounted for in CSS). */
+  protected jumpTo(questionId: string): void {
+    const item = this.#document.getElementById(`q-${questionId}`);
+    if (!item) return;
+    item.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const control = item.querySelector<HTMLElement>('input, textarea') ?? item;
+    control.focus({ preventScroll: true });
+  }
+
+  protected jumpToNumber(questionNumber: number): void {
+    const question = this.store.active()?.paper.questions[questionNumber - 1];
+    if (question) this.jumpTo(question.id);
   }
 }

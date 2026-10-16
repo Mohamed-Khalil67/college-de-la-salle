@@ -7,6 +7,8 @@ import {
   type ExamPaper,
   type GradeTextAnswerRequest,
   type GradeTextAnswerResponse,
+  type PublishResultsRequest,
+  type PublishResultsResponse,
   PAPER_DOC_ID,
   type SuggestTextGradeRequest,
 } from '@exam/contracts';
@@ -55,5 +57,14 @@ export class SubmissionReviewService {
       { timeout: 70_000 },
     );
     return (await call(request)).data;
+  }
+
+  /** Releases results to candidates for an exam with manual release. */
+  async publishResults(examId: string): Promise<PublishResultsResponse> {
+    const call = httpsCallable<PublishResultsRequest, PublishResultsResponse>(
+      this.#functions,
+      'publishResults',
+    );
+    return (await call({ examId })).data;
   }
 }

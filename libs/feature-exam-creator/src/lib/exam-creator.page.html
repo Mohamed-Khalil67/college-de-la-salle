@@ -64,6 +64,26 @@
       </div>
 
       <div class="field">
+        <label for="pass">درجة النجاح (نسبة مئوية)</label>
+        <exam-number-input
+          inputId="pass"
+          describedBy="pass-hint pass-errors"
+          placeholder="بلا درجة نجاح"
+          [formField]="examForm.passPercent"
+        />
+        <p id="pass-hint" class="hint">اتركه فارغًا لعرض الدرجة دون حكمٍ بالنجاح أو الرسوب.</p>
+        <exam-field-errors id="pass-errors" [field]="examForm.passPercent" [force]="attempted()" />
+      </div>
+
+      <div class="field">
+        <label for="release">إظهار النتيجة للمُختبَر</label>
+        <select id="release" [formField]="examForm.resultRelease" aria-describedby="release-hint">
+          <option value="ON_GRADED">فور اكتمال التصحيح</option>
+          <option value="MANUAL">عندما أنشر النتائج يدويًّا</option>
+        </select>
+        <p id="release-hint" class="hint">لا يرى المُختبَر درجته قبل ذلك؛ إذ يمنع الخادم الاطّلاع عليها.</p>
+      </div>
+      <div class="field">
         <span class="label" id="opens-label">يُتاح من</span>
         <exam-datetime-input labelId="opens-label" [formField]="examForm.opensAt" />
         <exam-field-errors id="opens-errors" [field]="examForm.opensAt" [force]="attempted()" />

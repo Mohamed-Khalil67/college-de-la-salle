@@ -1,15 +1,23 @@
 import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
 import {
   COLLECTIONS,
+  countAnswered,
   type EpochMillis,
+  type ExamDraft,
   type ExamMeta,
   type ExamSession,
   type Submission,
+  toPercent,
 } from '@exam/contracts';
 import { collection, query, where } from 'firebase/firestore';
 import { AuthStore } from './auth.store';
 import { FIRESTORE } from './firebase.providers';
-import { examMetaConverter, sessionConverter, submissionConverter } from './firestore-converters';
+import {
+  draftRowConverter,
+  examMetaConverter,
+  sessionConverter,
+  submissionConverter,
+} from './firestore-converters';
 import { firestoreQueryResource } from './firestore-resource';
 import { injectServerNow } from './server-clock';
 
@@ -23,6 +31,11 @@ export interface CandidateRow {
   readonly expiresAt: EpochMillis;
   readonly remainingMs: number;
   readonly submission: Submission | null;
+  /** Live answered count from the autosaved draft (in-progress candidates). */
+  readonly answeredCount: number | null;
+  /** Against the exam's pass mark; 
+ull while ungraded or when there is no pass mark. */
+  readonly passed: boolean | null;
 }
 
 /**
@@ -83,9 +96,24 @@ export class ExaminerDashboardStore {
       ),
   });
 
+  readonly #drafts = firestoreQueryResource<ExamDraft & { id: string }, { uid: string; examId: string }>({
+    params: () => this.#scope(),
+    query: ({ uid, examId }) =>
+      query(
+        collection(this.#db, COLLECTIONS.drafts).withConverter(draftRowConverter),
+        where('examOwnerId', '==', uid),
+        where('examId', '==', examId),
+      ),
+  });
+
   readonly examsLoading = this.#exams.isLoading;
   readonly error = computed(
-    () => this.#exams.error() ?? this.#sessions.error() ?? this.#submissions.error() ?? null,
+    () =>
+      this.#exams.error() ??
+      this.#sessions.error() ??
+      this.#submissions.error() ??
+      this.#drafts.error() ??
+      null,
   );
 
   /** Submission open in the review panel. */
@@ -101,9 +129,16 @@ export class ExaminerDashboardStore {
   readonly rows = computed<readonly CandidateRow[]>(() => {
     const now = this.#now();
     const submissions = new Map(this.#submissions.value().map((s) => [s.id, s]));
+    const drafts = new Map(this.#drafts.value().map((d) => [d.id, d]));
+    const passPercent = this.selectedExam()?.scoring.passPercent ?? null;
     return this.#sessions
       .value()
-      .map((session) => toRow(session, submissions.get(session.id) ?? null, now))
+      .map((session) =>
+        toRow(session, submissions.get(session.id) ?? null, now, {
+          draft: drafts.get(session.id) ?? null,
+          passPercent,
+        }),
+      )
       .sort((a, b) => b.startedAt - a.startedAt);
   });
 
@@ -119,6 +154,10 @@ export class ExaminerDashboardStore {
       graded: graded.length,
       expired: rows.filter((r) => r.status === 'EXPIRED').length,
       averageScore: avg,
+      passed: graded.filter((r) => r.passed === true).length,
+      passRate: graded.some((r) => r.passed !== null)
+        ? Math.round((graded.filter((r) => r.passed).length / graded.length) * 100)
+        : null,
     };
   });
 }
@@ -128,6 +167,7 @@ export function toRow(
   session: ExamSession,
   submission: Submission | null,
   now: EpochMillis,
+  extras: { draft?: ExamDraft | null; passPercent?: number | null } = {},
 ): CandidateRow {
   let status: CandidateRowStatus;
   if (submission) {
@@ -150,5 +190,10 @@ export function toRow(
     expiresAt: session.expiresAt,
     remainingMs: Math.max(0, session.expiresAt - now),
     submission,
+    answeredCount: extras.draft ? countAnswered(extras.draft.answers) : null,
+    passed:
+      status === 'GRADED' && extras.passPercent != null && submission?.score != null
+        ? toPercent(submission.score, submission.maxScore ?? 0) >= extras.passPercent
+        : null,
   };
 }

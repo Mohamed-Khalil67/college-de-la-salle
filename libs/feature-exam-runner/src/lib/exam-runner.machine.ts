@@ -37,6 +37,8 @@ export interface ActiveContext {
   readonly session: ExamSession;
   readonly paper: ExamPaper;
   readonly answers: Readonly<Record<QuestionId, AnswerValue>>;
+  /** Questions the candidate marked to revisit, in paper order. */
+  readonly flagged: readonly QuestionId[];
   readonly now: EpochMillis;
   readonly integrity: IntegrityTracker;
   readonly lastError: string | null;
@@ -69,10 +71,12 @@ export type RunnerEvent =
       readonly paper: ExamPaper;
       readonly now: EpochMillis;
       readonly restoredAnswers: Readonly<Record<QuestionId, unknown>>;
+      readonly restoredFlags?: readonly QuestionId[];
     }
   | { readonly type: 'SESSION_CLOSED'; readonly session: ExamSession }
   | { readonly type: 'ANSWER_SELECTED'; readonly questionId: QuestionId; readonly option: number }
   | { readonly type: 'ANSWER_TYPED'; readonly questionId: QuestionId; readonly text: string }
+  | { readonly type: 'FLAG_TOGGLED'; readonly questionId: QuestionId }
   | { readonly type: 'TICK'; readonly now: EpochMillis }
   | { readonly type: 'VISIBILITY_CHANGED'; readonly hidden: boolean; readonly now: EpochMillis }
   | { readonly type: 'SUBMIT_REQUESTED' }
@@ -105,6 +109,7 @@ export function transition(state: RunnerState, event: RunnerEvent): RunnerState 
               session: event.session,
               paper: event.paper,
               answers: sanitizeAnswers(event.restoredAnswers, event.paper),
+              flagged: sanitizeFlags(event.restoredFlags ?? [], event.paper),
               now: event.now,
               integrity: { visibilityLossCount: 0, hiddenMs: 0, hiddenSince: null },
               lastError: null,
@@ -129,6 +134,16 @@ export function transition(state: RunnerState, event: RunnerEvent): RunnerState 
           const question = ctx.paper.questions.find((q) => q.id === event.questionId);
           if (question?.type !== 'TEXT') return state;
           return withAnswer(state.ctx, event.questionId, event.text.slice(0, question.maxLength));
+        }
+        case 'FLAG_TOGGLED': {
+          if (!ctx.paper.questions.some((q) => q.id === event.questionId)) return state;
+          const set = new Set(ctx.flagged);
+          if (set.has(event.questionId)) set.delete(event.questionId);
+          else set.add(event.questionId);
+          return {
+            phase: 'ACTIVE',
+            ctx: { ...ctx, flagged: sanitizeFlags([...set], ctx.paper) },
+          };
         }
         case 'TICK':
           return guardDeadline({ phase: 'ACTIVE', ctx: { ...ctx, now: event.now } });
@@ -283,7 +298,8 @@ function sanitizeAnswers(
   return clean;
 }
 
-/** A question counts as answered once it has an option or non-blank text. */
-export function isAnswered(value: AnswerValue | undefined): boolean {
-  return typeof value === 'number' || (typeof value === 'string' && value.trim().length > 0);
+/** Keeps only flags for questions on the paper, in paper order, without duplicates. */
+function sanitizeFlags(flags: readonly QuestionId[], paper: ExamPaper): QuestionId[] {
+  const wanted = new Set(flags);
+  return paper.questions.filter((q) => wanted.has(q.id)).map((q) => q.id);
 }

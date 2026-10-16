@@ -1,16 +1,18 @@
 import { Component, computed, input, output } from '@angular/core';
 import type { TextQuestion } from '@exam/contracts';
 import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
+import { FlagToggle } from './flag-toggle';
 
 /** One written-answer question: a labelled textarea with a live character budget. */
 @Component({
   selector: 'exam-text-question-card',
-  imports: [ArNumberPipe, ArCountPipe, BidiIsolate],
+  imports: [ArNumberPipe, ArCountPipe, BidiIsolate, FlagToggle],
   template: `
     <div class="card" role="group" [attr.aria-labelledby]="'tq-label-' + question().id">
       <div class="head" [id]="'tq-label-' + question().id">
         <span class="index">السؤال {{ index() + 1 | arNumber }}</span>
         <span class="points">{{ question().points | arCount: 'point' }} · إجابة مقالية</span>
+        <exam-flag-toggle class="flag" [flagged]="flagged()" [disabled]="disabled()" (toggled)="flagToggled.emit()" />
       </div>
       <label class="prompt exam-text" [for]="'tq-' + question().id" examIsolate>{{ question().prompt }}</label>
       <textarea
@@ -32,7 +34,8 @@ import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
   `,
   styles: `
     .card { border: 1px solid var(--border); border-radius: var(--radius); padding-block: 1.1rem 1.35rem; padding-inline: 1.35rem; background: var(--surface); display: grid; gap: 0.5rem; }
-    .head { display: flex; gap: 0.75rem; align-items: baseline; }
+    .head { display: flex; gap: 0.75rem; align-items: baseline; flex-wrap: wrap; }
+    .flag { margin-inline-start: auto; }
     .index { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--accent-strong); }
     .points { font-size: 0.85rem; color: var(--muted); }
     .prompt { font-weight: 400; }
@@ -47,6 +50,8 @@ export class TextQuestionCard {
   readonly value = input('');
   readonly disabled = input(false);
   readonly typed = output<string>();
+  readonly flagged = input(false);
+  readonly flagToggled = output<void>();
 
   protected readonly nearLimit = computed(
     () => this.value().length >= this.question().maxLength * 0.9,

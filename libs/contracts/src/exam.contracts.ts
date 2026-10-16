@@ -70,6 +70,19 @@ export interface IntegrityPolicy {
   readonly maxVisibilityLosses: number | null;
 }
 
+/**
+ * When a candidate may see their result.
+ *  - `ON_GRADED`: as soon as grading is complete (immediately for auto-graded exams).
+ *  - `MANUAL`: only after the examiner presses "publish results".
+ */
+export type ResultRelease = 'ON_GRADED' | 'MANUAL';
+
+export interface ScoringPolicy {
+  /** Minimum percentage (0–100) to pass. `null` = no pass/fail verdict, score only. */
+  readonly passPercent: number | null;
+  readonly resultRelease: ResultRelease;
+}
+
 export interface ExamDefinition {
   readonly id: string;
   readonly ownerId: Uid;
@@ -79,6 +92,7 @@ export interface ExamDefinition {
   readonly window: ExamWindow;
   readonly accessCode: string;
   readonly integrity: IntegrityPolicy;
+  readonly scoring: ScoringPolicy;
   readonly questions: readonly Question[];
   readonly answerKey: AnswerKey;
   readonly rubrics: TextRubrics;
@@ -93,11 +107,15 @@ export interface ExamDefinition {
  *   exams/{examId}/paper/current      ExamPaperDoc    owner + candidate holding a LIVE session
  *   exams/{examId}/private/answerKey  AnswerKeyDoc    owner only (and the grader, via Admin SDK)
  *   accessCodes/{code}                AccessCodeDoc   any signed-in user, by exact code (no list)
+ *   drafts/{sessionId}                ExamDraft       candidate (write until expiry) + owner (read)
+ *   results/{sessionId}               ExamResult      written by the server only once released
  */
 
 export type ExamMeta = Omit<ExamDefinition, 'questions' | 'answerKey' | 'rubrics'> & {
   readonly questionCount: number;
   readonly maxScore: number;
+  /** For MANUAL release: set by the publishResults callable. */
+  readonly resultsPublished: boolean;
 };
 
 export interface ExamPaper {
@@ -149,7 +167,11 @@ export interface ExamSession {
  * Submission — created once by the candidate before `expiresAt`; graded by the server.
  * ---------------------------------------------------------------------------------------------- */
 
-export type CompletionReason = 'CANDIDATE' | 'AUTO_TIMER' | 'AUTO_INTEGRITY';
+/**
+ * SERVER_DRAFT: the candidate's device never submitted (crash, lost network, closed lid); the
+ * server finalised their last autosaved draft when the session expired.
+ */
+export type CompletionReason = 'CANDIDATE' | 'AUTO_TIMER' | 'AUTO_INTEGRITY' | 'SERVER_DRAFT';
 
 export interface IntegrityReport {
   readonly visibilityLossCount: number;
@@ -221,6 +243,52 @@ export interface Submission extends SubmissionDraft {
   readonly gradedAt: EpochMillis | null;
 }
 
+/* ------------------------------------------------------------------------------------------------
+ * ExamDraft — server-side autosave, written by the candidate while the session is live.
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface ExamDraft {
+  readonly examId: string;
+  readonly candidateId: Uid;
+  readonly examOwnerId: Uid;
+  readonly answers: Readonly<Record<QuestionId, AnswerValue>>;
+  readonly flagged: readonly QuestionId[];
+  readonly integrity: IntegrityReport;
+  /** Server time of the last save (`request.time`). */
+  readonly updatedAt: EpochMillis;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * ExamResult — what the candidate is allowed to see, written only by the server and only once the
+ * examiner's release policy allows it. Submissions themselves are hidden from candidates once
+ * graded, so a score can never leak before release.
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface WrittenFeedback {
+  readonly questionNumber: number;
+  readonly points: number;
+  readonly maxPoints: number;
+  readonly feedback: string;
+}
+
+export interface ExamResult {
+  readonly sessionId: string;
+  readonly examId: string;
+  readonly examOwnerId: Uid;
+  readonly examTitle: string;
+  readonly candidateId: Uid;
+  readonly candidateName: string;
+  readonly score: number;
+  readonly maxScore: number;
+  /** 0–100, one decimal. */
+  readonly percent: number;
+  readonly passPercent: number | null;
+  /** `null` when the exam has no pass mark. */
+  readonly passed: boolean | null;
+  readonly feedback: readonly WrittenFeedback[];
+  readonly publishedAt: EpochMillis;
+}
+
 /** Spec name for the candidate's response document (`submissions/{sessionId}`). */
 export type ExamSubmission = Submission;
 
@@ -266,6 +334,15 @@ export interface GradeTextAnswerResponse {
   readonly score: number | null;
 }
 
+/** Examiner-only. Publishes results of every graded submission of an exam (`MANUAL` release). */
+export interface PublishResultsRequest {
+  readonly examId: string;
+}
+
+export interface PublishResultsResponse {
+  readonly published: number;
+}
+
 /** Examiner-only. Asks the AI grader for a suggestion; stores and returns it, changes no score. */
 export interface SuggestTextGradeRequest {
   readonly sessionId: string;
@@ -283,6 +360,8 @@ export const COLLECTIONS = {
   accessCodes: 'accessCodes',
   sessions: 'sessions',
   submissions: 'submissions',
+  drafts: 'drafts',
+  results: 'results',
 } as const;
 
 export const PAPER_DOC_ID = 'current';

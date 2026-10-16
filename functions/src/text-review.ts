@@ -11,6 +11,8 @@ import {
   finalizeScore,
   type GradeTextAnswerRequest,
   type GradeTextAnswerResponse,
+  type PublishResultsRequest,
+  type PublishResultsResponse,
   isValidManualPoints,
   LIMITS,
   PAPER_DOC_ID,
@@ -20,6 +22,7 @@ import {
   type TextRubric,
 } from './contracts';
 import { readQuestions } from './exam-reads';
+import { examForResults, writeResultIfReleased } from './lifecycle';
 
 /*
  * Written-answer review. Both callables are examiner-only and verify ownership server-side:
@@ -52,7 +55,10 @@ export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextA
         throw new HttpsError('failed-precondition', 'لم يكتمل التصحيح الآلي بعد.');
       }
 
-      const paperSnap = await tx.get(paperRef(submission['examId']));
+      const [paperSnap, examSnap] = await Promise.all([
+        tx.get(paperRef(submission['examId'])),
+        tx.get(db.collection(COLLECTIONS.exams).doc(submission['examId'])),
+      ]);
       const questions = readQuestions(paperSnap);
       const question = requireTextQuestion(questions, questionId);
 
@@ -70,13 +76,23 @@ export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextA
       };
       const totals = finalizeScore(questions, submission['autoScore'] ?? 0, manualScores);
 
-      tx.update(submissionRef, {
-        [`manualScores.${questionId}`]: manualScores[questionId],
+      const update = {
         pendingReview: totals.pendingReview,
         gradingStatus: totals.gradingStatus,
         score: totals.score,
         gradedAt: totals.gradingStatus === 'GRADED' ? FieldValue.serverTimestamp() : null,
-      });
+      };
+      tx.update(submissionRef, { [`manualScores.${questionId}`]: manualScores[questionId], ...update });
+      // Final grade (or a re-grade of an already released result): refresh what the candidate sees.
+      if (examSnap.exists) {
+        writeResultIfReleased(
+          tx,
+          sessionId,
+          { ...submission, ...update, manualScores },
+          examForResults(examSnap.data()!),
+          questions,
+        );
+      }
 
       logger.info('grade.manual', { sessionId, questionId, points, status: totals.gradingStatus });
       return { gradingStatus: totals.gradingStatus, score: totals.score };
@@ -131,6 +147,47 @@ export const suggestTextGrade = onCall<SuggestTextGradeRequest, Promise<AiSugges
   },
 );
 
+/* ---------------------------------------------------------------------------------------------- */
+
+/**
+ * Examiner-only. Marks an exam's results as published and writes a result for every graded
+ * submission. Submissions graded later are published as they complete (see writeResultIfReleased).
+ */
+export const publishResults = onCall<PublishResultsRequest, Promise<PublishResultsResponse>>(
+  async (request) => {
+    const uid = requireExaminer(request);
+    const examId = String(request.data?.examId ?? '');
+    if (!examId || examId.includes('/')) throw new HttpsError('invalid-argument', 'معرِّف الاختبار غير صالح.');
+    const db = getFirestore();
+    const examRef = db.collection(COLLECTIONS.exams).doc(examId);
+
+    const examSnap = await examRef.get();
+    if (!examSnap.exists || examSnap.get('ownerId') !== uid) {
+      throw new HttpsError('not-found', 'لم يُعثَر على الاختبار.');
+    }
+    const [paperSnap, graded] = await Promise.all([
+      paperRef(examId).get(),
+      db
+        .collection(COLLECTIONS.submissions)
+        .where('examOwnerId', '==', uid)
+        .where('examId', '==', examId)
+        .where('gradingStatus', '==', 'GRADED')
+        .get(),
+    ]);
+    const questions = readQuestions(paperSnap);
+    const exam = { ...examForResults(examSnap.data()!), resultsPublished: true };
+
+    const batch = db.batch();
+    batch.update(examRef, { resultsPublished: true });
+    let published = 0;
+    for (const sub of graded.docs) {
+      if (writeResultIfReleased(batch, sub.id, sub.data(), exam, questions)) published++;
+    }
+    await batch.commit();
+    logger.info('results.published', { examId, published });
+    return { published };
+  },
+);
 /* ---------------------------------------------------------------------------------------------- */
 
 function selectGrader(): TextGrader {

@@ -5,6 +5,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { readQuestions } from './exam-reads';
+import { examForResults, finalizeExpiredSession, writeResultIfReleased } from './lifecycle';
 import {
   ANSWER_KEY_DOC_ID,
   COLLECTIONS,
@@ -60,8 +61,9 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
       if (existing.exists) {
         const current = toSession(existing.id, existing.data()!);
         if (current.status === 'ACTIVE' && current.expiresAt <= now.toMillis()) {
-          tx.update(sessionRef, { status: 'EXPIRED' satisfies ExamSessionStatus });
-          return { ...current, status: 'EXPIRED' as const };
+          // The device never submitted: close the session, finalising the autosaved draft if any.
+          const status = await finalizeExpiredSession(tx, sessionRef, existing.data()!);
+          return { ...current, status };
         }
         return current;
       }
@@ -119,11 +121,12 @@ export const gradeSubmission = onDocumentCreated(
     if (submission['gradingStatus']) return;
 
     const examRef = db.collection(COLLECTIONS.exams).doc(submission['examId'] as string);
-    const [paperSnap, keySnap] = await Promise.all([
+    const [examSnap, paperSnap, keySnap] = await Promise.all([
+      examRef.get(),
       examRef.collection(COLLECTIONS.paper).doc(PAPER_DOC_ID).get(),
       examRef.collection(COLLECTIONS.private).doc(ANSWER_KEY_DOC_ID).get(),
     ]);
-    if (!paperSnap.exists || !keySnap.exists) {
+    if (!examSnap.exists || !paperSnap.exists || !keySnap.exists) {
       logger.error('grade.missing-exam', { sessionId: event.params.sessionId });
       return;
     }
@@ -137,8 +140,7 @@ export const gradeSubmission = onDocumentCreated(
     // Exams without written questions are final immediately; others wait for the examiner.
     const totals = finalizeScore(questions, result.score, {});
 
-    const batch = db.batch();
-    batch.update(snap.ref, {
+    const grading = {
       autoScore: result.score,
       maxScore: result.maxScore,
       correctCount: result.correctCount,
@@ -148,7 +150,17 @@ export const gradeSubmission = onDocumentCreated(
       gradingStatus: totals.gradingStatus,
       score: totals.score,
       gradedAt: totals.gradingStatus === 'GRADED' ? FieldValue.serverTimestamp() : null,
-    });
+    };
+    const batch = db.batch();
+    batch.update(snap.ref, grading);
+    // Auto-graded exams with ON_GRADED release: the candidate sees the result immediately.
+    writeResultIfReleased(
+      batch,
+      event.params.sessionId,
+      { ...submission, ...grading },
+      examForResults(examSnap.data()!),
+      questions,
+    );
     batch.update(db.collection(COLLECTIONS.sessions).doc(event.params.sessionId), {
       status: 'SUBMITTED' satisfies ExamSessionStatus,
       submittedAt: submission['submittedAt'],
@@ -159,11 +171,11 @@ export const gradeSubmission = onDocumentCreated(
 );
 
 /* ---------------------------------------------------------------------------------------------- */
-/* sweepExpiredSessions — closes out sessions whose candidates vanished without submitting.        */
-/* (Correctness never depends on this: rules already reject late writes. It keeps status honest.)  */
+/* sweepExpiredSessions — closes out sessions whose candidates vanished without submitting, turning */
+/* their last autosaved draft into a submission. Rules already reject late client writes.         */
 /* ---------------------------------------------------------------------------------------------- */
 
-export { gradeTextAnswer, suggestTextGrade } from './text-review';
+export { gradeTextAnswer, publishResults, suggestTextGrade } from './text-review';
 
 export const sweepExpiredSessions = onSchedule('every 5 minutes', async () => {
   const expired = await db
@@ -173,13 +185,16 @@ export const sweepExpiredSessions = onSchedule('every 5 minutes', async () => {
     .limit(400)
     .get();
 
-  if (expired.empty) return;
-  const batch = db.batch();
+  let finalized = 0;
   for (const docSnap of expired.docs) {
-    batch.update(docSnap.ref, { status: 'EXPIRED' satisfies ExamSessionStatus });
+    const status = await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(docSnap.ref);
+      if (fresh.get('status') !== 'ACTIVE') return fresh.get('status') as ExamSessionStatus;
+      return finalizeExpiredSession(tx, docSnap.ref, fresh.data()!);
+    });
+    if (status === 'SUBMITTED') finalized++;
   }
-  await batch.commit();
-  logger.info('session.sweep', { expired: expired.size });
+  logger.info('session.sweep', { closed: expired.size, finalizedFromDraft: finalized });
 });
 
 /* ---------------------------------------------------------------------------------------------- */

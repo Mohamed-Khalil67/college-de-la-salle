@@ -1,7 +1,11 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, effect, inject, input, untracked } from '@angular/core';
+import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { AuthStore, ExaminerDashboardStore } from '@exam/data-access-exams';
+import {
+  AuthStore,
+  ExaminerDashboardStore,
+  SubmissionReviewService,
+} from '@exam/data-access-exams';
 import { SubmissionReviewPanel } from './review/submission-review-panel';
 import { StatusBadge } from './status-badge';
 import {
@@ -9,9 +13,11 @@ import {
   ArCountPipe,
   ArDatePipe,
   ArNumberPipe,
+  ArPercentPipe,
   ArScorePipe,
   arabicErrorMessage,
   BidiIsolate,
+  formatCount,
 } from '@exam/ui-arabic';
 
 @Component({
@@ -24,6 +30,7 @@ import {
     ArCountPipe,
     ArDatePipe,
     ArNumberPipe,
+    ArPercentPipe,
     ArScorePipe,
     BidiIsolate,
   ],
@@ -39,6 +46,9 @@ export class ExaminerDashboardPage {
   protected readonly auth = inject(AuthStore);
   protected readonly origin = inject(DOCUMENT).location.origin;
   readonly #router = inject(Router);
+  readonly #review = inject(SubmissionReviewService);
+  protected readonly publishing = signal(false);
+  protected readonly publishMessage = signal<string | null>(null);
 
   constructor() {
     effect(() => {
@@ -50,6 +60,19 @@ export class ExaminerDashboardPage {
   protected async signOut(): Promise<void> {
     await this.auth.signOut();
     await this.#router.navigateByUrl('/');
+  }
+
+  protected async publish(examId: string): Promise<void> {
+    this.publishing.set(true);
+    this.publishMessage.set(null);
+    try {
+      const { published } = await this.#review.publishResults(examId);
+      this.publishMessage.set(`نُشِرت النتائج: ${formatCount(published, 'result')}.`);
+    } catch (error) {
+      this.publishMessage.set(arabicErrorMessage(error));
+    } finally {
+      this.publishing.set(false);
+    }
   }
 
   protected errorText(error: unknown): string {

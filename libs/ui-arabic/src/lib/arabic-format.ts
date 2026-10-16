@@ -56,6 +56,11 @@ export function formatClock(ms: number, locale = APP_LOCALE): string {
   return `⁦${h ? `${formatNumber(h, {}, locale)}:` : ''}${two(m)}:${two(s)}⁩`;
 }
 
+/** 62.5 → "٦٢٫٥٪" (input is 0–100). */
+export function formatPercent(percent: number, locale = APP_LOCALE): string {
+  return formatNumber(percent / 100, { style: 'percent', maximumFractionDigits: 1 }, locale);
+}
+
 /** "٣ من ٥" — reads naturally in Arabic and avoids the bidi pitfalls of "3 / 5". */
 export function formatScore(score: number, max: number, locale = APP_LOCALE): string {
   return `${formatNumber(score, { maximumFractionDigits: 1 }, locale)} من ${formatNumber(max, {}, locale)}`;
@@ -116,6 +121,14 @@ export const NOUNS = {
     few: '{n} مرات',
     many: '{n} مرةً',
     other: '{n} مرة',
+  },
+  result: {
+    zero: 'لا نتائج',
+    one: 'نتيجة واحدة',
+    two: 'نتيجتان',
+    few: '{n} نتائج',
+    many: '{n} نتيجةً',
+    other: '{n} نتيجة',
   },
   answer: {
     zero: 'لا إجابات',

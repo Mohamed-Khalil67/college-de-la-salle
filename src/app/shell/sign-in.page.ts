@@ -46,10 +46,10 @@ const RETURN_URL_KEY = 'exam-platform:return-url';
   `,
   styles: `
     .narrow { max-inline-size: 34rem; margin-block: 2rem; margin-inline: auto; }
-    .dev { display: grid; gap: 0.4rem; margin-block-start: 2rem; padding-block-start: 1.25rem; border-block-start: 1px dashed var(--border); }
+    .dev { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.4rem; margin-block-start: 2rem; padding-block-start: 1.25rem; border-block-start: 1px dashed var(--border); }
     .dev h2 { margin: 0; font-size: 1.2rem; }
     .row { display: flex; gap: 0.5rem; }
-    .row input { flex: 1; }
+    .row input { flex: 1; min-inline-size: 0; } /* inputs keep an intrinsic min width in flex rows */
   `,
 })export class SignInPage {
   readonly returnUrl = input<string | undefined>();

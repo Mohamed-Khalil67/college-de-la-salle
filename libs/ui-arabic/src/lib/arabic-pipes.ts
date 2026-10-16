@@ -6,6 +6,7 @@ import {
   formatCount,
   formatDate,
   formatNumber,
+  formatPercent,
   formatScore,
 } from './arabic-format';
 
@@ -51,4 +52,19 @@ export class ArScorePipe implements PipeTransform {
   }
 }
 
-export const ARABIC_PIPES = [ArNumberPipe, ArDatePipe, ArClockPipe, ArCountPipe, ArScorePipe] as const;
+/** `{{ 62.5 | arPercent }}` → ٦٢٫٥٪ (input is 0–100) */
+@Pipe({ name: 'arPercent' })
+export class ArPercentPipe implements PipeTransform {
+  transform(percent: number | null | undefined): string {
+    return percent === null || percent === undefined ? '—' : formatPercent(percent);
+  }
+}
+
+export const ARABIC_PIPES = [
+  ArNumberPipe,
+  ArDatePipe,
+  ArClockPipe,
+  ArCountPipe,
+  ArScorePipe,
+  ArPercentPipe,
+] as const;

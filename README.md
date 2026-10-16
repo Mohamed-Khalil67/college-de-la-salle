@@ -48,8 +48,8 @@ The emulator UI is at http://localhost:4000.
 | Command | What it proves |
 | --- | --- |
 | `npm test` | Unit tests (Vitest via `ng test`): exam-runner FSM, graders, AI prompt/parse, dashboard derivations, clock offset |
-| `npm run test:rules` | `@firebase/rules-unit-testing` suite against the Firestore emulator (40 cases) |
-| `npm run test:e2e` | Playwright, desktop and mobile: an examiner creates an exam, a candidate completes it in RTL from the direct link, and the examiner grades it in the history view. Every page is checked for RTL direction, no horizontal overflow, no replacement characters, loaded Arabic fonts and diacritic-safe line-height |
+| `npm run test:rules` | `@firebase/rules-unit-testing` suite against the Firestore emulator (54 cases) |
+| `npm run test:e2e` | Playwright, desktop and mobile: an examiner creates an exam, a candidate completes it in RTL from the direct link, and the examiner grades it in the history view. Every page is checked for RTL direction, no horizontal overflow, no replacement characters, loaded Arabic fonts, diacritic-safe line-height, and **no untranslated text**: any Latin word in interface copy, placeholders, aria-labels or titles fails the run unless it is user content. A second scenario kills the candidate's device mid-exam and verifies that the server submits the autosaved draft and that results stay hidden until the examiner publishes them |
 
 The rules suite proves, among other things, that a candidate **cannot**:
 
@@ -81,6 +81,32 @@ Two RTL bugs that the mobile E2E caught and that are now fixed, kept here as rul
 
 - **Never hide things with a negative `inset-inline-start`.** In RTL that pushes them past the right edge and creates horizontal scroll. Hide with `clip-path` instead.
 - **Absolutely positioned screen-reader labels inside an `overflow: auto` table escape the scroller** unless the scroller is `position: relative`. In RTL they land off the left edge and widen the page.
+## Exam integrity features
+
+| Feature | How it works |
+| --- | --- |
+| **Server autosave** | Answers and review flags are saved to `drafts/{sessionId}` about 1.2 s after each change, and immediately when the tab is hidden. The rules accept draft writes only from the session's candidate, only while the session is live, stamped with server time. The candidate sees «حُفِظت إجاباتك على الخادم ١١:٥٧ ص». |
+| **Lost devices** | If a session expires without a submission, the server turns the last draft into the submission (`completedBy: SERVER_DRAFT`) and grades it. This runs in the scheduled sweep, and also immediately when the candidate reconnects. |
+| **Question navigator** | Numbered boxes (١، ٢، ٣…) show answered, unanswered and flagged questions. «علِّم للمراجعة» flags a question. The submit confirmation lists unanswered and flagged questions with jump links. |
+| **Pass mark** | The examiner sets a pass percentage, or leaves it empty for a score with no verdict. The dashboard shows ناجح/راسب per candidate and the pass rate. |
+| **Result release** | «فور اكتمال التصحيح» or «عندما أنشر النتائج يدويًّا». Scores reach candidates **only** through `results/{sessionId}`, which only Cloud Functions write, and only once release is allowed. Candidates can't read their own submission after it is graded, so a score can never leak early. |
+
+## Internationalisation
+
+The app is **Arabic-only by design**. Copy is written directly in Modern Standard Arabic in the
+templates, and every number, date, clock, percentage and counted noun goes through `Intl`
+(`libs/ui-arabic`). Angular's `@angular/localize` is **not** used: it produces one build per
+language, which adds nothing for a single-language app.
+
+If you later need English or French as well, the migration path is:
+
+1. Add `@angular/localize` and mark templates with `i18n` attributes and code strings with `$localize`.
+   Arabic stays the source language (`"sourceLocale": "ar"`).
+2. Extract with `ng extract-i18n`, translate the XLIFF files, and build per locale (`/ar/`, `/en/`).
+3. Make `APP_LOCALE` and `dir` follow the active locale. The CSS logical properties already make
+   LTR layouts work without changes.
+
+For switching language at runtime without a reload, use a runtime library such as Transloco instead.
 ## Question types & grading
 
 | Type | Candidate sees | Graded by |

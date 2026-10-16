@@ -77,10 +77,15 @@
           سُلِّمت الإجابات تلقائيًّا لتكرار مغادرتك صفحة الاختبار.
         }
       </p>
-      <p class="muted">يمكنك إغلاق هذه الصفحة الآن.</p>
+      @if (store.result(); as result) {
+        <exam-result-card [result]="result" />
+      } @else if (store.result() === null) {
+        <p class="muted" data-testid="result-pending">
+          ستظهر نتيجتك في هذه الصفحة فور اكتمال التصحيح ونشر المُمتحِن للنتائج.
+        </p>
+      }
     </section>
   }
-
   @case ('EXPIRED') {
     <section class="panel" role="alert">
       <h1>أُغلِق الاختبار</h1>
@@ -100,6 +105,23 @@
           </p>
         </div>
         <exam-countdown [remainingMs]="store.remainingMs()" [totalMs]="store.totalMs()" />
+        <div class="bar-row">
+          <exam-question-navigator
+            [questions]="ctx.paper.questions"
+            [answers]="ctx.answers"
+            [flagged]="ctx.flagged"
+            (jump)="jumpTo($event)"
+          />
+          <p class="save" [class.error]="store.saveState() === 'error'" aria-live="polite" data-testid="save-state">
+            @switch (store.saveState()) {
+              @case ('saved') { حُفِظت إجاباتك على الخادم {{ store.lastSavedAt() | arDate: 'time' }} }
+              @case ('saving') { جارٍ الحفظ على الخادم… }
+              @case ('pending') { توجد تغييرات لم تُحفَظ بعد… }
+              @case ('error') { تعذَّر الحفظ على الخادم، وستُعاد المحاولة تلقائيًّا. }
+              @default { تُحفَظ إجاباتك تلقائيًّا أثناء الحلّ. }
+            }
+          </p>
+        </div>
       </header>
 
       @if (ctx.integrity.visibilityLossCount > 0) {
@@ -116,7 +138,7 @@
 
       <ol class="questions">
         @for (question of ctx.paper.questions; track question.id; let i = $index) {
-          <li>
+          <li [id]="'q-' + question.id" tabindex="-1">
             @switch (question.type) {
               @case ('TEXT') {
                 <exam-text-question-card
@@ -125,6 +147,8 @@
                   [value]="$any(ctx.answers[question.id]) ?? ''"
                   [disabled]="state.phase === 'SUBMITTING'"
                   (typed)="store.typeAnswer(question.id, $event)"
+                  [flagged]="ctx.flagged.includes(question.id)"
+                  (flagToggled)="store.toggleFlag(question.id)"
                 />
               }
               @default {
@@ -134,6 +158,8 @@
                   [selected]="$any(ctx.answers[question.id])"
                   [disabled]="state.phase === 'SUBMITTING'"
                   (answered)="store.answer($event.questionId, $event.option)"
+                  [flagged]="ctx.flagged.includes(question.id)"
+                  (flagToggled)="store.toggleFlag(question.id)"
                 />
               }
             }
@@ -146,7 +172,29 @@
           <p aria-live="polite">جارٍ التسليم…</p>
         } @else {
           @if (confirmingSubmit()) {
-            <p>هل تريد التسليم الآن؟ لن تتمكَّن من تعديل إجاباتك بعد ذلك.</p>
+            <div class="confirm" role="alertdialog" aria-labelledby="confirm-title" aria-describedby="confirm-body">
+              <p id="confirm-title"><strong>هل تريد التسليم الآن؟</strong> لن تتمكَّن من تعديل إجاباتك بعد ذلك.</p>
+              <div id="confirm-body">
+                @if (store.unansweredNumbers().length) {
+                  <p class="warn" data-testid="unanswered">
+                    لم تُجِب بعدُ عن:
+                    @for (n of store.unansweredNumbers(); track n; let last = $last) {
+                      <button type="button" class="link" (click)="jumpToNumber(n)">السؤال {{ n | arNumber }}</button>{{ last ? '' : '، ' }}
+                    }
+                  </p>
+                } @else {
+                  <p class="ok">أجبتَ عن جميع الأسئلة.</p>
+                }
+                @if (store.flaggedNumbers().length) {
+                  <p class="warn" data-testid="flagged">
+                    مُعلَّمة للمراجعة:
+                    @for (n of store.flaggedNumbers(); track n; let last = $last) {
+                      <button type="button" class="link" (click)="jumpToNumber(n)">السؤال {{ n | arNumber }}</button>{{ last ? '' : '، ' }}
+                    }
+                  </p>
+                }
+              </div>
+            </div>
             <button type="button" (click)="confirmingSubmit.set(false)">متابعة الحلّ</button>
           }
           <button type="button" class="primary" (click)="requestSubmit()">

@@ -55,6 +55,29 @@
           <span class="label">رابط المُختبَرين</span>
           <code class="ltr">{{ origin }}/take/{{ exam.accessCode }}</code>
         </div>
+        <div class="release" data-testid="release">
+          <span class="label">النتائج</span>
+          <p>
+            درجة النجاح:
+            {{ exam.scoring.passPercent === null ? 'بلا درجة نجاح' : (exam.scoring.passPercent | arPercent) }}
+            ·
+            @if (exam.scoring.resultRelease === 'ON_GRADED') {
+              تُعرَض على المُختبَر فور اكتمال التصحيح
+            } @else if (exam.resultsPublished) {
+              <strong class="published">منشورة للمُختبَرين</strong>
+            } @else {
+              مخفية حتى تنشرها
+            }
+          </p>
+          @if (exam.scoring.resultRelease === 'MANUAL' && !exam.resultsPublished) {
+            <button type="button" class="primary" [disabled]="publishing()" (click)="publish(exam.id)">
+              {{ publishing() ? 'جارٍ النشر…' : 'نشر النتائج للمُختبَرين' }}
+            </button>
+          }
+          @if (publishMessage(); as message) {
+            <p class="hint" role="status">{{ message }}</p>
+          }
+        </div>
       </div>
 
       @let stats = store.stats();
@@ -67,6 +90,12 @@
           <dt>متوسط الدرجات</dt>
           <dd>{{ stats.averageScore | arScore: exam.maxScore }}</dd>
         </div>
+        @if (stats.passRate !== null) {
+          <div class="panel">
+            <dt>نسبة النجاح</dt>
+            <dd data-testid="pass-rate">{{ stats.passRate | arPercent }}</dd>
+          </div>
+        }
       </dl>
 
       <div class="panel table-wrap">
@@ -78,7 +107,9 @@
               <th scope="col">الحالة</th>
               <th scope="col">وقت البدء</th>
               <th scope="col">الوقت المتبقّي</th>
+              <th scope="col">التقدّم</th>
               <th scope="col">الدرجة</th>
+              <th scope="col">النتيجة</th>
               <th scope="col">طريقة التسليم</th>
               <th scope="col">مرات المغادرة</th>
               <th scope="col"><span class="visually-hidden">إجراءات</span></th>
@@ -93,6 +124,9 @@
                 <td class="num">
                   {{ row.status === 'IN_PROGRESS' ? (row.remainingMs | arClock) : '—' }}
                 </td>
+                <td class="num" data-testid="progress">
+                  {{ row.answeredCount === null ? '—' : (row.answeredCount | arNumber) + ' من ' + (exam.questionCount | arNumber) }}
+                </td>
                 <td class="num" data-testid="score">
                   @if (row.submission?.score !== null && row.submission?.score !== undefined) {
                     <strong>{{ row.submission!.score | arScore: row.submission!.maxScore }}</strong>
@@ -102,11 +136,21 @@
                     —
                   }
                 </td>
+                <td data-testid="verdict">
+                  @if (row.passed === true) {
+                    <span class="pass">ناجح</span>
+                  } @else if (row.passed === false) {
+                    <span class="fail">راسب</span>
+                  } @else {
+                    —
+                  }
+                </td>
                 <td>
                   @switch (row.submission?.completedBy) {
                     @case ('CANDIDATE') { المُختبَر }
                     @case ('AUTO_TIMER') { انتهاء الوقت }
                     @case ('AUTO_INTEGRITY') { سياسة النزاهة }
+                    @case ('SERVER_DRAFT') { حفظ الخادم عند انتهاء الوقت }
                     @default { — }
                   }
                 </td>
@@ -127,7 +171,7 @@
               </tr>
             } @empty {
               <tr>
-                <td colspan="8" class="muted empty-row">
+                <td colspan="10" class="muted empty-row">
                   لم يبدأ أحدٌ بعد. شارِك الرمز <code class="ltr">{{ exam.accessCode }}</code>، وستظهر الصفوف فور بدء المُختبَرين.
                 </td>
               </tr>

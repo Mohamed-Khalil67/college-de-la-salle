@@ -60,9 +60,9 @@ import { Star } from '@exam/ui-arabic';
     .hero h1 { margin-block: 0.75rem 0.5rem; }
     .lead { max-inline-size: 40rem; margin-inline: auto; color: var(--muted); font-size: 1.1rem; }
     .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.25rem; }
-    .join { display: grid; gap: 0.4rem; }
+    .join { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.4rem; }
     .row { display: flex; gap: 0.5rem; }
-    .code-input { font: 600 1.4rem/1.4 var(--mono); letter-spacing: 0.2em; text-transform: uppercase; inline-size: 100%; text-align: center; }
+    .code-input { font: 600 1.4rem/1.4 var(--mono); letter-spacing: 0.2em; text-transform: uppercase; inline-size: 100%; min-inline-size: 0; text-align: center; }
   `,
 })
 export class HomePage {

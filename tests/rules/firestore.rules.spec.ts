@@ -85,6 +85,8 @@ function examMeta(ownerId = EXAMINER, accessCode = ACCESS_CODE) {
     window: { opensAt: ts(-60 * MINUTE), closesAt: ts(60 * MINUTE) },
     accessCode,
     integrity: { maxVisibilityLosses: 3 },
+    scoring: { passPercent: 50, resultRelease: 'ON_GRADED' },
+    resultsPublished: false,
     questionCount: 2,
     maxScore: 2,
     createdAt: ts(-61 * MINUTE),
@@ -588,5 +590,149 @@ describe('isolation', () => {
       window: examMeta().window,
     });
     await assertFails(batch.commit());
+  });
+});
+
+/* ---------------------------------------------------------------------------------------------- */
+/* 4. Autosave drafts, released results, and hidden scores                                         */
+/* ---------------------------------------------------------------------------------------------- */
+
+function draft(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    examId: EXAM_ID,
+    candidateId: CANDIDATE,
+    examOwnerId: EXAMINER,
+    answers: { q1: 1 },
+    flagged: ['q2'],
+    integrity: { visibilityLossCount: 0, hiddenMs: 0 },
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  };
+}
+
+describe('server-side autosave drafts', () => {
+  it('candidate can save and re-save their draft while the session is live', async () => {
+    await seedSession();
+    const ref = doc(candidate(), 'drafts', SESSION_ID);
+    await assertSucceeds(setDoc(ref, draft()));
+    await assertSucceeds(setDoc(ref, draft({ answers: { q1: 0, q2: 'نص' } })));
+    await assertSucceeds(getDoc(ref));
+  });
+
+  it('rejects draft writes after the deadline', async () => {
+    await seedSession(CANDIDATE, { expiresAt: ts(-1_000) });
+    await assertFails(setDoc(doc(candidate(), 'drafts', SESSION_ID), draft()));
+  });
+
+  it('rejects a backdated draft timestamp', async () => {
+    await seedSession();
+    await assertFails(setDoc(doc(candidate(), 'drafts', SESSION_ID), draft({ updatedAt: ts(-60_000) })));
+  });
+
+  it('rejects a draft filed under a different exam', async () => {
+    await seedSession();
+    await assertFails(setDoc(doc(candidate(), 'drafts', SESSION_ID), draft({ examId: 'other-exam' })));
+  });
+
+  it('rejects drafts with extra fields (e.g. a smuggled score)', async () => {
+    await seedSession();
+    await assertFails(setDoc(doc(candidate(), 'drafts', SESSION_ID), draft({ score: 100 })));
+  });
+
+  it('candidate cannot write or read another candidate’s draft', async () => {
+    await seedSession(OTHER_CANDIDATE);
+    await assertFails(
+      setDoc(doc(candidate(), 'drafts', OTHER_SESSION_ID), draft({ candidateId: OTHER_CANDIDATE })),
+    );
+    await seed((db) => setDoc(doc(db, 'drafts', OTHER_SESSION_ID), { ...draft({ candidateId: OTHER_CANDIDATE }), updatedAt: ts(0) }));
+    await assertFails(getDoc(doc(candidate(), 'drafts', OTHER_SESSION_ID)));
+  });
+
+  it('the owning examiner can watch drafts; another examiner cannot', async () => {
+    await seed((db) => setDoc(doc(db, 'drafts', SESSION_ID), { ...draft(), updatedAt: ts(0) }));
+    await assertSucceeds(getDoc(doc(examiner(), 'drafts', SESSION_ID)));
+    await assertFails(getDoc(doc(examiner(OTHER_EXAMINER), 'drafts', SESSION_ID)));
+  });
+});
+
+describe('scores stay hidden until released', () => {
+  const graded = () => ({
+    ...submissionDraft(),
+    submittedAt: ts(0),
+    expiresAt: ts(4 * MINUTE),
+    gradingStatus: 'GRADED',
+    score: 2,
+    maxScore: 2,
+  });
+
+  it('candidate can read their own submission only before it is graded', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'submissions', SESSION_ID), { ...submissionDraft(), submittedAt: ts(0), expiresAt: ts(MINUTE) }),
+    );
+    await assertSucceeds(getDoc(doc(candidate(), 'submissions', SESSION_ID)));
+
+    await seed((db) => setDoc(doc(db, 'submissions', SESSION_ID), graded()));
+    await assertFails(getDoc(doc(candidate(), 'submissions', SESSION_ID)));
+  });
+
+  it('candidate can probe only their OWN not-yet-existing submission id', async () => {
+    await assertSucceeds(getDoc(doc(candidate(), 'submissions', SESSION_ID)));
+    await assertFails(getDoc(doc(candidate(), 'submissions', OTHER_SESSION_ID)));
+  });
+
+  it('nobody but the server can write results', async () => {
+    const result = { candidateId: CANDIDATE, examOwnerId: EXAMINER, score: 99, maxScore: 2 };
+    await assertFails(setDoc(doc(candidate(), 'results', SESSION_ID), result));
+    await assertFails(setDoc(doc(examiner(), 'results', SESSION_ID), result));
+  });
+
+  it('a released result is readable by its candidate and owner only', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'results', SESSION_ID), {
+        candidateId: CANDIDATE,
+        examOwnerId: EXAMINER,
+        score: 2,
+        maxScore: 2,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(candidate(), 'results', SESSION_ID)));
+    await assertSucceeds(getDoc(doc(examiner(), 'results', SESSION_ID)));
+    await assertFails(getDoc(doc(candidate(OTHER_CANDIDATE), 'results', SESSION_ID)));
+    await assertFails(getDoc(doc(examiner(OTHER_EXAMINER), 'results', SESSION_ID)));
+  });
+
+  it('candidate can wait on their own unpublished result without seeing others', async () => {
+    await assertSucceeds(getDoc(doc(candidate(), 'results', SESSION_ID)));
+    await assertFails(getDoc(doc(candidate(), 'results', OTHER_SESSION_ID)));
+  });
+});
+
+describe('scoring policy on exams', () => {
+  it('rejects a pass mark outside 0–100 and an unknown release mode', async () => {
+    const db = examiner();
+    await assertFails(
+      setDoc(doc(db, 'exams', 'exam-x'), {
+        ...examMeta(EXAMINER, 'XYZ789'),
+        scoring: { passPercent: 140, resultRelease: 'ON_GRADED' },
+        createdAt: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(db, 'exams', 'exam-y'), {
+        ...examMeta(EXAMINER, 'XYZ789'),
+        scoring: { passPercent: 60, resultRelease: 'ALWAYS' },
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('an exam cannot be created already "published"', async () => {
+    await assertFails(
+      setDoc(doc(examiner(), 'exams', 'exam-z'), {
+        ...examMeta(EXAMINER, 'XYZ789'),
+        resultsPublished: true,
+        createdAt: serverTimestamp(),
+      }),
+    );
   });
 });

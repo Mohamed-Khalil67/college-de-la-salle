@@ -1,12 +1,11 @@
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
-import type { QuestionId } from '@exam/contracts';
+import { type ExamResult, isAnswered, type QuestionId } from '@exam/contracts';
 import { ExamSessionGateway, ServerClock } from '@exam/data-access-exams';
 import { arabicErrorMessage } from '@exam/ui-arabic';
 import {
   type ActiveContext,
   initialRunnerState,
-  isAnswered,
   remainingMs,
   type RunnerEvent,
   type RunnerState,
@@ -15,12 +14,25 @@ import {
 } from './exam-runner.machine';
 
 const TICK_MS = 250;
+/** Autosave this long after the last change — frequent enough to lose almost nothing. */
+const AUTOSAVE_DEBOUNCE_MS = 1_200;
 const DRAFT_KEY = (sessionId: string) => `exam-runner:draft:${sessionId}`;
+
+export type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+
+interface LocalDraft {
+  readonly answers: Record<QuestionId, unknown>;
+  readonly flagged: QuestionId[];
+}
 
 /**
  * Runs the exam FSM: holds state in a signal, feeds it server-calibrated time, and executes the
  * side effects that belong to each phase *entry*. Effects only ever communicate back through
  * `dispatch`, so every state change is an auditable (state, event) → state step.
+ *
+ * Work-in-progress is saved twice: instantly to localStorage (survives a reload on this device)
+ * and, debounced, to the server draft (survives the device itself — the server submits the draft
+ * if the session expires without a submission).
  *
  * Provided per runner page so all timers/listeners die with the route.
  */
@@ -50,18 +62,45 @@ export class ExamRunnerStore {
   readonly answeredCount = computed(
     () => Object.values(this.active()?.answers ?? {}).filter((a) => isAnswered(a)).length,
   );
+  /** 1-based numbers of unanswered questions, for the submit confirmation. */
+  readonly unansweredNumbers = computed(() => {
+    const ctx = this.active();
+    if (!ctx) return [];
+    return ctx.paper.questions.flatMap((q, i) => (isAnswered(ctx.answers[q.id]) ? [] : [i + 1]));
+  });
+  readonly flaggedNumbers = computed(() => {
+    const ctx = this.active();
+    if (!ctx) return [];
+    const flagged = new Set(ctx.flagged);
+    return ctx.paper.questions.flatMap((q, i) => (flagged.has(q.id) ? [i + 1] : []));
+  });
+
+  /* Server autosave status, shown to the candidate. */
+  readonly saveState = signal<SaveState>('idle');
+  readonly lastSavedAt = signal<number | null>(null);
+
+  /* Released result (after submission). `undefined` = not checked yet, `null` = not released. */
+  readonly result = signal<ExamResult | null | undefined>(undefined);
 
   #ticker: ReturnType<typeof setInterval> | null = null;
-  readonly #onVisibility = () =>
-    this.dispatch({
-      type: 'VISIBILITY_CHANGED',
-      hidden: this.#document.visibilityState === 'hidden',
-      now: this.#clock.now(),
-    });
+  #saveTimer: ReturnType<typeof setTimeout> | null = null;
+  #saveQueued = false;
+  #saveInFlight: Promise<void> | null = null;
+  #stopResultWatch: (() => void) | null = null;
+
+  readonly #onVisibility = () => {
+    const hidden = this.#document.visibilityState === 'hidden';
+    if (hidden) this.#flushSave(); // the tab may never come back
+    this.dispatch({ type: 'VISIBILITY_CHANGED', hidden, now: this.#clock.now() });
+  };
+  readonly #onPageHide = () => this.#flushSave();
   readonly #onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.#stopRuntime());
+    inject(DestroyRef).onDestroy(() => {
+      this.#stopRuntime();
+      this.#stopResultWatch?.();
+    });
   }
 
   /* -------------------------------------------------------------------------------------------- */
@@ -93,6 +132,10 @@ export class ExamRunnerStore {
     this.dispatch({ type: 'ANSWER_TYPED', questionId, text });
   }
 
+  toggleFlag(questionId: QuestionId): void {
+    this.dispatch({ type: 'FLAG_TOGGLED', questionId });
+  }
+
   submit(): void {
     this.dispatch({ type: 'SUBMIT_REQUESTED' });
   }
@@ -108,9 +151,15 @@ export class ExamRunnerStore {
     this.#state.set(next);
 
     if (next.phase !== prev.phase) this.#onEnter(next);
-    const answersChanged =
-      next.phase === 'ACTIVE' && (prev.phase !== 'ACTIVE' || prev.ctx.answers !== next.ctx.answers);
-    if (answersChanged) this.#persistDraft(next.ctx);
+    const workChanged =
+      next.phase === 'ACTIVE' &&
+      (prev.phase !== 'ACTIVE' ||
+        prev.ctx.answers !== next.ctx.answers ||
+        prev.ctx.flagged !== next.ctx.flagged);
+    if (workChanged) {
+      this.#persistLocal(next.ctx);
+      if (prev.phase === 'ACTIVE') this.#scheduleSave();
+    }
   }
 
   #onEnter(state: RunnerState): void {
@@ -122,12 +171,17 @@ export class ExamRunnerStore {
         this.#startRuntime();
         break;
       case 'SUBMITTING':
+        this.#cancelSave();
         void this.#submit(state.ctx, state.reason);
         break;
       case 'SUBMITTED':
+        this.#stopRuntime();
+        this.#clearLocal(state.session.id);
+        this.#watchResult(state.session.id);
+        break;
       case 'EXPIRED':
         this.#stopRuntime();
-        this.#clearDraft(state.session.id);
+        this.#clearLocal(state.session.id);
         break;
     }
   }
@@ -139,14 +193,24 @@ export class ExamRunnerStore {
         this.dispatch({ type: 'SESSION_CLOSED', session });
         return;
       }
-      const paper = await this.#gateway.loadPaper(session.examId);
+      const [paper, serverDraft] = await Promise.all([
+        this.#gateway.loadPaper(session.examId),
+        this.#gateway.loadDraft(session.id),
+      ]);
+      // The server copy wins: it is what will be graded if this device goes away.
+      const local = this.#readLocal(session.id);
       this.dispatch({
         type: 'SESSION_OPENED',
         session,
         paper,
         now: this.#clock.now(),
-        restoredAnswers: this.#readDraft(session.id),
+        restoredAnswers: serverDraft?.answers ?? local.answers,
+        restoredFlags: serverDraft?.flagged ?? local.flagged,
       });
+      if (serverDraft) {
+        this.saveState.set('saved');
+        this.lastSavedAt.set(serverDraft.updatedAt);
+      }
     } catch (error) {
       this.dispatch({ type: 'START_FAILED', message: describe(error) });
     }
@@ -166,6 +230,68 @@ export class ExamRunnerStore {
     }
   }
 
+  #watchResult(sessionId: string): void {
+    this.#stopResultWatch?.();
+    this.#stopResultWatch = this.#gateway.watchResult(sessionId, (result) => this.result.set(result));
+  }
+
+  /* -------------------------------------------------------------------------------------------- */
+  /* Server autosave                                                                              */
+  /* -------------------------------------------------------------------------------------------- */
+
+  #scheduleSave(): void {
+    this.saveState.set('pending');
+    if (this.#saveTimer !== null) clearTimeout(this.#saveTimer);
+    this.#saveTimer = setTimeout(() => this.#flushSave(), AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  #cancelSave(): void {
+    if (this.#saveTimer !== null) clearTimeout(this.#saveTimer);
+    this.#saveTimer = null;
+  }
+
+  /**
+   * Saves now. Serialised: changes made while a save is in flight trigger exactly one follow-up
+   * save. "Changed" means answers/flags changed — not `now`, which moves on every tick.
+   */
+  #flushSave(): void {
+    this.#cancelSave();
+    const s = this.#state();
+    if (s.phase !== 'ACTIVE') return;
+    if (this.saveState() !== 'pending' && this.saveState() !== 'error') return; // nothing new
+    if (this.#saveInFlight) {
+      this.#saveQueued = true;
+      return;
+    }
+    const { answers, flagged } = s.ctx;
+    const ctx = s.ctx;
+    this.saveState.set('saving');
+    this.#saveInFlight = this.#gateway
+      .saveDraft(ctx.session.id, {
+        examId: ctx.session.examId,
+        candidateId: ctx.session.candidateId,
+        examOwnerId: ctx.session.examOwnerId,
+        answers,
+        flagged,
+        integrity: toSubmissionDraft(ctx, 'CANDIDATE').integrity,
+      })
+      .then(() => {
+        this.lastSavedAt.set(this.#clock.now());
+        const now = this.#state();
+        const unchanged =
+          now.phase === 'ACTIVE' && now.ctx.answers === answers && now.ctx.flagged === flagged;
+        this.saveState.set(unchanged ? 'saved' : 'pending');
+      })
+      .catch(() => this.saveState.set('error'))
+      .finally(() => {
+        this.#saveInFlight = null;
+        if (this.#saveQueued && this.#state().phase === 'ACTIVE') {
+          this.#saveQueued = false;
+          this.#flushSave();
+        }
+      });
+  }
+
   /* -------------------------------------------------------------------------------------------- */
   /* Runtime: ticker + visibility + unload guard                                                  */
   /* -------------------------------------------------------------------------------------------- */
@@ -176,40 +302,49 @@ export class ExamRunnerStore {
       () => this.dispatch({ type: 'TICK', now: this.#clock.now() }),
       TICK_MS,
     );
+    const win = this.#document.defaultView;
     this.#document.addEventListener('visibilitychange', this.#onVisibility);
-    this.#document.defaultView?.addEventListener('beforeunload', this.#onBeforeUnload);
+    win?.addEventListener('pagehide', this.#onPageHide);
+    win?.addEventListener('beforeunload', this.#onBeforeUnload);
   }
 
   #stopRuntime(): void {
     if (this.#ticker !== null) clearInterval(this.#ticker);
     this.#ticker = null;
+    this.#cancelSave();
+    const win = this.#document.defaultView;
     this.#document.removeEventListener('visibilitychange', this.#onVisibility);
-    this.#document.defaultView?.removeEventListener('beforeunload', this.#onBeforeUnload);
+    win?.removeEventListener('pagehide', this.#onPageHide);
+    win?.removeEventListener('beforeunload', this.#onBeforeUnload);
   }
 
   /* -------------------------------------------------------------------------------------------- */
-  /* Crash/reload resilience: answers survive a refresh within the same session                   */
+  /* Local copy: instant, survives a reload on this device                                        */
   /* -------------------------------------------------------------------------------------------- */
 
-  #persistDraft(ctx: ActiveContext): void {
+  #persistLocal(ctx: ActiveContext): void {
     try {
-      localStorage.setItem(DRAFT_KEY(ctx.session.id), JSON.stringify(ctx.answers));
+      const draft: LocalDraft = { answers: { ...ctx.answers }, flagged: [...ctx.flagged] };
+      localStorage.setItem(DRAFT_KEY(ctx.session.id), JSON.stringify(draft));
     } catch {
-      /* storage unavailable (private mode / quota) — answers stay in memory */
+      /* storage unavailable (private mode / quota) — the server draft still covers us */
     }
   }
 
-  #readDraft(sessionId: string): Record<QuestionId, unknown> {
+  #readLocal(sessionId: string): LocalDraft {
     try {
       const raw = localStorage.getItem(DRAFT_KEY(sessionId));
-      const parsed: unknown = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === 'object' ? (parsed as Record<QuestionId, unknown>) : {};
+      const parsed = raw ? (JSON.parse(raw) as Partial<LocalDraft>) : {};
+      return {
+        answers: parsed.answers && typeof parsed.answers === 'object' ? parsed.answers : {},
+        flagged: Array.isArray(parsed.flagged) ? parsed.flagged : [],
+      };
     } catch {
-      return {};
+      return { answers: {}, flagged: [] };
     }
   }
 
-  #clearDraft(sessionId: string): void {
+  #clearLocal(sessionId: string): void {
     try {
       localStorage.removeItem(DRAFT_KEY(sessionId));
     } catch {

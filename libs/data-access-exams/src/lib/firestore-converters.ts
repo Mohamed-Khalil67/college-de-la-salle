@@ -6,6 +6,9 @@ import {
   type ExamPaper,
   type ExamSession,
   type ManualGrade,
+  DEFAULT_SCORING,
+  type ExamDraft,
+  type ExamResult,
   normalizeQuestion,
   type Submission,
 } from '@exam/contracts';
@@ -53,6 +56,8 @@ export const examMetaConverter = readOnly<ExamMeta>((id, d) => ({
   window: { opensAt: millis(d['window']?.opensAt), closesAt: millis(d['window']?.closesAt) },
   accessCode: d['accessCode'],
   integrity: d['integrity'],
+  scoring: d['scoring'] ?? DEFAULT_SCORING,
+  resultsPublished: d['resultsPublished'] === true,
   questionCount: d['questionCount'],
   maxScore: d['maxScore'],
   // Pending server timestamps resolve to null in the local snapshot; fall back to "now-ish" order.
@@ -127,4 +132,40 @@ export const submissionConverter = readOnly<Submission>((id, d) => ({
   score: typeof d['score'] === 'number' ? d['score'] : null,
   maxScore: typeof d['maxScore'] === 'number' ? d['maxScore'] : null,
   gradedAt: millisOrNull(d['gradedAt']),
+}));
+
+export const draftConverter = readOnly<ExamDraft>((_id, d) => draftFrom(d));
+
+/** Dashboard rows need the session id the draft is filed under. */
+export const draftRowConverter = readOnly<ExamDraft & { readonly id: string }>((id, d) => ({
+  ...draftFrom(d),
+  id,
+}));
+
+function draftFrom(d: DocumentData): ExamDraft {
+  return {
+  examId: d['examId'],
+  candidateId: d['candidateId'],
+  examOwnerId: d['examOwnerId'],
+  answers: d['answers'] ?? {},
+  flagged: d['flagged'] ?? [],
+  integrity: d['integrity'] ?? { visibilityLossCount: 0, hiddenMs: 0 },
+  updatedAt: millis(d['updatedAt']),
+  };
+}
+
+export const resultConverter = readOnly<ExamResult>((_id, d) => ({
+  sessionId: d['sessionId'],
+  examId: d['examId'],
+  examOwnerId: d['examOwnerId'],
+  examTitle: d['examTitle'],
+  candidateId: d['candidateId'],
+  candidateName: d['candidateName'],
+  score: d['score'],
+  maxScore: d['maxScore'],
+  percent: d['percent'],
+  passPercent: d['passPercent'] ?? null,
+  passed: d['passed'] ?? null,
+  feedback: d['feedback'] ?? [],
+  publishedAt: millis(d['publishedAt']),
 }));

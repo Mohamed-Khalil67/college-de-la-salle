@@ -2,19 +2,41 @@ import { Service, inject } from '@angular/core';
 import {
   type AccessCodeRecord,
   COLLECTIONS,
+  type ExamDraft,
   type ExamPaper,
+  type ExamResult,
   normalizeAccessCode,
   PAPER_DOC_ID,
   type StartSessionRequest,
   type StartSessionResponse,
   type SubmissionDraft,
 } from '@exam/contracts';
-import { doc, getDoc, getDocFromServer, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
+import {
+  doc,
+  FirestoreError,
+  getDoc,
+  getDocFromServer,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  type Unsubscribe,
+} from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { AuthStore } from './auth.store';
 import { FIREBASE_FUNCTIONS, FIRESTORE } from './firebase.providers';
-import { accessCodeConverter, examPaperConverter } from './firestore-converters';
+import {
+  accessCodeConverter,
+  draftConverter,
+  examPaperConverter,
+  resultConverter,
+} from './firestore-converters';
 import { ServerClock } from './server-clock';
+
+export type DraftPayload = Pick<
+  ExamDraft,
+  'examId' | 'candidateId' | 'examOwnerId' | 'answers' | 'flagged' | 'integrity'
+>;
 
 /** Candidate-side I/O. Everything the exam runner touches goes through this one gateway. */
 @Service()
@@ -57,6 +79,37 @@ export class ExamSessionGateway {
     return snap.data();
   }
 
+  /* -------------------------------------------------------------------------------------------- */
+  /* Server-side autosave                                                                         */
+  /* -------------------------------------------------------------------------------------------- */
+
+  /**
+   * Saves the candidate's work-in-progress. Rules accept it only while the session is live and
+   * stamp it with server time. If the device dies, the server turns this draft into the submission
+   * when the session expires.
+   */
+  async saveDraft(sessionId: string, draft: DraftPayload): Promise<void> {
+    await setDoc(doc(this.#db, COLLECTIONS.drafts, sessionId), {
+      ...draft,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  async loadDraft(sessionId: string): Promise<ExamDraft | null> {
+    try {
+      const snap = await getDocFromServer(
+        doc(this.#db, COLLECTIONS.drafts, sessionId).withConverter(draftConverter),
+      );
+      return snap.exists() ? snap.data() : null;
+    } catch {
+      return null; // offline: fall back to the local copy
+    }
+  }
+
+  /* -------------------------------------------------------------------------------------------- */
+  /* Submission                                                                                   */
+  /* -------------------------------------------------------------------------------------------- */
+
   /**
    * One-shot submission. `submittedAt` is the server's `request.time`; `expiresAt` is echoed back
    * exactly so the rules can pin it to the session and reject anything after the deadline.
@@ -69,13 +122,28 @@ export class ExamSessionGateway {
     });
   }
 
-  /** Used after an ambiguous network failure: did the write land anyway? */
+  /**
+   * Used after an ambiguous network failure: did the write land anyway? Candidates may read their
+   * own submission only until it is graded, so "permission denied" also means "it arrived".
+   */
   async hasSubmitted(sessionId: string): Promise<boolean> {
     try {
       const snap = await getDocFromServer(doc(this.#db, COLLECTIONS.submissions, sessionId));
       return snap.exists();
-    } catch {
-      return false;
+    } catch (error) {
+      return error instanceof FirestoreError && error.code === 'permission-denied';
     }
+  }
+
+  /**
+   * Live view of the candidate's released result. Emits `null` until the examiner's release
+   * policy allows it — the score is not readable anywhere else.
+   */
+  watchResult(sessionId: string, next: (result: ExamResult | null) => void): Unsubscribe {
+    return onSnapshot(
+      doc(this.#db, COLLECTIONS.results, sessionId).withConverter(resultConverter),
+      (snap) => next(snap.exists() ? snap.data() : null),
+      () => next(null),
+    );
   }
 }

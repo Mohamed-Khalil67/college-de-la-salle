@@ -18,11 +18,12 @@
 .section-head h2 { margin: 0; }
 
 /* Fieldsets default to min-inline-size: min-content, which lets long content widen the page. */
-.question { margin: 0; display: grid; gap: 0.75rem; min-inline-size: 0; }
+.question { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.75rem; min-inline-size: 0; }
 .question legend { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--accent-strong); padding-inline: 0.4rem; }
 
 .options { display: grid; gap: 0.4rem; }
-.option-row { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: center; }
+.option-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.5rem; align-items: center; }
+.option-text { inline-size: 100%; min-inline-size: 0; }
 .option-row input[type='radio'] { width: 1.1rem; height: 1.1rem; accent-color: var(--ok); }
 .span-row { grid-column: 2 / -1; }
 

@@ -1,7 +1,12 @@
-import { AUTO_SUBMIT_LEAD_MS, type AccessCodeRecord, type ExamPaper, type ExamSession } from '@exam/contracts';
+import {
+  AUTO_SUBMIT_LEAD_MS,
+  type AccessCodeRecord,
+  type ExamPaper,
+  type ExamSession,
+  isAnswered,
+} from '@exam/contracts';
 import {
   initialRunnerState,
-  isAnswered,
   type RunnerEvent,
   type RunnerState,
   toSubmissionDraft,
@@ -96,6 +101,31 @@ describe('exam runner FSM', () => {
     state = transition(state, { type: 'ANSWER_TYPED', questionId: 'q1', text: 'not a choice' });
     state = transition(state, { type: 'ANSWER_SELECTED', questionId: 'q3', option: 0 });
     expect(state.phase === 'ACTIVE' && state.ctx.answers).toEqual({ q3: 'Hello worl' });
+  });
+
+  it('toggles review flags and keeps them in paper order', () => {
+    let state = transition(active(), { type: 'FLAG_TOGGLED', questionId: 'q3' });
+    state = transition(state, { type: 'FLAG_TOGGLED', questionId: 'q1' });
+    state = transition(state, { type: 'FLAG_TOGGLED', questionId: 'ghost' });
+    expect(state.phase === 'ACTIVE' && state.ctx.flagged).toEqual(['q1', 'q3']);
+    state = transition(state, { type: 'FLAG_TOGGLED', questionId: 'q1' });
+    expect(state.phase === 'ACTIVE' && state.ctx.flagged).toEqual(['q3']);
+  });
+
+  it('restores flags from the server draft, dropping unknown ones', () => {
+    const state = run([
+      { type: 'LOBBY_LOADED', lobby },
+      { type: 'START_REQUESTED', candidateName: 'Carol' },
+      {
+        type: 'SESSION_OPENED',
+        session,
+        paper,
+        now: T0 + 1_000,
+        restoredAnswers: {},
+        restoredFlags: ['q2', 'nope', 'q1'],
+      },
+    ]);
+    expect(state.phase === 'ACTIVE' && state.ctx.flagged).toEqual(['q1', 'q2']);
   });
 
   it('counts blank text as unanswered', () => {

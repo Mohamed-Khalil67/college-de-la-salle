@@ -1,6 +1,7 @@
 import { Component, input, output } from '@angular/core';
 import type { ChoiceQuestion } from '@exam/contracts';
 import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
+import { FlagToggle } from './flag-toggle';
 
 export interface AnswerChange {
   readonly questionId: string;
@@ -13,13 +14,14 @@ const ABJAD = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح'];
 /** One multiple-choice question as a native radio group (keyboard + screen-reader friendly). */
 @Component({
   selector: 'exam-question-card',
-  imports: [ArNumberPipe, ArCountPipe, BidiIsolate],
+  imports: [ArNumberPipe, ArCountPipe, BidiIsolate, FlagToggle],
   template: `
     <fieldset class="card" [disabled]="disabled()">
       <legend>
         <span class="index">السؤال {{ index() + 1 | arNumber }}</span>
         <span class="points">{{ question().points | arCount: 'point' }}</span>
       </legend>
+      <exam-flag-toggle class="flag" [flagged]="flagged()" [disabled]="disabled()" (toggled)="flagToggled.emit()" />
       <p class="prompt exam-text" examIsolate>{{ question().prompt }}</p>
       <div class="options">
         @for (option of question().options; track $index) {
@@ -43,6 +45,7 @@ const ABJAD = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح'];
     legend { display: flex; gap: 0.75rem; align-items: baseline; padding-inline: 0.4rem; }
     .index { font-family: var(--font-display); font-weight: 700; font-size: 1.2rem; color: var(--accent-strong); }
     .points { font-size: 0.85rem; color: var(--muted); }
+    .flag { display: block; text-align: end; }
     .prompt { margin-block: 0.25rem 1rem; }
     .options { display: grid; gap: 0.55rem; }
     .option {
@@ -63,6 +66,8 @@ export class QuestionCard {
   readonly selected = input<number | undefined>(undefined);
   readonly disabled = input(false);
   readonly answered = output<AnswerChange>();
+  readonly flagged = input(false);
+  readonly flagToggled = output<void>();
 
   protected readonly abjad = ABJAD;
 }

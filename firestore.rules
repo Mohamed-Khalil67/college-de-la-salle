@@ -106,9 +106,20 @@ service cloud.firestore {
             || (p.maxVisibilityLosses is int && p.maxVisibilityLosses >= 0 && p.maxVisibilityLosses <= 50));
     }
 
+    function isScoringPolicy(p) {
+      return p is map
+        && p.keys().hasAll(['passPercent', 'resultRelease'])
+        && p.keys().hasOnly(['passPercent', 'resultRelease'])
+        && (p.passPercent == null
+            || ((p.passPercent is int || p.passPercent is float)
+                && p.passPercent >= 0 && p.passPercent <= 100))
+        && p.resultRelease in ['ON_GRADED', 'MANUAL'];
+    }
+
     function isExamMeta(d) {
       let fields = ['ownerId', 'title', 'description', 'durationSeconds', 'window', 'accessCode',
-                    'integrity', 'questionCount', 'maxScore', 'createdAt'];
+                    'integrity', 'scoring', 'resultsPublished', 'questionCount', 'maxScore',
+                    'createdAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
         && d.ownerId == uid()
         && d.title is string && d.title.size() > 0 && d.title.size() <= 200
@@ -117,6 +128,8 @@ service cloud.firestore {
         && isWindow(d.window)
         && isAccessCode(d.accessCode)
         && isIntegrityPolicy(d.integrity)
+        && isScoringPolicy(d.scoring)
+        && d.resultsPublished is bool
         && d.questionCount is int && d.questionCount >= 1 && d.questionCount <= 100
         && d.maxScore is int && d.maxScore >= 1
         && d.createdAt is timestamp;
@@ -132,7 +145,8 @@ service cloud.firestore {
 
       allow create: if isExaminer()
         && isExamMeta(request.resource.data)
-        && request.resource.data.createdAt == request.time;
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.resultsPublished == false;
 
       allow update: if isExaminer()
         && resource.data.ownerId == uid()
@@ -256,10 +270,73 @@ service cloud.firestore {
         && s.completedBy in ['CANDIDATE', 'AUTO_TIMER', 'AUTO_INTEGRITY'];
     }
 
+    // Session ids are "{examId}_{candidateUid}"; this proves the id belongs to the caller.
+    function isOwnSessionId(sessionId) {
+      return sessionId.matches('^[A-Za-z0-9-]+_' + uid() + '$');
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Drafts (server-side autosave) — writable only by the session's candidate, only while live
+    // ---------------------------------------------------------------------------------------------
+
+    function isValidDraftWrite(sessionId) {
+      let session = get(sessionPath(sessionId)).data;
+      let d = request.resource.data;
+      let fields = ['examId', 'candidateId', 'examOwnerId', 'answers', 'flagged', 'integrity',
+                    'updatedAt'];
+      return signedIn()
+        && exists(sessionPath(sessionId))
+        && session.candidateId == uid()
+        && session.status == 'ACTIVE'
+        && request.time <= session.expiresAt
+        && d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.examId == session.examId
+        && d.candidateId == uid()
+        && d.examOwnerId == session.examOwnerId
+        && d.answers is map && d.answers.size() <= 100
+        && d.flagged is list && d.flagged.size() <= 100
+        && isIntegrityReport(d.integrity)
+        && d.updatedAt == request.time;
+    }
+
+    match /drafts/{sessionId} {
+      allow get: if signedIn()
+        && (
+          (resource == null && isOwnSessionId(sessionId))
+          || (resource != null && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid()))
+        );
+      allow list: if signedIn() && resource.data.examOwnerId == uid();
+      allow create, update: if isValidDraftWrite(sessionId);
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  Results — the only place a candidate sees a score. Written exclusively by Cloud Functions,
+    //  and only once the examiner's release policy allows it.
+    // ---------------------------------------------------------------------------------------------
+
+    match /results/{sessionId} {
+      allow get: if signedIn()
+        && (
+          (resource == null && isOwnSessionId(sessionId))
+          || (resource != null && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid()))
+        );
+      allow list: if signedIn() && resource.data.examOwnerId == uid();
+      allow write: if false;
+    }
+
     match /submissions/{sessionId} {
-      // Candidates see only their own; examiners see only submissions to exams they own.
-      allow read: if signedIn()
-        && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid());
+      // Examiners: every submission to exams they own (get and list).
+      // Candidates: only their OWN submission, only by exact id, and only until it is graded —
+      // after that, scores reach them exclusively through `results/*` once released. Reading a
+      // not-yet-existing own id is allowed so a client can tell "never arrived" from "arrived".
+      allow list: if signedIn() && resource.data.examOwnerId == uid();
+      allow get: if signedIn()
+        && (
+          (resource != null && resource.data.examOwnerId == uid())
+          || (isOwnSessionId(sessionId)
+              && (resource == null || resource.data.get('gradingStatus', null) == null))
+        );
 
       allow create: if isValidSubmissionCreate(sessionId);
 
