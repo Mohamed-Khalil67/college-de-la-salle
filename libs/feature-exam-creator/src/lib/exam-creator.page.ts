@@ -13,11 +13,26 @@ import {
   toNewExamInput,
 } from './exam-form.model';
 import { FieldErrors } from './field-errors';
-import { ArCountPipe, ArNumberPipe, arabicErrorMessage } from '@exam/ui-arabic';
+import {
+  ArabicDateTimeInput,
+  ArabicNumberInput,
+  ArCountPipe,
+  ArNumberPipe,
+  arabicErrorMessage,
+} from '@exam/ui-arabic';
 
 @Component({
   selector: 'exam-creator-page',
-  imports: [FormField, FormRoot, RouterLink, FieldErrors, ArCountPipe, ArNumberPipe],
+  imports: [
+    FormField,
+    FormRoot,
+    RouterLink,
+    FieldErrors,
+    ArCountPipe,
+    ArNumberPipe,
+    ArabicNumberInput,
+    ArabicDateTimeInput,
+  ],
   templateUrl: './exam-creator.page.html',
   styleUrl: './exam-creator.page.scss',
 })

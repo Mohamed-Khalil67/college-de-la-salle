@@ -34,7 +34,8 @@
 .question-footer { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
 .points { display: flex; gap: 0.5rem; align-items: center; }
 .add-row { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.points input { inline-size: 5rem; }
+.points exam-number-input { inline-size: 5rem; }
+.field > .label { font-weight: 600; font-size: 0.95rem; }
 
 
 .save-bar { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; flex-wrap: wrap; padding-block: 1.5rem 3rem; }

@@ -31,10 +31,11 @@ import { Star } from '@exam/ui-arabic';
               spellcheck="false"
               placeholder="ABC234"
               [formField]="joinForm.code"
-              aria-describedby="code-error"
+              aria-describedby="code-hint code-error"
             />
             <button type="submit" class="primary">متابعة</button>
           </div>
+          <p id="code-hint" class="hint">ستة أحرف لاتينية أو أرقام، كما زوَّدك بها المُمتحِن.</p>
           <p id="code-error" class="field-error" aria-live="polite">
             @if (joinForm.code().touched()) {
               @for (error of joinForm.code().errors(); track error.kind) {
@@ -71,7 +72,7 @@ export class HomePage {
   protected readonly joinForm = form(this.model, (p) => {
     required(p.code, { message: 'أدخِل الرمز الذي زوَّدك به المُمتحِن.' });
     maxLength(p.code, LIMITS.accessCodeLength + 2);
-    pattern(p.code, /^\s*[A-Za-z0-9]{6}\s*$/, {
+    pattern(p.code, /^\s*[A-Za-z0-9\u0660-\u0669\u06F0-\u06F9]{6}\s*$/, {
       message: 'يتكوَّن الرمز من ستة أحرف لاتينية أو أرقام.',
     });
   });

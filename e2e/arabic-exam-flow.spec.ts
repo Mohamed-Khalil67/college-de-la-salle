@@ -38,6 +38,12 @@ test('examiner creates, candidate completes in RTL, examiner sees the graded ent
   await expect(examiner.getByRole('heading', { name: 'إعداد اختبار' })).toBeVisible();
   await assertRtlIntegrity(examiner);
 
+  // Examiner-defined time and scoring render in Arabic digits, dates in Arabic words.
+  await expect(examiner.getByLabel('المدة (بالدقائق)')).toHaveValue('٥');
+  await examiner.getByLabel('المدة (بالدقائق)').fill('10'); // Latin keyboard input…
+  await expect(examiner.getByLabel('المدة (بالدقائق)')).toHaveValue('١٠'); // …shown as ١٠
+  await expect(examiner.locator('exam-datetime-input .preview').first()).toContainText('٢٠');
+
   // Validation messages are in Arabic.
   await examiner.getByRole('button', { name: 'نشر الاختبار' }).click();
   await expect(examiner.getByText('أدخِل عنوانًا للاختبار.')).toBeVisible();

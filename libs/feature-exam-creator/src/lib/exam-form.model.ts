@@ -18,12 +18,12 @@ import type { NewExamInput } from '@exam/data-access-exams';
 export interface QuestionModel {
   type: QuestionType;
   prompt: string;
-  points: number;
+  points: number | null;
   // CHOICE
   options: string[];
   correctIndex: number;
   // TEXT
-  maxLength: number;
+  maxLength: number | null;
   modelAnswer: string;
   criteria: string;
 }
@@ -31,7 +31,7 @@ export interface QuestionModel {
 export interface ExamFormModel {
   title: string;
   description: string;
-  durationMinutes: number;
+  durationMinutes: number | null;
   /** `datetime-local` strings in the examiner's local time zone. */
   opensAt: string;
   closesAt: string;
@@ -75,7 +75,7 @@ export const examFormSchema = schema<ExamFormModel>((p) => {
   min(p.durationMinutes, LIMITS.minDurationSeconds / 60, { message: 'أقلّ مدة دقيقة واحدة.' });
   max(p.durationMinutes, LIMITS.maxDurationSeconds / 60, { message: 'أقصى مدة أربع ساعات.' });
   validate(p.durationMinutes, ({ value }) =>
-    Number.isInteger(value()) ? null : { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الدقائق.' },
+    value() === null || Number.isInteger(value()) ? null : { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الدقائق.' },
   );
 
   required(p.opensAt, { message: 'حدِّد موعد بدء إتاحة الاختبار.' });
@@ -103,7 +103,7 @@ export const examFormSchema = schema<ExamFormModel>((p) => {
     min(q.points, 1, { message: 'أقلّ درجة للسؤال درجة واحدة.' });
     max(q.points, 100, { message: 'الحدّ الأقصى ١٠٠ درجة.' });
     validate(q.points, ({ value }) =>
-      Number.isInteger(value()) ? null : { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الدرجات.' },
+      value() === null || Number.isInteger(value()) ? null : { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الدرجات.' },
     );
 
     // Multiple choice
@@ -141,7 +141,7 @@ export function toNewExamInput(model: ExamFormModel): NewExamInput {
   return {
     title: model.title,
     description: model.description,
-    durationSeconds: model.durationMinutes * 60,
+    durationSeconds: (model.durationMinutes ?? 0) * 60,
     window: { opensAt: fromLocalInput(model.opensAt), closesAt: fromLocalInput(model.closesAt) },
     integrity: { maxVisibilityLosses: model.maxVisibilityLosses },
     questions: model.questions.map((q) =>
@@ -149,15 +149,15 @@ export function toNewExamInput(model: ExamFormModel): NewExamInput {
         ? {
             type: 'TEXT' as const,
             prompt: q.prompt,
-            points: q.points,
-            maxLength: q.maxLength,
+            points: q.points ?? 0,
+            maxLength: q.maxLength ?? LIMITS.defaultTextAnswerLength,
             modelAnswer: q.modelAnswer,
             criteria: q.criteria,
           }
         : {
             type: 'CHOICE' as const,
             prompt: q.prompt,
-            points: q.points,
+            points: q.points ?? 0,
             options: q.options,
             correctIndex: q.correctIndex,
           },

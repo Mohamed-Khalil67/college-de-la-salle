@@ -44,38 +44,34 @@
 
       <div class="field">
         <label for="duration">المدة (بالدقائق)</label>
-        <input
-          id="duration"
-          type="number"
-          inputmode="numeric"
+        <exam-number-input
+          inputId="duration"
+          describedBy="duration-errors"
           [formField]="examForm.durationMinutes"
-          aria-describedby="duration-errors"
         />
         <exam-field-errors id="duration-errors" [field]="examForm.durationMinutes" [force]="attempted()" />
       </div>
 
       <div class="field">
         <label for="integrity">التسليم التلقائي بعد مغادرة الصفحة</label>
-        <input
-          id="integrity"
-          type="number"
-          inputmode="numeric"
+        <exam-number-input
+          inputId="integrity"
+          describedBy="integrity-hint"
           placeholder="لا يُسلَّم تلقائيًّا"
           [formField]="examForm.maxVisibilityLosses"
-          aria-describedby="integrity-hint"
         />
         <p id="integrity-hint" class="hint">اتركه فارغًا لتسجيل مرات المغادرة فقط دون تسليم تلقائي.</p>
       </div>
 
       <div class="field">
-        <label for="opens">يُتاح من</label>
-        <input id="opens" type="datetime-local" [formField]="examForm.opensAt" aria-describedby="opens-errors" />
+        <span class="label" id="opens-label">يُتاح من</span>
+        <exam-datetime-input labelId="opens-label" [formField]="examForm.opensAt" />
         <exam-field-errors id="opens-errors" [field]="examForm.opensAt" [force]="attempted()" />
       </div>
 
       <div class="field">
-        <label for="closes">يُغلَق في</label>
-        <input id="closes" type="datetime-local" [formField]="examForm.closesAt" aria-describedby="closes-errors" />
+        <span class="label" id="closes-label">يُغلَق في</span>
+        <exam-datetime-input labelId="closes-label" [formField]="examForm.closesAt" />
         <exam-field-errors id="closes-errors" [field]="examForm.closesAt" [force]="attempted()" />
       </div>
     </section>
@@ -99,9 +95,9 @@
                 <option value="TEXT">إجابة مقالية (تُصحِّحها أنت، ويقترح الذكاء الاصطناعي)</option>
               </select>
             </div>
-            <label class="points">
+            <label class="points" [for]="'points-' + qi">
               الدرجة
-              <input type="number" inputmode="numeric" [formField]="question.points" />
+              <exam-number-input [inputId]="'points-' + qi" [formField]="question.points" />
             </label>
           </div>
           <exam-field-errors [id]="'points-errors-' + qi" [field]="question.points" [force]="attempted()" />
@@ -178,12 +174,10 @@
               </div>
               <div class="field narrow">
                 <label [for]="'maxlen-' + qi">الطول الأقصى للإجابة (بالأحرف)</label>
-                <input
-                  [id]="'maxlen-' + qi"
-                  type="number"
-                  inputmode="numeric"
+                <exam-number-input
+                  [inputId]="'maxlen-' + qi"
+                  [describedBy]="'maxlen-errors-' + qi"
                   [formField]="question.maxLength"
-                  [attr.aria-describedby]="'maxlen-errors-' + qi"
                 />
                 <exam-field-errors [id]="'maxlen-errors-' + qi" [field]="question.maxLength" [force]="attempted()" />
               </div>

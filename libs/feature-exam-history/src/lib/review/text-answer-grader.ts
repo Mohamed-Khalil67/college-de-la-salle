@@ -9,6 +9,7 @@ import {
 } from '@exam/contracts';
 import { SubmissionReviewService } from '@exam/data-access-exams';
 import {
+  ArabicNumberInput,
   ArCountPipe,
   ArNumberPipe,
   ArScorePipe,
@@ -22,7 +23,7 @@ import {
  */
 @Component({
   selector: 'exam-text-answer-grader',
-  imports: [FormField, FormRoot, ArCountPipe, ArNumberPipe, ArScorePipe, BidiIsolate],
+  imports: [FormField, FormRoot, ArCountPipe, ArNumberPipe, ArScorePipe, BidiIsolate, ArabicNumberInput],
   template: `
     @let q = question();
     <article class="grader" [attr.aria-labelledby]="'grader-' + q.id">
@@ -74,7 +75,7 @@ import {
       <form [formRoot]="gradeForm" (submit)="save($event)" class="grade-form">
         <div class="field">
           <label [for]="'pts-' + q.id">الدرجة (من ٠ إلى {{ q.points | arNumber }})</label>
-          <input [id]="'pts-' + q.id" type="number" step="0.5" inputmode="decimal" [formField]="gradeForm.points" />
+          <exam-number-input [inputId]="'pts-' + q.id" [allowDecimal]="true" [formField]="gradeForm.points" />
         </div>
         <div class="field grow">
           <label [for]="'fb-' + q.id">ملاحظات للمُختبَر <span class="muted">(اختياري)</span></label>
@@ -112,7 +113,7 @@ import {
     .rationale { font-size: 0.95rem; white-space: pre-wrap; }
     .grade-form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
     .field { display: grid; gap: 0.25rem; }
-    .field input { inline-size: 7rem; }
+    .field exam-number-input { inline-size: 7rem; }
     .grow { flex: 1; min-inline-size: 14rem; }
     .grow textarea { inline-size: 100%; }
   `,

@@ -138,6 +138,15 @@ export function formatCount(n: number, noun: CountedNoun | PluralForms, locale =
   return forms[category].replace('{n}', formatNumber(n, { maximumFractionDigits: 1 }, locale));
 }
 
+/** Converts Latin and Persian digits (and the decimal point) in a string to the app's digits. */
+export function toAppDigits(text: string, locale = APP_LOCALE): string {
+  if (!locale.includes('nu-arab')) return text;
+  return text
+    .replace(/[0-9]/g, (d) => String.fromCharCode(0x0660 + Number(d)))
+    .replace(/[۰-۹]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0x06f0 + 0x0660))
+    .replace(/\./g, '٫');
+}
+
 /** Parses digits typed in either script (Arabic-Indic, Persian, Latin) into a number. */
 export function parseLocalizedNumber(raw: string): number {
   const western = raw

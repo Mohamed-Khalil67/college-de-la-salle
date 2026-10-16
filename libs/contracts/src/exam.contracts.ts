@@ -316,7 +316,12 @@ export function sessionIdFor(examId: string, candidateId: Uid): string {
 }
 
 export function normalizeAccessCode(raw: string): string {
-  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return raw
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)) // Arabic-Indic digits
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0)) // Persian digits
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
 }
 
 export function isValidAccessCode(code: string): boolean {
