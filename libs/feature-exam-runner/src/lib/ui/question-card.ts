@@ -55,7 +55,7 @@ const ABJAD = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح'];
     }
     .option.selected { border-color: var(--accent); background: var(--accent-soft); }
     .option:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
-    .letter { font-family: var(--font-display); font-weight: 700; color: var(--terracotta-strong); min-inline-size: 1.5em; text-align: center; }
+    .letter { font-family: var(--font-display); font-weight: 700; color: var(--primary-strong); min-inline-size: 1.5em; text-align: center; }
     .text { font-family: var(--font-text); line-height: var(--leading-text); flex: 1; }
     input { accent-color: var(--accent); inline-size: 1.1rem; block-size: 1.1rem; margin: 0; }
   `,

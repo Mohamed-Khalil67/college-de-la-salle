@@ -1,6 +1,6 @@
 import { isPlatformBrowser } from '@angular/common';
 import { PLATFORM_ID, computed, inject } from '@angular/core';
-import { COLLECTIONS } from '@exam/contracts';
+import { COLLECTIONS, isSubjectId, type SubjectId } from '@exam/contracts';
 import { FIRESTORE, firestoreQueryResource } from '@exam/data-access-auth/data';
 import {
   collection,
@@ -11,7 +11,17 @@ import {
   type QueryDocumentSnapshot,
   where,
 } from 'firebase/firestore';
-import { isSubjectId, type PracticeExamCard, type SubjectId } from './curriculum.model';
+
+
+/** A practice exam an examiner chose to list publicly on a subject hub (`practice_catalog`). */
+export interface PracticeExamCard {
+  readonly examId: string;
+  readonly subjectId: SubjectId;
+  readonly title: string;
+  readonly code: string;
+  readonly durationSeconds: number;
+  readonly questionCount: number;
+}
 
 const MAX_CARDS = 24;
 

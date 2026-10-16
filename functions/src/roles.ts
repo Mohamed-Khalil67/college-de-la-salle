@@ -16,6 +16,7 @@ import {
   type RefreshRoleResponse,
   resolveRole,
   ROLE_CLAIM,
+  TEACHER_CLAIM,
   type UserRole,
 } from './contracts';
 
@@ -109,9 +110,16 @@ export const manageExaminerRole = onCall<
 export async function reconcileUser(user: UserRecord): Promise<UserRole> {
   const current = parseRole(user.customClaims?.[ROLE_CLAIM]);
   const next = await roleFromDirectory(user);
-  if (next === current) return next;
+  const teacher = hasRole(next, 'examiner');
+  const claimOk = (user.customClaims?.[TEACHER_CLAIM] === true) === teacher;
+  if (next === current && claimOk) return next;
 
-  await getAuth().setCustomUserClaims(user.uid, { ...user.customClaims, [ROLE_CLAIM]: next });
+  await getAuth().setCustomUserClaims(user.uid, {
+    ...user.customClaims,
+    [ROLE_CLAIM]: next,
+    [TEACHER_CLAIM]: teacher,
+  });
+  if (next === current) return next; // only the teacher flag was missing (older accounts)
   const metadata = db().collection(COLLECTIONS.userMetadata).doc(user.uid);
   if (hasRole(current, next)) {
     // Downgrade: close the stale-token window.
@@ -178,8 +186,8 @@ interface Actor {
 export async function requireAuthor(request: CallableRequest): Promise<string> {
   const auth = request.auth;
   if (!auth) throw new HttpsError('unauthenticated', 'سجِّل الدخول أولًا.');
-  if (!hasRole(parseRole(auth.token[ROLE_CLAIM]), 'examiner')) {
-    throw new HttpsError('permission-denied', 'هذا الإجراء مقصور على المُمتحِنين.');
+  if (auth.token[TEACHER_CLAIM] !== true) {
+    throw new HttpsError('permission-denied', 'هذا الإجراء مقصور على المعلّمين.');
   }
   const metadata = await db().collection(COLLECTIONS.userMetadata).doc(auth.uid).get();
   const revokeTime = metadata.get('revokeTime');

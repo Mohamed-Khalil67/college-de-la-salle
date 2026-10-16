@@ -52,14 +52,14 @@ interface Cell {
       font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted);
       background: var(--surface); border: 1.5px dashed var(--border); border-radius: 8px;
     }
-    .cell.answered { color: var(--on-terracotta); background: var(--accent); border: 1.5px solid var(--accent); }
-    .cell.flagged { border: 2px solid var(--terracotta); }
+    .cell.answered { color: var(--on-primary); background: var(--accent); border: 1.5px solid var(--accent); }
+    .cell.flagged { border: 2px solid var(--primary); }
     .cell.answered.flagged { box-shadow: inset 0 0 0 2px var(--surface); }
-    .flag { position: absolute; inset-block-start: -0.55rem; inset-inline-end: -0.35rem; font-size: 0.8rem; color: var(--terracotta-strong); }
+    .flag { position: absolute; inset-block-start: -0.55rem; inset-inline-end: -0.35rem; font-size: 0.8rem; color: var(--primary-strong); }
     .legend { display: flex; gap: 1rem; margin: 0.35rem 0 0; font-size: 0.8rem; color: var(--muted); }
     .swatch { display: inline-block; inline-size: 0.8rem; block-size: 0.8rem; border-radius: 3px; vertical-align: middle; border: 1.5px dashed var(--border); }
     .swatch.answered { background: var(--accent); border: 0; }
-    .swatch.flagged { border: 2px solid var(--terracotta); }
+    .swatch.flagged { border: 2px solid var(--primary); }
   `,
 })
 export class QuestionNavigator {

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { directoryKeysFor, hasRole, parseDirectoryTarget, parseRole, resolveRole } from './roles';
+import { directoryKeysFor, hasRole, parseDirectoryTarget, parseRole, resolveRole, TEACHER_CLAIM } from './roles';
 
 describe('roles', () => {
+  it('names the claim the rules check', () => {
+    expect(TEACHER_CLAIM).toBe('teacher');
+  });
+
   it('treats unknown claims as the least-privileged role', () => {
     expect(parseRole('super_admin')).toBe('super_admin');
     expect(parseRole('examiner')).toBe('examiner');

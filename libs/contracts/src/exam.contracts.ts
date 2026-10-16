@@ -105,8 +105,8 @@ export interface AccessPolicy {
   readonly mode: AccessMode;
 }
 
-/** Curriculum subjects an exam can be assigned to (see @exam/data-access-curriculum). */
-export const SUBJECT_IDS = ['arabic', 'physics', 'chemistry', 'mathematics'] as const;
+/** Subjects an exam can be assigned to; each has a hub page (see content.ts). */
+export const SUBJECT_IDS = ['arabic', 'mathematics', 'physics-chemistry'] as const;
 export type SubjectId = (typeof SUBJECT_IDS)[number];
 
 export function isSubjectId(value: unknown): value is SubjectId {
@@ -470,6 +470,8 @@ export const COLLECTIONS = {
   examinerDirectory: 'examiner_directory',
   /** Public practice-exam cards per subject (`practice_catalog/{examId}`). Readable by anyone. */
   practiceCatalog: 'practice_catalog',
+  /** Editable portal pages (home, history, subject hubs). Public read; teacher-only write. */
+  contentPages: 'content_pages',
   /** Immutable record of every role change. Super-admin readable, server-written. */
   auditLogs: 'audit_logs',
   /** Per-user `revokeTime` (seconds) used by the rules to reject tokens minted before a revocation. */

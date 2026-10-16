@@ -18,7 +18,7 @@ import { Component, input, output } from '@angular/core';
   `,
   styles: `
     .flag-toggle { font-size: 0.85rem; padding-block: 0.2rem; padding-inline: 0.7rem; color: var(--muted); font-weight: 600; }
-    .flag-toggle.on { color: var(--terracotta-strong); border-color: var(--terracotta); background: var(--terracotta-soft); }
+    .flag-toggle.on { color: var(--primary-strong); border-color: var(--primary); background: var(--primary-soft); }
   `,
 })
 export class FlagToggle {

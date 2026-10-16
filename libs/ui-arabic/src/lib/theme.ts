@@ -1,5 +1,5 @@
-import { DOCUMENT } from '@angular/common';
-import { Component, Service, computed, effect, inject, signal } from '@angular/core';
+import { DOCUMENT, isPlatformBrowser } from '@angular/common';
+import { Component, PLATFORM_ID, Service, computed, effect, inject, signal } from '@angular/core';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -12,13 +12,17 @@ const STORAGE_KEY = 'exam-platform:theme';
 @Service()
 export class ThemeService {
   readonly #document = inject(DOCUMENT);
+  readonly #browser = isPlatformBrowser(inject(PLATFORM_ID));
   readonly #mode = signal<ThemeMode>(this.#initial());
   readonly mode = this.#mode.asReadonly();
   readonly isDark = computed(() => this.#mode() === 'dark');
 
   constructor() {
     effect(() => {
-      this.#document.documentElement.setAttribute('data-theme', this.#mode());
+      const mode = this.#mode();
+      // Prerendered HTML carries no theme attribute: the CSS follows the device preference by itself,
+      // so dark-mode visitors get no flash of the light theme before hydration.
+      if (this.#browser) this.#document.documentElement.setAttribute('data-theme', mode);
     });
   }
 

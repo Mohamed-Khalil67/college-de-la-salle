@@ -74,7 +74,7 @@ await db.runTransaction(async (tx) => {
 });
 
 if (user) {
-  await auth.setCustomUserClaims(user.uid, { ...user.customClaims, role: 'super_admin' });
+  await auth.setCustomUserClaims(user.uid, { ...user.customClaims, role: 'super_admin', teacher: true });
   await db.collection('user_metadata').doc(user.uid).delete();
   console.log(`${email} is now the super admin. They should sign out and in again (or refresh permissions).`);
 } else {

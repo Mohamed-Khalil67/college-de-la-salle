@@ -1,38 +1,71 @@
-<div dir="rtl" lang="ar" class="shell">
-  <a class="skip-link" href="#main">تخطَّ إلى المحتوى الرئيس</a>
-  <exam-frieze [size]="34" />
-  <header class="app-header">
-    <a routerLink="/" class="brand" data-testid="brand">
-      <span class="brand-title"><portal-school-name /></span>
-      <span class="brand-tagline">{{ curriculum.school().section }}</span>
-    </a>
-    <nav aria-label="التنقّل الرئيس" class="main-nav">
-      <app-nav-menu label="عن المدرسة" [items]="aboutMenu" />
-      <app-nav-menu label="الأقسام" [items]="sectionsMenu" />
-      <app-nav-menu label="المواد الدراسية" [items]="subjectsMenu()" />
-      <a routerLink="/exams" routerLinkActive="active">الاختبارات</a>
-      @if (auth.isSuperAdmin()) {
-        <a routerLink="/admin" routerLinkActive="active">إدارة الصلاحيات</a>
-      }
-      @if (auth.isExaminer()) {
-        <a routerLink="/examiner" routerLinkActive="active">لوحة المُمتحِن</a>
-      }
-    </nav>
-    <div class="account">
-      @if (auth.hasAccount()) {
-        <span class="who"><bdi>{{ auth.displayName() }}</bdi></span>
-        <button type="button" class="link-button" (click)="signOut()">تسجيل الخروج</button>
-      } @else {
-        <a routerLink="/sign-in">تسجيل الدخول</a>
-      }
-      <exam-theme-toggle />
+<div class="shell" [dir]="pageLang.dir()">
+  <a class="skip-link" href="#main" [attr.lang]="pageLang.lang()">{{ fr() ? 'Aller au contenu principal' : 'تخطَّ إلى المحتوى الرئيس' }}</a>
+
+  <header class="sticky top-0 z-30 border-b-2 border-gold bg-navy-900 text-cream shadow-md" [attr.lang]="pageLang.lang()">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5">
+      <a routerLink="/" class="brand group grid no-underline" data-testid="brand">
+        <span class="text-xl font-bold leading-tight text-cream md:text-2xl"><portal-school-name /></span>
+        <span class="text-xs font-semibold text-gold">الثانوية العامة · القسم العربي</span>
+      </a>
+
+      <button
+        type="button"
+        class="menu-button md:hidden"
+        [attr.aria-expanded]="menuOpen()"
+        aria-controls="primary-nav"
+        (click)="menuOpen.set(!menuOpen())"
+      >
+        <span aria-hidden="true">{{ menuOpen() ? '✕' : '☰' }}</span>
+        <span class="visually-hidden">{{ fr() ? 'Menu' : 'القائمة' }}</span>
+      </button>
+
+      <nav
+        id="primary-nav"
+        class="w-full flex-col gap-1 md:flex md:w-auto md:flex-row md:flex-wrap md:items-center md:gap-x-1"
+        [class.flex]="menuOpen()"
+        [class.hidden]="!menuOpen()"
+        [attr.aria-label]="fr() ? 'Navigation principale' : 'التنقّل الرئيس'"
+      >
+        @for (item of nav; track item.link) {
+          <a
+            class="nav-link"
+            [routerLink]="item.link"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: !!item.exact }"
+            [attr.lang]="item.lang"
+            [attr.dir]="item.lang === 'fr' ? 'ltr' : 'rtl'"
+          >{{ item.label }}</a>
+        }
+
+        @if (auth.isTeacher()) {
+          <a class="nav-link" routerLink="/examiner" routerLinkActive="active">{{ fr() ? 'Tableau de bord' : 'لوحة المعلّم' }}</a>
+        }
+        @if (auth.isSuperAdmin()) {
+          <a class="nav-link" routerLink="/admin" routerLinkActive="active">{{ fr() ? 'Accès' : 'إدارة الصلاحيات' }}</a>
+        }
+        @if (!auth.hasAccount()) {
+          <a class="nav-link teacher-link" routerLink="/sign-in" [queryParams]="{ returnUrl: here() }" lang="fr" dir="ltr" data-testid="teacher-login">Mode Enseignant</a>
+        }
+      </nav>
+
+      <div class="flex flex-wrap items-center gap-3">
+        @if (auth.hasAccount()) {
+          <span class="hidden max-w-[10rem] truncate text-sm text-cream/80 2xl:inline"><bdi>{{ auth.displayName() }}</bdi></span>
+          <button type="button" class="signout" (click)="signOut()">{{ fr() ? 'Se déconnecter' : 'تسجيل الخروج' }}</button>
+        }
+        <exam-theme-toggle />
+      </div>
     </div>
   </header>
-  <main id="main" tabindex="-1">
+
+  <main id="main" tabindex="-1" [attr.lang]="pageLang.lang()">
     <router-outlet />
   </main>
-  <footer class="app-footer">
-    <p><portal-school-name /> · {{ curriculum.school().section }}</p>
-    <p class="muted">في الاختبارات: الوقت يحدِّده الخادم، ومفاتيح الإجابات لا يطَّلع عليها المُختبَر.</p>
+
+  <footer class="app-footer" [attr.lang]="pageLang.lang()">
+    <p><portal-school-name /> · الظاهر · القاهرة</p>
+    <p class="muted">الثانوية العامة — القسم العربي · <span lang="fr" dir="ltr">Section arabe du lycée</span></p>
   </footer>
+
+  <portal-teacher-bar />
 </div>

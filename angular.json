@@ -30,13 +30,16 @@
               }
             ],
             "styles": [
-              "node_modules/@fontsource/amiri/400.css",
-              "node_modules/@fontsource/amiri/700.css",
-              "node_modules/@fontsource/ibm-plex-sans-arabic/400.css",
-              "node_modules/@fontsource/ibm-plex-sans-arabic/500.css",
-              "node_modules/@fontsource/ibm-plex-sans-arabic/600.css",
+              "node_modules/@fontsource/cairo/arabic-400.css",
+              "node_modules/@fontsource/cairo/arabic-600.css",
+              "node_modules/@fontsource/cairo/arabic-700.css",
+              "node_modules/@fontsource/cairo/latin-400.css",
+              "node_modules/@fontsource/cairo/latin-600.css",
+              "node_modules/@fontsource/cairo/latin-700.css",
+              "node_modules/@fontsource-variable/inter/wght.css",
               "node_modules/@fontsource/noto-naskh-arabic/400.css",
               "node_modules/@fontsource/noto-naskh-arabic/600.css",
+              "src/tailwind.css",
               "src/styles.scss"
             ],
             "server": "src/main.server.ts",

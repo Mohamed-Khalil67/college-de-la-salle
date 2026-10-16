@@ -44,7 +44,7 @@ export class ExamRunnerPage {
 
   protected readonly candidate = signal({ name: '' });
   protected readonly candidateForm = form(this.candidate, (p) => {
-    required(p.name, { message: 'أدخِل اسمك ليتعرَّف عليك المُمتحِن.' });
+    required(p.name, { message: 'أدخِل اسمك ليتعرَّف عليك المعلّم.' });
     maxLength(p.name, LIMITS.maxCandidateNameLength, { message: 'الاسم أطول من المسموح.' });
   });
 

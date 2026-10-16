@@ -22,6 +22,7 @@
       "@exam/data-access-curriculum/practice": ["./libs/data-access-curriculum/src/practice.ts"],
       "@exam/data-access-auth/data": ["./libs/data-access-auth/src/data.ts"],
       "@exam/data-access-curriculum": ["./libs/data-access-curriculum/src/index.ts"],
+      "@exam/feature-portal/practice": ["./libs/feature-portal/src/practice.ts"],
       "@exam/feature-portal": ["./libs/feature-portal/src/index.ts"],
       "@exam/data-access-auth": ["./libs/data-access-auth/src/index.ts"],
       "@exam/feature-admin-panel": ["./libs/feature-admin-panel/src/index.ts"],

@@ -90,7 +90,7 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
 
       const status = exam['status'] ?? 'PUBLISHED';
       if (status === 'DRAFT') throw new HttpsError('failed-precondition', 'لم يُنشَر هذا الاختبار بعد.');
-      if (status === 'CLOSED') throw new HttpsError('failed-precondition', 'أغلق المُمتحِن هذا الاختبار.');
+      if (status === 'CLOSED') throw new HttpsError('failed-precondition', 'أغلق المعلّم هذا الاختبار.');
 
       if (exam['access']?.mode === 'ROSTER') {
         const email = token.email_verified === true ? normalizeEmail(String(token.email ?? '')) : '';

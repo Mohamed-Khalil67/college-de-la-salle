@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { LIMITS, normalizeAccessCode } from '@exam/contracts';
 import { AuthStore } from '@exam/data-access-auth';
 import { CandidateInvitationsStore } from '@exam/data-access-exams';
+import { SUBJECTS } from '@exam/contracts';
+import { PracticeExams } from '@exam/feature-portal/practice';
 import { ArCountPipe, ArDatePipe, arabicErrorMessage, BidiIsolate, Star } from '@exam/ui-arabic';
 
 /**
@@ -12,23 +14,23 @@ import { ArCountPipe, ArDatePipe, arabicErrorMessage, BidiIsolate, Star } from '
  */
 @Component({
   selector: 'app-exams-home-page',
-  imports: [FormField, FormRoot, RouterLink, Star, ArCountPipe, ArDatePipe, BidiIsolate],
+  imports: [FormField, FormRoot, RouterLink, Star, ArCountPipe, ArDatePipe, BidiIsolate, PracticeExams],
   providers: [CandidateInvitationsStore],
   template: `
     <section class="hero">
       <exam-star [size]="34" />
       <h1>اخْتِبَارَاتٌ مُؤَقَّتَةٌ بِعَدْلٍ وَأَمَانَة</h1>
-      <p class="lead">أدخِل رمز الاختبار الذي زوَّدك به المُمتحِن، أو افتح الرابط الذي أرسله إليك.</p>
+      <p class="lead">أدخِل رمز الاختبار الذي زوَّدك به المعلّم، أو افتح الرابط الذي أرسله إليك.</p>
     </section>
 
     @if (notAllowed()) {
       <p class="notice" role="status">
-        {{ notAllowed() === 'super_admin' ? 'هذه الصفحة مقصورة على المشرف العام.' : 'هذا الحساب ليس من حسابات المُمتحِنين المعتمدة، لذا تُعرَض لك صفحة المُختبَرين.' }}
+        {{ notAllowed() === 'super_admin' ? 'هذه الصفحة مقصورة على المشرف العام.' : 'هذا الحساب ليس من حسابات المعلّمين المعتمدة، لذا تُعرَض لك صفحة المُختبَرين.' }}
       </p>
     }
-    @if (auth.hasAccount() && !auth.isExaminer()) {
+    @if (auth.hasAccount() && !auth.isTeacher()) {
       <div class="role-refresh">
-        <p class="muted">مُنِحتَ صلاحية المُمتحِن للتوّ؟ حدِّث صلاحياتك دون الحاجة إلى تسجيل الخروج.</p>
+        <p class="muted">مُنِحتَ صلاحية المعلّم للتوّ؟ حدِّث صلاحياتك دون الحاجة إلى تسجيل الخروج.</p>
         <button type="button" [disabled]="refreshing()" (click)="refreshRole()">
           {{ refreshing() ? 'جارٍ التحديث…' : 'تحديث صلاحياتي' }}
         </button>
@@ -57,7 +59,7 @@ import { ArCountPipe, ArDatePipe, arabicErrorMessage, BidiIsolate, Star } from '
             />
             <button type="submit" class="primary">متابعة</button>
           </div>
-          <p id="code-hint" class="hint">ستة أحرف لاتينية أو أرقام، كما زوَّدك بها المُمتحِن.</p>
+          <p id="code-hint" class="hint">ستة أحرف لاتينية أو أرقام، كما زوَّدك بها المعلّم.</p>
           <p id="code-error" class="field-error" aria-live="polite">
             @if (joinForm.code().touched()) {
               @for (error of joinForm.code().errors(); track error.kind) {
@@ -99,8 +101,18 @@ import { ArCountPipe, ArDatePipe, arabicErrorMessage, BidiIsolate, Star } from '
       </div>
     </section>
 
+    <section class="bank" aria-labelledby="bank-title" data-testid="exam-bank">
+      <h2 id="bank-title">بنك الامتحانات التدريبية</h2>
+      <p class="muted">اختبارات مؤقَّتة مفتوحة للجميع، مصنَّفة بحسب المادة. لا يلزمك حساب.</p>
+      @for (s of subjects; track s.id) {
+        <div class="subject-block" [attr.lang]="s.lang" [attr.dir]="s.lang === 'fr' ? 'ltr' : 'rtl'">
+          <portal-practice-exams [subjectId]="s.id" [lang]="s.lang" [heading]="s.name" [showIntro]="false" />
+        </div>
+      }
+    </section>
+
     <p class="examiner-entry muted">
-      هل أنت مُمتحِن؟ <a routerLink="/sign-in">سجِّل الدخول لإدارة اختباراتك</a>.
+      هل أنت معلّم؟ <a routerLink="/sign-in">سجِّل الدخول لإدارة اختباراتك</a>.
     </p>
   `,
   styles: `
@@ -118,6 +130,9 @@ import { ArCountPipe, ArDatePipe, arabicErrorMessage, BidiIsolate, Star } from '
     .invite .title { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--accent-strong); }
     .invite .meta { font-size: 0.85rem; color: var(--muted); }
     .examiner-entry { text-align: center; margin-block-start: 2rem; }
+    .bank { display: grid; gap: 1rem; margin-block-start: 2rem; }
+    .bank > h2, .bank > p { margin: 0; }
+    .subject-block { padding-block: 1rem; padding-inline: 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
     .role-refresh { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block: 1rem; }
     .role-refresh p { margin: 0; }
   `,
@@ -129,6 +144,7 @@ export class ExamsHomePage {
   protected readonly auth = inject(AuthStore);
   protected readonly invites = inject(CandidateInvitationsStore);
   readonly #router = inject(Router);
+  protected readonly subjects = SUBJECTS;
   protected readonly refreshing = signal(false);
   protected readonly refreshMessage = signal<string | null>(null);
 
@@ -139,8 +155,8 @@ export class ExamsHomePage {
     try {
       await this.auth.refreshClaims();
       if (this.auth.isSuperAdmin()) await this.#router.navigateByUrl('/admin');
-      else if (this.auth.isExaminer()) await this.#router.navigateByUrl('/examiner');
-      else this.refreshMessage.set('لم تتغيّر صلاحياتك: حسابك ليس في دليل المُمتحِنين.');
+      else if (this.auth.isTeacher()) await this.#router.navigateByUrl('/examiner');
+      else this.refreshMessage.set('لم تتغيّر صلاحياتك: حسابك ليس في دليل المعلّمين.');
     } catch (error) {
       this.refreshMessage.set(arabicErrorMessage(error));
     } finally {
@@ -150,7 +166,7 @@ export class ExamsHomePage {
 
   protected readonly model = signal({ code: '' });
   protected readonly joinForm = form(this.model, (p) => {
-    required(p.code, { message: 'أدخِل الرمز الذي زوَّدك به المُمتحِن.' });
+    required(p.code, { message: 'أدخِل الرمز الذي زوَّدك به المعلّم.' });
     maxLength(p.code, LIMITS.accessCodeLength + 2);
     pattern(p.code, /^\s*[A-Za-z0-9٠-٩۰-۹]{6}\s*$/, {
       message: 'يتكوَّن الرمز من ستة أحرف لاتينية أو أرقام.',

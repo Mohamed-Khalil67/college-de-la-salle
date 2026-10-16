@@ -8,3 +8,4 @@ export * from './lib/arabic-number-input';
 export * from './lib/arabic-datetime-input';
 export * from './lib/theme';
 export * from './lib/share-panel';
+export * from './lib/page-lang';

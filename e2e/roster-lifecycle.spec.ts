@@ -89,12 +89,12 @@ test('invite-only exam with a question bank: roster gate, invitations, lock, clo
   // A non-examiner account never reaches the dashboard.
   await visitor.goto('/examiner');
   await expect(visitor).toHaveURL(/\/exams\?notAllowed=examiner$/);
-  await expect(visitor.getByText('هذا الحساب ليس من حسابات المُمتحِنين المعتمدة', { exact: false })).toBeVisible();
+  await expect(visitor.getByText('هذا الحساب ليس من حسابات المعلّمين المعتمدة', { exact: false })).toBeVisible();
   await checkPage(visitor);
 
   /* ---------------------------------------------------------------- Invited candidate */
   const candidate = await newPage(browser);
-  await candidate.goto('/');
+  await candidate.goto('/exams');
   await checkPage(candidate);
   await candidate.getByRole('link', { name: 'تسجيل الدخول' }).first().click();
   await signInAs(candidate, invited, 'Invited');
@@ -136,7 +136,7 @@ test('invite-only exam with a question bank: roster gate, invitations, lock, clo
   await lifecycle.getByRole('button', { name: 'إغلاق الاختبار' }).click();
   await expect(lifecycle).toContainText('مغلق');
   await visitor.goto(shareUrl);
-  await expect(visitor.getByText('أغلق المُمتحِن هذا الاختبار', { exact: false })).toBeVisible();
+  await expect(visitor.getByText('أغلق المعلّم هذا الاختبار', { exact: false })).toBeVisible();
 
   await lifecycle.getByRole('button', { name: 'نسخ إلى مسودة جديدة' }).click();
   await expect(examiner.getByRole('heading', { name: 'تعديل الاختبار' })).toBeVisible();

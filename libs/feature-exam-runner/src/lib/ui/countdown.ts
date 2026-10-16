@@ -43,7 +43,7 @@ import { formatClock, formatCount } from '@exam/ui-arabic';
       background: var(--surface); border: 1.5px solid var(--gold);
     }
     .label { font-size: 0.75rem; color: var(--muted); }
-    .clock { font: 600 1.6rem/1.3 var(--font-ui); font-variant-numeric: tabular-nums; color: var(--terracotta-strong); }
+    .clock { font: 600 1.6rem/1.3 var(--font-ui); font-variant-numeric: tabular-nums; color: var(--primary-strong); }
     .warn { --ring: var(--warn); }
     .critical { --ring: var(--danger); }
     .critical .clock { color: var(--danger); }

@@ -32,7 +32,7 @@ import { ArNumberPipe, ArScorePipe, BidiIsolate, formatPercent, Star } from '@ex
         }
       </dl>
       @if (r.feedback.length) {
-        <h3>ملاحظات المُمتحِن</h3>
+        <h3>ملاحظات المعلّم</h3>
         <ul class="feedback">
           @for (f of r.feedback; track f.questionNumber) {
             <li>

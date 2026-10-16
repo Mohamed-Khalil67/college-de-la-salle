@@ -62,7 +62,7 @@ export class AuthStore {
     return user !== undefined && this.#claims()?.uid === (user?.uid ?? null);
   });
   readonly userRole = computed<UserRole>(() => (this.roleReady() ? (this.#claims()?.role ?? 'examinee') : 'examinee'));
-  readonly isExaminer = computed(() => hasRole(this.userRole(), 'examiner'));
+  readonly isTeacher = computed(() => hasRole(this.userRole(), 'examiner'));
   readonly isSuperAdmin = computed(() => this.userRole() === 'super_admin');
   /** Verified, lower-cased email — what rosters, invitations and the directory match against. */
   readonly verifiedEmail = computed(() => {

@@ -61,6 +61,7 @@ function withRole(uid: string, role: 'examiner' | 'super_admin', authTime = 1_00
     .authenticatedContext(uid, {
       firebase: { sign_in_provider: 'google.com' },
       role,
+      teacher: true,
       email: `${uid}@school.test`,
       email_verified: true,
       iat: authTime,
@@ -849,11 +850,12 @@ describe('RBAC: roles, administration and revocation', () => {
     }));
   });
 
-  it('the legacy boolean `examiner` claim grants nothing; only the `role` claim counts', async () => {
+  it('the `role` claim alone grants nothing; only `teacher: true` unlocks authoring', async () => {
     const legacy = env
       .authenticatedContext('legacy-user', {
         firebase: { sign_in_provider: 'google.com' },
         examiner: true,
+        role: 'examiner',
         email: 'legacy@school.test',
         email_verified: true,
       })
@@ -1031,39 +1033,78 @@ describe('public portal and practice catalog', () => {
     ...overrides,
   });
 
+  const page = (id: string, overrides: Record<string, unknown> = {}) => ({
+    id,
+    lang: id === 'mathematiques' ? 'fr' : 'ar',
+    hero: { title: 'Mathématiques', subtitle: 'Thanaweya Amma', intro: 'Intro' },
+    summary: 'Résumé',
+    timeline: [],
+    chapters: [{ id: 'c1', title: 'Analyse', summary: '', topics: ['Limites'] }],
+    resources: [],
+    announcements: [],
+    updatedAt: serverTimestamp(),
+    updatedBy: EXAMINER,
+    ...overrides,
+  });
+
   beforeEach(async () => {
     await seed(async (db) => {
-      await setDoc(doc(db, 'school_content', 'history'), { title: 'تاريخ المدرسة' });
-      await setDoc(doc(db, 'news', 'n1'), { title: 'خبر' });
-      await setDoc(doc(db, 'curriculum', 'arabic'), { name: 'اللغة العربية' });
+      await setDoc(doc(db, 'content_pages', 'mathematiques'), page('mathematiques', { updatedAt: Timestamp.now() }));
       await setDoc(doc(db, 'practice_catalog', 'listed-exam'), { ...card(), examId: 'listed-exam', publishedAt: Timestamp.now() });
     });
   });
 
-  it('signed-out visitors can read school history, news, curriculum and practice cards', async () => {
+  it('signed-out visitors can read content pages and practice cards', async () => {
     const visitor = anonymous();
-    await assertSucceeds(getDoc(doc(visitor, 'school_content', 'history')));
-    await assertSucceeds(getDocs(collection(visitor, 'news')));
-    await assertSucceeds(getDoc(doc(visitor, 'curriculum', 'arabic')));
+    await assertSucceeds(getDoc(doc(visitor, 'content_pages', 'mathematiques')));
+    await assertSucceeds(getDocs(collection(visitor, 'content_pages')));
     await assertSucceeds(getDocs(query(collection(visitor, 'practice_catalog'), where('subjectId', '==', 'arabic'))));
   });
 
-  it('nobody writes school content from a client, not even the super admin', async () => {
-    for (const db of [superAdmin(), examiner(), anonymous()]) {
-      await assertFails(setDoc(doc(db, 'news', 'n2'), { title: 'x' }));
-      await assertFails(updateDoc(doc(db, 'school_content', 'history'), { title: 'x' }));
-      await assertFails(deleteDoc(doc(db, 'curriculum', 'arabic')));
+  it('only a teacher can write content pages', async () => {
+    await assertSucceeds(setDoc(doc(examiner(), 'content_pages', 'mathematiques'), page('mathematiques')));
+    await assertSucceeds(setDoc(doc(superAdmin(), 'content_pages', 'home'), page('home', { updatedBy: SUPER_ADMIN })));
+
+    for (const db of [student(STUDENT, STUDENT_EMAIL), candidate(), anonymous()]) {
+      await assertFails(setDoc(doc(db, 'content_pages', 'mathematiques'), page('mathematiques')));
+      await assertFails(updateDoc(doc(db, 'content_pages', 'mathematiques'), { summary: 'piraté' }));
+      await assertFails(deleteDoc(doc(db, 'content_pages', 'mathematiques')));
     }
   });
 
-  it('signed-out visitors can never read questions banks, answer keys or rubrics', async () => {
+  it('a teacher whose role was revoked (stale token) cannot edit content', async () => {
+    await seed((db) => setDoc(doc(db, 'user_metadata', EXAMINER), { revokeTime: 5_000 }));
+    await assertFails(setDoc(doc(examiner(EXAMINER, 4_000), 'content_pages', 'mathematiques'), page('mathematiques')));
+    await assertSucceeds(setDoc(doc(examiner(EXAMINER, 6_000), 'content_pages', 'mathematiques'), page('mathematiques')));
+  });
+
+  it('content pages are validated: id, size, shape, server time and author', async () => {
+    const t = examiner();
+    await assertFails(setDoc(doc(t, 'content_pages', 'unknown-page'), page('unknown-page')));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('home')));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { lang: 'en' })));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { summary: 'x'.repeat(5001) })));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { hero: { title: 'x', subtitle: '', intro: '', html: '<b>' } })));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { chapters: Array.from({ length: 41 }, (_, i) => ({ id: `c${i}`, title: 't', summary: '', topics: [] })) })));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { updatedAt: Timestamp.fromMillis(1) })));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { updatedBy: 'someone-else' })));
+    await assertFails(setDoc(doc(t, 'content_pages', 'mathematiques'), page('mathematiques', { extra: 1 })));
+  });
+
+  it('the old school_content, news and curriculum collections are gone: nobody writes them', async () => {
+    for (const col of ['school_content', 'news', 'curriculum']) {
+      await assertFails(setDoc(doc(superAdmin(), col, 'x'), { title: 'x' }));
+      await assertFails(getDoc(doc(anonymous(), col, 'x')));
+    }
+  });
+
+  it('signed-out visitors can never read question banks, answer keys or rubrics', async () => {
     const visitor = anonymous();
     await assertFails(getDoc(doc(visitor, 'exams', EXAM_ID)));
     await assertFails(getDoc(doc(visitor, 'exams', EXAM_ID, 'paper', 'current')));
     await assertFails(getDoc(doc(visitor, 'exams', EXAM_ID, 'private', 'answerKey')));
     await assertFails(getDocs(collection(visitor, 'sessionPapers')));
   });
-
   it('an examiner lists their own published, code-access exam on a subject hub', async () => {
     await assertSucceeds(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card()));
   });
@@ -1071,7 +1112,7 @@ describe('public portal and practice catalog', () => {
   it('a card must match the exam: owner, code, published status and code access', async () => {
     await assertFails(setDoc(doc(examiner(OTHER_EXAMINER), 'practice_catalog', EXAM_ID), card({ ownerId: OTHER_EXAMINER })));
     await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ code: 'ZZZ999' })));
-    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ subjectId: 'biology' })));
+    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ subjectId: 'biologie' })));
     await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ answers: { q1: 0 } })));
 
     await seed((db) => updateDoc(doc(db, 'exams', EXAM_ID), { status: 'DRAFT' }));

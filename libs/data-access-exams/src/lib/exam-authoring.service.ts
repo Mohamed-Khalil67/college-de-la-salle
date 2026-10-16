@@ -216,7 +216,7 @@ export class ExamAuthoringService {
 
   #requireExaminer(): string {
     const ownerId = this.#auth.uid();
-    if (!ownerId || !this.#auth.isExaminer()) throw new Error('سجِّل الدخول بوصفك مُمتحِنًا أولًا.');
+    if (!ownerId || !this.#auth.isTeacher()) throw new Error('سجِّل الدخول بوصفك معلّمًا أولًا.');
     return ownerId;
   }
 

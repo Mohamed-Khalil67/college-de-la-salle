@@ -49,9 +49,15 @@ service cloud.firestore {
       return !exists(metadata) || request.auth.token.auth_time > get(metadata).data.revokeTime;
     }
 
-    // Exam authors: examiners and the super admin.
+    // Teachers (exam authors and portal editors): `request.auth.token.teacher == true`. The claim is
+    // set only by Cloud Functions for accounts in examiner_directory (and the super admin).
+    function isTeacher() {
+      return signedIn() && request.auth.token.get('teacher', false) == true && tokenFresh();
+    }
+
+    // Kept as the name used by the exam rules below: an exam author IS a teacher.
     function isExaminer() {
-      return signedIn() && role() in ['super_admin', 'examiner'] && tokenFresh();
+      return isTeacher();
     }
 
     function isSuperAdmin() {
@@ -157,7 +163,7 @@ service cloud.firestore {
     }
 
     function isSubjectId(s) {
-      return s in ['arabic', 'physics', 'chemistry', 'mathematics'];
+      return s in ['arabic', 'mathematics', 'physics-chemistry'];
     }
 
     function isCatalogPolicy(p) {
@@ -316,26 +322,39 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------------------------------
-    //  Public portal content — readable by anyone, including signed-out visitors. School pages
-    //  (history, news, gallery, curriculum) ship prerendered from the app bundle; these collections
-    //  let the school manage the same content from the console later. Clients never write them.
+    //  Public portal content — readable by anyone, including signed-out visitors. Only teachers
+    //  (token.teacher == true) may write it. The page shape is validated field by field; list
+    //  *items* can't be iterated in rules, so their content is bounded by size here and strictly
+    //  sanitized again on the client before rendering (see sanitizePage in contracts).
     // ---------------------------------------------------------------------------------------------
 
-    match /school_content/{docId} {
-      allow read: if true;
-      allow write: if false;
+    function isContentPage(d, pageId) {
+      let fields = ['id', 'lang', 'hero', 'summary', 'timeline', 'chapters', 'resources',
+                    'announcements', 'updatedAt', 'updatedBy'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.id == pageId
+        && d.lang in ['ar', 'fr']
+        && d.hero is map
+        && d.hero.keys().hasOnly(['title', 'subtitle', 'intro'])
+        && d.hero.title is string && d.hero.title.size() <= 200
+        && d.hero.subtitle is string && d.hero.subtitle.size() <= 200
+        && d.hero.intro is string && d.hero.intro.size() <= 2000
+        && d.summary is string && d.summary.size() <= 5000
+        && d.timeline is list && d.timeline.size() <= 30
+        && d.chapters is list && d.chapters.size() <= 40
+        && d.resources is list && d.resources.size() <= 40
+        && d.announcements is list && d.announcements.size() <= 40
+        && d.updatedAt == request.time
+        && d.updatedBy == uid();
     }
 
-    match /news/{newsId} {
+    match /content_pages/{pageId} {
       allow read: if true;
-      allow write: if false;
+      allow create, update: if isTeacher()
+        && pageId in ['home', 'history', 'arabe', 'mathematiques', 'physique-chimie']
+        && isContentPage(request.resource.data, pageId);
+      allow delete: if isTeacher();
     }
-
-    match /curriculum/{nodeId} {
-      allow read: if true;
-      allow write: if false;
-    }
-
     // Practice cards: what a subject hub lists. Public read; written only by the exam's owner, and
     // only while the exam itself is published, open by code, and points at this exact code. The
     // card carries no questions — those are released per candidate when a session starts.

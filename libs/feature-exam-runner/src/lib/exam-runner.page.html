@@ -35,10 +35,10 @@
 
       @switch (lobbyGate(state.lobby)) {
         @case ('DRAFT') {
-          <p class="gate" role="status">لم يُنشَر هذا الاختبار بعد. عُد إليه حين يُعلِن المُمتحِن عن موعده.</p>
+          <p class="gate" role="status">لم يُنشَر هذا الاختبار بعد. عُد إليه حين يُعلِن المعلّم عن موعده.</p>
         }
         @case ('CLOSED') {
-          <p class="gate" role="status">أغلق المُمتحِن هذا الاختبار، فلا يمكن بدؤه الآن.</p>
+          <p class="gate" role="status">أغلق المعلّم هذا الاختبار، فلا يمكن بدؤه الآن.</p>
         }
         @case ('SIGN_IN') {
           <div class="gate" role="status" data-testid="roster-gate">
@@ -102,7 +102,7 @@
         <exam-result-card [result]="result" />
       } @else if (store.result() === null) {
         <p class="muted" data-testid="result-pending">
-          ستظهر نتيجتك في هذه الصفحة فور اكتمال التصحيح ونشر المُمتحِن للنتائج.
+          ستظهر نتيجتك في هذه الصفحة فور اكتمال التصحيح ونشر المعلّم للنتائج.
         </p>
       }
     </section>

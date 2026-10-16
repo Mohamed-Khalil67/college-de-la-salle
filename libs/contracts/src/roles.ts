@@ -16,6 +16,13 @@ export type UserRole = 'super_admin' | 'examiner' | 'examinee';
 /** Name of the custom claim that carries the role. */
 export const ROLE_CLAIM = 'role';
 
+/**
+ * Boolean custom claim, `true` for teachers (and the super admin, who is also a teacher). This is
+ * the ONLY thing the content and exam write rules check: `request.auth.token.teacher == true`.
+ * The `examiner` role in this codebase is the teacher; the super admin only manages who has the claim.
+ */
+export const TEACHER_CLAIM = 'teacher';
+
 /** Roles that may author, edit and grade exams. */
 export const AUTHOR_ROLES: readonly UserRole[] = ['super_admin', 'examiner'];
 

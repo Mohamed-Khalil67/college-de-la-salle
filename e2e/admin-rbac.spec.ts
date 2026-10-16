@@ -17,7 +17,7 @@ test('super admin grants examiner rights; the user refreshes claims and schedule
   await admin.goto('/sign-in');
   await signInAs(admin, SUPER_ADMIN_EMAIL, 'المشرف العام');
   await expect(admin).toHaveURL(/\/admin$/);
-  await expect(admin.getByRole('heading', { name: 'إدارة صلاحيات المُمتحِنين' })).toBeVisible();
+  await expect(admin.getByRole('heading', { name: 'إدارة صلاحيات المعلّمين' })).toBeVisible();
   await checkPage(admin);
 
   /* -------------------------------------------- An ordinary account is not an examiner */
@@ -33,12 +33,12 @@ test('super admin grants examiner rights; the user refreshes claims and schedule
 
   /* -------------------------------------------- Grant */
   await admin.getByLabel('البريد الإلكتروني أو النطاق').fill('not-an-email');
-  await admin.getByRole('button', { name: 'منح صلاحية المُمتحِن' }).click();
+  await admin.getByRole('button', { name: 'منح صلاحية المعلّم' }).click();
   await expect(admin.getByText(/أدخِل بريدًا صحيحًا/)).toBeVisible();
 
   await admin.getByLabel('البريد الإلكتروني أو النطاق').fill(teacherEmail);
-  await admin.getByRole('button', { name: 'منح صلاحية المُمتحِن' }).click();
-  await expect(admin.getByTestId('admin-feedback')).toContainText('مُنِحت صلاحية المُمتحِن');
+  await admin.getByRole('button', { name: 'منح صلاحية المعلّم' }).click();
+  await expect(admin.getByTestId('admin-feedback')).toContainText('مُنِحت صلاحية المعلّم');
   await expect(admin.getByTestId('admin-feedback')).toContainText('حساب واحد');
   const row = admin.getByTestId('directory').locator('tbody tr', { has: admin.getByText(teacherEmail, { exact: true }) });
   await expect(row.getByTestId('status')).toHaveText('نشطة');
@@ -64,16 +64,16 @@ test('super admin grants examiner rights; the user refreshes claims and schedule
   await teacher.getByLabel('نصّ الخيار 1', { exact: true }).fill('الكاثود');
   await teacher.getByLabel('نصّ الخيار 2', { exact: true }).fill('الأنود');
   await teacher.getByLabel('تحديد الخيار 1 إجابةً صحيحة').check();
-  await teacher.getByLabel('المادة الدراسية').selectOption('chemistry');
+  await teacher.getByLabel('المادة الدراسية').selectOption('physics-chemistry');
   await teacher.getByRole('button', { name: 'نشر الاختبار' }).click();
   await expect(teacher.getByRole('heading', { name: 'شارِك الاختبار مع المُختبَرين' })).toBeVisible();
   await checkPage(teacher);
 
   /* -------------------------------------------- Revoke: immediate, and audited */
   await row.getByRole('button', { name: /سحب/ }).click();
-  await expect(admin.getByTestId('admin-feedback')).toContainText('سُحِبت صلاحية المُمتحِن');
+  await expect(admin.getByTestId('admin-feedback')).toContainText('سُحِبت صلاحية المعلّم');
   await expect(row.getByTestId('status')).toHaveText('مسحوبة');
-  await expect(admin.getByTestId('audit-log').getByText('سحب صلاحية المُمتحِن').first()).toBeVisible();
+  await expect(admin.getByTestId('audit-log').getByText('سحب صلاحية المعلّم').first()).toBeVisible();
 
   // The revoked session can no longer reach the dashboard: either the revoked refresh token signs
   // the user out, or the refreshed claim says examinee.

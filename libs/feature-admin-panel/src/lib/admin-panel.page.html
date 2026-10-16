@@ -1,7 +1,7 @@
 <header class="page-header">
   <div>
     <p class="eyebrow">المشرف العام · <bdi>{{ auth.displayName() }}</bdi></p>
-    <h1>إدارة صلاحيات المُمتحِنين</h1>
+    <h1>إدارة صلاحيات المعلّمين</h1>
     <p class="muted">
       مَن يحقّ له إنشاء الاختبارات وتصحيحها. يُنفَّذ كل تغيير على الخادم، ويُسجَّل في سجلّ التدقيق، ويُبطِل
       جلسات من تُسحَب صلاحيته فورًا.
@@ -14,7 +14,7 @@
 }
 
 <dl class="stats" aria-label="ملخّص الصلاحيات">
-  <div><dt>مُمتحِنون نشطون</dt><dd data-testid="active-count">{{ store.counts().active | arNumber }}</dd></div>
+  <div><dt>معلّمون نشطون</dt><dd data-testid="active-count">{{ store.counts().active | arNumber }}</dd></div>
   <div><dt>صلاحيات مسحوبة</dt><dd>{{ store.counts().revoked | arNumber }}</dd></div>
   <div><dt>مشرفون عامّون</dt><dd>{{ store.counts().admins | arNumber }}</dd></div>
 </dl>
@@ -35,7 +35,7 @@
         [formField]="grantForm.email"
         aria-describedby="grant-hint grant-error"
       />
-      <button type="submit" class="primary" [disabled]="busy()">منح صلاحية المُمتحِن</button>
+      <button type="submit" class="primary" [disabled]="busy()">منح صلاحية المعلّم</button>
       <button type="button" [disabled]="busy()" (click)="submitFrom($event, 'revoke')">سحب الصلاحية</button>
     </div>
     <p id="grant-hint" class="hint">
@@ -61,7 +61,7 @@
 
 <section class="panel" aria-labelledby="directory-title">
   <div class="section-head">
-    <h2 id="directory-title">دليل المُمتحِنين</h2>
+    <h2 id="directory-title">دليل المعلّمين</h2>
     <div class="filters">
       <label for="search" class="visually-hidden">بحث في الدليل</label>
       <input id="search" type="search" class="ltr" placeholder="بحث…" [value]="store.search()" (input)="store.search.set(searchBox.value)" #searchBox />
@@ -76,7 +76,7 @@
 
   <div class="table-wrap">
     <table data-testid="directory">
-      <caption class="visually-hidden">الحسابات والنطاقات المُدرَجة في دليل المُمتحِنين</caption>
+      <caption class="visually-hidden">الحسابات والنطاقات المُدرَجة في دليل المعلّمين</caption>
       <thead>
         <tr>
           <th scope="col">الحساب أو النطاق</th>

@@ -2,46 +2,48 @@
 
 .shell { min-block-size: 100dvh; display: flex; flex-direction: column; }
 
-.app-header {
-  display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
-  padding-block: 0.9rem; padding-inline: clamp(1rem, 4vw, 2.5rem);
-  background: var(--surface);
-  border-block-end: 1px solid var(--border);
+/* Header controls on the navy bar (colour utilities live in the template; these need pseudo-states). */
+.nav-link {
+  display: block;
+  padding-block: 0.4rem;
+  padding-inline: 0.6rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+  color: #f5ebe0;
+  font-weight: 600;
+  text-decoration: none;
+  border-block-end: 2px solid transparent;
 }
-.brand { display: grid; text-decoration: none; }
-.main-nav { flex: 1; justify-content: center; }
-.account { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
-.brand-title {
-  font-family: var(--font-display); font-weight: 700; font-size: clamp(1.6rem, 3.4vw, 2.1rem);
-  line-height: var(--leading-display); color: var(--accent-strong);
+.nav-link:hover { background: rgb(197 168 128 / 0.18); color: #fff; }
+.nav-link.active { border-block-end-color: #c5a880; color: #fff; }
+.teacher-link { color: #c5a880; }
+
+.menu-button, .signout {
+  background: transparent;
+  color: #f5ebe0;
+  border: 1px solid rgb(197 168 128 / 0.7);
+  padding-block: 0.3rem;
+  padding-inline: 0.8rem;
 }
-.brand-tagline { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; color: var(--terracotta-strong); }
-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; font-weight: 600; }
-@media (max-width: 640px) {
-  .main-nav { flex-basis: 100%; justify-content: flex-start; }
-}
-nav a.active { text-decoration-thickness: 2px; }
-.who { font-weight: 400; color: var(--muted); font-size: 0.9rem; max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.link-button { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 0.35em; }
-.link-button:hover:not(:disabled) { background: none; color: var(--accent-strong); }
+.menu-button:hover:not(:disabled), .signout:hover:not(:disabled) { background: rgb(197 168 128 / 0.18); border-color: #c5a880; }
 
 main {
   flex: 1; inline-size: 100%; max-inline-size: 74rem; margin-inline: auto; outline: none;
   padding-block: 1.75rem 3rem; padding-inline: clamp(1rem, 4vw, 2.5rem);
 }
 
-.app-footer p { margin-block: 0.15rem; }
 .app-footer {
   text-align: center; font-size: 0.85rem; color: var(--muted);
   padding-block: 1rem; border-block-start: 1px solid var(--border); background: var(--surface);
 }
+.app-footer p { margin-block: 0.15rem; }
 
 /*
  * Hidden by clipping, not by an off-screen offset: in RTL a negative `inset-inline-start` pushes
  * the link past the RIGHT edge, which creates horizontal scroll instead of hiding it.
  */
 .skip-link {
-  position: absolute; inset-inline-start: 0.5rem; inset-block-start: 0.5rem; z-index: 10;
+  position: absolute; inset-inline-start: 0.5rem; inset-block-start: 0.5rem; z-index: 50;
   padding-block: 0.5rem; padding-inline: 0.75rem; background: var(--surface); border-radius: var(--radius);
   clip-path: inset(50%); white-space: nowrap;
 }

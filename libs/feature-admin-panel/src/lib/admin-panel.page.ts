@@ -12,8 +12,8 @@ import { type DirectoryFilter, RoleAdminStore } from '@exam/data-access-auth/dat
 import { ArDatePipe, ArNumberPipe, arabicErrorMessage, formatCount } from '@exam/ui-arabic';
 
 const ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
-  GRANT_EXAMINER: 'منح صلاحية المُمتحِن',
-  REVOKE_EXAMINER: 'سحب صلاحية المُمتحِن',
+  GRANT_EXAMINER: 'منح صلاحية المعلّم',
+  REVOKE_EXAMINER: 'سحب صلاحية المعلّم',
   BOOTSTRAP_SUPER_ADMIN: 'تعيين المشرف العام',
 };
 
@@ -64,7 +64,7 @@ export class AdminPanelPage {
     this.feedback.set(null);
     try {
       const result = await this.store.manage(email, action);
-      const verb = action === 'grant' ? 'مُنِحت صلاحية المُمتحِن لـ' : 'سُحِبت صلاحية المُمتحِن من';
+      const verb = action === 'grant' ? 'مُنِحت صلاحية المعلّم لـ' : 'سُحِبت صلاحية المعلّم من';
       const reach = result.accountsUpdated
         ? `حُدِّث ${formatCount(result.accountsUpdated, 'account')} فورًا.`
         : action === 'grant'
@@ -89,7 +89,7 @@ export class AdminPanelPage {
   }
 
   protected roleLabel(entry: ExaminerDirectoryEntry): string {
-    return entry.role === 'super_admin' ? 'مشرف عام' : 'مُمتحِن';
+    return entry.role === 'super_admin' ? 'مشرف عام' : 'معلّم';
   }
 
   protected actionLabel(action: AuditAction): string {
