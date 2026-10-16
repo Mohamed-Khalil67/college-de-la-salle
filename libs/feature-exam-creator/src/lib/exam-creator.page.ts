@@ -99,6 +99,12 @@ export class ExamCreatorPage {
     disabled(p.shuffleOptions, frozen);
     disabled(p.questionsPerCandidate, frozen);
     disabled(p.accessMode, frozen);
+    disabled(p.subjectId, frozen);
+    disabled(p.listed, ({ valueOf }) => {
+      if (this.locked()) return 'الاختبار مُجمَّد بعد بدء المُختبَرين';
+      if (!valueOf(p.subjectId)) return 'اختر مادة أولًا';
+      return valueOf(p.accessMode) === 'ROSTER' ? 'اختبارات المدعوّين لا تُعرَض للعامّة' : false;
+    });
     disabled(p.questions, frozen);
   });
 

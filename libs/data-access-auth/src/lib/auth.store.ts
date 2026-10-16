@@ -1,5 +1,13 @@
-import { Service, computed, inject, signal } from '@angular/core';
-import { normalizeEmail, type RefreshRoleResponse } from '@exam/contracts';
+import { isPlatformBrowser } from '@angular/common';
+import { PLATFORM_ID, Service, computed, inject, signal } from '@angular/core';
+import {
+  hasRole,
+  normalizeEmail,
+  parseRole,
+  type RefreshRoleResponse,
+  ROLE_CLAIM,
+  type UserRole,
+} from '@exam/contracts';
 import {
   getRedirectResult,
   GoogleAuthProvider,
@@ -11,32 +19,34 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
-import { FIREBASE_AUTH, FIREBASE_FUNCTIONS, FIREBASE_PLATFORM_CONFIG } from './firebase.providers';
+import { FIREBASE_APP, FIREBASE_AUTH, FIREBASE_PLATFORM_CONFIG } from './firebase.providers';
 
-interface ResolvedRole {
+/** The role resolved for one account. `uid: null` = signed out. */
+interface ResolvedClaims {
   readonly uid: string | null;
-  readonly examiner: boolean;
+  readonly role: UserRole;
 }
 
 /**
  * Auth state and role as signals. `undefined` user = still resolving the persisted session.
  *
- * Roles: examiners are an admin-managed allow-list (`config/examiners`), proven by the `examiner`
- * custom claim that only the `refreshRole` function sets. Everyone else who signs in is a
- * candidate. The role is re-checked on every sign-in so allow-list changes apply immediately.
+ * The role is the `role` custom claim (`super_admin` | `examiner` | `examinee`), set only by Cloud
+ * Functions from the examiner directory. It's re-checked against the server on every sign-in and
+ * on demand (`refreshClaims()`), so a grant or revocation applies without waiting an hour for the
+ * ID token to roll over. On the server (SSR / prerender) nobody is signed in.
  */
 @Service()
 export class AuthStore {
+  readonly #browser = isPlatformBrowser(inject(PLATFORM_ID));
   readonly #auth = inject(FIREBASE_AUTH);
-  readonly #functions = inject(FIREBASE_FUNCTIONS);
+  readonly #app = inject(FIREBASE_APP);
   readonly #config = inject(FIREBASE_PLATFORM_CONFIG);
-  readonly #user = signal<User | null | undefined>(undefined);
-  readonly #role = signal<ResolvedRole | null>(null);
+  readonly #user = signal<User | null | undefined>(this.#browser ? undefined : null);
+  readonly #claims = signal<ResolvedClaims | null>(this.#browser ? null : { uid: null, role: 'examinee' });
   readonly #redirectError = signal<string | null>(null);
-  #pendingRole: Promise<void> = Promise.resolve();
+  #pendingClaims: Promise<void> = Promise.resolve();
 
-  readonly user = this.#user.asReadonly();
+  readonly currentUser = this.#user.asReadonly();
   /** Error from completing a redirect sign-in, if one was in flight. */
   readonly redirectError = this.#redirectError.asReadonly();
   readonly ready = computed(() => this.#user() !== undefined);
@@ -49,10 +59,12 @@ export class AuthStore {
   /** The role has been resolved for the current user. */
   readonly roleReady = computed(() => {
     const user = this.#user();
-    return user !== undefined && this.#role()?.uid === (user?.uid ?? null);
+    return user !== undefined && this.#claims()?.uid === (user?.uid ?? null);
   });
-  readonly isExaminer = computed(() => this.roleReady() && this.#role()?.examiner === true);
-  /** Verified, lower-cased email — what rosters and invitations match against. */
+  readonly userRole = computed<UserRole>(() => (this.roleReady() ? (this.#claims()?.role ?? 'examinee') : 'examinee'));
+  readonly isExaminer = computed(() => hasRole(this.userRole(), 'examiner'));
+  readonly isSuperAdmin = computed(() => this.userRole() === 'super_admin');
+  /** Verified, lower-cased email — what rosters, invitations and the directory match against. */
   readonly verifiedEmail = computed(() => {
     const user = this.#user();
     return user?.email && user.emailVerified ? normalizeEmail(user.email) : null;
@@ -63,10 +75,11 @@ export class AuthStore {
   readonly emulatorSignInAvailable = this.#config.emulators !== null;
 
   constructor() {
+    if (!this.#browser) return;
     // Root singleton: the listener lives for the lifetime of the app.
     onAuthStateChanged(this.#auth, (user) => {
       this.#user.set(user);
-      this.#pendingRole = this.#resolveRole(user);
+      this.#pendingClaims = this.#resolveClaims(user, false);
     });
     // Completes a redirect sign-in (no-op otherwise) and surfaces its failure.
     getRedirectResult(this.#auth).catch(() =>
@@ -75,13 +88,24 @@ export class AuthStore {
   }
 
   whenReady(): Promise<void> {
-    return this.#auth.authStateReady();
+    return this.#browser ? this.#auth.authStateReady() : Promise.resolve();
   }
 
   /** Resolves once the current user's role is known (for guards and post-sign-in routing). */
   async whenRoleReady(): Promise<void> {
     await this.whenReady();
-    await this.#pendingRole;
+    await this.#pendingClaims;
+  }
+
+  /**
+   * Asks the server to re-evaluate this account's role, then force-refreshes the ID token so
+   * Firestore rules see the new claim immediately. If the account's tokens were revoked, the
+   * refresh fails and the user is signed out — they sign in again with their current role.
+   */
+  refreshClaims(): Promise<void> {
+    const user = this.#auth.currentUser;
+    this.#pendingClaims = this.#resolveClaims(user, true);
+    return this.#pendingClaims;
   }
 
   /**
@@ -118,22 +142,43 @@ export class AuthStore {
     return signOut(this.#auth);
   }
 
-  async #resolveRole(user: User | null): Promise<void> {
+  async #resolveClaims(user: User | null, force: boolean): Promise<void> {
     if (!user || user.isAnonymous) {
-      this.#role.set({ uid: user?.uid ?? null, examiner: false });
+      this.#claims.set({ uid: user?.uid ?? null, role: 'examinee' });
       return;
     }
-    let examiner = false;
+    let role: UserRole;
     try {
-      const call = httpsCallable<void, RefreshRoleResponse>(this.#functions, 'refreshRole');
-      examiner = (await call()).data.examiner;
+      role = (await this.#callRefreshRole()).role;
       const token = await user.getIdTokenResult();
-      // The claim changed on the server: refresh the token so Firestore rules see it.
-      if ((token.claims['examiner'] === true) !== examiner) await user.getIdToken(true);
-    } catch {
+      // The claim changed on the server (or the caller insists): refresh so the rules see it.
+      if (force || parseRole(token.claims[ROLE_CLAIM]) !== role) await user.getIdToken(true);
+    } catch (error) {
+      if (isRevoked(error)) {
+        await signOut(this.#auth);
+        return;
+      }
       // Offline or function unavailable: fall back to the claim already in the token.
-      examiner = (await user.getIdTokenResult()).claims['examiner'] === true;
+      role = parseRole((await user.getIdTokenResult()).claims[ROLE_CLAIM]);
     }
-    if (this.#auth.currentUser?.uid === user.uid) this.#role.set({ uid: user.uid, examiner });
+    if (this.#auth.currentUser?.uid === user.uid) this.#claims.set({ uid: user.uid, role });
   }
+
+  /**
+   * The Functions SDK is loaded on demand: signed-out visitors of the public portal never download
+   * it, and signed-in users fetch it once, right after sign-in.
+   */
+  async #callRefreshRole(): Promise<RefreshRoleResponse> {
+    const [{ httpsCallable }, { createFunctions }] = await Promise.all([
+      import('firebase/functions'),
+      import('./functions.token'),
+    ]);
+    const functions = createFunctions(this.#app.app, this.#app.fresh, this.#config);
+    return (await httpsCallable<void, RefreshRoleResponse>(functions, 'refreshRole')()).data;
+  }
+}
+
+function isRevoked(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 'auth/user-token-expired' || code === 'auth/user-disabled';
 }

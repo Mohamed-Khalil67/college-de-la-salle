@@ -7,10 +7,11 @@ import {
   provideZonelessChangeDetection,
 } from '@angular/core';
 import { provideRouter, TitleStrategy, withComponentInputBinding } from '@angular/router';
-import { provideFirebasePlatform } from '@exam/data-access-exams';
+import { provideFirebasePlatform } from '@exam/data-access-auth';
 import { environment } from '../environments/environment';
 import { routes } from './app.routes';
 import { ArabicTitleStrategy } from './shell/arabic-title.strategy';
+import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
 
 // Angular's own locale data (used by any built-in pipe or i18n API). App formatting itself goes
 // through the Intl-based helpers in @exam/ui-arabic.
@@ -27,5 +28,8 @@ export const appConfig: ApplicationConfig = {
     { provide: TitleStrategy, useClass: ArabicTitleStrategy },
     { provide: LOCALE_ID, useValue: 'ar' },
     provideFirebasePlatform(environment),
+    // Public pages are prerendered; hydration reuses that DOM (no flash, no layout shift) and
+    // event replay keeps clicks made before the bundle finishes loading.
+    provideClientHydration(withEventReplay()),
   ],
 };

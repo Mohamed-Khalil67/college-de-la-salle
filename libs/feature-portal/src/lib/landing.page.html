@@ -1,0 +1,78 @@
+@let school = store.school();
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-text">
+    <p class="eyebrow">{{ school.section }}</p>
+    <h1 id="hero-title">
+      مدرسة <portal-school-name />
+      <span class="sub">القِسْمُ العَرَبِيّ</span>
+    </h1>
+    <p class="lead">{{ school.tagline }}</p>
+    <div class="actions">
+      <a class="button primary" routerLink="/sections/arabic">القسم العربي</a>
+      <a class="button" routerLink="/exams">الاختبارات التدريبية</a>
+    </div>
+  </div>
+  <img
+    class="hero-art"
+    ngSrc="/images/hero.svg"
+    width="1200"
+    height="800"
+    priority
+    alt="زخرفة نجمية ثمانية وأقواس أندلسية"
+  />
+</section>
+
+<section aria-labelledby="subjects-title">
+  <div class="section-head">
+    <h2 id="subjects-title">المواد الدراسية</h2>
+  </div>
+  <ul class="subjects">
+    @for (subject of store.subjects(); track subject.id) {
+      <li>
+        <a class="subject-card" [routerLink]="['/subjects', subject.id]">
+          <exam-star [size]="22" />
+          <span class="name">{{ subject.name }}</span>
+          <span class="tagline">{{ subject.tagline }}</span>
+        </a>
+      </li>
+    }
+  </ul>
+</section>
+
+<section class="tracks panel" aria-labelledby="tracks-title">
+  <h2 id="tracks-title">شُعَب الثانوية العامة</h2>
+  <dl>
+    @for (track of store.tracks(); track track.id) {
+      <div>
+        <dt>{{ track.name }}</dt>
+        <dd>{{ track.description }}</dd>
+      </div>
+    }
+  </dl>
+</section>
+
+<div class="columns">
+  <section aria-labelledby="news-title">
+    <div class="section-head">
+      <h2 id="news-title">أخبار المدرسة</h2>
+      <a routerLink="/about/news">كل الأخبار</a>
+    </div>
+    <portal-news-list [news]="store.news()" [limit]="3" />
+  </section>
+
+  <section aria-labelledby="history-title" class="history panel">
+    <h2 id="history-title">من تاريخ المدرسة</h2>
+    @if (school.history[0]; as first) {
+      <p class="exam-text">{{ first.paragraphs[0] }}</p>
+    }
+    <a routerLink="/about/history">تاريخ المدرسة ←</a>
+  </section>
+</div>
+
+<section aria-labelledby="gallery-title">
+  <div class="section-head">
+    <h2 id="gallery-title">معرض الصور</h2>
+    <a routerLink="/about/gallery">المعرض كاملًا</a>
+  </div>
+  <portal-gallery-grid [images]="store.gallery()" [limit]="3" />
+</section>

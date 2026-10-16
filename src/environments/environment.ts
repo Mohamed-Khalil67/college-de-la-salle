@@ -1,4 +1,4 @@
-import type { FirebasePlatformConfig } from '@exam/data-access-exams';
+import type { FirebasePlatformConfig } from '@exam/data-access-auth';
 
 /**
  * Development: everything runs against the local Firebase Emulator Suite (`npm run emulators`).

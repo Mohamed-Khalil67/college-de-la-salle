@@ -146,6 +146,29 @@
         </p>
       </div>
 
+      <div class="field">
+        <label for="subject">المادة الدراسية</label>
+        <select id="subject" [formField]="examForm.subjectId" aria-describedby="subject-hint">
+          <option value="">بلا مادة</option>
+          <option value="arabic">اللغة العربية</option>
+          <option value="physics">الفيزياء</option>
+          <option value="chemistry">الكيمياء</option>
+          <option value="mathematics">الرياضيات</option>
+        </select>
+        <p id="subject-hint" class="hint">يُصنَّف الاختبار تحت هذه المادة في بوابة المدرسة.</p>
+      </div>
+
+      <div class="field">
+        <span class="label" id="listed-label">التدريب الحرّ</span>
+        <label class="check">
+          <input type="checkbox" [formField]="examForm.listed" aria-describedby="listed-hint" />
+          عرضه في صفحة المادة اختبارًا تدريبيًّا مفتوحًا
+        </label>
+        <p id="listed-hint" class="hint">
+          يظهر للزوّار في صفحة المادة متى كان منشورًا ومتاحًا بالرمز. لا تُكشَف الأسئلة قبل بدء الاختبار.
+        </p>
+      </div>
+
       @if (examForm.accessMode().value() === 'ROSTER') {
         <div class="field span-2">
           <label for="roster">قائمة المدعوّين (بريد إلكتروني في كل سطر)</label>

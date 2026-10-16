@@ -1,8 +1,10 @@
 import type {
   AccessPolicy,
   AnswerValue,
+  CatalogPolicy,
   ChoiceQuestion,
   DeliveryPolicy,
+  ExamStatus,
   Question,
   QuestionId,
   SessionLayout,
@@ -21,6 +23,17 @@ export const DEFAULT_DELIVERY: DeliveryPolicy = {
 };
 
 export const DEFAULT_ACCESS: AccessPolicy = { mode: 'CODE' };
+
+export const DEFAULT_CATALOG: CatalogPolicy = { subjectId: null, listed: false };
+
+/** Whether an exam should have a public practice card right now. */
+export function isPubliclyListed(exam: {
+  readonly catalog: CatalogPolicy;
+  readonly status: ExamStatus;
+  readonly access: AccessPolicy;
+}): boolean {
+  return exam.catalog.listed && exam.catalog.subjectId !== null && exam.status === 'PUBLISHED' && exam.access.mode === 'CODE';
+}
 
 /** Uniform random integer in [0, n). */
 export type RandomInt = (n: number) => number;
@@ -117,7 +130,7 @@ export function toCanonicalAnswers(
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Access: examiner allow-list and exam rosters
+ * Access: exam rosters
  * ---------------------------------------------------------------------------------------------- */
 
 export function normalizeEmail(email: string): string {
@@ -128,19 +141,6 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function isValidEmail(email: string): boolean {
   return EMAIL.test(email);
-}
-
-/**
- * Allow-list entries are exact emails ("teacher@school.edu") or whole domains ("@school.edu").
- * The email must be verified by the identity provider; callers check that.
- */
-export function isAllowedExaminer(email: string, entries: readonly string[]): boolean {
-  const e = normalizeEmail(email);
-  if (!e) return false;
-  return entries.some((raw) => {
-    const entry = normalizeEmail(raw);
-    return entry.startsWith('@') ? e.endsWith(entry) : e === entry;
-  });
 }
 
 export interface ParsedRoster {

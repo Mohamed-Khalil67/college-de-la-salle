@@ -1,10 +1,9 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { COLLECTIONS, type Invitation } from '@exam/contracts';
 import { collection, query, where } from 'firebase/firestore';
-import { AuthStore } from './auth.store';
-import { FIRESTORE } from './firebase.providers';
+import { AuthStore } from '@exam/data-access-auth';
+import { FIRESTORE, firestoreQueryResource } from '@exam/data-access-auth/data';
 import { invitationConverter } from './firestore-converters';
-import { firestoreQueryResource } from './firestore-resource';
 
 /**
  * Exams the signed-in candidate is invited to (live). Rules only release invitations whose email

@@ -10,15 +10,14 @@ import {
   toPercent,
 } from '@exam/contracts';
 import { collection, query, where } from 'firebase/firestore';
-import { AuthStore } from './auth.store';
-import { FIRESTORE } from './firebase.providers';
+import { AuthStore } from '@exam/data-access-auth';
+import { FIRESTORE, firestoreQueryResource } from '@exam/data-access-auth/data';
 import {
   draftRowConverter,
   examMetaConverter,
   sessionConverter,
   submissionConverter,
 } from './firestore-converters';
-import { firestoreQueryResource } from './firestore-resource';
 import { injectServerNow } from './server-clock';
 
 export type CandidateRowStatus = 'IN_PROGRESS' | 'GRADING' | 'NEEDS_REVIEW' | 'GRADED' | 'EXPIRED';

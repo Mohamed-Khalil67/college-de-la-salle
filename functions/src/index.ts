@@ -1,6 +1,5 @@
 import { randomInt } from 'node:crypto';
 import { initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -17,17 +16,14 @@ import {
   type DeliveryPolicy,
   type ExamSession,
   type ExamSessionStatus,
-  EXAMINERS_CONFIG_DOC_ID,
   finalizeScore,
   gradeAnswers,
   type IntegrityPolicy,
-  isAllowedExaminer,
   isValidAccessCode,
   LIMITS,
   normalizeAccessCode,
   normalizeEmail,
   PAPER_DOC_ID,
-  type RefreshRoleResponse,
   ROSTER_DOC_ID,
   type SessionLayout,
   sessionIdFor,
@@ -39,30 +35,7 @@ import {
 initializeApp();
 const db = getFirestore();
 
-/* ---------------------------------------------------------------------------------------------- */
-/* refreshRole — examiner allow-list → `examiner` custom claim.                                    */
-/*                                                                                                 */
-/* config/examiners { emails: ["teacher@school.edu", "@school.edu"] } is admin-managed (no client  */
-/* access). Only verified emails qualify. The claim is what firestore.rules trusts.                */
-/* ---------------------------------------------------------------------------------------------- */
-
-export const refreshRole = onCall<void, Promise<RefreshRoleResponse>>(async (request) => {
-  const auth = request.auth;
-  if (!auth) throw new HttpsError('unauthenticated', 'سجِّل الدخول أولًا.');
-
-  const email = normalizeEmail(String(auth.token.email ?? ''));
-  const verified = auth.token.email_verified === true;
-  const config = await db.collection(COLLECTIONS.config).doc(EXAMINERS_CONFIG_DOC_ID).get();
-  const entries = (config.get('emails') ?? []) as string[];
-  const examiner =
-    auth.token.firebase?.sign_in_provider !== 'anonymous' && verified && isAllowedExaminer(email, entries);
-
-  const user = await getAuth().getUser(auth.uid);
-  if ((user.customClaims?.['examiner'] === true) !== examiner) {
-    await getAuth().setCustomUserClaims(auth.uid, { ...user.customClaims, examiner });
-  }
-  return { examiner };
-});
+export { manageExaminerRole, refreshRole } from './roles';
 
 /* ---------------------------------------------------------------------------------------------- */
 /* startSession — the ONLY way an ExamSession comes into existence.                                */
@@ -76,8 +49,9 @@ export const refreshRole = onCall<void, Promise<RefreshRoleResponse>>(async (req
 
 export const startSession = onCall<StartSessionRequest, Promise<StartSessionResponse>>(
   async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid) throw new HttpsError('unauthenticated', 'سجِّل الدخول قبل بدء الاختبار.');
+    const auth = request.auth;
+    if (!auth) throw new HttpsError('unauthenticated', 'سجِّل الدخول قبل بدء الاختبار.');
+    const { uid, token } = auth;
 
     const code = normalizeAccessCode(String(request.data?.accessCode ?? ''));
     if (!isValidAccessCode(code)) throw new HttpsError('invalid-argument', 'رمز الاختبار غير صالح.');
@@ -119,7 +93,6 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
       if (status === 'CLOSED') throw new HttpsError('failed-precondition', 'أغلق المُمتحِن هذا الاختبار.');
 
       if (exam['access']?.mode === 'ROSTER') {
-        const token = request.auth!.token;
         const email = token.email_verified === true ? normalizeEmail(String(token.email ?? '')) : '';
         if (!email) {
           throw new HttpsError(
@@ -160,7 +133,7 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
         examTitle: exam['title'] as string,
         candidateId: uid,
         candidateName,
-        candidateEmail: request.auth!.token.email ?? null,
+        candidateEmail: token.email ?? null,
         startedAt: now,
         expiresAt,
         status: 'ACTIVE' satisfies ExamSessionStatus,

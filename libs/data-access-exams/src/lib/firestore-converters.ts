@@ -7,6 +7,7 @@ import {
   type ExamSession,
   type ManualGrade,
   DEFAULT_ACCESS,
+  DEFAULT_CATALOG,
   DEFAULT_DELIVERY,
   DEFAULT_SCORING,
   type ExamDraft,
@@ -65,6 +66,7 @@ export const examMetaConverter = readOnly<ExamMeta>((id, d) => ({
   resultsPublished: d['resultsPublished'] === true,
   delivery: d['delivery'] ?? DEFAULT_DELIVERY,
   access: d['access'] ?? DEFAULT_ACCESS,
+  catalog: d['catalog'] ?? DEFAULT_CATALOG,
   // Exams created before the lifecycle existed were live immediately.
   status: d['status'] ?? 'PUBLISHED',
   lockedAt: millisOrNull(d['lockedAt']),

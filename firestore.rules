@@ -35,10 +35,27 @@ service cloud.firestore {
       return request.auth.uid;
     }
 
-    // Examiners are an allow-list (config/examiners), proven by the `examiner` custom claim that
-    // only the refreshRole Cloud Function sets. Every other signed-in user is a candidate.
+    // RBAC: the `role` custom claim ('super_admin' | 'examiner' | 'examinee') is set only by Cloud
+    // Functions from examiner_directory. A missing claim means examinee.
+    function role() {
+      return request.auth.token.get('role', 'examinee');
+    }
+
+    // Zero-trust revocation: when a role is withdrawn, the server revokes the account's refresh
+    // tokens and stamps user_metadata/{uid}.revokeTime. ID tokens minted before that (auth_time is
+    // the sign-in time) are rejected for privileged access instead of living out their hour.
+    function tokenFresh() {
+      let metadata = /databases/$(database)/documents/user_metadata/$(uid());
+      return !exists(metadata) || request.auth.token.auth_time > get(metadata).data.revokeTime;
+    }
+
+    // Exam authors: examiners and the super admin.
     function isExaminer() {
-      return signedIn() && request.auth.token.get('examiner', false) == true;
+      return signedIn() && role() in ['super_admin', 'examiner'] && tokenFresh();
+    }
+
+    function isSuperAdmin() {
+      return signedIn() && role() == 'super_admin' && tokenFresh();
     }
 
     function verifiedEmail() {
@@ -59,11 +76,18 @@ service cloud.firestore {
       return /databases/$(database)/documents/sessions/$(sessionId);
     }
 
+    // Owner-side access to exam data (answer keys, candidates' work) needs a LIVE author role:
+    // ownership alone is not enough once the role has been revoked. The uid comparison runs first,
+    // so candidates never pay for the role lookup.
+    function isOwner(ownerId) {
+      return ownerId == uid() && isExaminer();
+    }
+
     // Ownership as currently stored (reads, deletes).
     function ownsExam(examId) {
       return signedIn()
         && exists(examPath(examId))
-        && get(examPath(examId)).data.ownerId == uid();
+        && isOwner(get(examPath(examId)).data.ownerId);
     }
 
     // Ownership as it will be after this request/batch commits (creates & updates). This lets an
@@ -132,11 +156,23 @@ service cloud.firestore {
       return p is map && p.keys().hasOnly(['mode']) && p.mode in ['CODE', 'ROSTER'];
     }
 
+    function isSubjectId(s) {
+      return s in ['arabic', 'physics', 'chemistry', 'mathematics'];
+    }
+
+    function isCatalogPolicy(p) {
+      return p is map && p.keys().hasOnly(['subjectId', 'listed'])
+        && (p.subjectId == null || isSubjectId(p.subjectId))
+        && p.listed is bool;
+    }
+
     function isExamMeta(d) {
       let fields = ['ownerId', 'title', 'description', 'durationSeconds', 'window', 'accessCode',
                     'integrity', 'scoring', 'delivery', 'access', 'status', 'lockedAt',
                     'resultsPublished', 'questionCount', 'maxScore', 'createdAt'];
-      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+      // `catalog` is optional so exams created before subjects existed stay valid.
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields.concat(['catalog']))
+        && (!('catalog' in d) || isCatalogPolicy(d.catalog))
         && d.ownerId == uid()
         && d.title is string && d.title.size() > 0 && d.title.size() <= 200
         && d.description is string && d.description.size() <= 2000
@@ -160,7 +196,7 @@ service cloud.firestore {
 
     match /exams/{examId} {
       // `list` is safe: Firestore rejects any query that is not constrained to ownerId == uid.
-      allow read: if signedIn() && resource.data.ownerId == uid();
+      allow read: if signedIn() && isOwner(resource.data.ownerId);
 
       allow create: if isExaminer()
         && isExamMeta(request.resource.data)
@@ -264,7 +300,7 @@ service cloud.firestore {
 
     match /invitations/{inviteId} {
       allow read: if signedIn()
-        && (resource.data.ownerId == uid()
+        && (isOwner(resource.data.ownerId)
             || (verifiedEmail() != '' && resource.data.email == verifiedEmail()));
 
       allow create, update: if isExaminer()
@@ -279,17 +315,79 @@ service cloud.firestore {
       allow delete: if isExaminer() && resource.data.ownerId == uid();
     }
 
-    // Admin-managed configuration (examiner allow-list). No client access at all.
-    match /config/{docId} {
+    // ---------------------------------------------------------------------------------------------
+    //  Public portal content — readable by anyone, including signed-out visitors. School pages
+    //  (history, news, gallery, curriculum) ship prerendered from the app bundle; these collections
+    //  let the school manage the same content from the console later. Clients never write them.
+    // ---------------------------------------------------------------------------------------------
+
+    match /school_content/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /curriculum/{nodeId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Practice cards: what a subject hub lists. Public read; written only by the exam's owner, and
+    // only while the exam itself is published, open by code, and points at this exact code. The
+    // card carries no questions — those are released per candidate when a session starts.
+    match /practice_catalog/{examId} {
+      allow read: if true;
+
+      allow create, update: if ownsExamAfter(examId)
+        && request.resource.data.keys().hasOnly(['examId', 'ownerId', 'subjectId', 'title', 'code',
+                                                 'durationSeconds', 'questionCount', 'publishedAt'])
+        && request.resource.data.examId == examId
+        && request.resource.data.ownerId == uid()
+        && isSubjectId(request.resource.data.subjectId)
+        && request.resource.data.title is string && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.durationSeconds is int
+        && request.resource.data.questionCount is int
+        && request.resource.data.publishedAt == request.time
+        && request.resource.data.code == getAfter(examPath(examId)).data.accessCode
+        && getAfter(examPath(examId)).data.status == 'PUBLISHED'
+        && getAfter(examPath(examId)).data.access.mode == 'CODE';
+
+      // Deleting a card that doesn't exist is a no-op the authoring batch relies on.
+      allow delete: if isExaminer() && (resource == null || resource.data.ownerId == uid());
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    //  RBAC administration — written ONLY by Cloud Functions (manageExaminerRole, refreshRole) and
+    //  the bootstrap script. The super admin may read; nobody may write from a client.
+    // ---------------------------------------------------------------------------------------------
+
+    match /examiner_directory/{entry} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
+    // Immutable audit trail: no client create, update or delete, ever.
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
+    match /user_metadata/{userId} {
       allow read, write: if false;
     }
+
     // ---------------------------------------------------------------------------------------------
     //  Sessions (the authoritative timer)
     // ---------------------------------------------------------------------------------------------
 
     match /sessions/{sessionId} {
       allow read: if signedIn()
-        && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid());
+        && (resource.data.candidateId == uid() || isOwner(resource.data.examOwnerId));
 
       // startedAt / expiresAt / status are minted and advanced ONLY by Cloud Functions (Admin SDK
       // bypasses rules). No client can create, extend, reset, or delete a session.
@@ -301,7 +399,7 @@ service cloud.firestore {
     match /sessionPapers/{sessionId} {
       allow get: if signedIn()
         && resource != null
-        && (resource.data.examOwnerId == uid()
+        && (isOwner(resource.data.examOwnerId)
             || (resource.data.candidateId == uid()
                 && get(sessionPath(sessionId)).data.status == 'ACTIVE'
                 && request.time <= get(sessionPath(sessionId)).data.expiresAt));
@@ -382,9 +480,9 @@ service cloud.firestore {
       allow get: if signedIn()
         && (
           (resource == null && isOwnSessionId(sessionId))
-          || (resource != null && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid()))
+          || (resource != null && (resource.data.candidateId == uid() || isOwner(resource.data.examOwnerId)))
         );
-      allow list: if signedIn() && resource.data.examOwnerId == uid();
+      allow list: if signedIn() && isOwner(resource.data.examOwnerId);
       allow create, update: if isValidDraftWrite(sessionId);
       allow delete: if false;
     }
@@ -398,9 +496,9 @@ service cloud.firestore {
       allow get: if signedIn()
         && (
           (resource == null && isOwnSessionId(sessionId))
-          || (resource != null && (resource.data.candidateId == uid() || resource.data.examOwnerId == uid()))
+          || (resource != null && (resource.data.candidateId == uid() || isOwner(resource.data.examOwnerId)))
         );
-      allow list: if signedIn() && resource.data.examOwnerId == uid();
+      allow list: if signedIn() && isOwner(resource.data.examOwnerId);
       allow write: if false;
     }
 
@@ -409,10 +507,10 @@ service cloud.firestore {
       // Candidates: only their OWN submission, only by exact id, and only until it is graded —
       // after that, scores reach them exclusively through `results/*` once released. Reading a
       // not-yet-existing own id is allowed so a client can tell "never arrived" from "arrived".
-      allow list: if signedIn() && resource.data.examOwnerId == uid();
+      allow list: if signedIn() && isOwner(resource.data.examOwnerId);
       allow get: if signedIn()
         && (
-          (resource != null && resource.data.examOwnerId == uid())
+          (resource != null && isOwner(resource.data.examOwnerId))
           || (isOwnSessionId(sessionId)
               && (resource == null || resource.data.get('gradingStatus', null) == null))
         );

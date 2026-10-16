@@ -17,6 +17,8 @@
   --font-display: 'Amiri', 'Noto Naskh Arabic', serif; /* titles: classical Naskh, renders tashkeel beautifully */
   --font-text: 'Noto Naskh Arabic', 'Amiri', serif; /* question text: highest legibility with diacritics */
   --font-ui: 'IBM Plex Sans Arabic', system-ui, 'Segoe UI', Tahoma, sans-serif; /* controls & chrome */
+  /* Latin institutional branding (« Collège de la Salle ») and formulas: Amiri ships a matching Latin serif. */
+  --font-latin: 'Amiri', 'Times New Roman', serif;
   --mono: ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace;
 
   --leading-ui: 1.75;

@@ -105,6 +105,23 @@ export interface AccessPolicy {
   readonly mode: AccessMode;
 }
 
+/** Curriculum subjects an exam can be assigned to (see @exam/data-access-curriculum). */
+export const SUBJECT_IDS = ['arabic', 'physics', 'chemistry', 'mathematics'] as const;
+export type SubjectId = (typeof SUBJECT_IDS)[number];
+
+export function isSubjectId(value: unknown): value is SubjectId {
+  return typeof value === 'string' && (SUBJECT_IDS as readonly string[]).includes(value);
+}
+
+/**
+ * Where the exam appears on the public portal. `listed` exams that are published, open by code
+ * and assigned to a subject get a card in `practice_catalog` on that subject's hub.
+ */
+export interface CatalogPolicy {
+  readonly subjectId: SubjectId | null;
+  readonly listed: boolean;
+}
+
 export interface ExamDefinition {
   readonly id: string;
   readonly ownerId: Uid;
@@ -117,6 +134,7 @@ export interface ExamDefinition {
   readonly scoring: ScoringPolicy;
   readonly delivery: DeliveryPolicy;
   readonly access: AccessPolicy;
+  readonly catalog: CatalogPolicy;
   readonly questions: readonly Question[];
   readonly answerKey: AnswerKey;
   readonly rubrics: TextRubrics;
@@ -419,11 +437,6 @@ export interface GradeTextAnswerResponse {
 }
 
 /** Examiner-only. Publishes results of every graded submission of an exam (`MANUAL` release). */
-/** Re-evaluates the caller's examiner role against the allow-list and refreshes their claims. */
-export interface RefreshRoleResponse {
-  readonly examiner: boolean;
-}
-
 export interface PublishResultsRequest {
   readonly examId: string;
 }
@@ -453,12 +466,17 @@ export const COLLECTIONS = {
   results: 'results',
   sessionPapers: 'sessionPapers',
   invitations: 'invitations',
-  config: 'config',
+  /** Role directory (exact emails and `@domain` entries). Super-admin readable, server-written. */
+  examinerDirectory: 'examiner_directory',
+  /** Public practice-exam cards per subject (`practice_catalog/{examId}`). Readable by anyone. */
+  practiceCatalog: 'practice_catalog',
+  /** Immutable record of every role change. Super-admin readable, server-written. */
+  auditLogs: 'audit_logs',
+  /** Per-user `revokeTime` (seconds) used by the rules to reject tokens minted before a revocation. */
+  userMetadata: 'user_metadata',
 } as const;
 
 export const ROSTER_DOC_ID = 'roster';
-/** `config/examiners` — `{ emails: string[] }`: exact emails or `@domain` entries. Admin-managed. */
-export const EXAMINERS_CONFIG_DOC_ID = 'examiners';
 
 export const PAPER_DOC_ID = 'current';
 export const ANSWER_KEY_DOC_ID = 'answerKey';

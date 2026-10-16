@@ -14,7 +14,7 @@ import {
 } from '@exam/contracts';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { FIREBASE_FUNCTIONS, FIRESTORE } from './firebase.providers';
+import { FIREBASE_FUNCTIONS, FIRESTORE } from '@exam/data-access-auth/data';
 import { answerKeyConverter, examPaperConverter } from './firestore-converters';
 
 export interface ExamGradingContext {

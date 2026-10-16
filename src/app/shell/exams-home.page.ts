@@ -2,15 +2,16 @@ import { Component, inject, input, signal } from '@angular/core';
 import { form, FormField, FormRoot, maxLength, pattern, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
 import { LIMITS, normalizeAccessCode } from '@exam/contracts';
-import { AuthStore, CandidateInvitationsStore } from '@exam/data-access-exams';
-import { ArCountPipe, ArDatePipe, BidiIsolate, Star } from '@exam/ui-arabic';
+import { AuthStore } from '@exam/data-access-auth';
+import { CandidateInvitationsStore } from '@exam/data-access-exams';
+import { ArCountPipe, ArDatePipe, arabicErrorMessage, BidiIsolate, Star } from '@exam/ui-arabic';
 
 /**
- * The default page: the candidate's door. Enter a code, or — when signed in — pick from the exams
- * you were invited to. Examiners reach their dashboard through «تسجيل الدخول».
+ * The candidates' page (/exams): enter a code, or — when signed in — pick from the exams you were
+ * invited to. Accounts that were just granted examiner access can refresh their role here.
  */
 @Component({
-  selector: 'app-home-page',
+  selector: 'app-exams-home-page',
   imports: [FormField, FormRoot, RouterLink, Star, ArCountPipe, ArDatePipe, BidiIsolate],
   providers: [CandidateInvitationsStore],
   template: `
@@ -20,10 +21,21 @@ import { ArCountPipe, ArDatePipe, BidiIsolate, Star } from '@exam/ui-arabic';
       <p class="lead">أدخِل رمز الاختبار الذي زوَّدك به المُمتحِن، أو افتح الرابط الذي أرسله إليك.</p>
     </section>
 
-    @if (notExaminer()) {
+    @if (notAllowed()) {
       <p class="notice" role="status">
-        هذا الحساب ليس من حسابات المُمتحِنين المعتمدة، لذا تُعرَض لك صفحة المُختبَرين.
+        {{ notAllowed() === 'super_admin' ? 'هذه الصفحة مقصورة على المشرف العام.' : 'هذا الحساب ليس من حسابات المُمتحِنين المعتمدة، لذا تُعرَض لك صفحة المُختبَرين.' }}
       </p>
+    }
+    @if (auth.hasAccount() && !auth.isExaminer()) {
+      <div class="role-refresh">
+        <p class="muted">مُنِحتَ صلاحية المُمتحِن للتوّ؟ حدِّث صلاحياتك دون الحاجة إلى تسجيل الخروج.</p>
+        <button type="button" [disabled]="refreshing()" (click)="refreshRole()">
+          {{ refreshing() ? 'جارٍ التحديث…' : 'تحديث صلاحياتي' }}
+        </button>
+        @if (refreshMessage(); as message) {
+          <p class="hint" role="status">{{ message }}</p>
+        }
+      </div>
     }
 
     <section class="cards">
@@ -106,15 +118,35 @@ import { ArCountPipe, ArDatePipe, BidiIsolate, Star } from '@exam/ui-arabic';
     .invite .title { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--accent-strong); }
     .invite .meta { font-size: 0.85rem; color: var(--muted); }
     .examiner-entry { text-align: center; margin-block-start: 2rem; }
+    .role-refresh { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block: 1rem; }
+    .role-refresh p { margin: 0; }
   `,
 })
-export class HomePage {
-  /** `?notExaminer=1` — set by the examiner guard when a non-examiner account tries the dashboard. */
-  readonly notExaminer = input<string | undefined>();
+export class ExamsHomePage {
+  /** `?notAllowed=examiner|super_admin` — set by `roleGuard` when an account lacks the role. */
+  readonly notAllowed = input<string | undefined>();
 
   protected readonly auth = inject(AuthStore);
   protected readonly invites = inject(CandidateInvitationsStore);
   readonly #router = inject(Router);
+  protected readonly refreshing = signal(false);
+  protected readonly refreshMessage = signal<string | null>(null);
+
+  /** Picks up a role granted after sign-in (server re-check + forced token refresh). */
+  protected async refreshRole(): Promise<void> {
+    this.refreshing.set(true);
+    this.refreshMessage.set(null);
+    try {
+      await this.auth.refreshClaims();
+      if (this.auth.isSuperAdmin()) await this.#router.navigateByUrl('/admin');
+      else if (this.auth.isExaminer()) await this.#router.navigateByUrl('/examiner');
+      else this.refreshMessage.set('لم تتغيّر صلاحياتك: حسابك ليس في دليل المُمتحِنين.');
+    } catch (error) {
+      this.refreshMessage.set(arabicErrorMessage(error));
+    } finally {
+      this.refreshing.set(false);
+    }
+  }
 
   protected readonly model = signal({ code: '' });
   protected readonly joinForm = form(this.model, (p) => {

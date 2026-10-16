@@ -22,8 +22,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { AuthStore } from './auth.store';
-import { FIREBASE_FUNCTIONS, FIRESTORE } from './firebase.providers';
+import { AuthStore } from '@exam/data-access-auth';
+import { FIREBASE_FUNCTIONS, FIRESTORE } from '@exam/data-access-auth/data';
 import {
   accessCodeConverter,
   draftConverter,

@@ -9,6 +9,8 @@ import {
 } from '@angular/forms/signals';
 import {
   type AccessMode,
+  isSubjectId,
+  type SubjectId,
   LIMITS,
   parseRoster,
   type QuestionType,
@@ -53,6 +55,10 @@ export interface ExamFormModel {
   questionsPerCandidate: number | null;
   // Access
   accessMode: AccessMode;
+  /** '' = no subject. */
+  subjectId: SubjectId | '';
+  /** List as a free practice exam on the subject's public hub. */
+  listed: boolean;
   /** Invited emails, one per line (ROSTER mode). */
   rosterText: string;
   questions: QuestionModel[];
@@ -86,6 +92,8 @@ export function initialExamModel(nowMs: number): ExamFormModel {
     shuffleOptions: false,
     questionsPerCandidate: null,
     accessMode: 'CODE',
+    subjectId: '',
+    listed: false,
     rosterText: '',
     questions: [blankQuestion()],
   };
@@ -107,6 +115,8 @@ export function modelFromExam(exam: EditableExam): ExamFormModel {
     shuffleOptions: input.delivery.shuffleOptions,
     questionsPerCandidate: input.delivery.questionsPerCandidate,
     accessMode: input.access.mode,
+    subjectId: input.catalog.subjectId ?? '',
+    listed: input.catalog.listed,
     rosterText: input.roster.join('\n'),
     questions: input.questions.map((q) => ({
       ...blankQuestion(q.type),
@@ -228,6 +238,10 @@ export function toNewExamInput(model: ExamFormModel): NewExamInput {
       questionsPerCandidate: model.questionsPerCandidate,
     },
     access: { mode: model.accessMode },
+    catalog: {
+      subjectId: isSubjectId(model.subjectId) ? model.subjectId : null,
+      listed: model.listed && isSubjectId(model.subjectId) && model.accessMode === 'CODE',
+    },
     roster: model.accessMode === 'ROSTER' ? parseRoster(model.rosterText).emails : [],
     questions: model.questions.map((q) =>
       q.type === 'TEXT'

@@ -88,7 +88,7 @@ test('invite-only exam with a question bank: roster gate, invitations, lock, clo
 
   // A non-examiner account never reaches the dashboard.
   await visitor.goto('/examiner');
-  await expect(visitor).toHaveURL(/\/\?notExaminer=1$/);
+  await expect(visitor).toHaveURL(/\/exams\?notAllowed=examiner$/);
   await expect(visitor.getByText('هذا الحساب ليس من حسابات المُمتحِنين المعتمدة', { exact: false })).toBeVisible();
   await checkPage(visitor);
 
@@ -98,7 +98,7 @@ test('invite-only exam with a question bank: roster gate, invitations, lock, clo
   await checkPage(candidate);
   await candidate.getByRole('link', { name: 'تسجيل الدخول' }).first().click();
   await signInAs(candidate, invited, 'Invited');
-  await expect(candidate).toHaveURL(/\/$/);
+  await expect(candidate).toHaveURL(/\/exams$/);
   const invitation = candidate.getByTestId('invitations').getByRole('link', { name: new RegExp(TITLE) });
   await expect(invitation).toBeVisible();
   await checkPage(candidate);

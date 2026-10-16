@@ -1,4 +1,4 @@
-import type { FirebasePlatformConfig } from '@exam/data-access-exams';
+import type { FirebasePlatformConfig } from '@exam/data-access-auth';
 
 /**
  * Production: replace with your Firebase web app config (Firebase console → Project settings).

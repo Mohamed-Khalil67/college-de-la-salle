@@ -18,7 +18,7 @@ export class ThemeService {
 
   constructor() {
     effect(() => {
-      this.#document.documentElement.dataset['theme'] = this.#mode();
+      this.#document.documentElement.setAttribute('data-theme', this.#mode());
     });
   }
 

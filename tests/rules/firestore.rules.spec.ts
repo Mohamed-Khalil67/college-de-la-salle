@@ -38,6 +38,7 @@ const PROJECT_ID = 'demo-exam-rules';
 
 const EXAMINER = 'examiner-alice';
 const OTHER_EXAMINER = 'examiner-bob';
+const SUPER_ADMIN = 'admin-zainab';
 const CANDIDATE = 'candidate-carol';
 const OTHER_CANDIDATE = 'candidate-dave';
 
@@ -54,16 +55,27 @@ let env: RulesTestEnvironment;
 /* Contexts                                                                                        */
 /* ---------------------------------------------------------------------------------------------- */
 
-/** An allow-listed examiner: carries the `examiner` claim set by the refreshRole function. */
-function examiner(uid = EXAMINER): Firestore {
+/** An account with a `role` claim, as set by the role Cloud Functions. `authTime` = sign-in time (s). */
+function withRole(uid: string, role: 'examiner' | 'super_admin', authTime = 1_000): Firestore {
   return env
     .authenticatedContext(uid, {
       firebase: { sign_in_provider: 'google.com' },
-      examiner: true,
+      role,
       email: `${uid}@school.test`,
       email_verified: true,
+      iat: authTime,
+      auth_time: authTime,
     })
     .firestore() as unknown as Firestore;
+}
+
+/** A directory-listed examiner. */
+function examiner(uid = EXAMINER, authTime?: number): Firestore {
+  return withRole(uid, 'examiner', authTime);
+}
+
+function superAdmin(uid = SUPER_ADMIN, authTime?: number): Firestore {
+  return withRole(uid, 'super_admin', authTime);
 }
 
 /** A real (Google) account that is NOT on the examiner allow-list: a signed-in candidate. */
@@ -804,17 +816,106 @@ function newExam(overrides: Partial<Record<string, unknown>> = {}) {
   return { ...examMeta(EXAMINER, 'XYZ789'), createdAt: serverTimestamp(), ...overrides };
 }
 
-describe('examiner role', () => {
-  it('a signed-in account that is not on the examiner allow-list cannot author exams', async () => {
+describe('RBAC: roles, administration and revocation', () => {
+  const directoryEntry = {
+    entry: 'teacher@school.test',
+    kind: 'EMAIL',
+    role: 'examiner',
+    status: 'ACTIVE',
+    uid: null,
+    updatedAt: Timestamp.now(),
+    updatedBy: 'admin-zainab@school.test',
+  };
+  const auditLine = {
+    action: 'GRANT_EXAMINER',
+    actorUid: SUPER_ADMIN,
+    actorEmail: 'admin-zainab@school.test',
+    target: 'teacher@school.test',
+    targetUids: [],
+    at: Timestamp.now(),
+  };
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'examiner_directory', 'teacher@school.test'), directoryEntry);
+      await setDoc(doc(db, 'audit_logs', 'log-1'), auditLine);
+    });
+  });
+
+  it('an examinee (signed-in, no role) cannot author exams', async () => {
     await assertFails(setDoc(doc(student(STUDENT, STUDENT_EMAIL), 'exams', 'exam-s'), {
       ...newExam(),
       ownerId: STUDENT,
     }));
   });
 
-  it('nobody can read or write the examiner allow-list from a client', async () => {
-    await assertFails(getDoc(doc(examiner(), 'config', 'examiners')));
-    await assertFails(setDoc(doc(examiner(), 'config', 'examiners'), { emails: ['me@x.com'] }));
+  it('the legacy boolean `examiner` claim grants nothing; only the `role` claim counts', async () => {
+    const legacy = env
+      .authenticatedContext('legacy-user', {
+        firebase: { sign_in_provider: 'google.com' },
+        examiner: true,
+        email: 'legacy@school.test',
+        email_verified: true,
+      })
+      .firestore() as unknown as Firestore;
+    await assertFails(setDoc(doc(legacy, 'exams', 'exam-l'), { ...newExam(), ownerId: 'legacy-user' }));
+  });
+
+  it('the super admin can author exams too', async () => {
+    await assertSucceeds(setDoc(doc(superAdmin(), 'exams', 'exam-a'), { ...newExam(), ownerId: SUPER_ADMIN }));
+  });
+
+  it('only the super admin can read the examiner directory and the audit log', async () => {
+    await assertSucceeds(getDoc(doc(superAdmin(), 'examiner_directory', 'teacher@school.test')));
+    await assertSucceeds(getDocs(collection(superAdmin(), 'examiner_directory')));
+    await assertSucceeds(getDocs(collection(superAdmin(), 'audit_logs')));
+
+    for (const db of [examiner(), student(STUDENT, STUDENT_EMAIL), candidate(), anonymous()]) {
+      await assertFails(getDoc(doc(db, 'examiner_directory', 'teacher@school.test')));
+      await assertFails(getDocs(collection(db, 'examiner_directory')));
+      await assertFails(getDoc(doc(db, 'audit_logs', 'log-1')));
+      await assertFails(getDocs(collection(db, 'audit_logs')));
+    }
+  });
+
+  it('nobody — not even the super admin — can grant roles by writing the directory from a client', async () => {
+    for (const db of [superAdmin(), examiner(), student(STUDENT, STUDENT_EMAIL)]) {
+      await assertFails(setDoc(doc(db, 'examiner_directory', 'me@school.test'), { ...directoryEntry, entry: 'me@school.test' }));
+      await assertFails(updateDoc(doc(db, 'examiner_directory', 'teacher@school.test'), { status: 'REVOKED' }));
+      await assertFails(deleteDoc(doc(db, 'examiner_directory', 'teacher@school.test')));
+    }
+  });
+
+  it('the audit log is immutable: no client create, edit or delete', async () => {
+    const admin = superAdmin();
+    await assertFails(setDoc(doc(admin, 'audit_logs', 'log-2'), auditLine));
+    await assertFails(updateDoc(doc(admin, 'audit_logs', 'log-1'), { target: 'someone-else@school.test' }));
+    await assertFails(deleteDoc(doc(admin, 'audit_logs', 'log-1')));
+  });
+
+  it('revocation metadata is server-only', async () => {
+    await assertFails(getDoc(doc(superAdmin(), 'user_metadata', EXAMINER)));
+    await assertFails(setDoc(doc(examiner(), 'user_metadata', EXAMINER), { revokeTime: 0 }));
+  });
+
+  it('a token minted before a revocation loses examiner access, even though its claim still says examiner', async () => {
+    await seed((db) => setDoc(doc(db, 'user_metadata', EXAMINER), { revokeTime: 5_000 }));
+
+    const stale = examiner(EXAMINER, 4_000);
+    await assertFails(getDoc(doc(stale, 'exams', EXAM_ID)));
+    await assertFails(getDoc(doc(stale, 'exams', EXAM_ID, 'private', 'answerKey')));
+    await assertFails(getDocs(query(collection(stale, 'submissions'), where('examOwnerId', '==', EXAMINER))));
+    await assertFails(setDoc(doc(stale, 'exams', 'exam-new'), { ...newExam() }));
+
+    // After signing in again (and being re-granted), access resumes.
+    const fresh = examiner(EXAMINER, 6_000);
+    await assertSucceeds(getDoc(doc(fresh, 'exams', EXAM_ID)));
+  });
+
+  it('a revoked super admin token cannot read the audit log', async () => {
+    await seed((db) => setDoc(doc(db, 'user_metadata', SUPER_ADMIN), { revokeTime: 5_000 }));
+    await assertFails(getDocs(collection(superAdmin(SUPER_ADMIN, 4_000), 'audit_logs')));
+    await assertSucceeds(getDocs(collection(superAdmin(SUPER_ADMIN, 6_000), 'audit_logs')));
   });
 });
 
@@ -915,5 +1016,76 @@ describe('rosters and invitations', () => {
 
   it('the invitation id must match its exam and email', async () => {
     await assertFails(setDoc(doc(examiner(), 'invitations', `${EXAM_ID}__someone@else.test`), invitation));
+  });
+});
+describe('public portal and practice catalog', () => {
+  const card = (overrides: Record<string, unknown> = {}) => ({
+    examId: EXAM_ID,
+    ownerId: EXAMINER,
+    subjectId: 'arabic',
+    title: 'تدريب النحو',
+    code: ACCESS_CODE,
+    durationSeconds: 300,
+    questionCount: 2,
+    publishedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'school_content', 'history'), { title: 'تاريخ المدرسة' });
+      await setDoc(doc(db, 'news', 'n1'), { title: 'خبر' });
+      await setDoc(doc(db, 'curriculum', 'arabic'), { name: 'اللغة العربية' });
+      await setDoc(doc(db, 'practice_catalog', 'listed-exam'), { ...card(), examId: 'listed-exam', publishedAt: Timestamp.now() });
+    });
+  });
+
+  it('signed-out visitors can read school history, news, curriculum and practice cards', async () => {
+    const visitor = anonymous();
+    await assertSucceeds(getDoc(doc(visitor, 'school_content', 'history')));
+    await assertSucceeds(getDocs(collection(visitor, 'news')));
+    await assertSucceeds(getDoc(doc(visitor, 'curriculum', 'arabic')));
+    await assertSucceeds(getDocs(query(collection(visitor, 'practice_catalog'), where('subjectId', '==', 'arabic'))));
+  });
+
+  it('nobody writes school content from a client, not even the super admin', async () => {
+    for (const db of [superAdmin(), examiner(), anonymous()]) {
+      await assertFails(setDoc(doc(db, 'news', 'n2'), { title: 'x' }));
+      await assertFails(updateDoc(doc(db, 'school_content', 'history'), { title: 'x' }));
+      await assertFails(deleteDoc(doc(db, 'curriculum', 'arabic')));
+    }
+  });
+
+  it('signed-out visitors can never read questions banks, answer keys or rubrics', async () => {
+    const visitor = anonymous();
+    await assertFails(getDoc(doc(visitor, 'exams', EXAM_ID)));
+    await assertFails(getDoc(doc(visitor, 'exams', EXAM_ID, 'paper', 'current')));
+    await assertFails(getDoc(doc(visitor, 'exams', EXAM_ID, 'private', 'answerKey')));
+    await assertFails(getDocs(collection(visitor, 'sessionPapers')));
+  });
+
+  it('an examiner lists their own published, code-access exam on a subject hub', async () => {
+    await assertSucceeds(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card()));
+  });
+
+  it('a card must match the exam: owner, code, published status and code access', async () => {
+    await assertFails(setDoc(doc(examiner(OTHER_EXAMINER), 'practice_catalog', EXAM_ID), card({ ownerId: OTHER_EXAMINER })));
+    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ code: 'ZZZ999' })));
+    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ subjectId: 'biology' })));
+    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card({ answers: { q1: 0 } })));
+
+    await seed((db) => updateDoc(doc(db, 'exams', EXAM_ID), { status: 'DRAFT' }));
+    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card()));
+
+    await seed((db) => updateDoc(doc(db, 'exams', EXAM_ID), { status: 'PUBLISHED', access: { mode: 'ROSTER' } }));
+    await assertFails(setDoc(doc(examiner(), 'practice_catalog', EXAM_ID), card()));
+  });
+
+  it('candidates and visitors cannot publish or remove practice cards', async () => {
+    await assertFails(setDoc(doc(candidate(), 'practice_catalog', EXAM_ID), card({ ownerId: CANDIDATE })));
+    await assertFails(setDoc(doc(anonymous(), 'practice_catalog', EXAM_ID), card()));
+    await assertFails(deleteDoc(doc(candidate(), 'practice_catalog', 'listed-exam')));
+    await assertFails(deleteDoc(doc(examiner(OTHER_EXAMINER), 'practice_catalog', 'listed-exam')));
+    await assertSucceeds(deleteDoc(doc(examiner(), 'practice_catalog', 'listed-exam')));
   });
 });

@@ -9,12 +9,17 @@
   border-block-end: 1px solid var(--border);
 }
 .brand { display: grid; text-decoration: none; }
+.main-nav { flex: 1; justify-content: center; }
+.account { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .brand-title {
   font-family: var(--font-display); font-weight: 700; font-size: clamp(1.6rem, 3.4vw, 2.1rem);
   line-height: var(--leading-display); color: var(--accent-strong);
 }
-.brand-tagline { font-size: 0.85rem; color: var(--muted); }
-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.1rem; font-weight: 600; }
+.brand-tagline { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; color: var(--terracotta-strong); }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; font-weight: 600; }
+@media (max-width: 640px) {
+  .main-nav { flex-basis: 100%; justify-content: flex-start; }
+}
 nav a.active { text-decoration-thickness: 2px; }
 .who { font-weight: 400; color: var(--muted); font-size: 0.9rem; max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 0.35em; }
@@ -25,6 +30,7 @@ main {
   padding-block: 1.75rem 3rem; padding-inline: clamp(1rem, 4vw, 2.5rem);
 }
 
+.app-footer p { margin-block: 0.15rem; }
 .app-footer {
   text-align: center; font-size: 0.85rem; color: var(--muted);
   padding-block: 1rem; border-block-start: 1px solid var(--border); background: var(--surface);

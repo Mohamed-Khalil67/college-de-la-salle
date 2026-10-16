@@ -3,7 +3,7 @@ import { Component, effect, inject, input, signal, untracked } from '@angular/co
 import { form, FormField, FormRoot, maxLength, required, submit } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
 import { type AccessCodeRecord, LIMITS } from '@exam/contracts';
-import { AuthStore } from '@exam/data-access-exams';
+import { AuthStore } from '@exam/data-access-auth';
 import { ArCountPipe, ArDatePipe, ArNumberPipe, BidiIsolate, Star } from '@exam/ui-arabic';
 import { ExamRunnerStore } from './exam-runner.store';
 import { Countdown } from './ui/countdown';

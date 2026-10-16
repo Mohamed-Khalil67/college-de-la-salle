@@ -7,6 +7,9 @@ import { defineConfig, devices } from '@playwright/test';
  *
  * or, with `npm run emulators` already running: npx playwright test
  */
+/** Override to test a dev server on another port, e.g. E2E_BASE_URL=http://localhost:4201. */
+const baseURL = process.env['E2E_BASE_URL'] ?? 'http://localhost:4200';
+
 export default defineConfig({
   testDir: 'e2e',
   globalSetup: './e2e/global-setup.ts',
@@ -16,7 +19,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL,
     locale: 'ar',
     colorScheme: 'light',
     trace: 'retain-on-failure',
@@ -24,7 +27,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'npm start',
-    url: 'http://localhost:4200',
+    url: baseURL,
     reuseExistingServer: true,
     timeout: 180_000,
   },

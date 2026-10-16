@@ -3,22 +3,28 @@
  * count shown in the UI goes through here, so switching digits (Arabic-Indic ↔ Latin) or calendar
  * is a one-line change in `APP_LOCALE`.
  *
- * `ar-u-nu-arab` → Arabic-Indic digits (٠١٢٣), Gregorian calendar.
- * Use `ar-u-nu-latn` for Western digits (common in the Maghreb).
+ * `ar-EG-u-nu-arab` → Egyptian Arabic conventions (the school is in Egypt), Arabic-Indic digits
+ * (٠١٢٣), Gregorian calendar. `ar-EG` already defaults to Arabic-Indic digits; the explicit
+ * `nu-arab` documents it and keeps `toAppDigits` aligned. Use `-u-nu-latn` for Western digits.
  */
-export const APP_LOCALE = 'ar-u-nu-arab';
+export const APP_LOCALE = 'ar-EG-u-nu-arab';
 
 const numberFormats = new Map<string, Intl.NumberFormat>();
 const dateFormats = new Map<string, Intl.DateTimeFormat>();
 const pluralRules = new Intl.PluralRules('ar');
 
-export type DateStyle = 'date' | 'time' | 'datetime' | 'short';
+export type DateStyle = 'date' | 'time' | 'datetime' | 'short' | 'calendar';
 
 const DATE_OPTIONS: Record<DateStyle, Intl.DateTimeFormatOptions> = {
   date: { dateStyle: 'long' },
   time: { timeStyle: 'short' },
   datetime: { dateStyle: 'medium', timeStyle: 'short' },
   short: { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' },
+  /**
+   * Calendar dates of school content (news). Pinned to Cairo time so prerendered HTML and the
+   * hydrated page agree whatever the server's or visitor's time zone.
+   */
+  calendar: { dateStyle: 'long', timeZone: 'Africa/Cairo' },
 };
 
 export function formatNumber(
@@ -82,6 +88,22 @@ export interface PluralForms {
 }
 
 export const NOUNS = {
+  account: {
+    zero: 'لا حسابات',
+    one: 'حساب واحد',
+    two: 'حسابان',
+    few: '{n} حسابات',
+    many: '{n} حسابًا',
+    other: '{n} حساب',
+  },
+  exam: {
+    zero: 'لا اختبارات',
+    one: 'اختبار واحد',
+    two: 'اختباران',
+    few: '{n} اختبارات',
+    many: '{n} اختبارًا',
+    other: '{n} اختبار',
+  },
   minute: {
     zero: 'لا دقائق',
     one: 'دقيقة واحدة',

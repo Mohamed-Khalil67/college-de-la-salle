@@ -2,7 +2,6 @@ import {
   applyLayout,
   buildLayout,
   deliveredQuestions,
-  isAllowedExaminer,
   parseRoster,
   questionsDelivered,
   toCanonicalAnswers,
@@ -89,14 +88,6 @@ describe('applyLayout and toCanonicalAnswers', () => {
 });
 
 describe('access lists', () => {
-  it('matches exact emails and whole domains, case-insensitively', () => {
-    const entries = ['Teacher@School.edu', '@uni.edu'];
-    expect(isAllowedExaminer('teacher@school.edu', entries)).toBe(true);
-    expect(isAllowedExaminer('dr.x@uni.edu', entries)).toBe(true);
-    expect(isAllowedExaminer('student@school.edu', entries)).toBe(false);
-    expect(isAllowedExaminer('x@evil-uni.edu.com', entries)).toBe(false);
-  });
-
   it('parses pasted rosters, de-duplicating and reporting invalid entries', () => {
     expect(parseRoster('a@x.com, B@x.com\nb@x.com; not-an-email ، c@y.org')).toEqual({
       emails: ['a@x.com', 'b@x.com', 'c@y.org'],

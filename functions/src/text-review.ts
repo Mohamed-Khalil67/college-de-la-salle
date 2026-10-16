@@ -1,7 +1,7 @@
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { defineSecret, defineString } from 'firebase-functions/params';
 import { logger } from 'firebase-functions/v2';
-import { type CallableRequest, HttpsError, onCall } from 'firebase-functions/v2/https';
+import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { emulatorMockGrader, geminiGrader, type TextGrader } from './ai/text-grader';
 import {
   ANSWER_KEY_DOC_ID,
@@ -22,6 +22,7 @@ import {
   type TextQuestion,
   type TextRubric,
 } from './contracts';
+import { requireAuthor } from './roles';
 import { readQuestions } from './exam-reads';
 import { examForResults, writeResultIfReleased } from './lifecycle';
 
@@ -42,7 +43,7 @@ const isEmulator = process.env['FUNCTIONS_EMULATOR'] === 'true';
 
 export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextAnswerResponse>>(
   async (request) => {
-    const uid = requireExaminer(request);
+    const uid = await requireAuthor(request);
     const { sessionId, questionId } = requireIds(request.data);
     const feedback = String(request.data?.feedback ?? '').trim().slice(0, LIMITS.maxFeedbackLength);
     const source = request.data?.source === 'AI_ACCEPTED' ? 'AI_ACCEPTED' : 'MANUAL';
@@ -107,7 +108,7 @@ export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextA
 export const suggestTextGrade = onCall<SuggestTextGradeRequest, Promise<AiSuggestion>>(
   { secrets: [GEMINI_API_KEY], timeoutSeconds: 60 },
   async (request) => {
-    const uid = requireExaminer(request);
+    const uid = await requireAuthor(request);
     const { sessionId, questionId } = requireIds(request.data);
     const db = getFirestore();
     const submissionRef = db.collection(COLLECTIONS.submissions).doc(sessionId);
@@ -157,7 +158,7 @@ export const suggestTextGrade = onCall<SuggestTextGradeRequest, Promise<AiSugges
  */
 export const publishResults = onCall<PublishResultsRequest, Promise<PublishResultsResponse>>(
   async (request) => {
-    const uid = requireExaminer(request);
+    const uid = await requireAuthor(request);
     const examId = String(request.data?.examId ?? '');
     if (!examId || examId.includes('/')) throw new HttpsError('invalid-argument', 'معرِّف الاختبار غير صالح.');
     const db = getFirestore();
@@ -198,15 +199,6 @@ function selectGrader(): TextGrader {
   if (key) return geminiGrader(key, GEMINI_MODEL.value());
   if (isEmulator) return emulatorMockGrader();
   throw new Error('التصحيح بالذكاء الاصطناعي غير مُهيَّأ: اضبط المفتاح السرّي GEMINI_API_KEY.');
-}
-
-function requireExaminer(request: CallableRequest): string {
-  const auth = request.auth;
-  if (!auth) throw new HttpsError('unauthenticated', 'سجِّل الدخول أولًا.');
-  if (auth.token.firebase?.sign_in_provider === 'anonymous') {
-    throw new HttpsError('permission-denied', 'التصحيح مقصور على المُمتحِنين.');
-  }
-  return auth.uid;
 }
 
 function requireIds(data: unknown): { sessionId: string; questionId: string } {

@@ -1,8 +1,8 @@
 import { Component, effect, inject, input, resource, signal, untracked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import type { AccessMode, ExamMeta, ExamStatus } from '@exam/contracts';
+import { AuthStore } from '@exam/data-access-auth';
 import {
-  AuthStore,
   ExamAuthoringService,
   ExaminerDashboardStore,
   SubmissionReviewService,

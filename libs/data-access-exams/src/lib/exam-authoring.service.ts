@@ -4,6 +4,7 @@ import {
   type AccessPolicy,
   ANSWER_KEY_DOC_ID,
   type AnswerKeyRecord,
+  type CatalogPolicy,
   COLLECTIONS,
   type DeliveryPolicy,
   type ExamMeta,
@@ -12,6 +13,7 @@ import {
   type ExamWindow,
   type IntegrityPolicy,
   invitationIdFor,
+  isPubliclyListed,
   LIMITS,
   normalizeEmail,
   PAPER_DOC_ID,
@@ -32,8 +34,8 @@ import {
   type WriteBatch,
   writeBatch,
 } from 'firebase/firestore';
-import { AuthStore } from './auth.store';
-import { FIRESTORE } from './firebase.providers';
+import { AuthStore } from '@exam/data-access-auth';
+import { FIRESTORE } from '@exam/data-access-auth/data';
 import {
   answerKeyConverter,
   examMetaConverter,
@@ -67,6 +69,8 @@ export interface NewExamInput {
   readonly scoring: ScoringPolicy;
   readonly delivery: DeliveryPolicy;
   readonly access: AccessPolicy;
+  /** Subject assignment and public practice listing. */
+  readonly catalog: CatalogPolicy;
   /** Invited emails (used when `access.mode === 'ROSTER'`). */
   readonly roster: readonly string[];
   readonly questions: readonly NewQuestionInput[];
@@ -126,6 +130,7 @@ export class ExamAuthoringService {
         ownerId,
       });
       this.#syncRoster(batch, examRef, ownerId, accessCode, input, status, [], input.roster);
+      this.#syncCatalog(batch, examRef.id, ownerId, accessCode, input, status, questionsDelivered(content.questions.length, input.delivery));
 
       try {
         await batch.commit();
@@ -175,19 +180,21 @@ export class ExamAuthoringService {
         ...accessCodeFields(input, content, status),
       });
       this.#syncRoster(batch, examRef, ownerId, meta.accessCode, input, status, current.roster, input.roster);
+      this.#syncCatalog(batch, meta.id, ownerId, meta.accessCode, input, status, questionsDelivered(content.questions.length, input.delivery));
     } else {
       if (status !== meta.status) {
         batch.update(examRef, { status });
         batch.update(doc(this.#db, COLLECTIONS.accessCodes, meta.accessCode), { status });
       }
       this.#syncRoster(batch, examRef, ownerId, meta.accessCode, metaAsInput(meta), status, current.roster, input.roster);
+      if (status !== meta.status) this.#syncCatalog(batch, meta.id, ownerId, meta.accessCode, meta, status, cardQuestionCount(meta));
     }
     await batch.commit();
   }
 
   /** Publish / close / reopen. Also updates the lobby card and every invitation. */
   async setStatus(meta: ExamMeta, status: ExamStatus): Promise<void> {
-    this.#requireExaminer();
+    const ownerId = this.#requireExaminer();
     const examRef = doc(this.#db, COLLECTIONS.exams, meta.id);
     const roster = await getDoc(doc(examRef, COLLECTIONS.private, ROSTER_DOC_ID).withConverter(rosterConverter));
     const batch = writeBatch(this.#db);
@@ -196,6 +203,7 @@ export class ExamAuthoringService {
     for (const email of roster.data()?.emails ?? []) {
       batch.update(doc(this.#db, COLLECTIONS.invitations, invitationIdFor(meta.id, email)), { status });
     }
+    this.#syncCatalog(batch, meta.id, ownerId, meta.accessCode, meta, status, cardQuestionCount(meta));
     await batch.commit();
   }
 
@@ -218,6 +226,37 @@ export class ExamAuthoringService {
       ownerId,
       answers: content.answerKey,
       rubrics: content.rubrics,
+    });
+  }
+
+  /**
+   * Keeps the exam's public practice card in step with its settings: present only while the exam
+   * is published, open by code, assigned to a subject and marked as listed.
+   */
+  #syncCatalog(
+    batch: WriteBatch,
+    examId: string,
+    ownerId: string,
+    code: string,
+    exam: Pick<NewExamInput, 'title' | 'durationSeconds' | 'access' | 'catalog'>,
+    status: ExamStatus,
+    questionCount: number,
+  ): void {
+    const ref = doc(this.#db, COLLECTIONS.practiceCatalog, examId);
+    const subjectId = exam.catalog.subjectId;
+    if (!subjectId || !isPubliclyListed({ catalog: exam.catalog, status, access: exam.access })) {
+      batch.delete(ref);
+      return;
+    }
+    batch.set(ref, {
+      examId,
+      ownerId,
+      subjectId,
+      title: exam.title.trim(),
+      code,
+      durationSeconds: exam.durationSeconds,
+      questionCount,
+      publishedAt: serverTimestamp(),
     });
   }
 
@@ -311,6 +350,7 @@ function metaFields(input: NewExamInput, content: Content) {
     scoring: input.scoring,
     delivery,
     access: input.access,
+    catalog: input.catalog,
     questionCount: content.questions.length,
     maxScore: content.maxScore,
   };
@@ -331,6 +371,11 @@ function accessCodeFields(input: NewExamInput, content: Content, status: ExamSta
   };
 }
 
+/** Questions each candidate receives, as shown on the public card. */
+function cardQuestionCount(meta: ExamMeta): number {
+  return questionsDelivered(meta.questionCount, meta.delivery);
+}
+
 function metaAsInput(meta: ExamMeta): Pick<NewExamInput, 'title' | 'durationSeconds' | 'window' | 'access'> {
   return { title: meta.title, durationSeconds: meta.durationSeconds, window: meta.window, access: meta.access };
 }
@@ -347,6 +392,7 @@ export function toInput(exam: EditableExam): NewExamInput {
     scoring: meta.scoring,
     delivery: meta.delivery,
     access: meta.access,
+    catalog: meta.catalog,
     roster,
     questions: paper.questions.map((q) =>
       q.type === 'TEXT'
