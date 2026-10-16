@@ -9,7 +9,7 @@
 
     <button
       type="button"
-      class="menu-button md:hidden"
+      class="menu-button"
       [attr.aria-expanded]="menuOpen()"
       aria-controls="primary-nav"
       (click)="menuOpen.set(!menuOpen())"
@@ -21,10 +21,10 @@
     <nav
       id="primary-nav"
       aria-label="Navigation principale"
-      class="w-full md:flex md:w-auto"
+      class="primary-nav w-full lg:flex lg:w-auto"
       [class.hidden]="!menuOpen()"
     >
-      <ul class="m-0 flex list-none flex-col gap-1 p-0 md:flex-row md:items-center">
+      <ul class="m-0 flex list-none flex-col gap-1 p-0 lg:flex-row lg:items-center">
         @for (item of nav; track item.link) {
           <li>
             <a
@@ -36,7 +36,7 @@
             >{{ item.label }}</a>
           </li>
         }
-        <li class="md:ms-2">
+        <li class="mt-2 lg:ms-2 lg:mt-0">
           <a class="account-link" routerLink="/espace-eleve" routerLinkActive="active" data-testid="account-link">
             {{ student.firstName() ? 'Mon espace · ' + student.firstName() : 'Espace élève' }}
           </a>
