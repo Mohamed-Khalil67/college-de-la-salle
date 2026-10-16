@@ -11,7 +11,8 @@
     "test:e2e": "npm run functions:build && firebase emulators:exec --only auth,firestore,functions --project demo-exam-platform \"playwright test\"",
     "test:all": "ng test --watch=false && npm run test:rules && npm run test:e2e",
     "functions:build": "npm --prefix functions run build",
-    "emulators": "npm run functions:build && firebase emulators:start --project demo-exam-platform"
+    "emulators": "npm run functions:build && firebase emulators:start --project demo-exam-platform",
+    "seed:emulator": "node scripts/seed-emulator.mjs"
   },
   "private": true,
   "packageManager": "npm@12.0.2",

@@ -1,5 +1,5 @@
 import { Component, computed, input, output } from '@angular/core';
-import type { TextQuestion } from '@exam/contracts';
+import type { AnswerValue, TextQuestion } from '@exam/contracts';
 import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
 import { FlagToggle } from './flag-toggle';
 
@@ -16,6 +16,7 @@ import { FlagToggle } from './flag-toggle';
       </div>
       <label class="prompt exam-text" [for]="'tq-' + question().id" examIsolate>{{ question().prompt }}</label>
       <textarea
+        #textarea
         [id]="'tq-' + question().id"
         rows="6"
         dir="auto"
@@ -24,8 +25,8 @@ import { FlagToggle } from './flag-toggle';
         [attr.maxlength]="question().maxLength"
         [disabled]="disabled()"
         [attr.aria-describedby]="'tq-count-' + question().id"
-        (input)="typed.emit($any($event.target).value)"
-        (change)="typed.emit($any($event.target).value)"
+        (input)="typed.emit(textarea.value)"
+        (change)="typed.emit(textarea.value)"
       ></textarea>
       <p class="count" [id]="'tq-count-' + question().id" [class.near]="nearLimit()">
         {{ value().length | arNumber }} من {{ question().maxLength | arCount: 'character' }}
@@ -47,7 +48,12 @@ import { FlagToggle } from './flag-toggle';
 export class TextQuestionCard {
   readonly question = input.required<TextQuestion>();
   readonly index = input.required<number>();
-  readonly value = input('');
+  /** The candidate's stored answer; anything but text reads as empty. */
+  readonly answer = input<AnswerValue>();
+  protected readonly value = computed(() => {
+    const answer = this.answer();
+    return typeof answer === 'string' ? answer : '';
+  });
   readonly disabled = input(false);
   readonly typed = output<string>();
   readonly flagged = input(false);

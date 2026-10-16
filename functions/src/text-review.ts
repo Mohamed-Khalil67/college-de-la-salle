@@ -8,6 +8,7 @@ import {
   type AiSuggestion,
   buildAiGradePrompt,
   COLLECTIONS,
+  deliveredQuestions,
   finalizeScore,
   type GradeTextAnswerRequest,
   type GradeTextAnswerResponse,
@@ -59,7 +60,8 @@ export const gradeTextAnswer = onCall<GradeTextAnswerRequest, Promise<GradeTextA
         tx.get(paperRef(submission['examId'])),
         tx.get(db.collection(COLLECTIONS.exams).doc(submission['examId'])),
       ]);
-      const questions = readQuestions(paperSnap);
+      // Only the questions this candidate actually received count towards their total.
+      const questions = deliveredQuestions(readQuestions(paperSnap), submission['questionIds']);
       const question = requireTextQuestion(questions, questionId);
 
       const points = request.data?.points;
@@ -181,7 +183,8 @@ export const publishResults = onCall<PublishResultsRequest, Promise<PublishResul
     batch.update(examRef, { resultsPublished: true });
     let published = 0;
     for (const sub of graded.docs) {
-      if (writeResultIfReleased(batch, sub.id, sub.data(), exam, questions)) published++;
+      const delivered = deliveredQuestions(questions, sub.get('questionIds'));
+      if (writeResultIfReleased(batch, sub.id, sub.data(), exam, delivered)) published++;
     }
     await batch.commit();
     logger.info('results.published', { examId, published });

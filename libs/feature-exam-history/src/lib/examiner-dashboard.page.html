@@ -5,7 +5,6 @@
   </div>
   <div class="header-actions">
     <a class="button primary" routerLink="/examiner/new">اختبار جديد</a>
-    <button type="button" (click)="signOut()">تسجيل الخروج</button>
   </div>
 </header>
 
@@ -26,6 +25,7 @@
         (click)="store.selectedExamId.set(exam.id)"
       >
         <span class="exam-name" examIsolate>{{ exam.title }}</span>
+        <span class="status-chip" [class]="'status-chip ' + exam.status.toLowerCase()">{{ statusLabel(exam.status) }}</span>
         <span class="exam-meta">
           <code class="ltr">{{ exam.accessCode }}</code> · {{ exam.durationSeconds / 60 | arCount: 'minute' }} ·
           {{ exam.questionCount | arCount: 'question' }}
@@ -51,9 +51,46 @@
             · الدرجة العظمى {{ exam.maxScore | arCount: 'point' }}
           </p>
         </div>
-        <div class="share">
-          <span class="label">رابط المُختبَرين</span>
-          <code class="ltr">{{ origin }}/take/{{ exam.accessCode }}</code>
+        <div class="lifecycle" data-testid="lifecycle">
+          <span class="label">حالة الاختبار</span>
+          <p>
+            <strong [class]="'status-text ' + exam.status.toLowerCase()">{{ statusLabel(exam.status) }}</strong>
+            · {{ accessLabel(exam.access.mode) }}
+            @if (exam.lockedAt) {
+              · <span class="muted">مُجمَّد منذ بدء أول مُختبَر</span>
+            }
+          </p>
+          <div class="lifecycle-actions">
+            <a class="button" [routerLink]="['/examiner/exams', exam.id, 'edit']">
+              {{ exam.lockedAt ? 'المدعوّون والحالة' : 'تعديل' }}
+            </a>
+            @switch (exam.status) {
+              @case ('DRAFT') {
+                <button type="button" class="primary" [disabled]="busy()" (click)="setStatus(exam, 'PUBLISHED')">نشر الاختبار</button>
+              }
+              @case ('PUBLISHED') {
+                <button type="button" [disabled]="busy()" (click)="setStatus(exam, 'CLOSED')">إغلاق الاختبار</button>
+              }
+              @case ('CLOSED') {
+                <button type="button" [disabled]="busy()" (click)="setStatus(exam, 'PUBLISHED')">إعادة فتح الاختبار</button>
+              }
+            }
+            <button type="button" [disabled]="busy()" (click)="duplicate(exam.id)">نسخ إلى مسودة جديدة</button>
+          </div>
+          @if (actionMessage(); as message) {
+            <p class="hint" role="status">{{ message }}</p>
+          }
+        </div>
+        <div class="share-wrap">
+          <exam-share-panel
+            [title]="exam.title"
+            [code]="exam.accessCode"
+            [durationSeconds]="exam.durationSeconds"
+            [opensAt]="exam.window.opensAt"
+            [closesAt]="exam.window.closesAt"
+            [status]="exam.status"
+            [emails]="roster.value() ?? []"
+          />
         </div>
         <div class="release" data-testid="release">
           <span class="label">النتائج</span>
@@ -125,13 +162,14 @@
                   {{ row.status === 'IN_PROGRESS' ? (row.remainingMs | arClock) : '—' }}
                 </td>
                 <td class="num" data-testid="progress">
-                  {{ row.answeredCount === null ? '—' : (row.answeredCount | arNumber) + ' من ' + (exam.questionCount | arNumber) }}
+                  {{ row.answeredCount === null ? '—' : (row.answeredCount | arNumber) + ' من ' + (row.questionCount | arNumber) }}
                 </td>
                 <td class="num" data-testid="score">
-                  @if (row.submission?.score !== null && row.submission?.score !== undefined) {
-                    <strong>{{ row.submission!.score | arScore: row.submission!.maxScore }}</strong>
-                  } @else if (row.status === 'NEEDS_REVIEW') {
-                    {{ row.submission!.autoScore | arNumber }} + ؟ من {{ row.submission!.maxScore | arNumber }}
+                  @let sub = row.submission;
+                  @if (sub && sub.score !== null) {
+                    <strong>{{ sub.score | arScore: sub.maxScore }}</strong>
+                  } @else if (sub && row.status === 'NEEDS_REVIEW') {
+                    {{ sub.autoScore | arNumber }} + ؟ من {{ sub.maxScore | arNumber }}
                   } @else {
                     —
                   }

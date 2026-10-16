@@ -14,6 +14,7 @@ const session: ExamSession = {
   status: 'ACTIVE',
   integrity: { maxVisibilityLosses: null },
   submittedAt: null,
+  questionCount: 2,
 };
 
 const submission: Submission = {
@@ -36,6 +37,8 @@ const submission: Submission = {
   score: null,
   maxScore: null,
   gradedAt: null,
+  questionIds: null,
+  canonicalAnswers: null,
 };
 
 describe('dashboard row derivation', () => {

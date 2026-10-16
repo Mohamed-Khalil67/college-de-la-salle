@@ -6,8 +6,13 @@ import {
   type ExamPaper,
   type ExamSession,
   type ManualGrade,
+  DEFAULT_ACCESS,
+  DEFAULT_DELIVERY,
   DEFAULT_SCORING,
   type ExamDraft,
+  type Invitation,
+  type RosterRecord,
+  type SessionPaper,
   type ExamResult,
   normalizeQuestion,
   type Submission,
@@ -58,6 +63,11 @@ export const examMetaConverter = readOnly<ExamMeta>((id, d) => ({
   integrity: d['integrity'],
   scoring: d['scoring'] ?? DEFAULT_SCORING,
   resultsPublished: d['resultsPublished'] === true,
+  delivery: d['delivery'] ?? DEFAULT_DELIVERY,
+  access: d['access'] ?? DEFAULT_ACCESS,
+  // Exams created before the lifecycle existed were live immediately.
+  status: d['status'] ?? 'PUBLISHED',
+  lockedAt: millisOrNull(d['lockedAt']),
   questionCount: d['questionCount'],
   maxScore: d['maxScore'],
   // Pending server timestamps resolve to null in the local snapshot; fall back to "now-ish" order.
@@ -84,6 +94,30 @@ export const accessCodeConverter = readOnly<AccessCodeRecord>((_id, d) => ({
   durationSeconds: d['durationSeconds'],
   questionCount: d['questionCount'],
   window: { opensAt: millis(d['window']?.opensAt), closesAt: millis(d['window']?.closesAt) },
+  status: d['status'] ?? 'PUBLISHED',
+  accessMode: d['accessMode'] ?? 'CODE',
+}));
+
+export const sessionPaperConverter = readOnly<SessionPaper>((_id, d) => ({
+  examOwnerId: d['examOwnerId'],
+  candidateId: d['candidateId'],
+  questions: (d['questions'] ?? []).map(normalizeQuestion),
+}));
+
+export const rosterConverter = readOnly<RosterRecord>((_id, d) => ({
+  ownerId: d['ownerId'],
+  emails: d['emails'] ?? [],
+}));
+
+export const invitationConverter = readOnly<Invitation>((_id, d) => ({
+  examId: d['examId'],
+  ownerId: d['ownerId'],
+  email: d['email'],
+  code: d['code'],
+  title: d['title'],
+  durationSeconds: d['durationSeconds'],
+  window: { opensAt: millis(d['window']?.opensAt), closesAt: millis(d['window']?.closesAt) },
+  status: d['status'] ?? 'PUBLISHED',
 }));
 
 export const sessionConverter = readOnly<ExamSession>((id, d) => ({
@@ -98,6 +132,7 @@ export const sessionConverter = readOnly<ExamSession>((id, d) => ({
   status: d['status'],
   integrity: d['integrity'],
   submittedAt: millisOrNull(d['submittedAt']),
+  questionCount: d['questionCount'] ?? d['layout']?.questionIds?.length ?? 0,
 }));
 
 export const submissionConverter = readOnly<Submission>((id, d) => ({
@@ -132,6 +167,8 @@ export const submissionConverter = readOnly<Submission>((id, d) => ({
   score: typeof d['score'] === 'number' ? d['score'] : null,
   maxScore: typeof d['maxScore'] === 'number' ? d['maxScore'] : null,
   gradedAt: millisOrNull(d['gradedAt']),
+  questionIds: d['questionIds'] ?? null,
+  canonicalAnswers: d['canonicalAnswers'] ?? null,
 }));
 
 export const draftConverter = readOnly<ExamDraft>((_id, d) => draftFrom(d));

@@ -54,9 +54,26 @@ let env: RulesTestEnvironment;
 /* Contexts                                                                                        */
 /* ---------------------------------------------------------------------------------------------- */
 
+/** An allow-listed examiner: carries the `examiner` claim set by the refreshRole function. */
 function examiner(uid = EXAMINER): Firestore {
   return env
-    .authenticatedContext(uid, { firebase: { sign_in_provider: 'google.com' } })
+    .authenticatedContext(uid, {
+      firebase: { sign_in_provider: 'google.com' },
+      examiner: true,
+      email: `${uid}@school.test`,
+      email_verified: true,
+    })
+    .firestore() as unknown as Firestore;
+}
+
+/** A real (Google) account that is NOT on the examiner allow-list: a signed-in candidate. */
+function student(uid: string, email: string, verified = true): Firestore {
+  return env
+    .authenticatedContext(uid, {
+      firebase: { sign_in_provider: 'google.com' },
+      email,
+      email_verified: verified,
+    })
     .firestore() as unknown as Firestore;
 }
 
@@ -86,6 +103,10 @@ function examMeta(ownerId = EXAMINER, accessCode = ACCESS_CODE) {
     accessCode,
     integrity: { maxVisibilityLosses: 3 },
     scoring: { passPercent: 50, resultRelease: 'ON_GRADED' },
+    delivery: { shuffleQuestions: false, shuffleOptions: false, questionsPerCandidate: null },
+    access: { mode: 'CODE' },
+    status: 'PUBLISHED',
+    lockedAt: null,
     resultsPublished: false,
     questionCount: 2,
     maxScore: 2,
@@ -165,8 +186,20 @@ async function seedExam() {
       durationSeconds: 300,
       questionCount: 2,
       window: examMeta().window,
+      status: 'PUBLISHED',
+      accessMode: 'CODE',
     });
   });
+}
+
+async function seedSessionPaper(candidateId = CANDIDATE) {
+  await seed((db) =>
+    setDoc(doc(db, 'sessionPapers', `${EXAM_ID}_${candidateId}`), {
+      examOwnerId: EXAMINER,
+      candidateId,
+      questions: paper.questions,
+    }),
+  );
 }
 
 async function seedSession(candidateId = CANDIDATE, overrides = {}) {
@@ -205,9 +238,15 @@ afterAll(async () => {
 /* ---------------------------------------------------------------------------------------------- */
 
 describe('answer key protection', () => {
-  it('candidate with a LIVE session can read the question paper', async () => {
+  it('candidate with a LIVE session can read THEIR session paper', async () => {
     await seedSession();
-    await assertSucceeds(getDoc(doc(candidate(), 'exams', EXAM_ID, 'paper', 'current')));
+    await seedSessionPaper();
+    await assertSucceeds(getDoc(doc(candidate(), 'sessionPapers', SESSION_ID)));
+  });
+
+  it('candidate can never read the full question bank, even during a live session', async () => {
+    await seedSession();
+    await assertFails(getDoc(doc(candidate(), 'exams', EXAM_ID, 'paper', 'current')));
   });
 
   it('candidate can NEVER read the answer key, even during a live session', async () => {
@@ -220,20 +259,33 @@ describe('answer key protection', () => {
     await assertFails(getDocs(collection(candidate(), 'exams', EXAM_ID, 'private')));
   });
 
-  it('candidate cannot read the paper before their session exists', async () => {
-    await assertFails(getDoc(doc(candidate(), 'exams', EXAM_ID, 'paper', 'current')));
-  });
-
-  it('candidate cannot read the paper after their session expires', async () => {
+  it('candidate cannot read their session paper after the session expires', async () => {
     await seedSession(CANDIDATE, { expiresAt: ts(-1_000) });
-    await assertFails(getDoc(doc(candidate(), 'exams', EXAM_ID, 'paper', 'current')));
+    await seedSessionPaper();
+    await assertFails(getDoc(doc(candidate(), 'sessionPapers', SESSION_ID)));
   });
 
-  it('candidate cannot read the paper through ANOTHER candidate’s session', async () => {
+  it('candidate cannot read ANOTHER candidate’s session paper', async () => {
     await seedSession(OTHER_CANDIDATE);
-    await assertFails(getDoc(doc(candidate(), 'exams', EXAM_ID, 'paper', 'current')));
+    await seedSessionPaper(OTHER_CANDIDATE);
+    await assertFails(getDoc(doc(candidate(), 'sessionPapers', OTHER_SESSION_ID)));
   });
 
+  it('nobody but the server writes session papers', async () => {
+    await seedSession();
+    await assertFails(
+      setDoc(doc(candidate(), 'sessionPapers', SESSION_ID), {
+        examOwnerId: EXAMINER,
+        candidateId: CANDIDATE,
+        questions: [],
+      }),
+    );
+  });
+
+  it('the exam owner can read session papers', async () => {
+    await seedSessionPaper();
+    await assertSucceeds(getDoc(doc(examiner(), 'sessionPapers', SESSION_ID)));
+  });
   it('candidate cannot read exam metadata directly', async () => {
     await seedSession();
     await assertFails(getDoc(doc(candidate(), 'exams', EXAM_ID)));
@@ -254,7 +306,7 @@ describe('answer key protection', () => {
 
   it('unauthenticated users can read nothing', async () => {
     await assertFails(getDoc(doc(anonymous(), 'accessCodes', ACCESS_CODE)));
-    await assertFails(getDoc(doc(anonymous(), 'exams', EXAM_ID, 'paper', 'current')));
+    await assertFails(getDoc(doc(anonymous(), 'sessionPapers', SESSION_ID)));
   });
 
   it('signed-in users can resolve an access code but cannot enumerate codes', async () => {
@@ -550,6 +602,8 @@ describe('isolation', () => {
       durationSeconds: 300,
       questionCount: 2,
       window: examMeta().window,
+      status: 'PUBLISHED',
+      accessMode: 'CODE',
     });
     await assertSucceeds(batch.commit());
   });
@@ -588,6 +642,8 @@ describe('isolation', () => {
       durationSeconds: 300,
       questionCount: 2,
       window: examMeta().window,
+      status: 'PUBLISHED',
+      accessMode: 'CODE',
     });
     await assertFails(batch.commit());
   });
@@ -734,5 +790,130 @@ describe('scoring policy on exams', () => {
         createdAt: serverTimestamp(),
       }),
     );
+  });
+});
+
+/* ---------------------------------------------------------------------------------------------- */
+/* 5. Roles, exam lifecycle lock, rosters and invitations                                          */
+/* ---------------------------------------------------------------------------------------------- */
+
+const STUDENT = 'student-sara';
+const STUDENT_EMAIL = 'sara@students.test';
+
+function newExam(overrides: Partial<Record<string, unknown>> = {}) {
+  return { ...examMeta(EXAMINER, 'XYZ789'), createdAt: serverTimestamp(), ...overrides };
+}
+
+describe('examiner role', () => {
+  it('a signed-in account that is not on the examiner allow-list cannot author exams', async () => {
+    await assertFails(setDoc(doc(student(STUDENT, STUDENT_EMAIL), 'exams', 'exam-s'), {
+      ...newExam(),
+      ownerId: STUDENT,
+    }));
+  });
+
+  it('nobody can read or write the examiner allow-list from a client', async () => {
+    await assertFails(getDoc(doc(examiner(), 'config', 'examiners')));
+    await assertFails(setDoc(doc(examiner(), 'config', 'examiners'), { emails: ['me@x.com'] }));
+  });
+});
+
+describe('exam lifecycle lock', () => {
+  beforeEach(async () => {
+    await seed((db) => updateDoc(doc(db, 'exams', EXAM_ID), { lockedAt: ts(-MINUTE) }));
+  });
+
+  it('once a candidate has started, questions and answers are frozen', async () => {
+    const db = examiner();
+    await assertFails(updateDoc(doc(db, 'exams', EXAM_ID), { title: 'changed' }));
+    await assertFails(setDoc(doc(db, 'exams', EXAM_ID, 'paper', 'current'), paper));
+    await assertFails(
+      setDoc(doc(db, 'exams', EXAM_ID, 'private', 'answerKey'), { ownerId: EXAMINER, answers: { q1: 0 } }),
+    );
+  });
+
+  it('…but the examiner can still close the exam and edit the roster', async () => {
+    const db = examiner();
+    await assertSucceeds(updateDoc(doc(db, 'exams', EXAM_ID), { status: 'CLOSED' }));
+    await assertSucceeds(
+      setDoc(doc(db, 'exams', EXAM_ID, 'private', 'roster'), { ownerId: EXAMINER, emails: [STUDENT_EMAIL] }),
+    );
+  });
+
+  it('an examiner cannot unlock an exam by clearing lockedAt', async () => {
+    await assertFails(updateDoc(doc(examiner(), 'exams', EXAM_ID), { lockedAt: null }));
+  });
+
+  it('a locked exam cannot be deleted', async () => {
+    await assertFails(deleteDoc(doc(examiner(), 'exams', EXAM_ID)));
+  });
+
+  it('an exam cannot be created already locked', async () => {
+    await assertFails(setDoc(doc(examiner(), 'exams', 'exam-l'), newExam({ lockedAt: ts(0) })));
+  });
+
+  it('rejects an invalid question-bank draw size', async () => {
+    await assertFails(
+      setDoc(
+        doc(examiner(), 'exams', 'exam-d'),
+        newExam({ delivery: { shuffleQuestions: true, shuffleOptions: true, questionsPerCandidate: 5 } }),
+      ),
+    );
+    await assertSucceeds(
+      setDoc(
+        doc(examiner(), 'exams', 'exam-d'),
+        newExam({ delivery: { shuffleQuestions: true, shuffleOptions: true, questionsPerCandidate: 1 } }),
+      ),
+    );
+  });
+});
+
+describe('rosters and invitations', () => {
+  const inviteId = `${EXAM_ID}__${STUDENT_EMAIL}`;
+  const invitation = {
+    examId: EXAM_ID,
+    ownerId: EXAMINER,
+    email: STUDENT_EMAIL,
+    code: ACCESS_CODE,
+    title: 'Distributed Systems Midterm',
+    durationSeconds: 300,
+    window: examMeta().window,
+    status: 'PUBLISHED',
+  };
+
+  it('the roster is private to the owner', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'exams', EXAM_ID, 'private', 'roster'), { ownerId: EXAMINER, emails: [STUDENT_EMAIL] }),
+    );
+    await assertSucceeds(getDoc(doc(examiner(), 'exams', EXAM_ID, 'private', 'roster')));
+    await assertFails(getDoc(doc(student(STUDENT, STUDENT_EMAIL), 'exams', EXAM_ID, 'private', 'roster')));
+  });
+
+  it('the owner can invite; the invited, verified email can find the invitation', async () => {
+    await assertSucceeds(setDoc(doc(examiner(), 'invitations', inviteId), invitation));
+    await assertSucceeds(getDoc(doc(student(STUDENT, STUDENT_EMAIL), 'invitations', inviteId)));
+    await assertSucceeds(
+      getDocs(
+        query(collection(student(STUDENT, STUDENT_EMAIL), 'invitations'), where('email', '==', STUDENT_EMAIL)),
+      ),
+    );
+  });
+
+  it('nobody else can see the invitation — not other students, not unverified emails', async () => {
+    await seed((db) => setDoc(doc(db, 'invitations', inviteId), invitation));
+    await assertFails(getDoc(doc(student('mallory', 'mallory@students.test'), 'invitations', inviteId)));
+    await assertFails(getDoc(doc(student('spoof', STUDENT_EMAIL, false), 'invitations', inviteId)));
+    await assertFails(getDoc(doc(candidate(), 'invitations', inviteId)));
+  });
+
+  it('students cannot invite themselves, and examiners cannot invite to someone else’s exam', async () => {
+    await assertFails(setDoc(doc(student(STUDENT, STUDENT_EMAIL), 'invitations', inviteId), invitation));
+    await assertFails(
+      setDoc(doc(examiner(OTHER_EXAMINER), 'invitations', inviteId), { ...invitation, ownerId: OTHER_EXAMINER }),
+    );
+  });
+
+  it('the invitation id must match its exam and email', async () => {
+    await assertFails(setDoc(doc(examiner(), 'invitations', `${EXAM_ID}__someone@else.test`), invitation));
   });
 });

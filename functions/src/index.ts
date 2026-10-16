@@ -1,4 +1,6 @@
+import { randomInt } from 'node:crypto';
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
@@ -8,23 +10,59 @@ import { readQuestions } from './exam-reads';
 import { examForResults, finalizeExpiredSession, writeResultIfReleased } from './lifecycle';
 import {
   ANSWER_KEY_DOC_ID,
+  applyLayout,
+  buildLayout,
   COLLECTIONS,
+  deliveredQuestions,
+  type DeliveryPolicy,
   type ExamSession,
   type ExamSessionStatus,
+  EXAMINERS_CONFIG_DOC_ID,
   finalizeScore,
   gradeAnswers,
   type IntegrityPolicy,
+  isAllowedExaminer,
   isValidAccessCode,
   LIMITS,
   normalizeAccessCode,
+  normalizeEmail,
   PAPER_DOC_ID,
+  type RefreshRoleResponse,
+  ROSTER_DOC_ID,
+  type SessionLayout,
   sessionIdFor,
   type StartSessionRequest,
   type StartSessionResponse,
+  toCanonicalAnswers,
 } from './contracts';
 
 initializeApp();
 const db = getFirestore();
+
+/* ---------------------------------------------------------------------------------------------- */
+/* refreshRole — examiner allow-list → `examiner` custom claim.                                    */
+/*                                                                                                 */
+/* config/examiners { emails: ["teacher@school.edu", "@school.edu"] } is admin-managed (no client  */
+/* access). Only verified emails qualify. The claim is what firestore.rules trusts.                */
+/* ---------------------------------------------------------------------------------------------- */
+
+export const refreshRole = onCall<void, Promise<RefreshRoleResponse>>(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'سجِّل الدخول أولًا.');
+
+  const email = normalizeEmail(String(auth.token.email ?? ''));
+  const verified = auth.token.email_verified === true;
+  const config = await db.collection(COLLECTIONS.config).doc(EXAMINERS_CONFIG_DOC_ID).get();
+  const entries = (config.get('emails') ?? []) as string[];
+  const examiner =
+    auth.token.firebase?.sign_in_provider !== 'anonymous' && verified && isAllowedExaminer(email, entries);
+
+  const user = await getAuth().getUser(auth.uid);
+  if ((user.customClaims?.['examiner'] === true) !== examiner) {
+    await getAuth().setCustomUserClaims(auth.uid, { ...user.customClaims, examiner });
+  }
+  return { examiner };
+});
 
 /* ---------------------------------------------------------------------------------------------- */
 /* startSession — the ONLY way an ExamSession comes into existence.                                */
@@ -32,6 +70,8 @@ const db = getFirestore();
 /* startedAt/expiresAt are minted from the server clock. Firestore rules forbid every client write */
 /* to `sessions/*`, so the timer cannot be forged, extended, or reset. The call is idempotent: a   */
 /* reconnecting candidate gets their existing session back (and a fresh serverNow for clock sync). */
+/* It also enforces the exam lifecycle and roster, draws/shuffles this candidate's paper, and      */
+/* freezes the exam's questions from the first start on.                                           */
 /* ---------------------------------------------------------------------------------------------- */
 
 export const startSession = onCall<StartSessionRequest, Promise<StartSessionResponse>>(
@@ -53,6 +93,9 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
 
     const examRef = db.collection(COLLECTIONS.exams).doc(examId);
     const sessionRef = db.collection(COLLECTIONS.sessions).doc(sessionIdFor(examId, uid));
+    const paperRef = examRef.collection(COLLECTIONS.paper).doc(PAPER_DOC_ID);
+    const rosterRef = examRef.collection(COLLECTIONS.private).doc(ROSTER_DOC_ID);
+    const sessionPaperRef = db.collection(COLLECTIONS.sessionPapers).doc(sessionRef.id);
 
     const session = await db.runTransaction(async (tx) => {
       const [examSnap, existing] = await Promise.all([tx.get(examRef), tx.get(sessionRef)]);
@@ -70,15 +113,41 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
 
       if (!examSnap.exists) throw new HttpsError('not-found', 'لم يعد هذا الاختبار موجودًا.');
       const exam = examSnap.data()!;
+
+      const status = exam['status'] ?? 'PUBLISHED';
+      if (status === 'DRAFT') throw new HttpsError('failed-precondition', 'لم يُنشَر هذا الاختبار بعد.');
+      if (status === 'CLOSED') throw new HttpsError('failed-precondition', 'أغلق المُمتحِن هذا الاختبار.');
+
+      if (exam['access']?.mode === 'ROSTER') {
+        const token = request.auth!.token;
+        const email = token.email_verified === true ? normalizeEmail(String(token.email ?? '')) : '';
+        if (!email) {
+          throw new HttpsError(
+            'permission-denied',
+            'هذا الاختبار مقصور على المدعوّين. سجِّل الدخول بالحساب الذي دُعيتَ به.',
+          );
+        }
+        const roster = await tx.get(rosterRef);
+        const emails = ((roster.get('emails') ?? []) as string[]).map(normalizeEmail);
+        if (!emails.includes(email)) {
+          throw new HttpsError('permission-denied', 'حسابك غير مدرج في قائمة المدعوّين لهذا الاختبار.');
+        }
+      }
+
       const opensAt = exam['window'].opensAt as Timestamp;
       const closesAt = exam['window'].closesAt as Timestamp;
-
       if (now.toMillis() < opensAt.toMillis()) {
         throw new HttpsError('failed-precondition', 'لم يُتَح هذا الاختبار بعد.');
       }
       if (now.toMillis() >= closesAt.toMillis()) {
         throw new HttpsError('failed-precondition', 'انتهت مدة إتاحة هذا الاختبار.');
       }
+
+      // This candidate's paper: bank draw + shuffles, from a CSPRNG.
+      const questions = readQuestions(await tx.get(paperRef));
+      const layout = buildLayout(questions, exam['delivery'] as DeliveryPolicy | undefined, (n) =>
+        randomInt(n),
+      );
 
       // The exam window is a hard stop: a late starter gets less time, never more.
       const expiresAt = Timestamp.fromMillis(
@@ -91,13 +160,23 @@ export const startSession = onCall<StartSessionRequest, Promise<StartSessionResp
         examTitle: exam['title'] as string,
         candidateId: uid,
         candidateName,
+        candidateEmail: request.auth!.token.email ?? null,
         startedAt: now,
         expiresAt,
         status: 'ACTIVE' satisfies ExamSessionStatus,
         integrity: exam['integrity'] as IntegrityPolicy,
         submittedAt: null,
+        questionCount: layout.questionIds.length,
+        layout,
       };
       tx.create(sessionRef, data);
+      tx.create(sessionPaperRef, {
+        examOwnerId: exam['ownerId'],
+        candidateId: uid,
+        questions: applyLayout(questions, layout),
+      });
+      // Freeze the questions and key: edits after a candidate has started would be unfair.
+      if (!exam['lockedAt']) tx.update(examRef, { lockedAt: now });
       return toSession(sessionRef.id, data);
     });
 
@@ -121,26 +200,36 @@ export const gradeSubmission = onDocumentCreated(
     if (submission['gradingStatus']) return;
 
     const examRef = db.collection(COLLECTIONS.exams).doc(submission['examId'] as string);
-    const [examSnap, paperSnap, keySnap] = await Promise.all([
+    const sessionRef = db.collection(COLLECTIONS.sessions).doc(event.params.sessionId);
+    const [examSnap, paperSnap, keySnap, sessionSnap] = await Promise.all([
       examRef.get(),
       examRef.collection(COLLECTIONS.paper).doc(PAPER_DOC_ID).get(),
       examRef.collection(COLLECTIONS.private).doc(ANSWER_KEY_DOC_ID).get(),
+      sessionRef.get(),
     ]);
     if (!examSnap.exists || !paperSnap.exists || !keySnap.exists) {
       logger.error('grade.missing-exam', { sessionId: event.params.sessionId });
       return;
     }
 
-    const questions = readQuestions(paperSnap);
+    // Map what the candidate saw back to the authored paper.
+    const layout = (sessionSnap.get('layout') ?? null) as SessionLayout | null;
+    const questions = deliveredQuestions(readQuestions(paperSnap), layout?.questionIds);
+    const canonicalAnswers = toCanonicalAnswers(
+      (submission['answers'] ?? {}) as Record<string, unknown>,
+      layout,
+    );
     const result = gradeAnswers(
       questions,
       keySnap.get('answers') as Record<string, number>,
-      (submission['answers'] ?? {}) as Record<string, unknown>,
+      canonicalAnswers,
     );
     // Exams without written questions are final immediately; others wait for the examiner.
     const totals = finalizeScore(questions, result.score, {});
 
     const grading = {
+      questionIds: questions.map((q) => q.id),
+      canonicalAnswers,
       autoScore: result.score,
       maxScore: result.maxScore,
       correctCount: result.correctCount,
@@ -161,7 +250,7 @@ export const gradeSubmission = onDocumentCreated(
       examForResults(examSnap.data()!),
       questions,
     );
-    batch.update(db.collection(COLLECTIONS.sessions).doc(event.params.sessionId), {
+    batch.update(sessionRef, {
       status: 'SUBMITTED' satisfies ExamSessionStatus,
       submittedAt: submission['submittedAt'],
     });
@@ -199,6 +288,7 @@ export const sweepExpiredSessions = onSchedule('every 5 minutes', async () => {
 
 /* ---------------------------------------------------------------------------------------------- */
 
+/** Client-facing session. The layout (option permutations) stays on the server. */
 function toSession(id: string, data: FirebaseFirestore.DocumentData): ExamSession {
   return {
     id,
@@ -212,5 +302,6 @@ function toSession(id: string, data: FirebaseFirestore.DocumentData): ExamSessio
     status: data['status'],
     integrity: data['integrity'],
     submittedAt: data['submittedAt'] ? (data['submittedAt'] as Timestamp).toMillis() : null,
+    questionCount: data['questionCount'] ?? data['layout']?.questionIds?.length ?? 0,
   };
 }

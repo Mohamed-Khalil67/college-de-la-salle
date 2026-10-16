@@ -6,7 +6,6 @@ import {
   type ExamPaper,
   type ExamResult,
   normalizeAccessCode,
-  PAPER_DOC_ID,
   type StartSessionRequest,
   type StartSessionResponse,
   type SubmissionDraft,
@@ -28,8 +27,8 @@ import { FIREBASE_FUNCTIONS, FIRESTORE } from './firebase.providers';
 import {
   accessCodeConverter,
   draftConverter,
-  examPaperConverter,
   resultConverter,
+  sessionPaperConverter,
 } from './firestore-converters';
 import { ServerClock } from './server-clock';
 
@@ -71,12 +70,16 @@ export class ExamSessionGateway {
     return data;
   }
 
-  /** Readable only while the caller's session is live — enforced by rules, not by this code. */
-  async loadPaper(examId: string): Promise<ExamPaper> {
-    const ref = doc(this.#db, COLLECTIONS.exams, examId, COLLECTIONS.paper, PAPER_DOC_ID);
-    const snap = await getDocFromServer(ref.withConverter(examPaperConverter));
+  /**
+   * This candidate's paper (bank draw + shuffles applied by the server). Readable only while the
+   * caller's session is live — enforced by rules, not by this code.
+   */
+  async loadPaper(sessionId: string): Promise<ExamPaper> {
+    const ref = doc(this.#db, COLLECTIONS.sessionPapers, sessionId).withConverter(sessionPaperConverter);
+    const snap = await getDocFromServer(ref);
     if (!snap.exists()) throw new Error('ورقة الأسئلة غير متاحة.');
-    return snap.data();
+    const paper = snap.data();
+    return { ownerId: paper.examOwnerId, questions: paper.questions };
   }
 
   /* -------------------------------------------------------------------------------------------- */

@@ -1,9 +1,9 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { type RouterStateSnapshot, TitleStrategy } from '@angular/router';
 
 /** Route titles become "<page> — منصّة الاختبارات" in the browser tab. */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class ArabicTitleStrategy extends TitleStrategy {
   readonly #title = inject(Title);
 

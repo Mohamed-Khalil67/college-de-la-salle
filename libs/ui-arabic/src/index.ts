@@ -6,3 +6,5 @@ export * from './lib/bidi-isolate';
 export * from './lib/ornaments';
 export * from './lib/arabic-number-input';
 export * from './lib/arabic-datetime-input';
+export * from './lib/theme';
+export * from './lib/share-panel';

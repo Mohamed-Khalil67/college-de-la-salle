@@ -1,5 +1,5 @@
-import { Component, input, output } from '@angular/core';
-import type { ChoiceQuestion } from '@exam/contracts';
+import { Component, computed, input, output } from '@angular/core';
+import type { AnswerValue, ChoiceQuestion } from '@exam/contracts';
 import { ArCountPipe, ArNumberPipe, BidiIsolate } from '@exam/ui-arabic';
 import { FlagToggle } from './flag-toggle';
 
@@ -63,7 +63,12 @@ const ABJAD = ['أ', 'ب', 'ج', 'د', 'هـ', 'و', 'ز', 'ح'];
 export class QuestionCard {
   readonly question = input.required<ChoiceQuestion>();
   readonly index = input.required<number>();
-  readonly selected = input<number | undefined>(undefined);
+  /** The candidate's stored answer; only an option index counts as a selection. */
+  readonly answer = input<AnswerValue>();
+  protected readonly selected = computed(() => {
+    const answer = this.answer();
+    return typeof answer === 'number' ? answer : undefined;
+  });
   readonly disabled = input(false);
   readonly answered = output<AnswerChange>();
   readonly flagged = input(false);

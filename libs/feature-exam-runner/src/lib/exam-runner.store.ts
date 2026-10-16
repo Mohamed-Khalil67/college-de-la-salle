@@ -194,7 +194,7 @@ export class ExamRunnerStore {
         return;
       }
       const [paper, serverDraft] = await Promise.all([
-        this.#gateway.loadPaper(session.examId),
+        this.#gateway.loadPaper(session.id),
         this.#gateway.loadDraft(session.id),
       ]);
       // The server copy wins: it is what will be graded if this device goes away.

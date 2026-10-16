@@ -30,6 +30,8 @@ export interface CandidateRow {
   readonly startedAt: EpochMillis;
   readonly expiresAt: EpochMillis;
   readonly remainingMs: number;
+  /** Questions this candidate received (bank draw applied). */
+  readonly questionCount: number;
   readonly submission: Submission | null;
   /** Live answered count from the autosaved draft (in-progress candidates). */
   readonly answeredCount: number | null;
@@ -146,7 +148,7 @@ export class ExaminerDashboardStore {
     const rows = this.rows();
     const graded = rows.filter((r) => r.status === 'GRADED');
     const avg = graded.length
-      ? graded.reduce((sum, r) => sum + (r.submission!.score ?? 0), 0) / graded.length
+      ? graded.reduce((sum, r) => sum + (r.submission?.score ?? 0), 0) / graded.length
       : null;
     return {
       inProgress: rows.filter((r) => r.status === 'IN_PROGRESS').length,
@@ -189,6 +191,7 @@ export function toRow(
     startedAt: session.startedAt,
     expiresAt: session.expiresAt,
     remainingMs: Math.max(0, session.expiresAt - now),
+    questionCount: session.questionCount,
     submission,
     answeredCount: extras.draft ? countAnswered(extras.draft.answers) : null,
     passed:

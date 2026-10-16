@@ -35,9 +35,16 @@ service cloud.firestore {
       return request.auth.uid;
     }
 
-    // Examiners must hold a real (non-anonymous) identity. Candidates may be anonymous.
+    // Examiners are an allow-list (config/examiners), proven by the `examiner` custom claim that
+    // only the refreshRole Cloud Function sets. Every other signed-in user is a candidate.
     function isExaminer() {
-      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+      return signedIn() && request.auth.token.get('examiner', false) == true;
+    }
+
+    function verifiedEmail() {
+      return request.auth.token.get('email_verified', false) == true
+        ? request.auth.token.get('email', '').lower()
+        : '';
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -67,15 +74,9 @@ service cloud.firestore {
         && getAfter(examPath(examId)).data.ownerId == uid();
     }
 
-    // A candidate holds a live session for `examId`: minted by the server, still ACTIVE, and the
-    // server clock has not passed its expiry.
-    function hasLiveSession(examId) {
-      let path = sessionPath(examId + '_' + uid());
-      return signedIn()
-        && exists(path)
-        && get(path).data.candidateId == uid()
-        && get(path).data.status == 'ACTIVE'
-        && request.time <= get(path).data.expiresAt;
+    // Questions and answers freeze once the first candidate starts (the server sets lockedAt).
+    function examUnlockedAfter(examId) {
+      return getAfter(examPath(examId)).data.get('lockedAt', null) == null;
     }
 
     function unchanged(field) {
@@ -116,10 +117,25 @@ service cloud.firestore {
         && p.resultRelease in ['ON_GRADED', 'MANUAL'];
     }
 
+    function isDeliveryPolicy(p, questionCount) {
+      return p is map
+        && p.keys().hasAll(['shuffleQuestions', 'shuffleOptions', 'questionsPerCandidate'])
+        && p.keys().hasOnly(['shuffleQuestions', 'shuffleOptions', 'questionsPerCandidate'])
+        && p.shuffleQuestions is bool
+        && p.shuffleOptions is bool
+        && (p.questionsPerCandidate == null
+            || (p.questionsPerCandidate is int
+                && p.questionsPerCandidate >= 1 && p.questionsPerCandidate <= questionCount));
+    }
+
+    function isAccessPolicy(p) {
+      return p is map && p.keys().hasOnly(['mode']) && p.mode in ['CODE', 'ROSTER'];
+    }
+
     function isExamMeta(d) {
       let fields = ['ownerId', 'title', 'description', 'durationSeconds', 'window', 'accessCode',
-                    'integrity', 'scoring', 'resultsPublished', 'questionCount', 'maxScore',
-                    'createdAt'];
+                    'integrity', 'scoring', 'delivery', 'access', 'status', 'lockedAt',
+                    'resultsPublished', 'questionCount', 'maxScore', 'createdAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
         && d.ownerId == uid()
         && d.title is string && d.title.size() > 0 && d.title.size() <= 200
@@ -129,6 +145,9 @@ service cloud.firestore {
         && isAccessCode(d.accessCode)
         && isIntegrityPolicy(d.integrity)
         && isScoringPolicy(d.scoring)
+        && isDeliveryPolicy(d.delivery, d.questionCount)
+        && isAccessPolicy(d.access)
+        && d.status in ['DRAFT', 'PUBLISHED', 'CLOSED']
         && d.resultsPublished is bool
         && d.questionCount is int && d.questionCount >= 1 && d.questionCount <= 100
         && d.maxScore is int && d.maxScore >= 1
@@ -146,23 +165,31 @@ service cloud.firestore {
       allow create: if isExaminer()
         && isExamMeta(request.resource.data)
         && request.resource.data.createdAt == request.time
+        && request.resource.data.status in ['DRAFT', 'PUBLISHED']
+        && request.resource.data.lockedAt == null
         && request.resource.data.resultsPublished == false;
 
+      // Before the first candidate starts: anything (except identity fields). Afterwards the exam
+      // is frozen — only its lifecycle status and result publication may change.
       allow update: if isExaminer()
         && resource.data.ownerId == uid()
         && isExamMeta(request.resource.data)
         && unchanged('ownerId')
         && unchanged('accessCode')
-        && unchanged('createdAt');
+        && unchanged('createdAt')
+        && request.resource.data.lockedAt == resource.data.get('lockedAt', null)
+        && (resource.data.get('lockedAt', null) == null
+            || request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['status', 'resultsPublished']));
 
-      allow delete: if isExaminer() && resource.data.ownerId == uid();
+      allow delete: if isExaminer() && resource.data.ownerId == uid() && resource.data.get('lockedAt', null) == null;
 
-      // Question paper: never contains answers. Readable by a candidate only while their
-      // server-minted session is live — not before it starts and not after it expires.
+      // The full question bank: owner only. Candidates receive sessionPapers/* instead.
       match /paper/{docId} {
-        allow read: if ownsExam(examId) || hasLiveSession(examId);
+        allow read: if ownsExam(examId);
 
         allow create, update: if ownsExamAfter(examId)
+          && examUnlockedAfter(examId)
           && docId == 'current'
           && request.resource.data.keys().hasOnly(['ownerId', 'questions'])
           && request.resource.data.ownerId == uid()
@@ -170,28 +197,43 @@ service cloud.firestore {
           && request.resource.data.questions.size() >= 1
           && request.resource.data.questions.size() <= 100;
 
-        allow delete: if ownsExam(examId);
+        allow delete: if ownsExam(examId) && get(examPath(examId)).data.get('lockedAt', null) == null;
       }
 
-      // Answer key + written-answer rubrics: owner only. Candidates can NEVER read it — not even
-      // during a live session.
+      // Answer key + rubrics (frozen once locked) and the invitation roster (editable any time):
+      // owner only. Candidates can NEVER read either.
       match /private/{docId} {
         allow read: if ownsExam(examId);
 
         allow create, update: if ownsExamAfter(examId)
-          && docId == 'answerKey'
-          && request.resource.data.keys().hasOnly(['ownerId', 'answers', 'rubrics'])
           && request.resource.data.ownerId == uid()
-          && request.resource.data.answers is map
-          && (!('rubrics' in request.resource.data) || request.resource.data.rubrics is map);
+          && (
+            (docId == 'answerKey'
+              && examUnlockedAfter(examId)
+              && request.resource.data.keys().hasOnly(['ownerId', 'answers', 'rubrics'])
+              && request.resource.data.answers is map
+              && (!('rubrics' in request.resource.data) || request.resource.data.rubrics is map))
+            || (docId == 'roster'
+              && request.resource.data.keys().hasOnly(['ownerId', 'emails'])
+              && request.resource.data.emails is list
+              && request.resource.data.emails.size() <= 300)
+          );
 
-        allow delete: if ownsExam(examId);
+        allow delete: if ownsExam(examId) && docId == 'roster';
       }
     }
 
     // ---------------------------------------------------------------------------------------------
     //  Access codes (public lobby lookup by exact code; enumeration is blocked)
     // ---------------------------------------------------------------------------------------------
+
+    function isAccessCodeShape(d) {
+      return d.keys().hasOnly(['code', 'examId', 'ownerId', 'title', 'description', 'durationSeconds',
+                               'questionCount', 'window', 'status', 'accessMode'])
+        && isWindow(d.window)
+        && d.status in ['DRAFT', 'PUBLISHED', 'CLOSED']
+        && d.accessMode in ['CODE', 'ROSTER'];
+    }
 
     match /accessCodes/{code} {
       allow get: if signedIn();
@@ -201,22 +243,46 @@ service cloud.firestore {
       // existing owner), and only for an exam the caller owns whose accessCode matches.
       allow create: if isExaminer()
         && isAccessCode(code)
-        && request.resource.data.keys().hasOnly(['code', 'examId', 'ownerId', 'title', 'description',
-                                                 'durationSeconds', 'questionCount', 'window'])
+        && isAccessCodeShape(request.resource.data)
         && request.resource.data.code == code
         && request.resource.data.ownerId == uid()
         && ownsExamAfter(request.resource.data.examId)
-        && getAfter(examPath(request.resource.data.examId)).data.accessCode == code
-        && isWindow(request.resource.data.window);
+        && getAfter(examPath(request.resource.data.examId)).data.accessCode == code;
 
       allow update: if isExaminer()
         && resource.data.ownerId == uid()
         && unchanged('code') && unchanged('examId') && unchanged('ownerId')
-        && isWindow(request.resource.data.window);
+        && isAccessCodeShape(request.resource.data);
 
       allow delete: if isExaminer() && resource.data.ownerId == uid();
     }
 
+    // ---------------------------------------------------------------------------------------------
+    //  Invitations — how an invited candidate finds their exams. Readable only by the invited,
+    //  verified email (and the owner); written only by the exam's owner.
+    // ---------------------------------------------------------------------------------------------
+
+    match /invitations/{inviteId} {
+      allow read: if signedIn()
+        && (resource.data.ownerId == uid()
+            || (verifiedEmail() != '' && resource.data.email == verifiedEmail()));
+
+      allow create, update: if isExaminer()
+        && request.resource.data.keys().hasOnly(['examId', 'ownerId', 'email', 'code', 'title',
+                                                 'durationSeconds', 'window', 'status'])
+        && request.resource.data.ownerId == uid()
+        && request.resource.data.email == request.resource.data.email.lower()
+        && inviteId == request.resource.data.examId + '__' + request.resource.data.email
+        && ownsExamAfter(request.resource.data.examId)
+        && request.resource.data.status in ['DRAFT', 'PUBLISHED', 'CLOSED'];
+
+      allow delete: if isExaminer() && resource.data.ownerId == uid();
+    }
+
+    // Admin-managed configuration (examiner allow-list). No client access at all.
+    match /config/{docId} {
+      allow read, write: if false;
+    }
     // ---------------------------------------------------------------------------------------------
     //  Sessions (the authoritative timer)
     // ---------------------------------------------------------------------------------------------
@@ -227,6 +293,19 @@ service cloud.firestore {
 
       // startedAt / expiresAt / status are minted and advanced ONLY by Cloud Functions (Admin SDK
       // bypasses rules). No client can create, extend, reset, or delete a session.
+      allow write: if false;
+    }
+
+    // This candidate's paper (bank draw + shuffles applied), built by the server at session start.
+    // Readable by its candidate only while the session is live, and by the exam owner.
+    match /sessionPapers/{sessionId} {
+      allow get: if signedIn()
+        && resource != null
+        && (resource.data.examOwnerId == uid()
+            || (resource.data.candidateId == uid()
+                && get(sessionPath(sessionId)).data.status == 'ACTIVE'
+                && request.time <= get(sessionPath(sessionId)).data.expiresAt));
+      allow list: if false;
       allow write: if false;
     }
 

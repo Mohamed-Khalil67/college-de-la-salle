@@ -1,34 +1,51 @@
-@if (created(); as exam) {
+@if (saved(); as done) {
   <section class="panel created" role="status">
-    <p class="eyebrow">نُشِر الاختبار</p>
-    <h1>شارِك الاختبار مع المُختبَرين</h1>
-    <div class="share">
-      <div>
-        <span class="label">رمز الاختبار</span>
-        <code class="code ltr">{{ exam.accessCode }}</code>
-      </div>
-      <div class="link">
-        <span class="label">الرابط المباشر</span>
-        <code class="ltr" data-testid="share-url">{{ shareUrl() }}</code>
-      </div>
-    </div>
+    <p class="eyebrow">{{ done.status === 'PUBLISHED' ? 'نُشِر الاختبار' : 'حُفِظ الاختبار مسودةً' }}</p>
+    <h1>{{ done.status === 'PUBLISHED' ? 'شارِك الاختبار مع المُختبَرين' : 'المسودة محفوظة' }}</h1>
+    <exam-share-panel
+      [title]="done.title"
+      [code]="done.accessCode"
+      [durationSeconds]="done.durationSeconds"
+      [opensAt]="done.opensAt"
+      [closesAt]="done.closesAt"
+      [status]="done.status"
+      [emails]="done.roster"
+    />
     <div class="actions">
-      <button type="button" (click)="copyLink()">{{ copied() ? 'نُسِخ الرابط' : 'نسخ الرابط' }}</button>
-      <a class="button primary" routerLink="/examiner" [queryParams]="{ exam: exam.examId }">
+      <a class="button primary" routerLink="/examiner" [queryParams]="{ exam: done.examId }">
         متابعة النتائج مباشرةً
       </a>
+      <a class="button" [routerLink]="['/examiner/exams', done.examId, 'edit']">متابعة التعديل</a>
       <button type="button" (click)="startOver()">إنشاء اختبار آخر</button>
     </div>
   </section>
+} @else if (loadError()) {
+  <section class="panel" role="alert">
+    <h1>تعذَّر فتح الاختبار</h1>
+    <p>{{ loadError() }}</p>
+    <a routerLink="/examiner">العودة إلى اللوحة</a>
+  </section>
+} @else if (examId() && !current()) {
+  <section class="panel" aria-busy="true"><p>جارٍ تحميل الاختبار…</p></section>
 } @else {
-  <form [formRoot]="examForm" (submit)="save($event)" class="creator" novalidate>
+  <form [formRoot]="examForm" (submit)="$event.preventDefault()" class="creator" novalidate>
     <header class="page-header">
       <div>
-        <p class="eyebrow">اختبار جديد</p>
-        <h1>إعداد اختبار</h1>
+        <p class="eyebrow">{{ current() ? 'تعديل اختبار' : 'اختبار جديد' }}</p>
+        <h1>{{ current() ? 'تعديل الاختبار' : 'إعداد اختبار' }}</h1>
+        @if (current(); as exam) {
+          <p class="muted">الحالة: <strong>{{ statusLabel(exam.meta.status) }}</strong> · الرمز <code class="ltr">{{ exam.meta.accessCode }}</code></p>
+        }
       </div>
       <a routerLink="/examiner">العودة إلى اللوحة</a>
     </header>
+
+    @if (locked()) {
+      <p class="locked" role="note" data-testid="locked">
+        بدأ مُختبَرون أداء هذا الاختبار، لذا جُمِّدت أسئلته وإعداداته حفاظًا على العدل. يمكنك تعديل قائمة
+        المدعوّين وحالة الاختبار فقط.
+      </p>
+    }
 
     <section class="panel grid">
       <div class="field span-2">
@@ -96,6 +113,55 @@
       </div>
     </section>
 
+    <section class="panel grid" aria-labelledby="delivery-heading">
+      <h2 id="delivery-heading" class="span-2">التسليم والوصول</h2>
+
+      <fieldset class="field span-2 checks">
+        <legend class="label">ترتيب الأسئلة لكل مُختبَر</legend>
+        <label class="check"><input type="checkbox" [formField]="examForm.shuffleQuestions" /> ترتيب عشوائي للأسئلة</label>
+        <label class="check"><input type="checkbox" [formField]="examForm.shuffleOptions" /> ترتيب عشوائي لخيارات الإجابة</label>
+        <p class="hint">يرى كل مُختبَر ترتيبًا مختلفًا، ويُصحَّح كلٌّ بحسب ترتيبه تلقائيًّا.</p>
+      </fieldset>
+
+      <div class="field">
+        <label for="bank">عدد الأسئلة المسحوبة لكل مُختبَر</label>
+        <exam-number-input
+          inputId="bank"
+          describedBy="bank-hint bank-errors"
+          placeholder="جميع الأسئلة"
+          [formField]="examForm.questionsPerCandidate"
+        />
+        <p id="bank-hint" class="hint">بنك أسئلة: يُسحَب لكل مُختبَر هذا العدد عشوائيًّا من الأسئلة أدناه. اتركه فارغًا لتقديم جميع الأسئلة.</p>
+        <exam-field-errors id="bank-errors" [field]="examForm.questionsPerCandidate" [force]="attempted()" />
+      </div>
+
+      <div class="field">
+        <label for="access">مَن يمكنه أداء الاختبار؟</label>
+        <select id="access" [formField]="examForm.accessMode" aria-describedby="access-hint">
+          <option value="CODE">كل من يملك الرابط أو الرمز</option>
+          <option value="ROSTER">المدعوّون فقط (بحساباتهم)</option>
+        </select>
+        <p id="access-hint" class="hint">
+          في وضع «المدعوّين فقط» يسجِّل المُختبَر الدخول بحسابه، ولا يُسمَح إلا للعناوين المُدرَجة أدناه.
+        </p>
+      </div>
+
+      @if (examForm.accessMode().value() === 'ROSTER') {
+        <div class="field span-2">
+          <label for="roster">قائمة المدعوّين (بريد إلكتروني في كل سطر)</label>
+          <textarea
+            id="roster"
+            rows="5"
+            class="ltr roster"
+            placeholder="student1@school.edu"
+            [formField]="examForm.rosterText"
+            aria-describedby="roster-count roster-errors"
+          ></textarea>
+          <p id="roster-count" class="hint">عدد المدعوّين: {{ rosterCount() | arNumber }}</p>
+          <exam-field-errors id="roster-errors" [field]="examForm.rosterText" [force]="attempted()" />
+        </div>
+      }
+    </section>
     <section class="questions" aria-labelledby="questions-heading">
       <div class="section-head">
         <h2 id="questions-heading">الأسئلة</h2>
@@ -204,6 +270,7 @@
             </div>
           }
 
+          @if (!locked()) {
           <div class="question-footer">
             @if (question.type().value() === 'CHOICE') {
               <button
@@ -223,24 +290,35 @@
               حذف السؤال
             </button>
           </div>
+          }
         </fieldset>
       }
 
+      @if (!locked()) {
       <div class="add-row">
         <button type="button" (click)="addQuestion('CHOICE')">+ سؤال اختيار من متعدِّد</button>
         <button type="button" (click)="addQuestion('TEXT')">+ سؤال مقالي</button>
       </div>
+      }
     </section>
     <footer class="save-bar">
       @if (saveError()) {
         <p class="form-error" role="alert">{{ saveError() }}</p>
       }
       @if (attempted() && examForm().invalid()) {
-        <p class="form-error" role="alert">صحِّح الحقول المُشار إليها قبل النشر.</p>
+        <p class="form-error" role="alert">صحِّح الحقول المُشار إليها قبل الحفظ.</p>
       }
-      <button type="submit" class="primary" [disabled]="examForm().submitting()">
-        {{ examForm().submitting() ? 'جارٍ النشر…' : 'نشر الاختبار' }}
-      </button>
+      @let status = current()?.meta?.status ?? 'DRAFT';
+      @if (status === 'DRAFT') {
+        <button type="button" [disabled]="examForm().submitting()" (click)="save('DRAFT')">حفظ كمسودة</button>
+        <button type="button" class="primary" [disabled]="examForm().submitting()" (click)="save('PUBLISHED')">
+          {{ examForm().submitting() ? 'جارٍ الحفظ…' : 'نشر الاختبار' }}
+        </button>
+      } @else {
+        <button type="button" class="primary" [disabled]="examForm().submitting()" (click)="save(status)">
+          {{ examForm().submitting() ? 'جارٍ الحفظ…' : 'حفظ التعديلات' }}
+        </button>
+      }
     </footer>
   </form>
 }

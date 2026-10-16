@@ -47,3 +47,13 @@ tbody th { font-weight: 600; }
 tbody tr:last-child > * { border-block-end: none; }
 .num { font-variant-numeric: tabular-nums; }
 .empty-row { text-align: center; padding: 2rem; white-space: normal; }
+.status-chip { justify-self: start; font-size: 0.75rem; font-weight: 600; padding-block: 0.05rem; padding-inline: 0.5rem; border-radius: 999px; }
+.status-chip.draft, .status-text.draft { background: var(--surface-2); color: var(--muted); }
+.status-chip.published, .status-text.published { background: var(--ok-soft); color: var(--ok-strong); }
+.status-chip.closed, .status-text.closed { background: var(--terracotta-soft); color: var(--terracotta-strong); }
+.status-text { padding-block: 0.05rem; padding-inline: 0.5rem; border-radius: 999px; }
+.lifecycle { flex-basis: 100%; display: grid; gap: 0.4rem; padding-block-start: 0.75rem; border-block-start: 1px dashed var(--border); }
+.lifecycle .label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.lifecycle p { margin: 0; }
+.lifecycle-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.share-wrap { flex-basis: 100%; min-inline-size: 0; padding-block-start: 0.75rem; border-block-start: 1px dashed var(--border); }

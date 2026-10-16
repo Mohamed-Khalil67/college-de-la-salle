@@ -32,11 +32,21 @@ npm run emulators
 npm start
 ```
 
-Then open http://localhost:4200.
+Seed the examiner allow-list into the emulator. By default, every `@example.test` address is an
+examiner:
 
-1. **Examiner sign-in** (دخول المُمتحِنين): with emulators, use the *الدخول عبر المحاكي المحلي* box. Any email works, and
-   different emails act as different, isolated examiners.
-2. **New exam**: the default is a 5-minute exam open for 24 hours. Publish it to get a 6-character code.
+```bash
+npm run seed:emulator
+```
+
+Then open http://localhost:4200. The home page is the **candidate page**: enter a code, or sign in
+to see the exams you were invited to.
+
+1. **Examiner sign-in** (تسجيل الدخول): with emulators, use the *الدخول عبر المحاكي المحلي* box.
+   An address on the allow-list (e.g. `teacher@example.test`) lands on the dashboard. Any other
+   address (e.g. `student@students.test`) lands on the candidate page.
+2. **New exam**: save it as a draft, or publish it to get a 6-character code, a direct link and a
+   ready-made Arabic invitation (copy, WhatsApp, or e-mail to the roster in BCC).
 3. **Candidate**: open the link in a *different browser profile or a private window* (auth is
    per-origin, so the same window would reuse the examiner identity). Enter a name and press Start.
 4. Watch the row on the examiner dashboard go *قيد الأداء → بانتظار التصحيح → صُحِّح*, live.
@@ -48,8 +58,8 @@ The emulator UI is at http://localhost:4000.
 | Command | What it proves |
 | --- | --- |
 | `npm test` | Unit tests (Vitest via `ng test`): exam-runner FSM, graders, AI prompt/parse, dashboard derivations, clock offset |
-| `npm run test:rules` | `@firebase/rules-unit-testing` suite against the Firestore emulator (54 cases) |
-| `npm run test:e2e` | Playwright, desktop and mobile: an examiner creates an exam, a candidate completes it in RTL from the direct link, and the examiner grades it in the history view. Every page is checked for RTL direction, no horizontal overflow, no replacement characters, loaded Arabic fonts, diacritic-safe line-height, and **no untranslated text**: any Latin word in interface copy, placeholders, aria-labels or titles fails the run unless it is user content. A second scenario kills the candidate's device mid-exam and verifies that the server submits the autosaved draft and that results stay hidden until the examiner publishes them |
+| `npm run test:rules` | `@firebase/rules-unit-testing` suite against the Firestore emulator (69 cases) |
+| `npm run test:e2e` | Playwright, desktop and mobile: an examiner creates an exam, a candidate completes it in RTL from the direct link, and the examiner grades it in the history view. Every page is checked for RTL direction, no horizontal overflow, no replacement characters, loaded Arabic fonts, diacritic-safe line-height, and **no untranslated text**: any Latin word in interface copy, placeholders, aria-labels or titles fails the run unless it is user content. A second scenario kills the candidate's device mid-exam and verifies that the server submits the autosaved draft and that results stay hidden until the examiner publishes them. A third covers invite-only exams (roster gate, rejected outsider, invitations on the home page), the question bank with shuffled options graded back to full marks, the lock after the first start, close and duplicate, non-examiners being turned away from the dashboard, and the remembered theme choice. Global setup seeds the allow-list |
 
 The rules suite proves, among other things, that a candidate **cannot**:
 
@@ -90,6 +100,20 @@ Two RTL bugs that the mobile E2E caught and that are now fixed, kept here as rul
 | **Question navigator** | Numbered boxes (١، ٢، ٣…) show answered, unanswered and flagged questions. «علِّم للمراجعة» flags a question. The submit confirmation lists unanswered and flagged questions with jump links. |
 | **Pass mark** | The examiner sets a pass percentage, or leaves it empty for a score with no verdict. The dashboard shows ناجح/راسب per candidate and the pass rate. |
 | **Result release** | «فور اكتمال التصحيح» or «عندما أنشر النتائج يدويًّا». Scores reach candidates **only** through `results/{sessionId}`, which only Cloud Functions write, and only once release is allowed. Candidates can't read their own submission after it is graded, so a score can never leak early. |
+
+## Roles, access and exam lifecycle
+
+| Feature | How it works |
+| --- | --- |
+| **Examiner allow-list** | `config/examiners` holds `{ emails: [...] }`, with exact addresses or whole domains (`"@school.edu"`). On every sign-in, the `refreshRole` callable checks the *verified* email against it and sets the `examiner` custom claim. The rules key on that claim, so a non-examiner account cannot create exams even through the SDK. Clients can't read or write `config/*`. |
+| **Candidate default page** | `/` is the candidate's page: a code box and, when signed in, a list of invitations. A non-examiner who opens `/examiner` is sent back with a notice. |
+| **Invite-only exams** | Access is «كل من يملك الرابط أو الرمز» (code) or «المدعوّون فقط» (roster, up to 300 emails). Roster exams require sign-in. `startSession` admits only a verified email on the roster, and each invitee gets an `invitations/{examId__email}` doc that only they (and the owner) can read. The roster stays editable after the exam locks. |
+| **Question bank and shuffle** | Draw N of the authored questions per candidate, and shuffle questions and/or options. The server draws the layout with a CSPRNG in `startSession`, stores it on the session, and writes the candidate's own paper to `sessionPapers/{sessionId}`, so candidates never see the full bank. The grader maps displayed option indexes back to the authored ones. |
+| **Lifecycle** | مسودة (can't be started) → منشور → مغلق (and back to منشور). On the first start, the server sets `lockedAt`: from then on the rules forbid edits to questions, key, timing and scoring, so every candidate sits the same exam. «نسخ إلى مسودة جديدة» clones an exam for the next sitting. |
+| **Theme** | ☾/☀ toggle in the header: Andalusian ivory by day, night palette by night. It starts from the device preference, then remembers each person's choice (local storage). |
+
+To make someone an examiner in production, create `config/examiners` in the Firebase console, for
+example `emails: ["teacher@school.edu", "@school.edu"]`. They get the role at their next sign-in.
 
 ## Internationalisation
 
@@ -185,8 +209,12 @@ Firestore rules authorize whole documents, never fields, so each secret lives in
 | Path | Contains | Readable by |
 | --- | --- | --- |
 | `exams/{id}` | metadata | owner |
-| `exams/{id}/paper/current` | questions, no answers | owner; candidate **while their session is live** |
+| `exams/{id}/paper/current` | the full question pool, no answers | owner only |
 | `exams/{id}/private/answerKey` | correct options | owner (grader uses Admin SDK) |
+| `exams/{id}/private/roster` | invited emails | owner |
+| `sessionPapers/{sessionId}` | this candidate's drawn and shuffled paper | owner; candidate **while their session is live**; server-written |
+| `invitations/{examId__email}` | invitation card | owner; the invited verified email |
+| `config/examiners` | examiner allow-list | server only |
 | `accessCodes/{code}` | lobby card | any signed-in user, exact `get` only |
 | `sessions/{examId_uid}` | authoritative timer | candidate + owner; **no client writes** |
 | `submissions/{examId_uid}` | answers, server score | candidate + owner; create-once before expiry |
@@ -229,15 +257,16 @@ a 250 ms ticker, `visibilitychange`, `beforeunload`, and draft persistence for r
 
 1. Create a Firebase project. Enable **Google** sign-in, **Anonymous** sign-in and Firestore.
    Cloud Functions need the **Blaze** plan.
-2. Put the web config in `src/environments/environment.production.ts` and the project id in
+2. Create the `config/examiners` document (see *Roles, access and exam lifecycle*).
+3. Put the web config in `src/environments/environment.production.ts` and the project id in
    `.firebaserc`.
-3. Build the app:
+4. Build the app:
 
 ```bash
 npm run build
 ```
 
-4. Deploy:
+5. Deploy:
 
 ```bash
 npx firebase deploy
@@ -249,6 +278,7 @@ npx firebase deploy
   feature to shrink it.
 - Integrity signals (tab switches) are client-reported and therefore advisory. Timing and grading
   are the only server-guaranteed properties.
-- Question types: single-answer multiple choice and written answer. Exams aren't locked against edits after the first session starts.
+- Question types: single-answer multiple choice and written answer.
+- Invitation emails are sent from the examiner's own mail or WhatsApp app (mailto / wa.me links). The platform doesn't send email itself.
 - Text answer length is enforced in the UI and by the grader, not by Firestore rules (rules can't iterate maps). The 1 MiB document limit is the hard cap.
 - Add App Check to bind callable and Firestore traffic to the genuine app.

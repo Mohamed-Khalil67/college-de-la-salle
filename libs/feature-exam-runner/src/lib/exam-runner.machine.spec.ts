@@ -25,6 +25,8 @@ const lobby: AccessCodeRecord = {
   durationSeconds: 300,
   questionCount: 2,
   window: { opensAt: T0 - 60_000, closesAt: T0 + 3_600_000 },
+  status: 'PUBLISHED',
+  accessMode: 'CODE',
 };
 
 const session: ExamSession = {
@@ -39,6 +41,7 @@ const session: ExamSession = {
   status: 'ACTIVE',
   integrity: { maxVisibilityLosses: 2 },
   submittedAt: null,
+  questionCount: 2,
 };
 
 const paper: ExamPaper = {

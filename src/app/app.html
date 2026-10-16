@@ -8,10 +8,17 @@
     </a>
     <nav aria-label="التنقّل الرئيس">
       @if (auth.isExaminer()) {
-        <a routerLink="/examiner">لوحة المُمتحِن</a>
-      } @else {
-        <a routerLink="/sign-in">دخول المُمتحِنين</a>
+        <a routerLink="/examiner" routerLinkActive="active">لوحة المُمتحِن</a>
+      } @else if (auth.hasAccount()) {
+        <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">اختباراتي</a>
       }
+      @if (auth.hasAccount()) {
+        <span class="who"><bdi>{{ auth.displayName() }}</bdi></span>
+        <button type="button" class="link-button" (click)="signOut()">تسجيل الخروج</button>
+      } @else {
+        <a routerLink="/sign-in">تسجيل الدخول</a>
+      }
+      <exam-theme-toggle />
     </nav>
   </header>
   <main id="main" tabindex="-1">

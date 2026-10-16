@@ -8,7 +8,7 @@ export const routes: Routes = [
   },
   {
     path: 'sign-in',
-    title: 'دخول المُمتحِنين',
+    title: 'تسجيل الدخول',
     loadComponent: () => import('./shell/sign-in.page').then((m) => m.SignInPage),
   },
   {
@@ -19,6 +19,11 @@ export const routes: Routes = [
         path: 'new',
         loadChildren: () =>
           import('@exam/feature-exam-creator').then((m) => m.EXAM_CREATOR_ROUTES),
+      },
+      {
+        path: 'exams',
+        loadChildren: () =>
+          import('@exam/feature-exam-creator').then((m) => m.EXAM_EDITOR_ROUTES),
       },
       {
         path: '',

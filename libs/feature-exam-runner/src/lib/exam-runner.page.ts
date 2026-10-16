@@ -2,7 +2,8 @@ import { DOCUMENT } from '@angular/common';
 import { Component, effect, inject, input, signal, untracked } from '@angular/core';
 import { form, FormField, FormRoot, maxLength, required, submit } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
-import { LIMITS } from '@exam/contracts';
+import { type AccessCodeRecord, LIMITS } from '@exam/contracts';
+import { AuthStore } from '@exam/data-access-exams';
 import { ArCountPipe, ArDatePipe, ArNumberPipe, BidiIsolate, Star } from '@exam/ui-arabic';
 import { ExamRunnerStore } from './exam-runner.store';
 import { Countdown } from './ui/countdown';
@@ -37,6 +38,7 @@ export class ExamRunnerPage {
   readonly code = input.required<string>();
 
   protected readonly store = inject(ExamRunnerStore);
+  protected readonly auth = inject(AuthStore);
   protected readonly confirmingSubmit = signal(false);
   readonly #document = inject(DOCUMENT);
 
@@ -46,7 +48,22 @@ export class ExamRunnerPage {
     maxLength(p.name, LIMITS.maxCandidateNameLength, { message: 'الاسم أطول من المسموح.' });
   });
 
+  /** What the lobby allows: start, sign in first (invite-only), or nothing (draft/closed). */
+  protected lobbyGate(lobby: AccessCodeRecord): 'START' | 'SIGN_IN' | 'DRAFT' | 'CLOSED' {
+    if (lobby.status === 'DRAFT') return 'DRAFT';
+    if (lobby.status === 'CLOSED') return 'CLOSED';
+    if (lobby.accessMode === 'ROSTER' && !this.auth.hasAccount()) return 'SIGN_IN';
+    return 'START';
+  }
+
   constructor() {
+    // Signed-in candidates start with their account name (they can still edit it).
+    effect(() => {
+      const name = this.auth.hasAccount() ? this.auth.displayName() : null;
+      if (name && !untracked(this.candidate).name) {
+        untracked(() => this.candidate.set({ name }));
+      }
+    });
     effect(() => {
       const code = this.code();
       untracked(() => void this.store.load(code));

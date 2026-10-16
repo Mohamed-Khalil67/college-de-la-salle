@@ -33,29 +33,50 @@
         <li>تُسجَّل مغادرتك لصفحة الاختبار، وقد تؤدّي إلى إنهائه مبكرًا.</li>
       </ul>
 
-      <form [formRoot]="candidateForm" (submit)="start($event)" class="start-form">
-        <label for="candidate-name">اسمك الكامل</label>
-        <input
-          id="candidate-name"
-          autocomplete="name"
-          dir="auto"
-          placeholder="محمد عادل"
-          [formField]="candidateForm.name"
-          [attr.aria-invalid]="candidateForm.name().touched() && candidateForm.name().invalid()"
-          aria-describedby="candidate-name-error"
-        />
-        <p id="candidate-name-error" class="field-error" aria-live="polite">
-          @if (candidateForm.name().touched()) {
-            @for (error of candidateForm.name().errors(); track error.kind) {
-              {{ error.message ?? 'قيمة غير صالحة.' }}
-            }
-          }
-        </p>
-        @if (state.error) {
-          <p class="form-error" role="alert">{{ state.error }}</p>
+      @switch (lobbyGate(state.lobby)) {
+        @case ('DRAFT') {
+          <p class="gate" role="status">لم يُنشَر هذا الاختبار بعد. عُد إليه حين يُعلِن المُمتحِن عن موعده.</p>
         }
-        <button type="submit" class="primary">ابدأ الاختبار</button>
-      </form>
+        @case ('CLOSED') {
+          <p class="gate" role="status">أغلق المُمتحِن هذا الاختبار، فلا يمكن بدؤه الآن.</p>
+        }
+        @case ('SIGN_IN') {
+          <div class="gate" role="status" data-testid="roster-gate">
+            <p>هذا الاختبار مقصور على المدعوّين. سجِّل الدخول بالحساب الذي دُعيتَ به للمتابعة.</p>
+            <a class="button primary" routerLink="/sign-in" [queryParams]="{ returnUrl: '/take/' + state.lobby.code }">
+              تسجيل الدخول
+            </a>
+          </div>
+        }
+        @default {
+          @if (state.lobby.accessMode === 'ROSTER') {
+            <p class="hint">تدخل بحساب <bdi>{{ auth.verifiedEmail() }}</bdi>.</p>
+          }
+          <form [formRoot]="candidateForm" (submit)="start($event)" class="start-form">
+            <label for="candidate-name">اسمك الكامل</label>
+            <input
+              id="candidate-name"
+              autocomplete="name"
+              dir="auto"
+              placeholder="محمد عادل"
+              [formField]="candidateForm.name"
+              [attr.aria-invalid]="candidateForm.name().touched() && candidateForm.name().invalid()"
+              aria-describedby="candidate-name-error"
+            />
+            <p id="candidate-name-error" class="field-error" aria-live="polite">
+              @if (candidateForm.name().touched()) {
+                @for (error of candidateForm.name().errors(); track error.kind) {
+                  {{ error.message ?? 'قيمة غير صالحة.' }}
+                }
+              }
+            </p>
+            @if (state.error) {
+              <p class="form-error" role="alert">{{ state.error }}</p>
+            }
+            <button type="submit" class="primary">ابدأ الاختبار</button>
+          </form>
+        }
+      }
     </section>
   }
 
@@ -144,7 +165,7 @@
                 <exam-text-question-card
                   [question]="question"
                   [index]="i"
-                  [value]="$any(ctx.answers[question.id]) ?? ''"
+                  [answer]="ctx.answers[question.id]"
                   [disabled]="state.phase === 'SUBMITTING'"
                   (typed)="store.typeAnswer(question.id, $event)"
                   [flagged]="ctx.flagged.includes(question.id)"
@@ -155,7 +176,7 @@
                 <exam-question-card
                   [question]="question"
                   [index]="i"
-                  [selected]="$any(ctx.answers[question.id])"
+                  [answer]="ctx.answers[question.id]"
                   [disabled]="state.phase === 'SUBMITTING'"
                   (answered)="store.answer($event.questionId, $event.option)"
                   [flagged]="ctx.flagged.includes(question.id)"

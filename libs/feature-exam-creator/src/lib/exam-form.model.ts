@@ -7,9 +7,15 @@ import {
   schema,
   validate,
 } from '@angular/forms/signals';
-import { LIMITS, type QuestionType, type ResultRelease } from '@exam/contracts';
-import { formatCount } from '@exam/ui-arabic';
-import type { NewExamInput } from '@exam/data-access-exams';
+import {
+  type AccessMode,
+  LIMITS,
+  parseRoster,
+  type QuestionType,
+  type ResultRelease,
+} from '@exam/contracts';
+import { formatCount, formatNumber } from '@exam/ui-arabic';
+import { type EditableExam, type NewExamInput, toInput } from '@exam/data-access-exams';
 
 /**
  * Flat on purpose: switching a question between types keeps what was typed for the other type,
@@ -40,6 +46,15 @@ export interface ExamFormModel {
   /** Minimum percentage to pass; `null` = score only, no pass/fail verdict. */
   passPercent: number | null;
   resultRelease: ResultRelease;
+  // Delivery
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+  /** Question bank: draw this many per candidate; `null` = all. */
+  questionsPerCandidate: number | null;
+  // Access
+  accessMode: AccessMode;
+  /** Invited emails, one per line (ROSTER mode). */
+  rosterText: string;
   questions: QuestionModel[];
 }
 
@@ -67,7 +82,37 @@ export function initialExamModel(nowMs: number): ExamFormModel {
     maxVisibilityLosses: 3,
     passPercent: 50,
     resultRelease: 'ON_GRADED',
+    shuffleQuestions: false,
+    shuffleOptions: false,
+    questionsPerCandidate: null,
+    accessMode: 'CODE',
+    rosterText: '',
     questions: [blankQuestion()],
+  };
+}
+
+/** Re-opens a stored exam in the editor. */
+export function modelFromExam(exam: EditableExam): ExamFormModel {
+  const input = toInput(exam);
+  return {
+    title: input.title,
+    description: input.description,
+    durationMinutes: Math.round(input.durationSeconds / 60),
+    opensAt: toLocalInput(input.window.opensAt),
+    closesAt: toLocalInput(input.window.closesAt),
+    maxVisibilityLosses: input.integrity.maxVisibilityLosses,
+    passPercent: input.scoring.passPercent,
+    resultRelease: input.scoring.resultRelease,
+    shuffleQuestions: input.delivery.shuffleQuestions,
+    shuffleOptions: input.delivery.shuffleOptions,
+    questionsPerCandidate: input.delivery.questionsPerCandidate,
+    accessMode: input.access.mode,
+    rosterText: input.roster.join('\n'),
+    questions: input.questions.map((q) => ({
+      ...blankQuestion(q.type),
+      ...q,
+      options: q.type === 'CHOICE' ? [...q.options] : ['', ''],
+    })),
   };
 }
 
@@ -96,6 +141,30 @@ export const examFormSchema = schema<ExamFormModel>((p) => {
 
   min(p.passPercent, 0, { message: 'لا يمكن أن تكون درجة النجاح سالبة.' });
   max(p.passPercent, 100, { message: 'درجة النجاح نسبة مئوية لا تتجاوز ١٠٠.' });
+
+  min(p.questionsPerCandidate, 1, { message: 'اسحب سؤالًا واحدًا على الأقل.' });
+  validate(p.questionsPerCandidate, ({ value, valueOf }) => {
+    const n = value();
+    if (n === null) return null;
+    if (!Number.isInteger(n)) return { kind: 'integer', message: 'أدخِل عددًا صحيحًا من الأسئلة.' };
+    const total = valueOf(p.questions).length;
+    return n > total
+      ? { kind: 'bank', message: `لا يمكن سحب أكثر من ${formatCount(total, 'question')}.` }
+      : null;
+  });
+
+  validate(p.rosterText, ({ value, valueOf }) => {
+    if (valueOf(p.accessMode) !== 'ROSTER') return null;
+    const { emails, invalid } = parseRoster(value());
+    if (invalid.length) {
+      return { kind: 'email', message: `عناوين غير صالحة: ${invalid.slice(0, 3).join('، ')}` };
+    }
+    if (!emails.length) return { kind: 'empty', message: 'أضِف بريدًا إلكترونيًّا واحدًا على الأقل.' };
+    if (emails.length > LIMITS.maxRosterSize) {
+      return { kind: 'size', message: `الحدّ الأقصى ${formatNumber(LIMITS.maxRosterSize)} عنوان بريد إلكتروني.` };
+    }
+    return null;
+  });
 
   validate(p.questions, ({ value }) => {
     if (value().length === 0) return { kind: 'minQuestions', message: 'أضِف سؤالًا واحدًا على الأقل.' };
@@ -153,6 +222,13 @@ export function toNewExamInput(model: ExamFormModel): NewExamInput {
     window: { opensAt: fromLocalInput(model.opensAt), closesAt: fromLocalInput(model.closesAt) },
     integrity: { maxVisibilityLosses: model.maxVisibilityLosses },
     scoring: { passPercent: model.passPercent, resultRelease: model.resultRelease },
+    delivery: {
+      shuffleQuestions: model.shuffleQuestions,
+      shuffleOptions: model.shuffleOptions,
+      questionsPerCandidate: model.questionsPerCandidate,
+    },
+    access: { mode: model.accessMode },
+    roster: model.accessMode === 'ROSTER' ? parseRoster(model.rosterText).emails : [],
     questions: model.questions.map((q) =>
       q.type === 'TEXT'
         ? {

@@ -39,3 +39,5 @@ button.link:hover { background: none; color: var(--accent-strong); }
 .submit-bar > p { margin: 0; margin-inline-end: auto; }
 .done { text-align: center; }
 .done h1 { color: var(--ok-strong); }
+.gate { margin-block-start: 1.25rem; padding-block: 0.85rem; padding-inline: 1rem; border-radius: var(--radius); background: var(--warn-soft); color: var(--warn-strong); display: grid; gap: 0.6rem; justify-items: start; }
+.gate p { margin: 0; }

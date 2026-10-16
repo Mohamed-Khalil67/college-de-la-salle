@@ -83,6 +83,28 @@ export interface ScoringPolicy {
   readonly resultRelease: ResultRelease;
 }
 
+/** Lifecycle: drafts are invisible to candidates; closed exams accept no new sessions. */
+export type ExamStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
+
+/** How the paper is delivered to each candidate. */
+export interface DeliveryPolicy {
+  readonly shuffleQuestions: boolean;
+  readonly shuffleOptions: boolean;
+  /** Question bank: draw this many questions per candidate. `null` = all questions. */
+  readonly questionsPerCandidate: number | null;
+}
+
+/**
+ * Who may take the exam.
+ *  - `CODE`: anyone with the link/code (anonymous candidates allowed).
+ *  - `ROSTER`: only signed-in accounts whose verified email is on the exam's roster.
+ */
+export type AccessMode = 'CODE' | 'ROSTER';
+
+export interface AccessPolicy {
+  readonly mode: AccessMode;
+}
+
 export interface ExamDefinition {
   readonly id: string;
   readonly ownerId: Uid;
@@ -93,6 +115,8 @@ export interface ExamDefinition {
   readonly accessCode: string;
   readonly integrity: IntegrityPolicy;
   readonly scoring: ScoringPolicy;
+  readonly delivery: DeliveryPolicy;
+  readonly access: AccessPolicy;
   readonly questions: readonly Question[];
   readonly answerKey: AnswerKey;
   readonly rubrics: TextRubrics;
@@ -104,8 +128,11 @@ export interface ExamDefinition {
  * the definition is partitioned by audience:
  *
  *   exams/{examId}                    ExamMetaDoc     owner only
- *   exams/{examId}/paper/current      ExamPaperDoc    owner + candidate holding a LIVE session
+ *   exams/{examId}/paper/current      ExamPaperDoc    owner only (the full question bank)
  *   exams/{examId}/private/answerKey  AnswerKeyDoc    owner only (and the grader, via Admin SDK)
+ *   exams/{examId}/private/roster     RosterDoc       owner only (invited candidate emails)
+ *   sessionPapers/{sessionId}         SessionPaper    candidate while LIVE + owner; written by server
+ *   invitations/{examId}__{email}     Invitation      the invited (verified) email + owner
  *   accessCodes/{code}                AccessCodeDoc   any signed-in user, by exact code (no list)
  *   drafts/{sessionId}                ExamDraft       candidate (write until expiry) + owner (read)
  *   results/{sessionId}               ExamResult      written by the server only once released
@@ -116,11 +143,46 @@ export type ExamMeta = Omit<ExamDefinition, 'questions' | 'answerKey' | 'rubrics
   readonly maxScore: number;
   /** For MANUAL release: set by the publishResults callable. */
   readonly resultsPublished: boolean;
+  readonly status: ExamStatus;
+  /** Set by the server when the first candidate starts; questions are frozen from then on. */
+  readonly lockedAt: EpochMillis | null;
 };
 
 export interface ExamPaper {
   readonly ownerId: Uid;
   readonly questions: readonly Question[];
+}
+
+export interface RosterRecord {
+  readonly ownerId: Uid;
+  /** Lower-cased, unique. */
+  readonly emails: readonly string[];
+}
+
+/**
+ * The paper as THIS candidate sees it: drawn from the bank, in their order, with their option order.
+ * Built by the server at session start; it never contains answers.
+ */
+export interface SessionPaper {
+  readonly examOwnerId: Uid;
+  readonly candidateId: Uid;
+  readonly questions: readonly Question[];
+}
+
+/** Lets an invited candidate find the exam on their home page. */
+export interface Invitation {
+  readonly examId: string;
+  readonly ownerId: Uid;
+  readonly email: string;
+  readonly code: string;
+  readonly title: string;
+  readonly durationSeconds: number;
+  readonly window: ExamWindow;
+  readonly status: ExamStatus;
+}
+
+export function invitationIdFor(examId: string, email: string): string {
+  return `${examId}__${email.toLowerCase()}`;
 }
 
 export interface AnswerKeyRecord {
@@ -137,8 +199,11 @@ export interface AccessCodeRecord {
   readonly title: string;
   readonly description: string;
   readonly durationSeconds: number;
+  /** Questions each candidate receives (bank draw applied). */
   readonly questionCount: number;
   readonly window: ExamWindow;
+  readonly status: ExamStatus;
+  readonly accessMode: AccessMode;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -161,6 +226,17 @@ export interface ExamSession {
   readonly status: ExamSessionStatus;
   readonly integrity: IntegrityPolicy;
   readonly submittedAt: EpochMillis | null;
+  /** Questions in this candidate's paper. */
+  readonly questionCount: number;
+}
+
+/**
+ * Server-side map from what the candidate saw to the authored paper.
+ * `optionOrders[qid][displayedIndex] = originalIndex`.
+ */
+export interface SessionLayout {
+  readonly questionIds: readonly QuestionId[];
+  readonly optionOrders: Readonly<Record<QuestionId, readonly number[]>>;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -241,6 +317,12 @@ export interface Submission extends SubmissionDraft {
   readonly score: number | null;
   readonly maxScore: number | null;
   readonly gradedAt: EpochMillis | null;
+  /**
+   * Written by the grader: the questions this candidate received (session order) and their answers
+   * mapped back to the authored option order. Absent on submissions from before shuffling existed.
+   */
+  readonly questionIds: readonly QuestionId[] | null;
+  readonly canonicalAnswers: Readonly<Record<QuestionId, AnswerValue>> | null;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -303,6 +385,8 @@ export const SERVER_ONLY_SUBMISSION_FIELDS = [
   'maxScore',
   'correctCount',
   'gradedAt',
+  'questionIds',
+  'canonicalAnswers',
 ] as const;
 
 /* ------------------------------------------------------------------------------------------------
@@ -335,6 +419,11 @@ export interface GradeTextAnswerResponse {
 }
 
 /** Examiner-only. Publishes results of every graded submission of an exam (`MANUAL` release). */
+/** Re-evaluates the caller's examiner role against the allow-list and refreshes their claims. */
+export interface RefreshRoleResponse {
+  readonly examiner: boolean;
+}
+
 export interface PublishResultsRequest {
   readonly examId: string;
 }
@@ -362,7 +451,14 @@ export const COLLECTIONS = {
   submissions: 'submissions',
   drafts: 'drafts',
   results: 'results',
+  sessionPapers: 'sessionPapers',
+  invitations: 'invitations',
+  config: 'config',
 } as const;
+
+export const ROSTER_DOC_ID = 'roster';
+/** `config/examiners` — `{ emails: string[] }`: exact emails or `@domain` entries. Admin-managed. */
+export const EXAMINERS_CONFIG_DOC_ID = 'examiners';
 
 export const PAPER_DOC_ID = 'current';
 export const ANSWER_KEY_DOC_ID = 'answerKey';
@@ -379,6 +475,7 @@ export const LIMITS = {
   maxFeedbackLength: 2_000,
   maxRubricLength: 4_000,
   accessCodeLength: 6,
+  maxRosterSize: 300,
 } as const;
 
 /**

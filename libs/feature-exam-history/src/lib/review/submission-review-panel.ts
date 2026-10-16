@@ -1,5 +1,11 @@
 import { Component, inject, input, output, resource } from '@angular/core';
-import type { ChoiceQuestion, Submission } from '@exam/contracts';
+import {
+  type AnswerValue,
+  type ChoiceQuestion,
+  deliveredQuestions,
+  type Question,
+  type Submission,
+} from '@exam/contracts';
 import { SubmissionReviewService } from '@exam/data-access-exams';
 import {
   ArCountPipe,
@@ -43,7 +49,7 @@ import { TextAnswerGrader } from './text-answer-grader';
       @if (context.error(); as error) {
         <p class="form-error" role="alert">تعذَّر تحميل محتوى الاختبار: {{ errorText(error) }}</p>
       } @else if (context.value(); as ctx) {
-        @for (q of ctx.paper.questions; track q.id; let i = $index) {
+        @for (q of delivered(ctx.paper.questions); track q.id; let i = $index) {
           @switch (q.type) {
             @case ('TEXT') {
               <exam-text-answer-grader
@@ -51,13 +57,13 @@ import { TextAnswerGrader } from './text-answer-grader';
                 [question]="q"
                 [label]="questionLabel(i)"
                 [rubric]="ctx.key.rubrics[q.id]"
-                [answer]="asText(s.answers[q.id])"
+                [answer]="asText(answerOf(q.id))"
                 [grade]="s.manualScores[q.id]"
                 [storedSuggestion]="s.aiSuggestions[q.id]"
               />
             }
             @default {
-              @let given = s.answers[q.id];
+              @let given = answerOf(q.id);
               @let correct = ctx.key.answers[q.id];
               <div class="choice">
                 <h4>{{ questionLabel(i) }} · اختيار من متعدِّد · {{ q.points | arCount: 'point' }}</h4>
@@ -102,6 +108,17 @@ export class SubmissionReviewPanel {
     params: () => this.submission().examId,
     loader: ({ params }) => this.#review.loadGradingContext(params),
   });
+
+  /** The questions this candidate received, in their order (bank draw + shuffle). */
+  protected delivered(questions: readonly Question[]): Question[] {
+    return deliveredQuestions(questions, this.submission().questionIds);
+  }
+
+  /** Answers mapped back to the authored option order by the grader. */
+  protected answerOf(questionId: string): AnswerValue | undefined {
+    const s = this.submission();
+    return (s.canonicalAnswers ?? s.answers)[questionId];
+  }
 
   protected questionLabel(index: number): string {
     return `السؤال ${formatNumber(index + 1)}`;

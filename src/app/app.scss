@@ -14,7 +14,11 @@
   line-height: var(--leading-display); color: var(--accent-strong);
 }
 .brand-tagline { font-size: 0.85rem; color: var(--muted); }
-nav { display: flex; gap: 1.25rem; font-weight: 600; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.1rem; font-weight: 600; }
+nav a.active { text-decoration-thickness: 2px; }
+.who { font-weight: 400; color: var(--muted); font-size: 0.9rem; max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 0.35em; }
+.link-button:hover:not(:disabled) { background: none; color: var(--accent-strong); }
 
 main {
   flex: 1; inline-size: 100%; max-inline-size: 74rem; margin-inline: auto; outline: none;
