@@ -51,3 +51,5 @@ ui-debug.log
 functions/lib/
 functions/src/contracts/
 functions/node_modules/
+functions/.env.local
+functions/.secret.local

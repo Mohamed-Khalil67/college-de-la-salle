@@ -28,6 +28,11 @@ const submission: Submission = {
   completedBy: 'AUTO_TIMER',
   expiresAt: 301_000,
   submittedAt: 299_000,
+  gradingStatus: null,
+  autoScore: null,
+  manualScores: {},
+  aiSuggestions: {},
+  pendingReview: [],
   score: null,
   maxScore: null,
   gradedAt: null,
@@ -44,9 +49,15 @@ describe('dashboard row derivation', () => {
     expect(toRow(session, null, 301_000).status).toBe('EXPIRED');
   });
 
-  it('is GRADING until the server writes a score, then GRADED', () => {
+  it('is GRADING until the auto pass runs, NEEDS_REVIEW for written answers, then GRADED', () => {
     expect(toRow(session, submission, 299_500).status).toBe('GRADING');
-    expect(toRow(session, { ...submission, score: 4, maxScore: 6 }, 299_500).status).toBe('GRADED');
+    expect(
+      toRow(session, { ...submission, gradingStatus: 'NEEDS_REVIEW', autoScore: 2 }, 299_500).status,
+    ).toBe('NEEDS_REVIEW');
+    expect(
+      toRow(session, { ...submission, gradingStatus: 'GRADED', score: 4, maxScore: 6 }, 299_500)
+        .status,
+    ).toBe('GRADED');
   });
 });
 

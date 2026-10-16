@@ -1,9 +1,13 @@
-import type {
-  AccessCodeRecord,
-  ExamMeta,
-  ExamPaper,
-  ExamSession,
-  Submission,
+import {
+  type AccessCodeRecord,
+  type AiSuggestion,
+  type AnswerKeyRecord,
+  type ExamMeta,
+  type ExamPaper,
+  type ExamSession,
+  type ManualGrade,
+  normalizeQuestion,
+  type Submission,
 } from '@exam/contracts';
 import {
   type DocumentData,
@@ -21,6 +25,15 @@ import {
 const millis = (value: unknown): number => (value instanceof Timestamp ? value.toMillis() : 0);
 const millisOrNull = (value: unknown): number | null =>
   value instanceof Timestamp ? value.toMillis() : null;
+
+function mapValues<T>(
+  map: DocumentData | undefined,
+  fn: (value: DocumentData) => T,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(map ?? {}).map(([k, v]) => [k, fn(v as DocumentData)]),
+  );
+}
 
 function readOnly<T>(fromFirestore: (id: string, data: DocumentData) => T): FirestoreDataConverter<T> {
   return {
@@ -48,7 +61,13 @@ export const examMetaConverter = readOnly<ExamMeta>((id, d) => ({
 
 export const examPaperConverter = readOnly<ExamPaper>((_id, d) => ({
   ownerId: d['ownerId'],
-  questions: d['questions'],
+  questions: (d['questions'] ?? []).map(normalizeQuestion),
+}));
+
+export const answerKeyConverter = readOnly<AnswerKeyRecord>((_id, d) => ({
+  ownerId: d['ownerId'],
+  answers: d['answers'] ?? {},
+  rubrics: d['rubrics'] ?? {},
 }));
 
 export const accessCodeConverter = readOnly<AccessCodeRecord>((_id, d) => ({
@@ -88,6 +107,23 @@ export const submissionConverter = readOnly<Submission>((id, d) => ({
   completedBy: d['completedBy'],
   expiresAt: millis(d['expiresAt']),
   submittedAt: millis(d['submittedAt']),
+  // Submissions graded before written questions existed have a score but no status.
+  gradingStatus: d['gradingStatus'] ?? (typeof d['score'] === 'number' ? 'GRADED' : null),
+  autoScore: typeof d['autoScore'] === 'number' ? d['autoScore'] : (d['score'] ?? null),
+  manualScores: mapValues<ManualGrade>(d['manualScores'], (g) => ({
+    points: g['points'],
+    feedback: g['feedback'] ?? '',
+    source: g['source'] ?? 'MANUAL',
+    gradedBy: g['gradedBy'],
+    gradedAt: millis(g['gradedAt']),
+  })),
+  aiSuggestions: mapValues<AiSuggestion>(d['aiSuggestions'], (s) => ({
+    points: s['points'],
+    rationale: s['rationale'] ?? '',
+    model: s['model'] ?? '',
+    createdAt: millis(s['createdAt']),
+  })),
+  pendingReview: d['pendingReview'] ?? [],
   score: typeof d['score'] === 'number' ? d['score'] : null,
   maxScore: typeof d['maxScore'] === 'number' ? d['maxScore'] : null,
   gradedAt: millisOrNull(d['gradedAt']),

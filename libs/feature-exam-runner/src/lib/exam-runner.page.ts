@@ -6,10 +6,11 @@ import { LIMITS } from '@exam/contracts';
 import { ExamRunnerStore } from './exam-runner.store';
 import { Countdown } from './ui/countdown';
 import { QuestionCard } from './ui/question-card';
+import { TextQuestionCard } from './ui/text-question-card';
 
 @Component({
   selector: 'exam-runner-page',
-  imports: [Countdown, QuestionCard, DatePipe, FormField, FormRoot, RouterLink],
+  imports: [Countdown, QuestionCard, TextQuestionCard, DatePipe, FormField, FormRoot, RouterLink],
   providers: [ExamRunnerStore],
   templateUrl: './exam-runner.page.html',
   styleUrl: './exam-runner.page.scss',

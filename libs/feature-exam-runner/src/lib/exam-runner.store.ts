@@ -5,6 +5,7 @@ import { ExamSessionGateway, ServerClock } from '@exam/data-access-exams';
 import {
   type ActiveContext,
   initialRunnerState,
+  isAnswered,
   remainingMs,
   type RunnerEvent,
   type RunnerState,
@@ -45,7 +46,9 @@ export class ExamRunnerStore {
     const ctx = this.active();
     return ctx ? ctx.session.expiresAt - ctx.session.startedAt : 0;
   });
-  readonly answeredCount = computed(() => Object.keys(this.active()?.answers ?? {}).length);
+  readonly answeredCount = computed(
+    () => Object.values(this.active()?.answers ?? {}).filter((a) => isAnswered(a)).length,
+  );
 
   #ticker: ReturnType<typeof setInterval> | null = null;
   readonly #onVisibility = () =>
@@ -83,6 +86,10 @@ export class ExamRunnerStore {
 
   answer(questionId: QuestionId, option: number): void {
     this.dispatch({ type: 'ANSWER_SELECTED', questionId, option });
+  }
+
+  typeAnswer(questionId: QuestionId, text: string): void {
+    this.dispatch({ type: 'ANSWER_TYPED', questionId, text });
   }
 
   submit(): void {
@@ -191,11 +198,11 @@ export class ExamRunnerStore {
     }
   }
 
-  #readDraft(sessionId: string): Record<QuestionId, number> {
+  #readDraft(sessionId: string): Record<QuestionId, unknown> {
     try {
       const raw = localStorage.getItem(DRAFT_KEY(sessionId));
       const parsed: unknown = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === 'object' ? (parsed as Record<QuestionId, number>) : {};
+      return parsed && typeof parsed === 'object' ? (parsed as Record<QuestionId, unknown>) : {};
     } catch {
       return {};
     }

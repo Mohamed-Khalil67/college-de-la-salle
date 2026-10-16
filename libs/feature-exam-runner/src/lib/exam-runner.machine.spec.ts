@@ -1,6 +1,7 @@
 import { AUTO_SUBMIT_LEAD_MS, type AccessCodeRecord, type ExamPaper, type ExamSession } from '@exam/contracts';
 import {
   initialRunnerState,
+  isAnswered,
   type RunnerEvent,
   type RunnerState,
   toSubmissionDraft,
@@ -38,8 +39,9 @@ const session: ExamSession = {
 const paper: ExamPaper = {
   ownerId: 'examiner',
   questions: [
-    { id: 'q1', prompt: 'A?', options: ['x', 'y', 'z'], points: 1 },
-    { id: 'q2', prompt: 'B?', options: ['x', 'y'], points: 2 },
+    { id: 'q1', type: 'CHOICE', prompt: 'A?', options: ['x', 'y', 'z'], points: 1 },
+    { id: 'q2', type: 'CHOICE', prompt: 'B?', options: ['x', 'y'], points: 2 },
+    { id: 'q3', type: 'TEXT', prompt: 'Explain.', points: 4, maxLength: 10 },
   ],
 };
 
@@ -89,6 +91,20 @@ describe('exam runner FSM', () => {
     expect(state.phase === 'ACTIVE' && state.ctx.answers).toEqual({ q1: 2 });
   });
 
+  it('records typed answers for written questions, capped at maxLength', () => {
+    let state = transition(active(), { type: 'ANSWER_TYPED', questionId: 'q3', text: 'Hello world, long' });
+    state = transition(state, { type: 'ANSWER_TYPED', questionId: 'q1', text: 'not a choice' });
+    state = transition(state, { type: 'ANSWER_SELECTED', questionId: 'q3', option: 0 });
+    expect(state.phase === 'ACTIVE' && state.ctx.answers).toEqual({ q3: 'Hello worl' });
+  });
+
+  it('counts blank text as unanswered', () => {
+    expect(isAnswered('   ')).toBe(false);
+    expect(isAnswered('x')).toBe(true);
+    expect(isAnswered(0)).toBe(true);
+    expect(isAnswered(undefined)).toBe(false);
+  });
+
   it('restores only answers that fit the paper', () => {
     const state = run([
       { type: 'LOBBY_LOADED', lobby },
@@ -98,10 +114,10 @@ describe('exam runner FSM', () => {
         session,
         paper,
         now: T0 + 1_000,
-        restoredAnswers: { q1: 1, q2: 9, ghost: 0 },
+        restoredAnswers: { q1: 1, q2: 9, ghost: 0, q3: 'draft text that is long' },
       },
     ]);
-    expect(state.phase === 'ACTIVE' && state.ctx.answers).toEqual({ q1: 1 });
+    expect(state.phase === 'ACTIVE' && state.ctx.answers).toEqual({ q1: 1, q3: 'draft text' });
   });
 
   describe('timer', () => {

@@ -4,18 +4,19 @@ import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions/v2';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { readQuestions } from './exam-reads';
 import {
   ANSWER_KEY_DOC_ID,
   COLLECTIONS,
   type ExamSession,
   type ExamSessionStatus,
+  finalizeScore,
   gradeAnswers,
   type IntegrityPolicy,
   isValidAccessCode,
   LIMITS,
   normalizeAccessCode,
   PAPER_DOC_ID,
-  type Question,
   sessionIdFor,
   type StartSessionRequest,
   type StartSessionResponse,
@@ -115,7 +116,7 @@ export const gradeSubmission = onDocumentCreated(
     const submission = snap.data();
 
     // Triggers are at-least-once; grading is idempotent.
-    if (typeof submission['score'] === 'number') return;
+    if (submission['gradingStatus']) return;
 
     const examRef = db.collection(COLLECTIONS.exams).doc(submission['examId'] as string);
     const [paperSnap, keySnap] = await Promise.all([
@@ -127,20 +128,32 @@ export const gradeSubmission = onDocumentCreated(
       return;
     }
 
+    const questions = readQuestions(paperSnap);
     const result = gradeAnswers(
-      paperSnap.get('questions') as Question[],
+      questions,
       keySnap.get('answers') as Record<string, number>,
       (submission['answers'] ?? {}) as Record<string, unknown>,
     );
+    // Exams without written questions are final immediately; others wait for the examiner.
+    const totals = finalizeScore(questions, result.score, {});
 
     const batch = db.batch();
-    batch.update(snap.ref, { ...result, gradedAt: FieldValue.serverTimestamp() });
+    batch.update(snap.ref, {
+      autoScore: result.score,
+      maxScore: result.maxScore,
+      correctCount: result.correctCount,
+      manualScores: {},
+      aiSuggestions: {},
+      pendingReview: totals.pendingReview,
+      gradingStatus: totals.gradingStatus,
+      score: totals.score,
+      gradedAt: totals.gradingStatus === 'GRADED' ? FieldValue.serverTimestamp() : null,
+    });
     batch.update(db.collection(COLLECTIONS.sessions).doc(event.params.sessionId), {
       status: 'SUBMITTED' satisfies ExamSessionStatus,
       submittedAt: submission['submittedAt'],
     });
     await batch.commit();
-
     logger.info('grade.done', { sessionId: event.params.sessionId, ...result });
   },
 );
@@ -149,6 +162,8 @@ export const gradeSubmission = onDocumentCreated(
 /* sweepExpiredSessions — closes out sessions whose candidates vanished without submitting.        */
 /* (Correctness never depends on this: rules already reject late writes. It keeps status honest.)  */
 /* ---------------------------------------------------------------------------------------------- */
+
+export { gradeTextAnswer, suggestTextGrade } from './text-review';
 
 export const sweepExpiredSessions = onSchedule('every 5 minutes', async () => {
   const expired = await db

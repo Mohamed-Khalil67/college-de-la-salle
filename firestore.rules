@@ -9,7 +9,8 @@ rules_version = '2';
 //    exams/{examId}/private/answerKey   correct answers ..... owner only (grader uses Admin SDK)
 //    accessCodes/{code}                 lobby card .......... any signed-in user, exact get only
 //    sessions/{examId_uid}              authoritative timer . read: candidate/owner, write: NOBODY
-//    submissions/{examId_uid}           answers + score ..... create once by candidate before expiry
+//    submissions/{examId_uid}           answers + score ..... create once by candidate before expiry;
+//                                                          grades only via Cloud Functions
 //
 //  Principles:
 //    1. Deny by default. Every allow below is an explicit, minimal grant.
@@ -158,15 +159,17 @@ service cloud.firestore {
         allow delete: if ownsExam(examId);
       }
 
-      // Answer key: owner only. Candidates can NEVER read it — not even during a live session.
+      // Answer key + written-answer rubrics: owner only. Candidates can NEVER read it — not even
+      // during a live session.
       match /private/{docId} {
         allow read: if ownsExam(examId);
 
         allow create, update: if ownsExamAfter(examId)
           && docId == 'answerKey'
-          && request.resource.data.keys().hasOnly(['ownerId', 'answers'])
+          && request.resource.data.keys().hasOnly(['ownerId', 'answers', 'rubrics'])
           && request.resource.data.ownerId == uid()
-          && request.resource.data.answers is map;
+          && request.resource.data.answers is map
+          && (!('rubrics' in request.resource.data) || request.resource.data.rubrics is map);
 
         allow delete: if ownsExam(examId);
       }
@@ -260,7 +263,8 @@ service cloud.firestore {
 
       allow create: if isValidSubmissionCreate(sessionId);
 
-      // Final once written. Grading writes go through the Admin SDK.
+      // Final once written — for candidates AND examiners. Automatic grading, manual grades and AI
+      // suggestions are all written by Cloud Functions (Admin SDK), which verify exam ownership.
       allow update, delete: if false;
     }
   }

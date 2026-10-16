@@ -112,13 +112,26 @@
       <ol class="questions">
         @for (question of ctx.paper.questions; track question.id; let i = $index) {
           <li>
-            <exam-question-card
-              [question]="question"
-              [index]="i"
-              [selected]="ctx.answers[question.id]"
-              [disabled]="state.phase === 'SUBMITTING'"
-              (answered)="store.answer($event.questionId, $event.option)"
-            />
+            @switch (question.type) {
+              @case ('TEXT') {
+                <exam-text-question-card
+                  [question]="question"
+                  [index]="i"
+                  [value]="$any(ctx.answers[question.id]) ?? ''"
+                  [disabled]="state.phase === 'SUBMITTING'"
+                  (typed)="store.typeAnswer(question.id, $event)"
+                />
+              }
+              @default {
+                <exam-question-card
+                  [question]="question"
+                  [index]="i"
+                  [selected]="$any(ctx.answers[question.id])"
+                  [disabled]="state.phase === 'SUBMITTING'"
+                  (answered)="store.answer($event.questionId, $event.option)"
+                />
+              }
+            }
           </li>
         }
       </ol>

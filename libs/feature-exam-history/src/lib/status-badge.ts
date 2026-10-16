@@ -4,6 +4,7 @@ import type { CandidateRowStatus } from '@exam/data-access-exams';
 const LABELS: Record<CandidateRowStatus, string> = {
   IN_PROGRESS: 'In progress',
   GRADING: 'Grading…',
+  NEEDS_REVIEW: 'Needs review',
   GRADED: 'Graded',
   EXPIRED: 'Expired',
 };
@@ -27,6 +28,7 @@ export class StatusBadge {
       case 'IN_PROGRESS':
         return 'live';
       case 'GRADING':
+      case 'NEEDS_REVIEW':
         return 'pending';
       case 'GRADED':
         return 'ok';

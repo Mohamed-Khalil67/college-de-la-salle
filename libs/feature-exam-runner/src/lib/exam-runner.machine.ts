@@ -4,6 +4,7 @@ import {
   type CompletionReason,
   type EpochMillis,
   type ExamPaper,
+  type AnswerValue,
   type ExamSession,
   type IntegrityReport,
   type QuestionId,
@@ -35,7 +36,7 @@ export interface IntegrityTracker extends IntegrityReport {
 export interface ActiveContext {
   readonly session: ExamSession;
   readonly paper: ExamPaper;
-  readonly answers: Readonly<Record<QuestionId, number>>;
+  readonly answers: Readonly<Record<QuestionId, AnswerValue>>;
   readonly now: EpochMillis;
   readonly integrity: IntegrityTracker;
   readonly lastError: string | null;
@@ -67,10 +68,11 @@ export type RunnerEvent =
       readonly session: ExamSession;
       readonly paper: ExamPaper;
       readonly now: EpochMillis;
-      readonly restoredAnswers: Readonly<Record<QuestionId, number>>;
+      readonly restoredAnswers: Readonly<Record<QuestionId, unknown>>;
     }
   | { readonly type: 'SESSION_CLOSED'; readonly session: ExamSession }
   | { readonly type: 'ANSWER_SELECTED'; readonly questionId: QuestionId; readonly option: number }
+  | { readonly type: 'ANSWER_TYPED'; readonly questionId: QuestionId; readonly text: string }
   | { readonly type: 'TICK'; readonly now: EpochMillis }
   | { readonly type: 'VISIBILITY_CHANGED'; readonly hidden: boolean; readonly now: EpochMillis }
   | { readonly type: 'SUBMIT_REQUESTED' }
@@ -119,8 +121,14 @@ export function transition(state: RunnerState, event: RunnerEvent): RunnerState 
       switch (event.type) {
         case 'ANSWER_SELECTED': {
           const question = ctx.paper.questions.find((q) => q.id === event.questionId);
-          if (!question || event.option < 0 || event.option >= question.options.length) return state;
-          return { phase: 'ACTIVE', ctx: { ...ctx, answers: { ...ctx.answers, [event.questionId]: event.option } } };
+          if (question?.type !== 'CHOICE') return state;
+          if (event.option < 0 || event.option >= question.options.length) return state;
+          return withAnswer(state.ctx, event.questionId, event.option);
+        }
+        case 'ANSWER_TYPED': {
+          const question = ctx.paper.questions.find((q) => q.id === event.questionId);
+          if (question?.type !== 'TEXT') return state;
+          return withAnswer(state.ctx, event.questionId, event.text.slice(0, question.maxLength));
         }
         case 'TICK':
           return guardDeadline({ phase: 'ACTIVE', ctx: { ...ctx, now: event.now } });
@@ -254,15 +262,28 @@ function closedSession(session: ExamSession): RunnerState {
   };
 }
 
+function withAnswer(ctx: ActiveContext, questionId: QuestionId, value: AnswerValue): RunnerState {
+  return { phase: 'ACTIVE', ctx: { ...ctx, answers: { ...ctx.answers, [questionId]: value } } };
+}
+
 /** Drop restored answers that don't match the paper (stale or tampered local storage). */
 function sanitizeAnswers(
-  answers: Readonly<Record<QuestionId, number>>,
+  answers: Readonly<Record<QuestionId, unknown>>,
   paper: ExamPaper,
-): Record<QuestionId, number> {
-  const clean: Record<QuestionId, number> = {};
+): Record<QuestionId, AnswerValue> {
+  const clean: Record<QuestionId, AnswerValue> = {};
   for (const q of paper.questions) {
     const a = answers[q.id];
-    if (Number.isInteger(a) && a >= 0 && a < q.options.length) clean[q.id] = a;
+    if (q.type === 'CHOICE' && Number.isInteger(a) && (a as number) >= 0 && (a as number) < q.options.length) {
+      clean[q.id] = a as number;
+    } else if (q.type === 'TEXT' && typeof a === 'string') {
+      clean[q.id] = a.slice(0, q.maxLength);
+    }
   }
   return clean;
+}
+
+/** A question counts as answered once it has an option or non-blank text. */
+export function isAnswered(value: AnswerValue | undefined): boolean {
+  return typeof value === 'number' || (typeof value === 'string' && value.trim().length > 0);
 }

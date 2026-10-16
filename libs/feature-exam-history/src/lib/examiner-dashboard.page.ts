@@ -2,11 +2,12 @@ import { DatePipe, DecimalPipe, DOCUMENT } from '@angular/common';
 import { Component, effect, inject, input, untracked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthStore, ExaminerDashboardStore } from '@exam/data-access-exams';
+import { SubmissionReviewPanel } from './review/submission-review-panel';
 import { StatusBadge } from './status-badge';
 
 @Component({
   selector: 'exam-examiner-dashboard-page',
-  imports: [RouterLink, DatePipe, DecimalPipe, StatusBadge],
+  imports: [RouterLink, DatePipe, DecimalPipe, StatusBadge, SubmissionReviewPanel],
   providers: [ExaminerDashboardStore],
   templateUrl: './examiner-dashboard.page.html',
   styleUrl: './examiner-dashboard.page.scss',

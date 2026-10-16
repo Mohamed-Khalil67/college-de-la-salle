@@ -2,7 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { form, FormField, FormRoot, submit } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
-import { LIMITS } from '@exam/contracts';
+import { LIMITS, type QuestionType } from '@exam/contracts';
 import { type CreatedExam, ExamAuthoringService } from '@exam/data-access-exams';
 import {
   blankQuestion,
@@ -56,8 +56,8 @@ export class ExamCreatorPage {
 
   /* ---- dynamic question set: all mutations are immutable model updates ---- */
 
-  protected addQuestion(): void {
-    this.#updateQuestions((qs) => [...qs, blankQuestion()]);
+  protected addQuestion(type: QuestionType): void {
+    this.#updateQuestions((qs) => [...qs, blankQuestion(type)]);
   }
 
   protected removeQuestion(index: number): void {

@@ -1,5 +1,5 @@
 import { Component, input, output } from '@angular/core';
-import type { Question } from '@exam/contracts';
+import type { ChoiceQuestion } from '@exam/contracts';
 
 export interface AnswerChange {
   readonly questionId: string;
@@ -46,7 +46,7 @@ export interface AnswerChange {
   `,
 })
 export class QuestionCard {
-  readonly question = input.required<Question>();
+  readonly question = input.required<ChoiceQuestion>();
   readonly index = input.required<number>();
   readonly selected = input<number | undefined>(undefined);
   readonly disabled = input(false);

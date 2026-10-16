@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, linkedSignal } from '@angular/core';
+import { Injectable, computed, inject, linkedSignal, signal } from '@angular/core';
 import {
   COLLECTIONS,
   type EpochMillis,
@@ -13,7 +13,7 @@ import { examMetaConverter, sessionConverter, submissionConverter } from './fire
 import { firestoreQueryResource } from './firestore-resource';
 import { injectServerNow } from './server-clock';
 
-export type CandidateRowStatus = 'IN_PROGRESS' | 'GRADING' | 'GRADED' | 'EXPIRED';
+export type CandidateRowStatus = 'IN_PROGRESS' | 'GRADING' | 'NEEDS_REVIEW' | 'GRADED' | 'EXPIRED';
 
 export interface CandidateRow {
   readonly sessionId: string;
@@ -88,6 +88,12 @@ export class ExaminerDashboardStore {
     () => this.#exams.error() ?? this.#sessions.error() ?? this.#submissions.error() ?? null,
   );
 
+  /** Submission open in the review panel. */
+  readonly reviewingSessionId = signal<string | null>(null);
+  readonly reviewing = computed(
+    () => this.rows().find((r) => r.sessionId === this.reviewingSessionId())?.submission ?? null,
+  );
+
   readonly selectedExam = computed(
     () => this.exams().find((e) => e.id === this.selectedExamId()) ?? null,
   );
@@ -109,6 +115,7 @@ export class ExaminerDashboardStore {
       : null;
     return {
       inProgress: rows.filter((r) => r.status === 'IN_PROGRESS').length,
+      needsReview: rows.filter((r) => r.status === 'NEEDS_REVIEW').length,
       graded: graded.length,
       expired: rows.filter((r) => r.status === 'EXPIRED').length,
       averageScore: avg,
@@ -124,7 +131,12 @@ export function toRow(
 ): CandidateRow {
   let status: CandidateRowStatus;
   if (submission) {
-    status = submission.score === null ? 'GRADING' : 'GRADED';
+    status =
+      submission.gradingStatus === 'GRADED'
+        ? 'GRADED'
+        : submission.gradingStatus === 'NEEDS_REVIEW'
+          ? 'NEEDS_REVIEW'
+          : 'GRADING';
   } else if (session.status === 'ACTIVE' && now < session.expiresAt) {
     status = 'IN_PROGRESS';
   } else {

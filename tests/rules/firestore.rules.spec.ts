@@ -388,6 +388,84 @@ describe('timer tamper resistance', () => {
 });
 
 /* ---------------------------------------------------------------------------------------------- */
+/* 2b. Written answers & grading integrity                                                         */
+/* ---------------------------------------------------------------------------------------------- */
+
+describe('written answers and grading', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'exams', EXAM_ID, 'paper', 'current'), {
+        ownerId: EXAMINER,
+        questions: [
+          ...paper.questions.map((q) => ({ ...q, type: 'CHOICE' })),
+          { id: 'q3', type: 'TEXT', prompt: 'Explain Raft terms.', points: 4, maxLength: 2000 },
+        ],
+      });
+      await setDoc(doc(db, 'exams', EXAM_ID, 'private', 'answerKey'), {
+        ...answerKey,
+        rubrics: { q3: { modelAnswer: 'Monotonic epochs…', criteria: '2 pts: epochs; 2 pts: stale leaders' } },
+      });
+    });
+    await seedSession();
+  });
+
+  it('accepts a submission mixing option indexes and free text', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(candidate(), 'submissions', SESSION_ID),
+        submissionDraft({
+          expiresAt: await sessionExpiry(),
+          answers: { q1: 1, q2: 0, q3: 'Terms are monotonically increasing epochs…' },
+        }),
+      ),
+    );
+  });
+
+  it('candidate can never read the rubric (it lives with the answer key)', async () => {
+    await assertFails(getDoc(doc(candidate(), 'exams', EXAM_ID, 'private', 'answerKey')));
+  });
+
+  it('candidate cannot self-grade a written answer at submit time', async () => {
+    await assertFails(
+      setDoc(
+        doc(candidate(), 'submissions', SESSION_ID),
+        submissionDraft({
+          expiresAt: await sessionExpiry(),
+          manualScores: { q3: { points: 4 } },
+        }),
+      ),
+    );
+  });
+
+  it('even the owning examiner cannot write grades directly (only via Cloud Functions)', async () => {
+    await seed((db) =>
+      setDoc(doc(db, 'submissions', SESSION_ID), {
+        ...submissionDraft({ answers: { q3: 'text' } }),
+        submittedAt: ts(0),
+        expiresAt: ts(4 * MINUTE),
+        gradingStatus: 'NEEDS_REVIEW',
+        autoScore: 2,
+        score: null,
+      }),
+    );
+    const ref = doc(examiner(), 'submissions', SESSION_ID);
+    await assertSucceeds(getDoc(ref));
+    await assertFails(updateDoc(ref, { 'manualScores.q3': { points: 4 }, score: 6 }));
+    await assertFails(updateDoc(ref, { 'aiSuggestions.q3': { points: 4 } }));
+  });
+
+  it('owner can store rubrics in the answer key', async () => {
+    await assertSucceeds(
+      setDoc(doc(examiner(), 'exams', EXAM_ID, 'private', 'answerKey'), {
+        ownerId: EXAMINER,
+        answers: { q1: 1 },
+        rubrics: { q3: { modelAnswer: '', criteria: 'x' } },
+      }),
+    );
+  });
+});
+
+/* ---------------------------------------------------------------------------------------------- */
 /* 3. Examiner & candidate isolation                                                               */
 /* ---------------------------------------------------------------------------------------------- */
 

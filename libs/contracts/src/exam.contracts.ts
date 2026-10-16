@@ -15,15 +15,50 @@ export type Uid = string;
  * ExamDefinition — the complete, authoritative exam as authored by an examiner.
  * ---------------------------------------------------------------------------------------------- */
 
-export interface Question {
+export type QuestionType = 'CHOICE' | 'TEXT';
+
+interface QuestionBase {
   readonly id: QuestionId;
   readonly prompt: string;
-  readonly options: readonly string[];
   readonly points: number;
 }
 
-/** Correct option index per question. Never leaves `exams/{id}/private/answerKey`. */
+/** Single-answer multiple choice. Graded automatically against the answer key. */
+export interface ChoiceQuestion extends QuestionBase {
+  readonly type: 'CHOICE';
+  readonly options: readonly string[];
+}
+
+/** Written answer. Graded by the examiner, optionally with an AI suggestion first. */
+export interface TextQuestion extends QuestionBase {
+  readonly type: 'TEXT';
+  readonly maxLength: number;
+}
+
+export type Question = ChoiceQuestion | TextQuestion;
+
+/** Correct option index per CHOICE question. Never leaves `exams/{id}/private/answerKey`. */
 export type AnswerKey = Readonly<Record<QuestionId, number>>;
+
+/** Grading guidance per TEXT question. Lives next to the answer key, equally private. */
+export interface TextRubric {
+  /** What a full-marks answer looks like. Optional. */
+  readonly modelAnswer: string;
+  /** How to award points, e.g. "1 pt: names consensus; 2 pts: explains leader terms". */
+  readonly criteria: string;
+}
+export type TextRubrics = Readonly<Record<QuestionId, TextRubric>>;
+
+/** A candidate's answer: option index for CHOICE, free text for TEXT. */
+export type AnswerValue = number | string;
+
+/**
+ * Documents written before question types existed have no `type`; they are multiple choice.
+ * Every reader of stored questions goes through this.
+ */
+export function normalizeQuestion(raw: Question | (Omit<ChoiceQuestion, 'type'> & { type?: undefined })): Question {
+  return raw.type ? raw : { ...raw, type: 'CHOICE' };
+}
 
 export interface ExamWindow {
   readonly opensAt: EpochMillis;
@@ -46,6 +81,7 @@ export interface ExamDefinition {
   readonly integrity: IntegrityPolicy;
   readonly questions: readonly Question[];
   readonly answerKey: AnswerKey;
+  readonly rubrics: TextRubrics;
   readonly createdAt: EpochMillis;
 }
 
@@ -59,7 +95,7 @@ export interface ExamDefinition {
  *   accessCodes/{code}                AccessCodeDoc   any signed-in user, by exact code (no list)
  */
 
-export type ExamMeta = Omit<ExamDefinition, 'questions' | 'answerKey'> & {
+export type ExamMeta = Omit<ExamDefinition, 'questions' | 'answerKey' | 'rubrics'> & {
   readonly questionCount: number;
   readonly maxScore: number;
 };
@@ -72,6 +108,7 @@ export interface ExamPaper {
 export interface AnswerKeyRecord {
   readonly ownerId: Uid;
   readonly answers: AnswerKey;
+  readonly rubrics: TextRubrics;
 }
 
 /** Public lobby card resolved from a shareable code. Contains nothing a candidate could exploit. */
@@ -126,31 +163,76 @@ export interface SubmissionDraft {
   readonly examOwnerId: Uid;
   readonly candidateId: Uid;
   readonly candidateName: string;
-  readonly answers: Readonly<Record<QuestionId, number>>;
+  readonly answers: Readonly<Record<QuestionId, AnswerValue>>;
   readonly integrity: IntegrityReport;
   readonly completedBy: CompletionReason;
   /** Copied from the session; rules pin it to the session's value. */
   readonly expiresAt: EpochMillis;
 }
 
+/** Result of the automatic pass: CHOICE questions only. */
 export interface GradeResult {
+  /** Points earned on auto-graded (CHOICE) questions. */
   readonly score: number;
+  /** Points available across ALL questions, written ones included. */
   readonly maxScore: number;
   readonly correctCount: number;
+  /** TEXT questions that a human must grade before the score is final. */
+  readonly pendingReview: readonly QuestionId[];
+}
+
+/**
+ * `NEEDS_REVIEW`: auto pass done, written answers still to be graded by the examiner.
+ * `GRADED`: every question has points; `score` is final.
+ */
+export type GradingStatus = 'NEEDS_REVIEW' | 'GRADED';
+
+export interface ManualGrade {
+  readonly points: number;
+  readonly feedback: string;
+  /** `AI_ACCEPTED` when the examiner kept the AI suggestion as-is. */
+  readonly source: 'MANUAL' | 'AI_ACCEPTED';
+  readonly gradedBy: Uid;
+  readonly gradedAt: EpochMillis;
+}
+
+/** Advisory only. An AI suggestion never changes a score until the examiner confirms it. */
+export interface AiSuggestion {
+  readonly points: number;
+  readonly rationale: string;
+  readonly model: string;
+  readonly createdAt: EpochMillis;
 }
 
 export interface Submission extends SubmissionDraft {
   readonly id: string;
   /** Server receipt time (`request.time`), the completion timestamp. */
   readonly submittedAt: EpochMillis;
-  /** Written only by the grader. `null` while grading is pending. */
+  /** `null` until the automatic grader has run. */
+  readonly gradingStatus: GradingStatus | null;
+  /** Points from auto-graded questions. */
+  readonly autoScore: number | null;
+  readonly manualScores: Readonly<Record<QuestionId, ManualGrade>>;
+  readonly aiSuggestions: Readonly<Record<QuestionId, AiSuggestion>>;
+  readonly pendingReview: readonly QuestionId[];
+  /** Final total — only set once `gradingStatus === 'GRADED'`. */
   readonly score: number | null;
   readonly maxScore: number | null;
   readonly gradedAt: EpochMillis | null;
 }
 
 /** Fields only the server may write onto a submission. */
-export const SERVER_ONLY_SUBMISSION_FIELDS = ['score', 'maxScore', 'correctCount', 'gradedAt'] as const;
+export const SERVER_ONLY_SUBMISSION_FIELDS = [
+  'gradingStatus',
+  'autoScore',
+  'manualScores',
+  'aiSuggestions',
+  'pendingReview',
+  'score',
+  'maxScore',
+  'correctCount',
+  'gradedAt',
+] as const;
 
 /* ------------------------------------------------------------------------------------------------
  * Callable contracts
@@ -165,6 +247,26 @@ export interface StartSessionResponse {
   readonly session: ExamSession;
   /** Server clock at response time, used by the client to compute its clock offset. */
   readonly serverNow: EpochMillis;
+}
+
+/** Examiner-only. Records the authoritative points for one written answer. */
+export interface GradeTextAnswerRequest {
+  readonly sessionId: string;
+  readonly questionId: QuestionId;
+  readonly points: number;
+  readonly feedback: string;
+  readonly source: ManualGrade['source'];
+}
+
+export interface GradeTextAnswerResponse {
+  readonly gradingStatus: GradingStatus;
+  readonly score: number | null;
+}
+
+/** Examiner-only. Asks the AI grader for a suggestion; stores and returns it, changes no score. */
+export interface SuggestTextGradeRequest {
+  readonly sessionId: string;
+  readonly questionId: QuestionId;
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -190,6 +292,10 @@ export const LIMITS = {
   minOptions: 2,
   maxOptions: 8,
   maxCandidateNameLength: 80,
+  defaultTextAnswerLength: 2_000,
+  maxTextAnswerLength: 10_000,
+  maxFeedbackLength: 2_000,
+  maxRubricLength: 4_000,
   accessCodeLength: 6,
 } as const;
 

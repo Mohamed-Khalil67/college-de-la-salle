@@ -91,6 +91,21 @@
         <fieldset class="panel question">
           <legend>Question {{ qi + 1 }}</legend>
 
+          <div class="question-head">
+            <div class="field">
+              <label [for]="'type-' + qi">Answer type</label>
+              <select [id]="'type-' + qi" [formField]="question.type">
+                <option value="CHOICE">Multiple choice (auto-graded)</option>
+                <option value="TEXT">Written answer (you grade, AI can suggest)</option>
+              </select>
+            </div>
+            <label class="points">
+              Points
+              <input type="number" inputmode="numeric" [formField]="question.points" />
+            </label>
+          </div>
+          <exam-field-errors [id]="'points-errors-' + qi" [field]="question.points" [force]="attempted()" />
+
           <div class="field">
             <label [for]="'prompt-' + qi">Prompt</label>
             <textarea
@@ -102,51 +117,85 @@
             <exam-field-errors [id]="'prompt-errors-' + qi" [field]="question.prompt" [force]="attempted()" />
           </div>
 
-          <div class="options" role="group" [attr.aria-label]="'Options for question ' + (qi + 1)">
-            <p class="hint">Select the radio button next to the correct answer. It is stored separately and never sent to candidates.</p>
-            @for (option of question.options; track $index; let oi = $index) {
-              <div class="option-row">
-                <input
-                  type="radio"
-                  [id]="'correct-' + qi + '-' + oi"
-                  [name]="'correct-' + qi"
-                  [checked]="question.correctIndex().value() === oi"
-                  (change)="markCorrect(qi, oi)"
-                  [attr.aria-label]="'Mark option ' + (oi + 1) + ' as correct'"
-                />
-                <input
-                  class="option-text"
-                  [formField]="option"
-                  [attr.aria-label]="'Option ' + (oi + 1) + ' text'"
-                  [attr.aria-describedby]="'option-errors-' + qi + '-' + oi"
-                />
-                <button
-                  type="button"
-                  class="icon"
-                  (click)="removeOption(qi, oi)"
-                  [disabled]="question.options().value().length <= limits.minOptions"
-                  [attr.aria-label]="'Remove option ' + (oi + 1)"
-                >
-                  ✕
-                </button>
-                <exam-field-errors class="span-row" [id]="'option-errors-' + qi + '-' + oi" [field]="option" [force]="attempted()" />
+          @if (question.type().value() === 'CHOICE') {
+            <div class="options" role="group" [attr.aria-label]="'Options for question ' + (qi + 1)">
+              <p class="hint">Select the radio button next to the correct answer. It is stored separately and never sent to candidates.</p>
+              @for (option of question.options; track $index; let oi = $index) {
+                <div class="option-row">
+                  <input
+                    type="radio"
+                    [id]="'correct-' + qi + '-' + oi"
+                    [name]="'correct-' + qi"
+                    [checked]="question.correctIndex().value() === oi"
+                    (change)="markCorrect(qi, oi)"
+                    [attr.aria-label]="'Mark option ' + (oi + 1) + ' as correct'"
+                  />
+                  <input
+                    class="option-text"
+                    [formField]="option"
+                    [attr.aria-label]="'Option ' + (oi + 1) + ' text'"
+                    [attr.aria-describedby]="'option-errors-' + qi + '-' + oi"
+                  />
+                  <button
+                    type="button"
+                    class="icon"
+                    (click)="removeOption(qi, oi)"
+                    [disabled]="question.options().value().length <= limits.minOptions"
+                    [attr.aria-label]="'Remove option ' + (oi + 1)"
+                  >
+                    ✕
+                  </button>
+                  <exam-field-errors class="span-row" [id]="'option-errors-' + qi + '-' + oi" [field]="option" [force]="attempted()" />
+                </div>
+              }
+              <exam-field-errors [id]="'correct-errors-' + qi" [field]="question.correctIndex" [force]="attempted()" />
+              <exam-field-errors [id]="'options-errors-' + qi" [field]="question.options" [force]="attempted()" />
+            </div>
+          } @else {
+            <div class="text-config">
+              <p class="hint">
+                Candidates answer in a text box. The criteria and model answer are stored with the answer
+                key: candidates never see them, and they guide your grading and the optional AI suggestion.
+              </p>
+              <div class="field">
+                <label [for]="'criteria-' + qi">Grading criteria</label>
+                <textarea
+                  [id]="'criteria-' + qi"
+                  rows="3"
+                  placeholder="e.g. 2 pts: defines a term. 2 pts: explains how terms reject stale leaders. 1 pt: example."
+                  [formField]="question.criteria"
+                  [attr.aria-describedby]="'criteria-errors-' + qi"
+                ></textarea>
+                <exam-field-errors [id]="'criteria-errors-' + qi" [field]="question.criteria" [force]="attempted()" />
               </div>
-            }
-            <exam-field-errors [id]="'correct-errors-' + qi" [field]="question.correctIndex" [force]="attempted()" />
-          </div>
+              <div class="field">
+                <label [for]="'model-' + qi">Model answer <span class="optional">(optional)</span></label>
+                <textarea [id]="'model-' + qi" rows="3" [formField]="question.modelAnswer"></textarea>
+              </div>
+              <div class="field narrow">
+                <label [for]="'maxlen-' + qi">Max answer length (characters)</label>
+                <input
+                  [id]="'maxlen-' + qi"
+                  type="number"
+                  inputmode="numeric"
+                  [formField]="question.maxLength"
+                  [attr.aria-describedby]="'maxlen-errors-' + qi"
+                />
+                <exam-field-errors [id]="'maxlen-errors-' + qi" [field]="question.maxLength" [force]="attempted()" />
+              </div>
+            </div>
+          }
 
           <div class="question-footer">
-            <button
-              type="button"
-              (click)="addOption(qi)"
-              [disabled]="question.options().value().length >= limits.maxOptions"
-            >
-              Add option
-            </button>
-            <label class="points">
-              Points
-              <input type="number" inputmode="numeric" [formField]="question.points" />
-            </label>
+            @if (question.type().value() === 'CHOICE') {
+              <button
+                type="button"
+                (click)="addOption(qi)"
+                [disabled]="question.options().value().length >= limits.maxOptions"
+              >
+                Add option
+              </button>
+            }
             <button
               type="button"
               class="danger"
@@ -156,13 +205,14 @@
               Remove question
             </button>
           </div>
-          <exam-field-errors [id]="'points-errors-' + qi" [field]="question.points" [force]="attempted()" />
         </fieldset>
       }
 
-      <button type="button" class="add-question" (click)="addQuestion()">+ Add question</button>
+      <div class="add-row">
+        <button type="button" (click)="addQuestion('CHOICE')">+ Multiple choice</button>
+        <button type="button" (click)="addQuestion('TEXT')">+ Written answer</button>
+      </div>
     </section>
-
     <footer class="save-bar">
       @if (saveError()) {
         <p class="form-error" role="alert">{{ saveError() }}</p>

@@ -3,12 +3,12 @@ import {
   ACCESS_CODE_ALPHABET,
   ANSWER_KEY_DOC_ID,
   COLLECTIONS,
-  type AnswerKey,
   type ExamWindow,
   type IntegrityPolicy,
   LIMITS,
   PAPER_DOC_ID,
   type Question,
+  type TextRubric,
 } from '@exam/contracts';
 import {
   collection,
@@ -21,13 +21,22 @@ import {
 import { FIRESTORE } from './firebase.providers';
 import { AuthStore } from './auth.store';
 
-export interface NewQuestionInput {
-  readonly prompt: string;
-  readonly options: readonly string[];
-  readonly correctIndex: number;
-  readonly points: number;
-}
-
+export type NewQuestionInput =
+  | {
+      readonly type: 'CHOICE';
+      readonly prompt: string;
+      readonly points: number;
+      readonly options: readonly string[];
+      readonly correctIndex: number;
+    }
+  | {
+      readonly type: 'TEXT';
+      readonly prompt: string;
+      readonly points: number;
+      readonly maxLength: number;
+      readonly modelAnswer: string;
+      readonly criteria: string;
+    };
 export interface NewExamInput {
   readonly title: string;
   readonly description: string;
@@ -58,16 +67,22 @@ export class ExamAuthoringService {
     const ownerId = this.#auth.uid();
     if (!ownerId || !this.#auth.isExaminer()) throw new Error('Sign in as an examiner first.');
 
-    const questions: Question[] = input.questions.map((q, i) => ({
-      id: `q${i + 1}`,
-      prompt: q.prompt.trim(),
-      options: q.options.map((o) => o.trim()),
-      points: q.points,
-    }));
-    const answerKey: AnswerKey = Object.fromEntries(
-      input.questions.map((q, i) => [`q${i + 1}`, q.correctIndex]),
-    );
-    const maxScore = questions.reduce((sum, q) => sum + q.points, 0);
+    // Split the authored questions by audience: the paper (candidates) never sees answers or
+    // rubrics; those go to the owner-only answer key document.
+    const questions: Question[] = [];
+    const answerKey: Record<string, number> = {};
+    const rubrics: Record<string, TextRubric> = {};
+    input.questions.forEach((q, i) => {
+      const id = `q${i + 1}`;
+      const base = { id, prompt: q.prompt.trim(), points: q.points };
+      if (q.type === 'TEXT') {
+        questions.push({ ...base, type: 'TEXT', maxLength: q.maxLength });
+        rubrics[id] = { modelAnswer: q.modelAnswer.trim(), criteria: q.criteria.trim() };
+      } else {
+        questions.push({ ...base, type: 'CHOICE', options: q.options.map((o) => o.trim()) });
+        answerKey[id] = q.correctIndex;
+      }
+    });    const maxScore = questions.reduce((sum, q) => sum + q.points, 0);
     const window = {
       opensAt: Timestamp.fromMillis(input.window.opensAt),
       closesAt: Timestamp.fromMillis(input.window.closesAt),
@@ -91,7 +106,11 @@ export class ExamAuthoringService {
         createdAt: serverTimestamp(),
       });
       batch.set(doc(examRef, COLLECTIONS.paper, PAPER_DOC_ID), { ownerId, questions });
-      batch.set(doc(examRef, COLLECTIONS.private, ANSWER_KEY_DOC_ID), { ownerId, answers: answerKey });
+      batch.set(doc(examRef, COLLECTIONS.private, ANSWER_KEY_DOC_ID), {
+        ownerId,
+        answers: answerKey,
+        rubrics,
+      });
       batch.set(doc(this.#db, COLLECTIONS.accessCodes, accessCode), {
         code: accessCode,
         examId: examRef.id,

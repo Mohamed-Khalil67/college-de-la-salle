@@ -47,8 +47,8 @@ The emulator UI is at http://localhost:4000.
 
 | Command | What it proves |
 | --- | --- |
-| `npm test` | Unit tests (Vitest via `ng test`): exam-runner FSM, grader, dashboard derivations, clock offset |
-| `npm run test:rules` | `@firebase/rules-unit-testing` suite against the Firestore emulator (35 cases) |
+| `npm test` | Unit tests (Vitest via `ng test`): exam-runner FSM, graders, AI prompt/parse, dashboard derivations, clock offset |
+| `npm run test:rules` | `@firebase/rules-unit-testing` suite against the Firestore emulator (40 cases) |
 
 The rules suite proves, among other things, that a candidate **cannot**:
 
@@ -62,6 +62,58 @@ The rules suite proves, among other things, that a candidate **cannot**:
 It also proves that examiners can only see their own exams, answer keys and submissions, and cannot
 hijack another examiner's access code.
 
+## Question types & grading
+
+| Type | Candidate sees | Graded by |
+| --- | --- | --- |
+| **Multiple choice** | Radio buttons | Automatically, server-side, against the private answer key |
+| **Written answer** | A text area with a character limit | The examiner, optionally helped by an AI suggestion |
+
+For written questions the examiner writes **grading criteria** and an optional **model answer**.
+Both are stored in the owner-only `private/answerKey` document, next to the multiple-choice key,
+so candidates never receive them.
+
+How grading flows:
+
+1. On submit, `gradeSubmission` scores multiple choice. If the exam has written questions the
+   submission becomes **Needs review** (`autoScore` set, `score` withheld). Otherwise it's **Graded**.
+2. The examiner clicks **Grade** on the dashboard. Each written answer is shown with its rubric.
+3. **Suggest grade with AI** (optional) calls `suggestTextGrade`, which sends the question, rubric,
+   model answer and student answer to the model and stores `{points, rationale}` as an
+   *advisory* suggestion. It never changes the score.
+4. **Save grade** calls `gradeTextAnswer` with whatever points the examiner chose: the suggestion,
+   or an override. Once every written answer has a grade, the submission becomes **Graded** with
+   the final total.
+
+Submissions stay immutable to every client, examiners included (proved in the rules tests). The two
+callables are the only write path, and they verify exam ownership server-side.
+
+### AI-assisted grading (free option)
+
+This uses the Google **Gemini API free tier** (an AI Studio key; no credit card needed).
+
+1. Get a key at https://aistudio.google.com/apikey
+2. For production, run this:
+
+```bash
+npx firebase functions:secrets:set GEMINI_API_KEY
+```
+
+3. For local emulators, create `functions/.secret.local` containing `GEMINI_API_KEY=your-key`.
+   It's git-ignored.
+
+The model defaults to `gemini-flash-latest` and can be changed through the `GEMINI_MODEL` param.
+Without a key, the **emulator** uses a clearly labelled mock (length-based, no AI call) so the
+workflow can be tested. In production the button reports that AI grading isn't configured.
+
+> **Privacy:** on the free tier Google may use prompts to improve its products, and prompts contain
+> student answers. For real student data, use a paid Gemini key or Vertex AI. Free-tier rate limits
+> are low (about 10 requests/minute at the time of writing), so the button returns a "quota reached"
+> message under load.
+
+Prompt-injection defences: the answer is wrapped in delimiters the student can't close, the system
+prompt tells the model to treat it as data, the output is forced to a JSON schema and clamped to
+`[0, max]` in half points, and **a human always confirms**.
 ## Architecture
 
 ```
@@ -72,7 +124,8 @@ libs/
   feature-exam-runner/     Exam-taking surface driven by an explicit FSM.
   feature-exam-history/    Live examiner dashboard.
 src/app/                   Shell: routes, guard, home, sign-in.
-functions/                 startSession · gradeSubmission · sweepExpiredSessions.
+functions/                 startSession · gradeSubmission · gradeTextAnswer · suggestTextGrade ·
+                           sweepExpiredSessions.
 firestore.rules            Zero-trust security model.
 tests/rules/               Security rules suite.
 ```
@@ -151,6 +204,6 @@ npx firebase deploy
   feature to shrink it.
 - Integrity signals (tab switches) are client-reported and therefore advisory. Timing and grading
   are the only server-guaranteed properties.
-- Questions are single-answer multiple choice. Exams aren't locked against edits after the first
-  session starts.
+- Question types: single-answer multiple choice and written answer. Exams aren't locked against edits after the first session starts.
+- Text answer length is enforced in the UI and by the grader, not by Firestore rules (rules can't iterate maps). The 1 MiB document limit is the hard cap.
 - Add App Check to bind callable and Firestore traffic to the genuine app.

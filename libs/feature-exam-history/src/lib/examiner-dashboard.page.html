@@ -60,6 +60,7 @@
       @let stats = store.stats();
       <dl class="stats">
         <div class="panel"><dt>In progress</dt><dd>{{ stats.inProgress }}</dd></div>
+        <div class="panel"><dt>Needs review</dt><dd>{{ stats.needsReview }}</dd></div>
         <div class="panel"><dt>Graded</dt><dd>{{ stats.graded }}</dd></div>
         <div class="panel"><dt>Expired, no submission</dt><dd>{{ stats.expired }}</dd></div>
         <div class="panel">
@@ -80,6 +81,7 @@
               <th scope="col">Score</th>
               <th scope="col">Completed by</th>
               <th scope="col">Tab switches</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -94,6 +96,8 @@
                 <td class="mono">
                   @if (row.submission?.score !== null && row.submission?.score !== undefined) {
                     <strong>{{ row.submission!.score }}</strong> / {{ row.submission!.maxScore }}
+                  } @else if (row.status === 'NEEDS_REVIEW') {
+                    {{ row.submission!.autoScore }} + ? / {{ row.submission!.maxScore }}
                   } @else {
                     —
                   }
@@ -107,10 +111,23 @@
                   }
                 </td>
                 <td class="mono">{{ row.submission?.integrity?.visibilityLossCount ?? '—' }}</td>
+                <td>
+                  @if (row.submission) {
+                    <button
+                      type="button"
+                      [class.primary]="row.status === 'NEEDS_REVIEW'"
+                      [attr.aria-pressed]="store.reviewingSessionId() === row.sessionId"
+                      (click)="store.reviewingSessionId.set(row.sessionId)"
+                    >
+                      {{ row.status === 'NEEDS_REVIEW' ? 'Grade' : 'Review' }}
+                      <span class="visually-hidden">{{ row.candidateName }}</span>
+                    </button>
+                  }
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="7" class="muted empty-row">
+                <td colspan="8" class="muted empty-row">
                   Nobody has started yet. Share code <code>{{ exam.accessCode }}</code> — rows appear live.
                 </td>
               </tr>
@@ -118,6 +135,13 @@
           </tbody>
         </table>
       </div>
+
+      @if (store.reviewing(); as submission) {
+        <exam-submission-review-panel
+          [submission]="submission"
+          (closed)="store.reviewingSessionId.set(null)"
+        />
+      }
     }
   </section>
 </div>

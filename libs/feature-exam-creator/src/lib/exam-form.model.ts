@@ -7,14 +7,24 @@ import {
   schema,
   validate,
 } from '@angular/forms/signals';
-import { LIMITS } from '@exam/contracts';
+import { LIMITS, type QuestionType } from '@exam/contracts';
 import type { NewExamInput } from '@exam/data-access-exams';
 
+/**
+ * Flat on purpose: switching a question between types keeps what was typed for the other type,
+ * and validators are gated on `type` with `when`.
+ */
 export interface QuestionModel {
+  type: QuestionType;
   prompt: string;
+  points: number;
+  // CHOICE
   options: string[];
   correctIndex: number;
-  points: number;
+  // TEXT
+  maxLength: number;
+  modelAnswer: string;
+  criteria: string;
 }
 
 export interface ExamFormModel {
@@ -29,8 +39,17 @@ export interface ExamFormModel {
   questions: QuestionModel[];
 }
 
-export function blankQuestion(): QuestionModel {
-  return { prompt: '', options: ['', ''], correctIndex: 0, points: 1 };
+export function blankQuestion(type: QuestionType = 'CHOICE'): QuestionModel {
+  return {
+    type,
+    prompt: '',
+    points: type === 'TEXT' ? 5 : 1,
+    options: ['', ''],
+    correctIndex: 0,
+    maxLength: LIMITS.defaultTextAnswerLength,
+    modelAnswer: '',
+    criteria: '',
+  };
 }
 
 /** Defaults implement the vertical slice: a 5-minute exam open for the next 24 hours. */
@@ -85,20 +104,37 @@ export const examFormSchema = schema<ExamFormModel>((p) => {
     validate(q.points, ({ value }) =>
       Number.isInteger(value()) ? null : { kind: 'integer', message: 'Whole points only.' },
     );
-    validate(q.options, ({ value }) =>
-      value().length < LIMITS.minOptions
+
+    // Multiple choice
+    validate(q.options, ({ value, valueOf }) =>
+      valueOf(q.type) === 'CHOICE' && value().length < LIMITS.minOptions
         ? { kind: 'minOptions', message: `At least ${LIMITS.minOptions} options.` }
         : null,
     );
-    applyEach(q.options, (option) => required(option, { message: 'Option text is required.' }));
+    applyEach(q.options, (option) =>
+      required(option, { message: 'Option text is required.', when: ({ valueOf }) => valueOf(q.type) === 'CHOICE' }),
+    );
     validate(q.correctIndex, ({ value, valueOf }) =>
-      value() >= 0 && value() < valueOf(q.options).length
+      valueOf(q.type) !== 'CHOICE' || (value() >= 0 && value() < valueOf(q.options).length)
         ? null
         : { kind: 'correct', message: 'Mark the correct option.' },
     );
+
+    // Written answer
+    required(q.maxLength, { when: ({ valueOf }) => valueOf(q.type) === 'TEXT' });
+    min(q.maxLength, 50, { message: 'Allow at least 50 characters.', when: ({ valueOf }) => valueOf(q.type) === 'TEXT' });
+    max(q.maxLength, LIMITS.maxTextAnswerLength, {
+      message: `At most ${LIMITS.maxTextAnswerLength} characters.`,
+      when: ({ valueOf }) => valueOf(q.type) === 'TEXT',
+    });
+    required(q.criteria, {
+      message: 'Describe how points are awarded — graders (human or AI) rely on it.',
+      when: ({ valueOf }) => valueOf(q.type) === 'TEXT',
+    });
+    maxLength(q.criteria, LIMITS.maxRubricLength);
+    maxLength(q.modelAnswer, LIMITS.maxRubricLength);
   });
 });
-
 export function toNewExamInput(model: ExamFormModel): NewExamInput {
   return {
     title: model.title,
@@ -106,12 +142,24 @@ export function toNewExamInput(model: ExamFormModel): NewExamInput {
     durationSeconds: model.durationMinutes * 60,
     window: { opensAt: fromLocalInput(model.opensAt), closesAt: fromLocalInput(model.closesAt) },
     integrity: { maxVisibilityLosses: model.maxVisibilityLosses },
-    questions: model.questions.map((q) => ({
-      prompt: q.prompt,
-      options: q.options,
-      correctIndex: q.correctIndex,
-      points: q.points,
-    })),
+    questions: model.questions.map((q) =>
+      q.type === 'TEXT'
+        ? {
+            type: 'TEXT' as const,
+            prompt: q.prompt,
+            points: q.points,
+            maxLength: q.maxLength,
+            modelAnswer: q.modelAnswer,
+            criteria: q.criteria,
+          }
+        : {
+            type: 'CHOICE' as const,
+            prompt: q.prompt,
+            points: q.points,
+            options: q.options,
+            correctIndex: q.correctIndex,
+          },
+    ),
   };
 }
 
