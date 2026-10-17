@@ -80,7 +80,7 @@ Java 21+) in a second terminal: `npm run emulators`.
 | `npm test` | Unit tests (Vitest via `ng test`): content integrity (photos with exact declared sizes, headcounts, directors, contacts), the subject catalogue (17 subjects, valid SVG illustrations), the school-space model (audiences, homework, grades, calendar) |
 | `npm run test:rules` | Security-rules tests against the Firestore emulator |
 | `npm run test:e2e` | Playwright, desktop and mobile (Pixel 7), against the emulators, started automatically: navigation, prerendering, layout shift, student and teacher flows, calendar |
-| `npm run build` | Production build; the 5 content pages are prerendered into `dist/exam-platform/browser` |
+| `npm run build` | Production build; the 5 content pages are prerendered into `dist/college-website/browser` |
 | `npm run deploy` | Build, then `firebase deploy --only hosting,firestore` |
 
 ## Where the content lives
@@ -93,26 +93,18 @@ catalogue is what teachers pick from when they publish or grade, and what the tr
 or extend it there. Subject illustrations are original drawings; replace them with school photos only
 with the right to use them.
 
-## CI/CD and AI review (GitHub Actions)
+## Deploying
 
-| Workflow | When | What |
-| --- | --- | --- |
-| `ci.yml` | every push and pull request | build, unit tests, rules tests, Playwright E2E (all against the emulators) |
-| `deploy.yml` | push to `main`, after the repository variable `DEPLOY_ENABLED` is `true` | build and deploy Hosting and Firestore rules to Firebase |
-| `ai-review.yml` | pull requests | sends the diff to Google Gemini (free tier) and posts a review comment |
-| Dependabot | weekly | npm and Actions updates |
+Deployment is manual for now (no CI/CD and no automated AI review yet; they were removed on purpose
+and can be restored from git history, commit `273f3a3`, when the project grows):
 
-Set up (Settings → Secrets and variables → Actions):
+```bash
+npm run test:all   # unit + rules + end-to-end tests (needs Java 21+ for the emulators)
+npm run deploy     # build, then firebase deploy --only hosting,firestore
+```
 
-- **`GEMINI_API_KEY`** (secret): a key from https://aistudio.google.com/apikey (free tier). Optional
-  variable `GEMINI_MODEL` (default `gemini-2.5-flash`). Without the key the review step is skipped.
-- **`FIREBASE_SERVICE_ACCOUNT`** (secret): a service-account JSON with *Firebase Hosting Admin* and
-  *Cloud Datastore Owner* roles; **`FIREBASE_PROJECT_ID`** (variable); **`DEPLOY_ENABLED`** = `true`.
-
-Never commit keys: they live only in GitHub secrets. The AI review treats the diff as untrusted data,
-only comments (never pushes or approves), and does not run on pull requests from forks (GitHub does
-not give them secrets). Free-tier requests may be used by Google to improve its products: do not send
-anything confidential through it.
+Live site: https://college-de-la-salle-daher.web.app (Firebase project `college-de-la-salle-daher`,
+Firestore in `europe-west1`). Sign in first with `npx firebase login`.
 
 ## Architecture
 

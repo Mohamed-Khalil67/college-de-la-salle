@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "exam-platform": {
+    "college-website": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -64,10 +64,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "exam-platform:build:production"
+              "buildTarget": "college-website:build:production"
             },
             "development": {
-              "buildTarget": "exam-platform:build:development"
+              "buildTarget": "college-website:build:development"
             }
           },
           "defaultConfiguration": "development"
