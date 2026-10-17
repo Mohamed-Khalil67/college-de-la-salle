@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BAC, CONTACTS, DIRECTORS, FOUNDER, MILESTONES, NATIONALE, PHOTOS, SECTIONS, SUBJECTS, sectionBySlug } from '../index';
+import { BAC, CONTACTS, DIRECTORS, FOUNDER, MILESTONES, NATIONALE, PHOTOS, SECTIONS, sectionBySlug } from '../index';
 
 /** Reads width and height from a JPEG's start-of-frame marker. */
 function jpegSize(file: string): { width: number; height: number } {
@@ -40,9 +40,11 @@ describe('photos', () => {
 });
 
 describe('sections', () => {
-  it('are the national section and the Bac section', () => {
+  it('are « Bac nationale » and « Bac français »', () => {
     expect(SECTIONS.map((s) => s.slug)).toEqual(['nationale', 'bac']);
     expect(sectionBySlug('bac')).toBe(BAC);
+    expect(NATIONALE.title).toBe('Bac nationale');
+    expect(BAC.title).toBe('Bac français');
     expect(sectionBySlug('maternelle')).toBeNull();
   });
 
@@ -67,12 +69,7 @@ describe('sections', () => {
     }
   });
 
-  it('the national section lists the same subjects that have pages', () => {
-    expect(SUBJECTS).toHaveLength(3);
-    expect(NATIONALE.blocks.map((b) => b.id)).toContain('matieres');
-  });
-
-  it('only French content outside the Arabic subject', () => {
+  it('the site content is all French (no Arabic script)', () => {
     const arabic = /[؀-ۿ]/;
     for (const s of SECTIONS) expect(arabic.test(JSON.stringify(s)), s.slug).toBe(false);
     expect(arabic.test(JSON.stringify([...MILESTONES, ...DIRECTORS, ...CONTACTS, FOUNDER]))).toBe(false);
@@ -94,6 +91,6 @@ describe('school facts', () => {
   it('contacts: nine departments, every number in international format', () => {
     expect(CONTACTS).toHaveLength(9);
     for (const c of CONTACTS) for (const phone of c.phones) expect(phone).toMatch(/^\+20 2 \d{4} \d{2} \d{2}$/);
-    expect(CONTACTS.find((c) => c.label === 'Section Bac français')?.phones).toEqual(['+20 2 2592 95 98']);
+    expect(CONTACTS.find((c) => c.label === 'Bac français')?.phones).toEqual(['+20 2 2592 95 98']);
   });
 });

@@ -8,7 +8,12 @@ export const routes: Routes = [
   {
     path: 'espace-eleve',
     title: 'Espace élève',
-    loadComponent: () => import('@site/student/account').then((m) => m.AccountPage),
+    loadComponent: () => import('@site/space/student').then((m) => m.StudentPage),
+  },
+  {
+    path: 'espace-enseignant',
+    title: 'Espace enseignant',
+    loadComponent: () => import('@site/space/teacher').then((m) => m.TeacherPage),
   },
   { path: '**', redirectTo: '' },
 ];

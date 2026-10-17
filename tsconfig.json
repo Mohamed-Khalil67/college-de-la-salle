@@ -19,11 +19,14 @@
       "@site/pages": [
         "./libs/site-pages/src/index.ts"
       ],
-      "@site/student": [
-        "./libs/student-space/src/index.ts"
+      "@site/space": [
+        "./libs/school-space/src/index.ts"
       ],
-      "@site/student/account": [
-        "./libs/student-space/src/account.ts"
+      "@site/space/student": [
+        "./libs/school-space/src/student.ts"
+      ],
+      "@site/space/teacher": [
+        "./libs/school-space/src/teacher.ts"
       ]
     }
   },

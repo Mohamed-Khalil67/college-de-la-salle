@@ -1,12 +1,12 @@
 import type { SectionPage } from './model';
 
 /**
- * The two sections of the college. Facts come from the college's official site (lasalle-eg.net) and
+ * The two tracks of the college. Facts come from the college's official site (lasalle-eg.net) and
  * the Bac section's site (bacdelasalle.com); the wording is the website's own.
  */
 export const NATIONALE: SectionPage = {
   slug: 'nationale',
-  title: 'Section nationale',
+  title: 'Bac nationale',
   kicker: 'Programme du ministère égyptien · Thanaweya Amma',
   intro:
     'Établissement bilingue de la maternelle à la Thanaweya Amma : les élèves suivent les programmes du ministère égyptien de l’Éducation, avec le français comme première langue étrangère et l’anglais comme deuxième. Les matières scientifiques sont enseignées en français.',
@@ -15,7 +15,7 @@ export const NATIONALE: SectionPage = {
     { value: '2 400', label: 'élèves au collège' },
     { value: 'FR', label: '1re langue étrangère (sciences en français)' },
     { value: '5', label: 'cycles, du jardin d’enfants au secondaire' },
-    { value: '3', label: 'matières détaillées en ligne' },
+    { value: '3', label: 'années de secondaire (Thanaweya Amma)' },
   ],
   blocks: [
     {
@@ -34,22 +34,6 @@ export const NATIONALE: SectionPage = {
       items: ['Jardin d’enfants', 'Petit primaire', 'Grand primaire', 'Cycle préparatoire', 'Cycle secondaire (Thanaweya Amma)'],
     },
     {
-      id: 'matieres',
-      title: 'Des matières détaillées en ligne',
-      paragraphs: [
-        'Pour la section secondaire, ce site propose, matière par matière, le programme chapitre par chapitre, les formules clés, des exercices corrigés et des conseils de méthode : langue arabe, mathématiques, physique-chimie.',
-      ],
-      items: [],
-    },
-    {
-      id: 'application',
-      title: 'L’application du collège',
-      paragraphs: [
-        'Le collège a lancé une application mobile pour la communication entre l’établissement, les élèves et les familles : explication de leçons, envoi de devoirs, signalement des absences. Les familles la téléchargent sur Android ou iOS, saisissent le numéro de téléphone enregistré auprès du collège, puis le code reçu par SMS.',
-      ],
-      items: [],
-    },
-    {
       id: 'inscription',
       title: 'Inscription',
       paragraphs: [
@@ -60,8 +44,6 @@ export const NATIONALE: SectionPage = {
   ],
   links: [
     { label: 'Annonces et inscriptions (site officiel)', url: 'http://www.lasalle-eg.net/', note: 'En arabe : conditions, pièces à fournir, formulaire.' },
-    { label: 'Application — Android', url: 'https://play.google.com/store/apps/details?id=pharossolutions.app.schoolapp.home.delasalle', note: 'Google Play' },
-    { label: 'Application — iOS', url: 'https://apps.apple.com/eg/app/coll%C3%A8ge-de-la-salle/id1534150382?l=fr', note: 'App Store' },
   ],
   counts: [],
   countsNote: '',
@@ -69,7 +51,7 @@ export const NATIONALE: SectionPage = {
 
 export const BAC: SectionPage = {
   slug: 'bac',
-  title: 'Section Bac français',
+  title: 'Bac français',
   kicker: 'Programmes français · Homologuée par l’AEFE',
   intro:
     'Ouverte en septembre 2009, la section française prépare au baccalauréat français. Elle fait partie intégrante du collège et partage son projet éducatif lasallien. Elle a été homologuée par l’AEFE le 10 janvier 2013 pour les classes de Seconde, Première et Terminale.',

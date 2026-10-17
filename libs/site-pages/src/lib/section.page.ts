@@ -1,15 +1,16 @@
 import { Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { CONTACTS, photo, SCHOOL, sectionBySlug, SUBJECTS } from '@site/content';
+import { CONTACTS, MATIERE_GROUPS, matieresFor, photo, SCHOOL, sectionBySlug } from '@site/content';
+import { MatiereCard } from './ui/matiere-card';
 import { SitePhoto } from './ui/site-photo';
 
 /**
- * `/section-nationale` and `/bac` — one layout for the college's two sections. Facts, blocks,
- * headcounts (Bac) and useful links come from site-content/sections.ts.
+ * `/bac-nationale` and `/bac-francais`: one layout for the college's two tracks. Facts, blocks,
+ * headcounts (Bac français), the subject catalogue and useful links.
  */
 @Component({
   selector: 'site-section-page',
-  imports: [RouterLink, SitePhoto],
+  imports: [RouterLink, SitePhoto, MatiereCard],
   template: `
     @if (page(); as s) {
       <header class="bg-navy-900 text-cream">
@@ -38,6 +39,7 @@ import { SitePhoto } from './ui/site-photo';
             @for (b of s.blocks; track b.id) {
               <li><a class="block rounded-md px-3 py-1.5 no-underline hover:bg-navy-100" [routerLink]="[]" [fragment]="b.id">{{ b.title }}</a></li>
             }
+            <li><a class="block rounded-md px-3 py-1.5 no-underline hover:bg-navy-100" [routerLink]="[]" fragment="matieres">Les matières</a></li>
             @if (s.counts.length) {
               <li><a class="block rounded-md px-3 py-1.5 no-underline hover:bg-navy-100" [routerLink]="[]" fragment="effectifs">Effectifs</a></li>
             }
@@ -59,20 +61,28 @@ import { SitePhoto } from './ui/site-photo';
                   }
                 </ul>
               }
-              @if (b.id === 'matieres') {
-                <ul class="m-0 mt-2 grid list-none gap-3 p-0 sm:grid-cols-3">
-                  @for (m of subjects; track m.slug) {
-                    <li>
-                      <a [routerLink]="['/matiere', m.slug]" class="block h-full rounded-xl border border-line bg-surface p-4 no-underline hover:border-navy-700 hover:bg-navy-100" [attr.lang]="m.lang">
-                        <span class="block text-lg font-bold text-navy-900">{{ m.title }}</span>
-                        <span class="text-sm text-muted">{{ m.highlights[0]?.value }} {{ m.lang === 'ar' ? 'وحدات' : 'chapitres' }}</span>
-                      </a>
-                    </li>
-                  }
-                </ul>
-              }
             </section>
           }
+
+          <section id="matieres" aria-labelledby="matieres-title" class="grid gap-6">
+            <div class="grid gap-2">
+              <h2 id="matieres-title" class="m-0 text-3xl">Les matières</h2>
+              <p class="m-0 text-muted">
+                Les matières que les enseignants peuvent publier dans l’espace de leur classe : devoirs, ressources et notes.
+                Connectez-vous à l’<a routerLink="/espace-eleve">Espace élève</a> pour voir celles de votre classe.
+              </p>
+            </div>
+            @for (g of groups(); track g.name) {
+              <div class="grid gap-3" [attr.data-testid]="'group-' + g.name">
+                <h3 class="m-0 text-lg text-gold-ink">{{ g.name }}</h3>
+                <ul class="m-0 grid list-none gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3" data-testid="matieres">
+                  @for (m of g.items; track m.id) {
+                    <li><site-matiere-card [matiere]="m" /></li>
+                  }
+                </ul>
+              </div>
+            }
+          </section>
 
           @if (s.counts.length) {
             <section id="effectifs" aria-labelledby="effectifs-title" class="grid gap-3">
@@ -124,21 +134,22 @@ import { SitePhoto } from './ui/site-photo';
             </ul>
           </section>
 
-          <aside class="grid gap-2 rounded-2xl bg-navy-900 p-6 text-cream" aria-label="Contact et espace élève">
-            <h2 class="m-0 text-2xl text-white">Une question ? Un élève de la section ?</h2>
+          <aside class="grid gap-2 rounded-2xl bg-navy-900 p-6 text-cream" aria-label="Contact et espaces en ligne">
+            <h2 class="m-0 text-2xl text-white">Une question ? Un élève ou un enseignant ?</h2>
             <p class="m-0">
               Secrétariat : <bdi dir="ltr">{{ phone() }}</bdi> · {{ school.address }}
             </p>
             <div class="mt-2 flex flex-wrap gap-3">
               <a class="btn btn-gold" routerLink="/contact">Nous contacter</a>
-              <a class="btn btn-outline-light" routerLink="/espace-eleve">Accéder à l’espace élève</a>
+              <a class="btn btn-outline-light" routerLink="/espace-eleve">Espace élève</a>
+              <a class="btn btn-outline-light" routerLink="/espace-enseignant">Espace enseignant</a>
             </div>
           </aside>
         </div>
       </div>
     } @else {
       <section class="mx-auto max-w-3xl px-4 py-20">
-        <h1>Section introuvable</h1>
+        <h1>Page introuvable</h1>
         <p><a routerLink="/">Retour à l’accueil</a></p>
       </section>
     }
@@ -149,11 +160,17 @@ export class SectionPage {
   readonly section = input.required<string>();
 
   protected readonly school = SCHOOL;
-  protected readonly subjects = SUBJECTS;
   protected readonly page = computed(() => sectionBySlug(this.section()));
   protected readonly heroPhoto = computed(() => photo(this.page()?.photo ?? 'campus-aerien'));
   protected readonly total = computed(() => (this.page()?.counts ?? []).flatMap((c) => c.levels).reduce((sum, l) => sum + l.students, 0));
   protected readonly phone = computed(() =>
-    (this.section() === 'bac' ? CONTACTS.find((c) => c.label === 'Section Bac français') : CONTACTS[0])?.phones[0] ?? '',
+    (this.section() === 'bac' ? CONTACTS.find((c) => c.label === 'Bac français') : CONTACTS[0])?.phones[0] ?? '',
   );
+
+  /** The catalogue for this track, by group (empty groups are skipped). */
+  protected readonly groups = computed(() => {
+    const track = this.section() === 'bac' ? 'bac' : 'nationale';
+    const items = matieresFor(track);
+    return MATIERE_GROUPS.map((name) => ({ name, items: items.filter((m) => m.group === name) })).filter((g) => g.items.length);
+  });
 }

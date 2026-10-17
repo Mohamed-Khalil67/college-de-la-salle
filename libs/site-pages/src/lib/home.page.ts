@@ -1,7 +1,7 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { KEY_FIGURES, MILESTONES, photo, SCHOOL, SECTIONS, SUBJECTS } from '@site/content';
+import { KEY_FIGURES, MILESTONES, photo, SCHOOL, SECTIONS } from '@site/content';
 import { SitePhoto } from './ui/site-photo';
 
 /** `/` — Accueil. */
@@ -19,11 +19,12 @@ import { SitePhoto } from './ui/site-photo';
           {{ school.name }} <span class="text-gold">— {{ school.district }}</span>
         </h1>
         <p class="m-0 max-w-2xl text-lg text-cream/90 md:text-xl">
-          {{ school.tagline }} Deux sections, un même projet lasallien : la section nationale et la section française du Bac.
+          {{ school.tagline }} Deux parcours, un même projet lasallien : le Bac nationale et le Bac français.
         </p>
         <div class="flex flex-wrap gap-3">
           <a class="btn btn-gold" href="#sections">Choisir ma section</a>
           <a class="btn btn-outline-light" routerLink="/espace-eleve">Espace élève</a>
+          <a class="btn btn-outline-light" routerLink="/espace-enseignant">Espace enseignant</a>
         </div>
       </div>
       <p class="absolute bottom-2 end-3 m-0 text-xs text-cream/70">{{ hero.credit }}</p>
@@ -50,7 +51,7 @@ import { SitePhoto } from './ui/site-photo';
         @for (s of sections; track s.slug) {
           <li>
             <a
-              [routerLink]="s.slug === 'bac' ? '/bac' : '/section-nationale'"
+              [routerLink]="s.slug === 'bac' ? '/bac-francais' : '/bac-nationale'"
               class="group grid h-full overflow-hidden rounded-2xl border border-line bg-surface no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               [attr.data-testid]="'section-card-' + s.slug"
             >
@@ -67,53 +68,29 @@ import { SitePhoto } from './ui/site-photo';
       </ul>
     </section>
 
-    <!-- Subjects (section nationale) -->
-    <section id="matieres" class="border-y border-line bg-surface" aria-labelledby="subjects-title">
-      <div class="mx-auto grid max-w-6xl gap-8 px-4 py-16">
+    <!-- The school spaces -->
+    <section class="border-y border-line bg-navy-100" aria-labelledby="space-title">
+      <div class="mx-auto grid max-w-6xl gap-8 px-4 py-14">
         <div class="grid gap-2">
-          <p class="kicker">Section nationale</p>
-          <h2 id="subjects-title" class="m-0 text-3xl">Les matières</h2>
-          <p class="m-0 max-w-2xl text-muted">
-            Pour chaque matière : le programme chapitre par chapitre, les notions et formules clés, des exercices types corrigés,
-            des conseils de méthode et le statut d’avancement du programme.
+          <p class="kicker">Espaces en ligne</p>
+          <h2 id="space-title" class="m-0 text-3xl">Les enseignants publient, les élèves retrouvent tout</h2>
+          <p class="m-0 max-w-3xl text-lg">
+            Annonces, devoirs avec date de rendu, ressources de cours et notes avec les commentaires de l’enseignant :
+            chaque élève du Bac nationale et du Bac français voit ce qui concerne sa classe, depuis n’importe quel appareil.
           </p>
         </div>
-        <ul class="m-0 grid list-none gap-6 p-0 md:grid-cols-3">
-          @for (s of subjects; track s.slug) {
-            <li>
-              <a
-                [routerLink]="['/matiere', s.slug]"
-                class="group grid h-full overflow-hidden rounded-2xl border border-line bg-page no-underline shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                [attr.data-testid]="'subject-card-' + s.slug"
-              >
-                <site-photo [photo]="photoOf(s.photo)" aspect="16 / 9" [caption]="false" rounded="rounded-none" sizes="(max-width: 768px) 100vw, 33vw" />
-                <div class="grid gap-2 p-5" [attr.lang]="s.lang" [attr.dir]="s.lang === 'ar' ? 'rtl' : 'ltr'">
-                  <span class="text-2xl font-bold text-navy-900">{{ s.title }}</span>
-                  <span class="text-sm text-gold-ink">{{ s.kicker }}</span>
-                  <span class="line-clamp-3 text-sm text-muted">{{ s.intro }}</span>
-                </div>
-                <span class="mt-auto px-5 pb-5 text-sm font-semibold text-navy-700 group-hover:underline">Voir la matière →</span>
-              </a>
-            </li>
-          }
+        <ul class="m-0 grid list-none gap-6 p-0 md:grid-cols-2">
+          <li class="grid content-start gap-3 rounded-2xl border border-line bg-surface p-6">
+            <h3 class="m-0 text-2xl">Espace élève</h3>
+            <p class="m-0 text-muted">Annonces, devoirs à faire, ressources et notes de votre classe, avec votre moyenne par matière.</p>
+            <div><a class="btn btn-navy-solid" routerLink="/espace-eleve" data-testid="home-student">Accéder à l’Espace élève</a></div>
+          </li>
+          <li class="grid content-start gap-3 rounded-2xl border border-line bg-surface p-6">
+            <h3 class="m-0 text-2xl">Espace enseignant</h3>
+            <p class="m-0 text-muted">Publiez pour une classe ou une section, fixez une date de rendu et saisissez les notes de vos élèves.</p>
+            <div><a class="btn btn-navy-solid" routerLink="/espace-enseignant" data-testid="home-teacher">Accéder à l’Espace enseignant</a></div>
+          </li>
         </ul>
-      </div>
-    </section>
-
-    <!-- Student space -->
-    <section class="bg-navy-100" aria-labelledby="space-title">
-      <div class="mx-auto grid max-w-6xl items-center gap-6 px-4 py-14 md:grid-cols-[2fr_1fr]">
-        <div class="grid gap-2">
-          <p class="kicker">Espace élève</p>
-          <h2 id="space-title" class="m-0 text-3xl">Suivez votre progression</h2>
-          <p class="m-0 text-lg">
-            Créez votre compte avec votre section et votre classe : cochez les chapitres révisés, gardez vos exercices et formules préférés,
-            et retrouvez tout depuis n’importe quel appareil.
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-3 md:justify-end">
-          <a class="btn btn-navy-solid" routerLink="/espace-eleve">Créer mon compte</a>
-        </div>
       </div>
     </section>
 
@@ -160,7 +137,6 @@ export class HomePage {
   protected readonly school = SCHOOL;
   protected readonly figures = KEY_FIGURES;
   protected readonly sections = SECTIONS;
-  protected readonly subjects = SUBJECTS;
   protected readonly milestones = MILESTONES;
   protected readonly hero = photo('campus-aerien');
   protected readonly inauguration = photo('inauguration-1955');

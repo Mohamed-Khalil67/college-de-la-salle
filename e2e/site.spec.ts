@@ -2,13 +2,9 @@ import { expect, type Page, test } from '@playwright/test';
 
 /*
  * Collège de la Salle — Daher, end to end, on desktop and mobile:
- *  - the site is French and left-to-right everywhere; only the Arabic subject's content is RTL,
- *    and the header never moves;
- *  - every page is prerendered, has its photos loaded, no horizontal overflow and no layout shift;
- *  - subject pages carry the full programme, worked examples and status.
+ *  - the site is French and left-to-right everywhere, and the header never moves;
+ *  - every page is prerendered, has its photos loaded, no horizontal overflow and no layout shift.
  */
-
-const ARABIC = /[؀-ۿ]/;
 
 async function trackLayoutShift(page: Page): Promise<void> {
   await page.addInitScript(() => {
@@ -42,7 +38,8 @@ async function checkPage(page: Page): Promise<void> {
     const images = [...document.querySelectorAll('main img')] as HTMLImageElement[];
     for (const img of images) {
       img.scrollIntoView();
-      await img.decode().catch(() => undefined);
+      // Lazy images load once in view; never wait forever for one that does not.
+      await Promise.race([img.decode().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 5000))]);
     }
     window.scrollTo(0, 0);
     const header = document.querySelector('body > app-root > header, app-root > header')!;
@@ -52,7 +49,7 @@ async function checkPage(page: Page): Promise<void> {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const text = walker.currentNode.textContent ?? '';
-      if (/[؀-ۿ]/.test(text) && !walker.currentNode.parentElement?.closest('[lang="ar"]')) {
+      if (/[؀-ۿ]/.test(text) && !walker.currentNode.parentElement?.closest('[lang="ar"], [dir="auto"]')) {
         strayArabic.push(text.trim().slice(0, 60));
       }
     }
@@ -77,56 +74,61 @@ async function checkPage(page: Page): Promise<void> {
 
 async function openNav(page: Page): Promise<void> {
   const menu = page.getByRole('button', { name: 'Menu' });
-  if (await menu.isVisible()) await menu.click();
+  // On small screens the menu is a toggle: open it only when it is closed.
+  if ((await menu.isVisible()) && (await menu.getAttribute('aria-expanded')) !== 'true') await menu.click();
 }
 
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Navigation principale' });
 
-test('French site with a flat navigation; only the Arabic subject reads right-to-left', async ({ page }) => {
+test('French site with a flat navigation and the two online spaces', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Collège de la Salle');
-  await expect(page).toHaveTitle('Collège de la Salle — Daher · Section arabe');
+  await expect(page).toHaveTitle('Collège de la Salle — Daher · Bac nationale & Bac français');
   await checkPage(page);
 
-  // Flat navigation, in French, with no Teacher Mode and no exam pages.
   await openNav(page);
-  await expect(nav(page).getByRole('link')).toHaveText(['Accueil', 'Histoire & Patrimoine', 'Section nationale', 'Bac français', 'Contact', 'Espace élève']);
-  await expect(page.getByText(/Mode Enseignant|bank|Banque|examens/i)).toHaveCount(0);
+  await expect(nav(page).getByRole('link')).toHaveText([
+    'Accueil', 'Histoire & Patrimoine', 'Bac nationale', 'Bac français', 'Contact', 'Espace élève', 'Espace enseignant',
+  ]);
+  await expect(page.getByText(/Mode Enseignant|Banque|examens/i)).toHaveCount(0);
 
-  // Arabic subject (reached from the national section's subject cards): RTL Arabic article, while
-  // the header and breadcrumb stay French and LTR.
-  await nav(page).getByRole('link', { name: 'Section nationale' }).click();
-  await expect(page).toHaveURL(/\/section-nationale$/);
-  await page.getByRole('link', { name: /اللغة العربية/ }).first().click();
-  await expect(page).toHaveURL(/\/matiere\/arabe$/);
-  const article = page.getByTestId('subject');
-  await expect(article).toHaveAttribute('lang', 'ar');
-  await expect(article).toHaveAttribute('dir', 'rtl');
-  await expect(page.getByTestId('subject-title')).toHaveText('اللغة العربية');
-  expect(await page.getByTestId('subject-title').evaluate((el) => getComputedStyle(el).fontFamily)).toContain('Cairo');
-  await expect(page.getByRole('navigation', { name: 'Fil d’Ariane' })).toContainText('Accueil');
-  await expect(page.getByRole('heading', { name: 'تاريخ اللغة العربية في مصر' })).toBeVisible();
-  // The table of contents follows the article to the right; the brand stays on the left.
-  const toc = await page.getByTestId('toc').boundingBox();
-  const viewport = page.viewportSize()!.width;
-  if (viewport >= 1024) expect(toc!.x).toBeGreaterThan(viewport / 2);
-  await checkPage(page);
+  for (const [name, url, title] of [
+    ['Bac nationale', /\/bac-nationale$/, 'Bac nationale'],
+    ['Bac français', /\/bac-francais$/, 'Bac français'],
+  ] as const) {
+    await openNav(page);
+    await nav(page).getByRole('link', { name }).click();
+    await expect(page).toHaveURL(url);
+    await expect(page.getByTestId('section-title')).toHaveText(title);
+    await checkPage(page);
+  }
 
-  // French subjects: LTR, Inter.
-  await page.goto('/matiere/mathematiques');
-  await expect(page.getByTestId('subject')).toHaveAttribute('dir', 'ltr');
-  await expect(page.getByTestId('subject-title')).toHaveText('Mathématiques');
+  await openNav(page);
+  await nav(page).getByRole('link', { name: 'Espace enseignant' }).click();
+  await expect(page).toHaveURL(/\/espace-enseignant$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Espace enseignant');
   await checkPage(page);
+});
 
-  await page.goto('/matiere/physique-chimie');
-  await expect(page.getByTestId('subject-title')).toHaveText('Physique-Chimie');
-  await expect(page.getByTestId('formula').first()).toHaveText('U = R · I');
-  await checkPage(page);
+test('the menu is a hamburger below 1280px and a single row of links above', async ({ page }) => {
+  await page.goto('/');
+  const width = page.viewportSize()!.width;
+  const menu = page.getByRole('button', { name: 'Menu' });
+  if (width >= 1280) {
+    await expect(menu).toBeHidden();
+    const tops = await nav(page).getByRole('link').evaluateAll((links) => links.map((l) => Math.round(l.getBoundingClientRect().top)));
+    expect(Math.max(...tops) - Math.min(...tops), 'all links on one row').toBeLessThanOrEqual(4);
+  } else {
+    await expect(menu).toBeVisible();
+    await expect(nav(page)).toBeHidden();
+    await menu.click();
+    await expect(nav(page)).toBeVisible();
+  }
 });
 
 test('no layout shift on any page (fonts preloaded with metric fallback, photos in reserved boxes)', async ({ page }, testInfo) => {
   await trackLayoutShift(page);
-  for (const path of ['/', '/histoire', '/section-nationale', '/bac', '/contact', '/matiere/arabe', '/matiere/mathematiques', '/matiere/physique-chimie']) {
+  for (const path of ['/', '/histoire', '/bac-nationale', '/bac-francais', '/contact', '/espace-eleve', '/espace-enseignant']) {
     await page.goto(path);
     const cls = await layoutShift(page);
     testInfo.annotations.push({ type: `CLS ${path}`, description: cls.toFixed(4) });
@@ -136,14 +138,11 @@ test('no layout shift on any page (fonts preloaded with metric fallback, photos 
 
 test('every page is prerendered with its content, French metadata and real school photos', async ({ page, request }) => {
   for (const [path, text] of [
-    ['/', 'Les matières'],
+    ['/', 'Les enseignants publient'],
     ['/histoire', 'Les grandes étapes'],
-    ['/section-nationale', 'Un collège bilingue, ouvert à tous'],
-    ['/bac', 'L’homologation AEFE'],
+    ['/bac-nationale', 'Un collège bilingue, ouvert à tous'],
+    ['/bac-francais', 'L’homologation AEFE'],
     ['/contact', 'Standard'],
-    ['/matiere/arabe', 'تاريخ اللغة العربية في مصر'],
-    ['/matiere/mathematiques', 'Calcul intégral'],
-    ['/matiere/physique-chimie', 'Induction électromagnétique'],
   ] as const) {
     const html = await (await request.get(path)).text();
     expect(html, `${path} is prerendered`).toContain(text);
@@ -177,45 +176,5 @@ test('history: milestones in order with archive photos and sources', async ({ pa
   await expect(page.getByTestId('gallery').locator('img')).toHaveCount(26);
   await expect(page.getByText('26 novembre 1955', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('Source : Archives lasalliennes (lasalle-po.org)').first()).toBeVisible();
-  await checkPage(page);
-});
-
-test('a subject page gives the full programme, corrected examples, tips, resources and status', async ({ page }) => {
-  await page.goto('/matiere/mathematiques');
-  await expect(page.getByTestId('chapter')).toHaveCount(6);
-  await expect(page.getByTestId('example')).toHaveCount(5);
-
-  // In-page navigation scrolls to the section, below the sticky header.
-  await page.getByTestId('toc').getByRole('link', { name: 'Exercices types corrigés' }).click();
-  await expect(page).toHaveURL(/#exercices$/);
-  const heading = await page.getByRole('heading', { name: 'Exercices types corrigés' }).boundingBox();
-  const header = await page.getByRole('banner').boundingBox();
-  expect(heading!.y).toBeGreaterThanOrEqual(header!.height - 2);
-
-  // Corrections are folded until asked for.
-  const second = page.getByTestId('example').nth(1);
-  await expect(second.getByText('Réponse')).toBeHidden();
-  await second.getByText('Voir la correction').click();
-  await expect(second.getByText('I = 1')).toBeVisible();
-
-  // Status of the programme: every chapter listed, with an accessible progress bar.
-  const status = page.getByTestId('status');
-  await expect(status).toContainText('0 chapitre terminé sur 6');
-  await expect(status.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '6');
-  await expect(status.getByRole('row')).toHaveCount(7);
-  await expect(page.getByText('Bientôt disponible').first()).toBeVisible();
-  await checkPage(page);
-});
-
-test('the Arabic subject page has its full content in Arabic', async ({ page }) => {
-  await page.goto('/matiere/arabe');
-  await expect(page.getByTestId('chapter')).toHaveCount(6);
-  await expect(page.getByRole('heading', { name: 'البلاغة' })).toBeVisible();
-  const example = page.getByTestId('example').nth(1);
-  await example.getByText('عرض الحلّ').click();
-  await expect(example).toContainText('تشبيه بليغ');
-  await expect(page.getByTestId('status')).toContainText('أُنجز ٠ من ٦ وحدات');
-  const text = await page.getByTestId('subject').innerText();
-  expect(ARABIC.test(text)).toBe(true);
   await checkPage(page);
 });

@@ -31,7 +31,7 @@ main {
 }
 
 .menu-button {
-  display: inline-flex; /* below 1024px; hidden by the media query at the end of this block */
+  display: inline-flex; /* below 1280px; hidden by the media query at the end of this block */
   align-items: center;
   gap: 0.4rem;
   padding-block: 0.35rem;
@@ -87,14 +87,14 @@ main {
   color: #0a192f;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .menu-button {
     display: none;
   }
 }
 
 /* Open mobile menu: full-width tap targets. */
-@media (max-width: 1023.98px) {
+@media (max-width: 1279.98px) {
   .nav-link,
   .account-link {
     padding-block: 0.7rem;
@@ -102,4 +102,9 @@ main {
   .account-link {
     text-align: center;
   }
+}
+
+/* Before a client-rendered page (the school spaces) has loaded, hold the space it will fill so the footer does not jump. */
+main:not(:has(router-outlet + *)) {
+  min-block-size: 100dvh;
 }

@@ -58,3 +58,9 @@ functions/.secret.local
 /test-results/
 /playwright-report/
 /blob-report/
+
+# Test and emulator output
+/test-results
+/playwright-report
+*-debug.log
+/.firebase

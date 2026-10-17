@@ -8,7 +8,7 @@ export const SCHOOL = {
   name: 'Collège de la Salle',
   district: 'Daher',
   city: 'Le Caire',
-  section: 'Section nationale & Bac français',
+  section: 'Bac nationale & Bac français',
   tagline: 'Un collège lasallien au cœur du Caire depuis 1898.',
   address: '6 El Beshnini St., El-Zaher, Le Caire',
   email: 'delasalle@lasalle-eg.net',
@@ -19,7 +19,7 @@ export const SCHOOL = {
 export const KEY_FIGURES: readonly KeyFigure[] = [
   { value: '1898', label: 'Fondation à Daher' },
   { value: '2 400', label: 'élèves de toutes confessions' },
-  { value: '2', label: 'sections : nationale et Bac français' },
+  { value: '2', label: 'filières : Bac nationale et Bac français' },
   { value: '2013', label: 'homologation AEFE du Bac' },
 ];
 
@@ -103,7 +103,7 @@ export const MILESTONES: readonly Milestone[] = [
 
 export const SCHOOL_HISTORY_INTRO: readonly string[] = [
   'Fondé en 1898 par les Frères des Écoles chrétiennes — l’institut créé par saint Jean-Baptiste de La Salle —, le collège de Daher appartient au réseau lasallien d’Égypte.',
-  'Sa section nationale prépare les élèves à la Thanaweya Amma, l’examen national de fin d’études secondaires ; sa section française les prépare au baccalauréat français. Les deux partagent le même projet éducatif lasallien.',
+  'Le Bac nationale prépare les élèves à la Thanaweya Amma, l’examen national de fin d’études secondaires ; le Bac français les prépare au baccalauréat français. Les deux partagent le même projet éducatif lasallien.',
 ];
 
 /** Saint Jean-Baptiste de La Salle — key dates published on the college's official site. */
@@ -179,7 +179,7 @@ export const CONTACTS: readonly ContactLine[] = [
   { label: 'Frère Supérieur', phones: ['+20 2 2590 43 48'] },
   { label: 'Frère Directeur du collège', phones: ['+20 2 2592 80 70'] },
   { label: 'Cycle secondaire', phones: ['+20 2 2592 24 03'] },
-  { label: 'Section Bac français', phones: ['+20 2 2592 95 98'] },
+  { label: 'Bac français', phones: ['+20 2 2592 95 98'] },
   { label: 'Cycle préparatoire', phones: ['+20 2 2588 56 51'] },
   { label: 'Grand primaire', phones: ['+20 2 2588 56 50'] },
   { label: 'Petit primaire', phones: ['+20 2 2588 56 49'] },
@@ -187,7 +187,7 @@ export const CONTACTS: readonly ContactLine[] = [
 ];
 
 export const SCHOOL_LINKS: readonly ExternalLink[] = [
-  { label: 'Site officiel du collège', url: 'http://www.lasalle-eg.net/', note: 'Annonces, inscriptions de la section nationale, vie du collège.' },
-  { label: 'Section Bac français', url: 'https://bacdelasalle.com/', note: 'Le site de la section française.' },
+  { label: 'Site officiel du collège', url: 'http://www.lasalle-eg.net/', note: 'Annonces, inscriptions du Bac nationale, vie du collège.' },
+  { label: 'Bac français', url: 'https://bacdelasalle.com/', note: 'Le site de la section française.' },
   { label: 'Frères des Écoles chrétiennes — Proche-Orient', url: 'https://lasalle-po.org/', note: 'Archives et actualités lasalliennes.' },
 ];

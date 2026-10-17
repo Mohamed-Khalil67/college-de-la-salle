@@ -1,12 +1,17 @@
 rules_version = '2';
 
 // =================================================================================================
-//  Student space — the only data in this project. Everything else is static.
+//  School space. Everything else on the site is static.
 //
-//    students/{uid}   one document per student: profile, chapter progress, favourites.
+//    students/{uid}    a student's profile (own document; teachers can read it to grade).
+//    teachers/{email}  the allow-list of teachers. Written ONLY by the school's administrator, in the
+//                      Firebase console (or with scripts/add-teacher.mjs): clients can never write it.
+//    posts/{id}        announcements, homework and resources published by teachers.
+//    events/{id}       the shared calendar: exams, activities, meetings. Teachers edit; students read theirs.
+//    grades/{id}       a grade a teacher gives to one student; only that student can read it.
 //
-//  A student can read and write ONLY their own document (the document id is their auth uid), and
-//  only in the exact shape below. Nobody can list the collection. Deny by default.
+//  A teacher is someone signed in with a VERIFIED e-mail that is listed in teachers/{email}.
+//  Deny by default.
 // =================================================================================================
 
 service cloud.firestore {
@@ -16,21 +21,35 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
+    function isTeacher() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/teachers/$(request.auth.token.email.lower()));
+    }
+
+    function isStudent() {
+      return signedIn() && exists(/databases/$(database)/documents/students/$(request.auth.uid));
+    }
+
+    function shortText(v, max) {
+      return v is string && v.size() >= 1 && v.size() <= max;
+    }
+
+    // ------------------------------------------------------------------ students
     function isStudentDoc(d) {
-      let fields = ['displayName', 'section', 'classe', 'progress', 'favourites', 'createdAt', 'updatedAt'];
+      let fields = ['displayName', 'section', 'classe', 'done', 'createdAt', 'updatedAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
-        && d.displayName is string && d.displayName.size() >= 1 && d.displayName.size() <= 80
+        && shortText(d.displayName, 80)
         && d.section in ['nationale', 'bac']
-        && d.classe is string && d.classe.size() >= 1 && d.classe.size() <= 40
-        && d.progress is map && d.progress.size() <= 10
-        && d.favourites is list && d.favourites.size() <= 200
+        && shortText(d.classe, 40)
+        && d.done is list && d.done.size() <= 300
         && d.createdAt is timestamp
         && d.updatedAt == request.time;
     }
 
     match /students/{uid} {
-      allow get: if signedIn() && request.auth.uid == uid;
-      allow list: if false;
+      allow get: if (signedIn() && request.auth.uid == uid) || isTeacher();
+      allow list: if isTeacher();
 
       allow create: if signedIn() && request.auth.uid == uid
         && isStudentDoc(request.resource.data)
@@ -42,6 +61,97 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt;
 
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ------------------------------------------------------------------ teachers
+    match /teachers/{email} {
+      // A teacher may read their own entry (to learn their role); nobody can write it from a client.
+      allow get: if signedIn() && request.auth.token.email.lower() == email;
+      allow list, write: if false;
+    }
+
+    // ------------------------------------------------------------------ posts
+    function isPost(d) {
+      let fields = ['type', 'title', 'body', 'subject', 'target', 'dueDate', 'url', 'authorUid', 'authorName', 'createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.type in ['announcement', 'assignment', 'resource']
+        && shortText(d.title, 120)
+        && d.body is string && d.body.size() <= 4000
+        && d.subject is string && d.subject.size() <= 40
+        && d.target in ['all', 'nationale', 'bac',
+             'nationale-secondaire-1', 'nationale-secondaire-2', 'nationale-secondaire-3',
+             'bac-seconde', 'bac-premiere', 'bac-terminale']
+        && (d.dueDate == null || (d.type == 'assignment' && d.dueDate is string && d.dueDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
+        && (d.type != 'assignment' || d.dueDate != null)
+        && (d.url == null || (d.type == 'resource' && d.url is string && d.url.size() <= 500 && d.url.matches('^https://.+')))
+        && d.authorUid == request.auth.uid
+        && shortText(d.authorName, 80)
+        && d.createdAt == request.time;
+    }
+
+    match /posts/{id} {
+      allow read: if isStudent() || isTeacher();
+      allow create: if isTeacher() && isPost(request.resource.data);
+      allow delete: if isTeacher() && resource.data.authorUid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ------------------------------------------------------------------ calendar
+    function validTarget(t) {
+      return t in ['all', 'nationale', 'bac',
+        'nationale-secondaire-1', 'nationale-secondaire-2', 'nationale-secondaire-3',
+        'bac-seconde', 'bac-premiere', 'bac-terminale'];
+    }
+
+    function eventFields(d) {
+      let fields = ['kind', 'title', 'date', 'time', 'target', 'subject', 'note', 'authorUid', 'authorName', 'createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.kind in ['exam', 'activity', 'meeting']
+        && shortText(d.title, 120)
+        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.time is string && (d.time == '' || d.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'))
+        && validTarget(d.target)
+        && d.subject is string && d.subject.size() <= 40
+        && d.note is string && d.note.size() <= 1000
+        && shortText(d.authorName, 80);
+    }
+
+    match /events/{id} {
+      allow read: if isStudent() || isTeacher();
+      allow create: if isTeacher() && eventFields(request.resource.data)
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      // The calendar is shared: any teacher can correct or remove an event. Who created it never changes.
+      allow update: if isTeacher() && eventFields(request.resource.data)
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isTeacher();
+    }
+
+    // ------------------------------------------------------------------ grades
+    function isGrade(d) {
+      let fields = ['studentUid', 'studentName', 'subject', 'title', 'score', 'outOf', 'comment', 'teacherUid', 'teacherName', 'createdAt'];
+      return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
+        && d.studentUid is string && exists(/databases/$(database)/documents/students/$(d.studentUid))
+        && shortText(d.studentName, 80)
+        && shortText(d.subject, 40)
+        && shortText(d.title, 120)
+        && d.outOf is number && d.outOf > 0 && d.outOf <= 100
+        && d.score is number && d.score >= 0 && d.score <= d.outOf
+        && d.comment is string && d.comment.size() <= 1000
+        && d.teacherUid == request.auth.uid
+        && shortText(d.teacherName, 80)
+        && d.createdAt == request.time;
+    }
+
+    match /grades/{id} {
+      // A student reads only their own grades; a teacher reads the grades they gave.
+      allow read: if signedIn() && (resource.data.studentUid == request.auth.uid
+        || (isTeacher() && resource.data.teacherUid == request.auth.uid));
+      allow create: if isTeacher() && isGrade(request.resource.data);
+      allow delete: if isTeacher() && resource.data.teacherUid == request.auth.uid;
+      allow update: if false;
     }
   }
 }

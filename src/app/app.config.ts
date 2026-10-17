@@ -23,7 +23,7 @@ class SiteTitleStrategy extends TitleStrategy {
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const page = this.buildTitle(snapshot);
     const site = 'Collège de la Salle — Daher';
-    this.#title.setTitle(page ? `${page} — ${site}` : `${site} · Section arabe`);
+    this.#title.setTitle(page ? `${page} — ${site}` : `${site} · Bac nationale & Bac français`);
   }
 }
 

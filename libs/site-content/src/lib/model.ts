@@ -1,11 +1,10 @@
 /**
  * Content model of the site. Pure types: no Angular.
  *
- * The site is French; only the Arabic-language subject page is written in Arabic (`lang: 'ar'`).
- * Every page is static content, prerendered at build time.
+ * The site is in French. These pages are institutional and static (prerendered at build time);
+ * everything that changes during the school year (announcements, homework, resources, grades) lives
+ * in Firestore and is written by teachers: see libs/school-space.
  */
-
-export type Lang = 'fr' | 'ar';
 
 export type PhotoId =
   | 'campus-aerien'
@@ -95,7 +94,7 @@ export interface LevelCount {
   readonly levels: readonly { readonly level: string; readonly students: number }[];
 }
 
-/** The two sections of the college: national (Egyptian programme) and French Baccalauréat. */
+/** The two tracks of the college: Bac nationale (Egyptian programme) and Bac français. */
 export interface SectionPage {
   readonly slug: 'nationale' | 'bac';
   readonly title: string;
@@ -108,67 +107,4 @@ export interface SectionPage {
   /** Headcount by level (Bac section only). */
   readonly counts: readonly LevelCount[];
   readonly countsNote: string;
-}
-
-/**
- * Progress of a chapter in the school year. Shown as a status chip; teachers update it in the
- * subject's content file (no chapter is marked done until they do).
- */
-export type ChapterStatus = 'prevu' | 'en-cours' | 'termine';
-
-export interface Chapter {
-  readonly id: string;
-  /** Part of the subject the chapter belongs to (e.g. « Physique », « Chimie »). */
-  readonly part: string;
-  readonly title: string;
-  readonly summary: string;
-  readonly objectives: readonly string[];
-  readonly notions: readonly string[];
-  readonly status: ChapterStatus;
-}
-
-export interface Formula {
-  readonly label: string;
-  /** Written with Unicode (², √, ∫, Σ …); always rendered left-to-right. */
-  readonly expression: string;
-  readonly note?: string;
-}
-
-export interface WorkedExample {
-  readonly title: string;
-  readonly statement: string;
-  /** Solution steps, in order. */
-  readonly steps: readonly string[];
-  readonly answer: string;
-}
-
-export interface Tip {
-  readonly title: string;
-  readonly text: string;
-}
-
-export interface Resource {
-  readonly title: string;
-  readonly description: string;
-  /** null until the file exists: shown as « bientôt disponible ». */
-  readonly url: string | null;
-}
-
-export interface SubjectPage {
-  readonly slug: 'arabe' | 'mathematiques' | 'physique-chimie';
-  readonly lang: Lang;
-  /** Name as shown in the (French) navigation. */
-  readonly navLabel: string;
-  readonly title: string;
-  readonly kicker: string;
-  readonly intro: string;
-  readonly photo: PhotoId;
-  readonly highlights: readonly KeyFigure[];
-  /** Optional background reading (e.g. the history of Arabic in Egypt). */
-  readonly context: { readonly title: string; readonly paragraphs: readonly string[]; readonly milestones: readonly { readonly period: string; readonly text: string }[] } | null;
-  readonly chapters: readonly Chapter[];
-  readonly formulas: readonly Formula[];
-  readonly examples: readonly WorkedExample[];
-  readonly tips: readonly Tip[];
-  readonly resources: readonly Resource[];
 }
