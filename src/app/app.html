@@ -2,9 +2,12 @@
 
 <header class="sticky top-0 z-30 border-b-2 border-gold bg-navy-900 text-cream shadow-md">
   <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3">
-    <a routerLink="/" class="grid no-underline" data-testid="brand">
-      <span class="text-xl font-bold leading-tight text-white md:text-2xl">{{ school.name }}</span>
-      <span class="text-xs font-semibold tracking-wide text-gold">{{ school.district }} · {{ school.city }} · depuis {{ year }}</span>
+    <a routerLink="/" class="flex items-center gap-3 no-underline" data-testid="brand">
+      <img ngSrc="/icon-192.png" width="40" height="40" priority alt="" class="shrink-0" />
+      <span class="grid">
+        <span class="text-xl font-bold leading-tight text-white md:text-2xl">{{ school.name }}</span>
+        <span class="text-xs font-semibold tracking-wide text-gold">{{ school.district }} · {{ school.city }} · depuis {{ year }}</span>
+      </span>
     </a>
 
     <button
@@ -71,6 +74,10 @@
       <p class="m-0">
         Archives des Frères des Écoles Chrétiennes – Proche-Orient,
         <a class="footer-link" href="https://lasalle-po.org/" target="_blank" rel="noopener noreferrer">lasalle-po.org</a>.
+      </p>
+      <p class="m-0">
+        Logo : Collège de la Salle,
+        <a class="footer-link" href="http://www.lasalle-eg.net/" target="_blank" rel="noopener noreferrer">lasalle-eg.net</a>.
       </p>
     </div>
   </div>
