@@ -7,14 +7,14 @@ import type { Grade, Post, PostType, SectionId, StudentProfile, StudentSummary, 
 
 /**
  * Production Firebase web config (public identifiers, not secrets — access is enforced by
- * firestore.rules). Replace the REPLACE_ME values with your project's config from the Firebase
- * console. While they are unset, the school space shows « bientôt disponible » in production.
+ * firestore.rules). The values below are the school project's config (from the Firebase
+ * console). If they are ever reset to REPLACE_ME, the school space shows « bientôt disponible » in production.
  */
 const PRODUCTION_CONFIG = {
-  apiKey: 'REPLACE_ME',
-  authDomain: 'REPLACE_ME.firebaseapp.com',
-  projectId: 'REPLACE_ME',
-  appId: 'REPLACE_ME',
+  apiKey: 'AIzaSyC_2ryGYJo5zu601ihfexEOv6zoqiH-vfc',
+  authDomain: 'college-de-la-salle-daher.firebaseapp.com',
+  projectId: 'college-de-la-salle-daher',
+  appId: '1:597106182117:web:53114269345d85b1fc510c',
 };
 
 /** Local development talks to the Firebase emulators (`npm run emulators`), never to production. */

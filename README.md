@@ -59,7 +59,7 @@ rendered as text (never HTML) with `dir="auto"`, so Arabic reads right to left o
 **Loading:** Firebase is imported lazily, in the browser only, after the first render, so the
 prerendered pages and the initial bundle never contain it. Writes show instantly.
 
-> **Production setup.** Create a Firebase project; enable *Authentication → Email/Password* and
+> **Production setup (done for `college-de-la-salle-daher`).** To redo it elsewhere: create a Firebase project; enable *Authentication → Email/Password* and
 > Firestore; paste your web config into `PRODUCTION_CONFIG` in
 > `libs/school-space/src/lib/space.service.ts` (public identifiers, not secrets); set the project id
 > in `.firebaserc`; deploy the rules. Until the `REPLACE_ME` values are replaced, the spaces show
