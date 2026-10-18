@@ -32,7 +32,7 @@ test('an e-mail the school has not listed gets no access, even when verified', a
   await page.getByRole('button', { name: 'Réessayer' }).click();
   await expect(page.getByTestId('not-authorised')).toBeVisible();
   await expect(page.getByTestId('teacher-dashboard')).toHaveCount(0);
-  await expect(page.getByTestId('teacher-link')).toHaveText('Espace enseignant');
+  await expect(page.getByTestId('account-menu')).toContainText('Se connecter');
 });
 
 test('a listed teacher must verify their e-mail before publishing', async ({ page }) => {
@@ -49,7 +49,7 @@ test('a listed teacher must verify their e-mail before publishing', async ({ pag
   await verifyEmail(email);
   await page.getByTestId('refresh').click();
   await expect(page.getByTestId('hello')).toHaveText('Bonjour Marc');
-  await expect(page.getByTestId('teacher-link')).toHaveText('Mon espace enseignant');
+  await expect(page.getByTestId('account-menu')).toContainText('Mon espace enseignant');
 });
 
 test('the event form explains what is missing', async ({ page }) => {
@@ -114,7 +114,7 @@ test('a teacher edits and deletes events, signs back in and finds announcements'
   await page.getByTestId('logout').click();
   await page.getByLabel('Adresse e-mail').fill(email);
   await page.getByLabel('Mot de passe').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Se connecter' }).click();
+  await page.getByTestId('login-submit').click();
   await expect(page.getByTestId('teacher-dashboard')).toBeVisible();
   const mine = page.getByTestId('my-posts').getByTestId('post');
   await expect(mine).toHaveCount(1);

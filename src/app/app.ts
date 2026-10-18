@@ -1,5 +1,5 @@
 import { DOCUMENT, NgOptimizedImage, ViewportScroller } from '@angular/common';
-import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SCHOOL } from '@site/content';
@@ -18,9 +18,11 @@ interface NavLink {
   imports: [NgOptimizedImage, RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  host: { '(document:keydown)': 'onKeydown($event)', '(document:click)': 'onDocumentClick($event)' },
 })
 export class App {
   readonly #router = inject(Router);
+  readonly #host = inject(ElementRef<HTMLElement>);
 
   protected readonly school = SCHOOL;
   protected readonly year = 1898;
@@ -40,6 +42,25 @@ export class App {
   });
   protected readonly teacherLabel = computed(() => (this.space.role() === 'teacher' ? 'Mon espace enseignant' : 'Espace enseignant'));
   protected readonly menuOpen = signal(false);
+  protected readonly accountOpen = signal(false);
+  /** The pill: « Se connecter » for a visitor, the person's space once signed in. */
+  protected readonly accountLabel = computed(() => {
+    const role = this.space.role();
+    if (role === 'student' && this.space.firstName()) return 'Mon espace · ' + this.space.firstName();
+    if (role === 'teacher') return 'Mon espace enseignant';
+    return 'Se connecter';
+  });
+
+  /** Escape closes the account menu (and returns focus to its pill); a click elsewhere closes it too. */
+  protected onKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape' || !this.accountOpen()) return;
+    this.accountOpen.set(false);
+    (this.#host.nativeElement as HTMLElement).querySelector<HTMLElement>('.account-button')?.focus();
+  }
+
+  protected onDocumentClick(event: MouseEvent): void {
+    if (this.accountOpen() && !(event.target as HTMLElement).closest('.account')) this.accountOpen.set(false);
+  }
 
   constructor() {
     // In-page links (« Sur cette page ») must land below the sticky header, not under it. The router's
@@ -56,6 +77,9 @@ export class App {
         filter((e) => e instanceof NavigationEnd),
         takeUntilDestroyed(),
       )
-      .subscribe(() => this.menuOpen.set(false));
+      .subscribe(() => {
+        this.menuOpen.set(false);
+        this.accountOpen.set(false);
+      });
   }
 }

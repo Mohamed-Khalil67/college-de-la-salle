@@ -14,18 +14,17 @@ test('signed out: the student space asks to sign in', async ({ page }) => {
   await page.goto('/espace-eleve');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Espace élève');
   await expect(page.getByRole('tab', { name: 'Connexion' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByTestId('account-link')).toHaveText('Espace élève');
-  await expect(page.getByTestId('teacher-link')).toHaveText('Espace enseignant');
+  await expect(page.getByTestId('account-menu')).toContainText('Se connecter');
 });
 
 test('forms validate in French and sign-in errors are explained', async ({ page }) => {
   await page.goto('/espace-eleve');
-  await page.getByRole('button', { name: 'Se connecter' }).click();
+  await page.getByTestId('login-submit').click();
   await expect(page.getByText('Saisissez votre adresse e-mail.')).toBeVisible();
 
   await page.getByLabel('Adresse e-mail').fill('inconnu@example.org');
   await page.getByLabel('Mot de passe').fill('mauvais-mot-de-passe');
-  await page.getByRole('button', { name: 'Se connecter' }).click();
+  await page.getByTestId('login-submit').click();
   await expect(page.getByTestId('form-message')).toHaveText('E-mail ou mot de passe incorrect.');
 
   await page.getByTestId('tab-register').click();
@@ -46,7 +45,7 @@ test('one page: next exam, today, homework, calendar and announcements — only 
   await registerStudent(student, { name: 'Sara Ibrahim', email: uniqueEmail('sara'), section: 'bac', classe: 'Première' });
 
   await expect(student.getByTestId('hello')).toHaveText('Bonjour Sara');
-  await expect(student.getByTestId('account-link')).toHaveText('Mon espace · Sara');
+  await expect(student.getByTestId('account-menu')).toContainText('Mon espace · Sara');
   await expect(student.getByTestId('next-exam')).toContainText('Aucun examen prévu');
   await expect(student.getByTestId('todo-empty')).toBeVisible();
   await expect(student.getByTestId('grades-empty')).toBeVisible();
@@ -192,13 +191,13 @@ test('sign out, then sign back in from another browser: everything is still ther
   await registerStudent(page, { name: 'Nour Hassan', email, section: 'nationale', classe: '2e secondaire' });
   await page.getByTestId('logout').click();
   await expect(page.getByRole('tab', { name: 'Connexion' })).toBeVisible();
-  await expect(page.getByTestId('account-link')).toHaveText('Espace élève');
+  await expect(page.getByTestId('account-menu')).toContainText('Se connecter');
 
   const other = await freshPage(browser);
   await other.goto('/espace-eleve');
   await other.getByLabel('Adresse e-mail').fill(email);
   await other.getByLabel('Mot de passe').fill(PASSWORD);
-  await other.getByRole('button', { name: 'Se connecter' }).click();
+  await other.getByTestId('login-submit').click();
   await expect(other.getByTestId('hello')).toHaveText('Bonjour Nour');
   await expect(other.getByTestId('chip-class')).toHaveText('2e secondaire');
   await other.context().close();

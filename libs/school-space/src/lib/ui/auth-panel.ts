@@ -37,7 +37,7 @@ type Mode = 'login' | 'register';
             <p class="m-0 rounded-lg px-3 py-2" [class]="m.ok ? 'bg-ok-soft text-ok' : 'bg-warn-soft text-warn'" role="alert" data-testid="form-message">{{ m.text }}</p>
           }
           <div class="flex flex-wrap items-center gap-3">
-            <button type="submit" class="btn btn-navy" [disabled]="busy()">{{ busy() ? 'Connexion…' : 'Se connecter' }}</button>
+            <button type="submit" class="btn btn-navy" [disabled]="busy()" data-testid="login-submit">{{ busy() ? 'Connexion…' : 'Se connecter' }}</button>
             <button type="button" class="link" (click)="onReset()" [disabled]="busy()">Mot de passe oublié ?</button>
           </div>
         </form>

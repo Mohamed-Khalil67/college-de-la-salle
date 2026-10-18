@@ -88,7 +88,7 @@ test('French site with a flat navigation and the two online spaces', async ({ pa
 
   await openNav(page);
   await expect(nav(page).getByRole('link')).toHaveText([
-    'Accueil', 'Histoire & Patrimoine', 'Bac nationale', 'Bac français', 'Contact', 'Espace élève', 'Espace enseignant',
+    'Accueil', 'Histoire & Patrimoine', 'Bac nationale', 'Bac français', 'Contact',
   ]);
   await expect(page.getByText(/Mode Enseignant|Banque|examens/i)).toHaveCount(0);
 
@@ -104,7 +104,8 @@ test('French site with a flat navigation and the two online spaces', async ({ pa
   }
 
   await openNav(page);
-  await nav(page).getByRole('link', { name: 'Espace enseignant' }).click();
+  await page.getByTestId('account-menu').click();
+  await page.getByTestId('teacher-link').click();
   await expect(page).toHaveURL(/\/espace-enseignant$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Espace enseignant');
   await checkPage(page);
@@ -177,4 +178,30 @@ test('history: milestones in order with archive photos and sources', async ({ pa
   await expect(page.getByText('26 novembre 1955', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('Source : Archives lasalliennes (lasalle-po.org)').first()).toBeVisible();
   await checkPage(page);
+});
+
+test('one account pill: it opens with both spaces, Escape closes it, a choice navigates', async ({ page }) => {
+  await page.goto('/');
+  await openNav(page);
+  const pill = page.getByTestId('account-menu');
+  await expect(pill).toContainText('Se connecter');
+  await expect(pill).toHaveAttribute('aria-expanded', 'false');
+  await pill.click();
+  await expect(pill).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('account-link')).toContainText('Espace élève');
+  await expect(page.getByTestId('teacher-link')).toContainText('Espace enseignant');
+
+  await page.keyboard.press('Escape');
+  await expect(pill).toHaveAttribute('aria-expanded', 'false');
+  await expect(pill).toBeFocused();
+
+  // A click elsewhere closes it too.
+  await pill.click();
+  await page.getByRole('heading', { level: 1 }).click();
+  await expect(pill).toHaveAttribute('aria-expanded', 'false');
+
+  await pill.click();
+  await page.getByTestId('account-link').click();
+  await expect(page).toHaveURL(/\/espace-eleve$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Espace élève');
 });

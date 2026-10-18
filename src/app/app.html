@@ -24,10 +24,10 @@
     <nav
       id="primary-nav"
       aria-label="Navigation principale"
-      class="primary-nav w-full xl:flex xl:w-auto xl:flex-1"
+      class="primary-nav w-full xl:flex xl:w-auto xl:flex-1 xl:items-center"
       [class.hidden]="!menuOpen()"
     >
-      <ul class="m-0 flex list-none flex-col gap-1 p-0 xl:w-full xl:flex-row xl:items-center xl:justify-between">
+      <ul class="m-0 flex list-none flex-col gap-1 p-0 xl:flex-row xl:items-center xl:gap-0.5">
         @for (item of nav; track item.link) {
           <li>
             <a
@@ -39,13 +39,39 @@
             >{{ item.label }}</a>
           </li>
         }
-        <li class="mt-2 xl:ms-2 xl:mt-0">
-          <a class="account-link" routerLink="/espace-eleve" routerLinkActive="active" data-testid="account-link">{{ studentLabel() }}</a>
-        </li>
-        <li>
-          <a class="account-link" routerLink="/espace-enseignant" routerLinkActive="active" data-testid="teacher-link">{{ teacherLabel() }}</a>
-        </li>
       </ul>
+
+      <!-- One pill for both spaces: a click chooses between the student and the teacher space. -->
+      <div class="account relative mt-2 xl:ms-auto xl:mt-0">
+        <button
+          type="button"
+          class="account-link account-button"
+          [attr.aria-expanded]="accountOpen()"
+          aria-controls="account-menu"
+          aria-haspopup="true"
+          (click)="accountOpen.set(!accountOpen())"
+          data-testid="account-menu"
+        >
+          <span>{{ accountLabel() }}</span>
+          <span aria-hidden="true" class="caret">▾</span>
+        </button>
+        @if (accountOpen()) {
+          <ul id="account-menu" class="account-menu m-0 list-none p-1" data-testid="account-menu-list">
+            <li>
+              <a class="account-item" routerLink="/espace-eleve" routerLinkActive="active" data-testid="account-link">
+                <span class="font-semibold">{{ studentLabel() }}</span>
+                <span class="block text-xs">Calendrier, devoirs, notes</span>
+              </a>
+            </li>
+            <li>
+              <a class="account-item" routerLink="/espace-enseignant" routerLinkActive="active" data-testid="teacher-link">
+                <span class="font-semibold">{{ teacherLabel() }}</span>
+                <span class="block text-xs">Calendrier, examens, notes</span>
+              </a>
+            </li>
+          </ul>
+        }
+      </div>
     </nav>
   </div>
 </header>

@@ -1,7 +1,7 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { KEY_FIGURES, MILESTONES, photo, SCHOOL, SECTIONS } from '@site/content';
+import { MILESTONES, photo, SCHOOL, SECTIONS } from '@site/content';
 import { SitePhoto } from './ui/site-photo';
 
 /** `/` — Accueil. */
@@ -22,23 +22,11 @@ import { SitePhoto } from './ui/site-photo';
           {{ school.tagline }} Deux parcours, un même projet lasallien : le Bac nationale et le Bac français.
         </p>
         <div class="flex flex-wrap gap-3">
-          <a class="btn btn-gold" href="#sections">Choisir ma section</a>
           <a class="btn btn-outline-light" routerLink="/espace-eleve">Espace élève</a>
           <a class="btn btn-outline-light" routerLink="/espace-enseignant">Espace enseignant</a>
         </div>
       </div>
       <p class="absolute bottom-2 end-3 m-0 text-xs text-cream/70">{{ hero.credit }}</p>
-    </section>
-
-    <section class="border-b border-line bg-surface" aria-label="Le collège en chiffres">
-      <dl class="mx-auto m-0 grid max-w-6xl grid-cols-2 gap-6 px-4 py-8 md:grid-cols-4">
-        @for (f of figures; track f.label) {
-          <div class="border-s-2 border-gold ps-4">
-            <dt class="text-sm text-muted">{{ f.label }}</dt>
-            <dd class="m-0 text-3xl font-bold text-navy-900">{{ f.value }}</dd>
-          </div>
-        }
-      </dl>
     </section>
 
     <!-- The two sections -->
@@ -135,7 +123,6 @@ import { SitePhoto } from './ui/site-photo';
 })
 export class HomePage {
   protected readonly school = SCHOOL;
-  protected readonly figures = KEY_FIGURES;
   protected readonly sections = SECTIONS;
   protected readonly milestones = MILESTONES;
   protected readonly hero = photo('campus-aerien');
