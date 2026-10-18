@@ -11,24 +11,7 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve",
-    "paths": {
-      "@site/content": [
-        "./libs/site-content/src/index.ts"
-      ],
-      "@site/pages": [
-        "./libs/site-pages/src/index.ts"
-      ],
-      "@site/space": [
-        "./libs/school-space/src/index.ts"
-      ],
-      "@site/space/student": [
-        "./libs/school-space/src/student.ts"
-      ],
-      "@site/space/teacher": [
-        "./libs/school-space/src/teacher.ts"
-      ]
-    }
+    "module": "preserve"
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
@@ -40,9 +23,6 @@
   "references": [
     {
       "path": "./tsconfig.app.json"
-    },
-    {
-      "path": "./tsconfig.spec.json"
     }
   ]
 }

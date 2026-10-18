@@ -4,7 +4,7 @@
 //
 // Flat navy background, antique-gold line art, cream accents: the school's palette. They are
 // original drawings (no licence to track). To use a real photograph for a subject instead, drop a
-// JPEG next to them and change `image` in libs/site-content/src/lib/matieres.ts.
+// JPEG next to them and change `image` in src/app/school/subjects.ts.
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const GOLD = '#C5A880';

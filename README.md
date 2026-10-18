@@ -50,7 +50,7 @@ Both spaces are **one page built around a calendar**, inspired by what Lyon 1 st
 
 A post or event is addressed to **everyone**, a **track** (Bac nationale / Bac français) or **one
 class** (1re, 2e, 3e secondaire — Seconde, Première, Terminale). Weeks start on Sunday (Egyptian
-school week; `WEEK_START` in `calendar.model.ts`). Documents are **links** (https): put the file on
+school week; `WEEK_START` in `src/app/space/calendar.model.ts`). Documents are **links** (https): put the file on
 the school's drive and paste the link. There is no file upload, so nothing needs a paid plan.
 
 **Teachers are added by the school's administrator**, never by themselves: in the Firebase console,
@@ -67,7 +67,7 @@ node scripts/add-teacher.mjs marc.dupont@example.org "Marc Dupont"
 student and exam, with `published`). E-mails and passwords live in Firebase Authentication, not in
 the database.
 
-**Security** (`firestore.rules`, tests in `tests/rules/`): a student reads and writes only their own
+**Security** (`firestore.rules`): a student reads and writes only their own
 profile; the calendar and announcements are readable by signed-in students and teachers only; only
 a verified, allow-listed teacher writes them; the allow-list cannot be written from a client; a
 grade is readable only by its student **once published**, and by the teacher who gave it; documents
@@ -90,17 +90,14 @@ Java 21+) in a second terminal: `npm run emulators`.
 
 | Command | What it does |
 | --- | --- |
-| `npm test` | Unit tests (Vitest via `ng test`): content integrity (photos with exact declared sizes, headcounts, directors, contacts), the subject catalogue (17 subjects, valid SVG illustrations), the school-space model (audiences, homework, grades, calendar) |
-| `npm run test:rules` | Security-rules tests against the Firestore emulator |
-| `npm run test:e2e` | Playwright, desktop and mobile (Pixel 7), against the emulators, started automatically: navigation, prerendering, layout shift, student and teacher flows, calendar |
 | `npm run build` | Production build; the 5 content pages are prerendered into `dist/college-website/browser` |
 | `npm run deploy` | Build, then `firebase deploy --only hosting,firestore` |
 
 ## Where the content lives
 
-Typed data in `libs/site-content/src/lib/`: `school.ts` (name, figures, milestones, directors,
-phones), `sections.ts` (the two track pages), `photos.ts` (26 photos: file, size, alt, credit,
-source) and **`matieres.ts`, the subject catalogue**: one entry per subject plus its illustration in
+Typed data in `src/app/school/`: `school-info.ts` (name, milestones, directors, phones),
+`tracks.ts` (the two track pages), `photos.ts` (26 photos: file, size, alt, credit, source) and
+**`subjects.ts`, the subject catalogue**: one entry per subject plus its illustration in
 `public/images/matieres/` (`node scripts/subject-images.mjs` regenerates the illustrations). The
 catalogue is what teachers pick from when they publish or grade, and what the track pages show: trim
 or extend it there. Subject illustrations are original drawings; replace them with school photos only
@@ -112,7 +109,6 @@ Deployment is manual for now (no CI/CD and no automated AI review yet; they were
 and can be restored from git history, commit `273f3a3`, when the project grows):
 
 ```bash
-npm run test:all   # unit + rules + end-to-end tests (needs Java 21+ for the emulators)
 npm run deploy     # build, then firebase deploy --only hosting,firestore
 ```
 
@@ -121,22 +117,38 @@ Firestore in `europe-west1`). Sign in first with `npx firebase login`.
 
 ## Architecture
 
+All the application code is in `src/app/`, organised by feature (Angular style guide):
+
 ```
-libs/
-  site-content/   Typed content (French) · photo catalogue · subject catalogue
-  site-pages/     Pages (home, history, tracks, contact), SitePhoto, MatiereCard, per-page meta
-  school-space/   Model (audiences, posts, grades, calendar) · SpaceService (lazy Firebase)
-                  · /student and /teacher pages (own lazy entry points) · calendar, post card, auth panel
-src/app/          Shell: sticky header (hamburger below 1280px), footer, routing
-public/           images (school, archives, matieres) and self-hosted fonts
-firestore.rules   Security rules        tests/rules/   Rules tests        e2e/   Playwright
+src/app/
+  app.ts · app.html · app.scss     Shell: header (school · pages · account pill), footer
+  app.routes.ts                    Routes (pages prerendered, spaces lazy and client-rendered)
+  school/                          Typed content: school info, tracks, photos, subject catalogue
+  pages/
+    pages.routes.ts                Public routes, titles and meta descriptions
+    site-photo.ts                  Credited photo in a reserved box (no layout shift)
+    home/  history/  contact/      One page per folder
+    section/                       Bac nationale / Bac français (+ subject card)
+  space/                           The school space
+    space.model.ts                 Classes, audiences, announcements, grades (pure functions)
+    calendar.model.ts              Event categories, weekly repetition, videos, .ics (pure functions)
+    space.service.ts               Firebase (lazy): sign-in, role, live data, writes
+    space-styles.ts                Shared form styles and category colours
+    auth/                          Sign in / create an account
+    calendar/                      Agenda (week/month), event window, event form
+    grades/                        Grade grid (per exam, publish step)
+    announcements/                 Announcement card
+    student-space/ teacher-space/  The two pages
+public/           Images (school, archives, matieres), fonts, icons
+firestore.rules   Security rules
+scripts/          add-teacher (emulator), make-icons, subject-images
 ```
 
-`outputMode: "static"`: content routes are prerendered and hydrated; the spaces are client-rendered.
-Entry points keep the bundle light (`@site/space` is the small shell part; the two pages are lazy).
-`<html lang="fr" dir="ltr">` everywhere; logical CSS properties only. Angular conventions: standalone
-components, zoneless, `input()`, `computed()`, `@Service()`, native control flow, Signal Forms,
-`NgOptimizedImage`, no `any`.
+`outputMode: "static"`: content routes are prerendered and hydrated; the spaces are client-rendered
+and lazy-loaded, and Firebase is only imported in the browser. `<html lang="fr" dir="ltr">`
+everywhere; logical CSS properties only. Angular conventions: standalone components, zoneless,
+`input()`/`output()`, signals, `computed()`, `linkedSignal()`, `@Service()`, `inject()`, native
+control flow, Signal Forms, `host` bindings, `NgOptimizedImage`, `strict` + `strictTemplates`, no `any`.
 
 ## History of this repository
 

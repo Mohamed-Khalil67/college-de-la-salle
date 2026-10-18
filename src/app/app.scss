@@ -157,3 +157,54 @@ main:not(:has(router-outlet + *)) {
     margin-block-start: 0.5rem;
   }
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * Header layout: three zones.
+ *  - phones/tablets: brand + « Menu » on one row; pages and account fold below when opened;
+ *  - from 1280px: a 3-column grid, the pages centred between the brand and the account pill,
+ *    whatever their widths (the side columns share the remaining space equally).
+ * ------------------------------------------------------------------------------------------- */
+.header-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem 2rem;
+  padding: 0.75rem 1rem;
+}
+.header-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.header-nav.closed,
+.header-account.closed {
+  display: none;
+}
+.header-account {
+  position: relative;
+  padding-block-end: 0.25rem;
+}
+@media (min-width: 768px) {
+  .header-bar {
+    padding-inline: 2rem;
+  }
+}
+@media (min-width: 1280px) {
+  .header-bar {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .header-nav,
+  .header-nav.closed,
+  .header-account,
+  .header-account.closed {
+    display: block;
+  }
+  .header-nav {
+    justify-self: center;
+  }
+  .header-account {
+    justify-self: end;
+    padding-block-end: 0;
+  }
+}

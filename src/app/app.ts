@@ -2,8 +2,8 @@ import { DOCUMENT, NgOptimizedImage, ViewportScroller } from '@angular/common';
 import { Component, ElementRef, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { SCHOOL } from '@site/content';
-import { SpaceService } from '@site/space';
+import { SCHOOL } from './school';
+import { SpaceService } from './space/space.service';
 import { filter } from 'rxjs';
 
 interface NavLink {
