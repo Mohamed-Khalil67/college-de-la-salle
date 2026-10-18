@@ -18,3 +18,19 @@ export const SPACE_STYLES = `
   .btn-outline-dark:hover { background: var(--navy-100); }
   .link { background: none; border: 0; padding: 0; font: inherit; color: var(--navy-700); text-decoration: underline; cursor: pointer; }
 `;
+
+/**
+ * One colour per event category (dark text on a light tint: AA contrast). Always shown with the category's
+ * name too, never colour alone.
+ */
+export const KIND_STYLES = `
+  .k-cours { background: #e6eefb; color: #1d3f7a; border-color: #1d3f7a; }
+  .k-td { background: #ece6f8; color: #4a2f86; border-color: #4a2f86; }
+  .k-tp { background: #def2ee; color: #145a4f; border-color: #145a4f; }
+  .k-examen { background: #fbe3e1; color: #8a1f17; border-color: #8a1f17; }
+  .k-controle { background: #fdecda; color: #84450b; border-color: #84450b; }
+  .k-devoir { background: #f6ebcf; color: #6e470d; border-color: #6e470d; }
+  .k-revision { background: #e3efdf; color: #24552d; border-color: #24552d; }
+  .k-activite { background: #fbe5ef; color: #86204f; border-color: #86204f; }
+  .k-reunion { background: #eceff3; color: #39465a; border-color: #39465a; }
+`;

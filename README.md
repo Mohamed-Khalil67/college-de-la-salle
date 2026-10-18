@@ -16,29 +16,42 @@ prerendering with hydration), **Tailwind CSS v4** and **Firebase** (Hosting, Aut
 | **Bac nationale** | Bilingual programme, the cycles, registration pointers, **the subjects** (14, with illustrations), useful links |
 | **Bac français** | Opened 2009, AEFE-homologated 10 January 2013, values, languages, orientation, headcounts (268), **the subjects** (15), registration forms |
 | **Contact** | Address, e-mail, phone numbers for 9 departments (dialable) |
-| **Espace élève** | Sign-up / sign-in, then: announcements, homework (with due dates, « fait »), the class calendar (read-only), grades with comments and averages, course material by subject |
-| **Espace enseignant** | Publish announcements, homework and resources to a class or a section; the shared calendar; enter grades by class and student |
+| **Espace élève** | One page: next exam, today, homework to hand in, the class calendar (week/month) with documents and videos, grades with averages, announcements |
+| **Espace enseignant** | The same page, editable: the shared calendar (classes, exams, homework…, weekly slots), grade grids per exam with a publish step, announcements |
 
 There are no hard-coded subject pages any more: what a subject contains (chapters, exercises,
 resources) is whatever teachers publish for it.
 
 ## The school space
 
-**Who can do what**
+Both spaces are **one page built around a calendar**, inspired by what Lyon 1 students get from ADE
+(timetable) and TOMUSS (grades), but in a single place.
 
-| | Student | Teacher |
-| --- | --- | --- |
-| Sign up | yes, with section and class | yes, but nothing works until the school lists their e-mail |
-| Posts (announcements, homework, resources) | read those addressed to their class | publish, delete their own |
-| Calendar (exams, extracurricular activities, meetings) | read what concerns their class | add, **correct and delete any event** (shared calendar), filter by class |
-| Grades | read their own | enter, delete the ones they gave |
-| Profile | change name, section, class | — |
+**Espace élève** (read-only):
+- **What is coming:** the next exam with a countdown, today's classes, homework still to hand in
+  (tick it as done).
+- **The calendar of my class:** week view (default; stacked on phones) or month view, filter by
+  subject. Hover an event for a preview; click it for the full window: when, where, who, details,
+  **documents and explanation videos** (YouTube and Google Drive play inside the window), my mark
+  once published, and « Ajouter à mon agenda » (an `.ics` file for Google or Apple Calendar).
+- **My grades:** average per subject and overall, weighted by coefficient, with the teacher's comment.
+- **Announcements** for my class.
 
-A post or calendar event is addressed to **everyone**, a **track** (Bac nationale / Bac français) or
-**one class** (1re, 2e, 3e secondaire — Seconde, Première, Terminale). Students see only what
-matches. Material is organised by class (the audience) and by subject (the student's « Ressources »
-tab groups it by subject). Resources are **links** (https): upload the file to the school's drive or
-site and paste the link. Real file upload would need Firebase Storage and is not set up.
+**Espace enseignant** (the same page, editable):
+- **Calendar:** add an event with « + Ajouter un événement » or the « + » of a day. Categories:
+  Cours, TD, TP, Examen, Contrôle, Devoir à rendre, Révision, Activité, Réunion. Each event has a
+  subject, a class or track, a date with start and end time, **weekly repetition** for timetable
+  slots, a place, details, links to documents and videos, and a coefficient for graded events.
+  The calendar is shared: any teacher can correct, move or delete an event. Filter by class.
+- **Examens et notes:** each exam, test, TP or homework opens a **grade grid** (one row per student
+  of the class, like TOMUSS). Marks are a **draft** until « Notes publiées » is ticked; correcting a
+  mark or emptying it works in the same grid.
+- **Announcements:** publish to everyone, a track or a class; delete your own.
+
+A post or event is addressed to **everyone**, a **track** (Bac nationale / Bac français) or **one
+class** (1re, 2e, 3e secondaire — Seconde, Première, Terminale). Weeks start on Sunday (Egyptian
+school week; `WEEK_START` in `calendar.model.ts`). Documents are **links** (https): put the file on
+the school's drive and paste the link. There is no file upload, so nothing needs a paid plan.
 
 **Teachers are added by the school's administrator**, never by themselves: in the Firebase console,
 create a document in the `teachers` collection whose **id is the teacher's e-mail in lower case**
@@ -49,21 +62,21 @@ create a document in the `teachers` collection whose **id is the teacher's e-mai
 node scripts/add-teacher.mjs marc.dupont@example.org "Marc Dupont"
 ```
 
-**Security** (`firestore.rules`, 25 tests in `tests/rules/`): a student reads and writes only their
-own profile; posts and the calendar are readable by signed-in students and teachers only; only a
-verified, allow-listed teacher can write them; the allow-list cannot be written from a client; a
-grade is readable only by its student and the teacher who gave it; documents have an exact shape,
-server timestamps and size limits; nothing else in the database is reachable. What teachers type is
-rendered as text (never HTML) with `dir="auto"`, so Arabic reads right to left on its own.
+**Data** (Firestore): `students/{uid}` (profile, homework done), `teachers/{email}` (allow-list),
+`posts` (announcements), `events` (the calendar), `grades/{eventId}_{studentUid}` (one mark per
+student and exam, with `published`). E-mails and passwords live in Firebase Authentication, not in
+the database.
+
+**Security** (`firestore.rules`, tests in `tests/rules/`): a student reads and writes only their own
+profile; the calendar and announcements are readable by signed-in students and teachers only; only
+a verified, allow-listed teacher writes them; the allow-list cannot be written from a client; a
+grade is readable only by its student **once published**, and by the teacher who gave it; documents
+have an exact shape, server timestamps and size limits; nothing else is reachable. What teachers
+type is shown as text (never HTML) with `dir="auto"`; links must be https and are checked again
+before display; video players are rebuilt from a validated id.
 
 **Loading:** Firebase is imported lazily, in the browser only, after the first render, so the
-prerendered pages and the initial bundle never contain it. Writes show instantly.
-
-> **Production setup (done for `college-de-la-salle-daher`).** To redo it elsewhere: create a Firebase project; enable *Authentication → Email/Password* and
-> Firestore; paste your web config into `PRODUCTION_CONFIG` in
-> `libs/school-space/src/lib/space.service.ts` (public identifiers, not secrets); set the project id
-> in `.firebaserc`; deploy the rules. Until the `REPLACE_ME` values are replaced, the spaces show
-> « disponible prochainement » in production (they work fully in development, against the emulators).
+prerendered pages and the initial bundle never contain it. Changes appear live on every open page.
 
 ## Run it
 

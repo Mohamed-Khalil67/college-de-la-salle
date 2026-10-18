@@ -48,13 +48,18 @@ const outsider = () => as('x', { email: 'x@example.org', email_verified: true })
 const visitor = () => env.unauthenticatedContext().firestore() as unknown as Firestore;
 
 const eventDoc = (authorUid = MARC, overrides: Record<string, unknown> = {}) => ({
-  kind: 'exam',
+  kind: 'examen',
   title: 'Examen de mathématiques',
-  date: '2026-11-12',
-  time: '08:30',
-  target: 'bac-premiere',
   subject: 'mathematiques',
-  note: 'Salle 12',
+  target: 'bac-premiere',
+  date: '2026-11-12',
+  start: '08:30',
+  end: '10:30',
+  repeatUntil: '',
+  place: 'Salle 12',
+  description: 'Calculatrice autorisée.',
+  attachments: [{ label: 'Sujet de l’an dernier', url: 'https://example.org/sujet.pdf' }],
+  coefficient: 2,
   authorUid,
   authorName: 'Marc Dupont',
   createdAt: serverTimestamp(),
@@ -69,11 +74,12 @@ const content = (overrides: Record<string, unknown> = {}) => {
 };
 
 describe('events', () => {
-  it('a verified, listed teacher adds exams, activities and meetings', async () => {
+  it('a verified, listed teacher adds classes, weekly timetable slots, exams, homework and meetings', async () => {
     const events = collection(marc(), 'events');
     await assertSucceeds(addDoc(events, eventDoc()));
-    await assertSucceeds(addDoc(events, eventDoc(MARC, { kind: 'activity', time: '', target: 'all', subject: '' })));
-    await assertSucceeds(addDoc(events, eventDoc(MARC, { kind: 'meeting', target: 'nationale-secondaire-2' })));
+    await assertSucceeds(addDoc(events, eventDoc(MARC, { kind: 'cours', repeatUntil: '2027-06-30', coefficient: 1, attachments: [] })));
+    await assertSucceeds(addDoc(events, eventDoc(MARC, { kind: 'devoir', start: '', end: '', place: '', target: 'all', subject: '' })));
+    await assertSucceeds(addDoc(events, eventDoc(MARC, { kind: 'reunion', target: 'nationale-secondaire-2', end: '' })));
   });
 
   it('students, outsiders, unverified teachers and visitors cannot add, edit or delete', async () => {
@@ -93,7 +99,7 @@ describe('events', () => {
   });
 
   it('the calendar is shared: another teacher can correct or delete an event, but not change its author', async () => {
-    await assertSucceeds(updateDoc(doc(lea(), 'events', 'e1'), content({ date: '2026-11-19', time: '10:00' })));
+    await assertSucceeds(updateDoc(doc(lea(), 'events', 'e1'), content({ date: '2026-11-19', start: '10:00', end: '12:00' })));
     await assertFails(updateDoc(doc(lea(), 'events', 'e1'), { ...content(), authorUid: LEA }));
     await assertFails(updateDoc(doc(lea(), 'events', 'e1'), { ...content(), authorName: 'Someone else' }));
     await assertSucceeds(deleteDoc(doc(lea(), 'events', 'e1')));
@@ -106,12 +112,20 @@ describe('events', () => {
     await assertFails(addDoc(events, eventDoc(MARC, { title: '' })));
     await assertFails(addDoc(events, eventDoc(MARC, { title: 'x'.repeat(121) })));
     await assertFails(addDoc(events, eventDoc(MARC, { date: 'bientôt' })));
-    await assertFails(addDoc(events, eventDoc(MARC, { time: '25:00' })));
+    await assertFails(addDoc(events, eventDoc(MARC, { start: '25:00' })));
+    await assertFails(addDoc(events, eventDoc(MARC, { end: '08:00' }))); // ends before it starts
+    await assertFails(addDoc(events, eventDoc(MARC, { start: '', end: '10:00' }))); // an end without a start
+    await assertFails(addDoc(events, eventDoc(MARC, { repeatUntil: '2026-01-01' }))); // repeats until before it starts
     await assertFails(addDoc(events, eventDoc(MARC, { target: 'cm2' })));
-    await assertFails(addDoc(events, eventDoc(MARC, { note: 'x'.repeat(1001) })));
+    await assertFails(addDoc(events, eventDoc(MARC, { place: 'x'.repeat(121) })));
+    await assertFails(addDoc(events, eventDoc(MARC, { description: 'x'.repeat(2001) })));
+    await assertFails(addDoc(events, eventDoc(MARC, { attachments: Array.from({ length: 11 }, () => ({ label: 'a', url: 'https://a.b' })) })));
+    await assertFails(addDoc(events, eventDoc(MARC, { attachments: 'https://a.b' })));
+    await assertFails(addDoc(events, eventDoc(MARC, { coefficient: 0 })));
     await assertFails(addDoc(events, eventDoc(MARC, { createdAt: Timestamp.fromMillis(5) })));
     await assertFails(addDoc(events, eventDoc(MARC, { extra: 1 })));
     await assertFails(updateDoc(doc(marc(), 'events', 'e1'), content({ kind: 'party' })));
     await assertFails(updateDoc(doc(marc(), 'events', 'e1'), { ...content(), createdAt: serverTimestamp() }));
   });
+
 });

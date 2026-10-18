@@ -71,3 +71,63 @@ export async function registerTeacher(page: Page, opts: { name: string; email: s
   await page.getByTestId('refresh').click();
   await expect(page.getByTestId('teacher-dashboard')).toBeVisible();
 }
+
+/** A day relative to today (local), YYYY-MM-DD: what the date inputs and the calendar use. */
+export function isoDay(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export interface EventInput {
+  kind: 'cours' | 'td' | 'tp' | 'examen' | 'controle' | 'devoir' | 'revision' | 'activite' | 'reunion';
+  title: string;
+  target?: string;
+  subject?: string;
+  date?: string;
+  start?: string;
+  end?: string;
+  weeklyUntil?: string;
+  place?: string;
+  description?: string;
+  coefficient?: string;
+  links?: { label: string; url: string }[];
+}
+
+/** What a teacher does with « + Ajouter un événement ». */
+export async function addEvent(page: Page, e: EventInput): Promise<void> {
+  await page.getByTestId('new-event').click();
+  const form = page.getByTestId('event-form');
+  await expect(form).toBeVisible();
+  await form.getByTestId(`kind-${e.kind}`).click();
+  await form.getByLabel('Titre').fill(e.title);
+  if (e.subject) await form.getByTestId('ef-subject').selectOption({ label: e.subject });
+  await form.getByTestId('ef-target').selectOption({ label: e.target ?? 'Tous les élèves' });
+  await form.getByTestId('ef-date').fill(e.date ?? isoDay());
+  if (e.start) await form.getByTestId('ef-start').fill(e.start);
+  if (e.end) await form.getByTestId('ef-end').fill(e.end);
+  if (e.weeklyUntil) {
+    await form.getByTestId('ef-weekly').check();
+    await form.getByTestId('ef-until').fill(e.weeklyUntil);
+  }
+  if (e.place) await form.getByTestId('ef-place').fill(e.place);
+  if (e.coefficient) await form.getByTestId('ef-coef').fill(e.coefficient);
+  if (e.description) await form.getByTestId('ef-description').fill(e.description);
+  for (const [i, link] of (e.links ?? []).entries()) {
+    await form.getByTestId('ef-att-add').click();
+    await form.getByTestId('ef-att-label').nth(i).fill(link.label);
+    await form.getByTestId('ef-att-url').nth(i).fill(link.url);
+  }
+  await form.getByTestId('ef-save').click();
+  await expect(form).toBeHidden();
+}
+
+/** What a teacher does in the « Annonces » card. */
+export async function announce(page: Page, a: { title: string; body?: string; target?: string }): Promise<void> {
+  const card = page.getByTestId('announcements');
+  await card.getByLabel('Titre').fill(a.title);
+  await card.getByLabel('Message').fill(a.body ?? '');
+  await card.getByTestId('post-target').selectOption({ label: a.target ?? 'Tous les élèves' });
+  await card.getByTestId('publish').click();
+  await expect(card.getByTestId('form-message')).toContainText('Annonce publiée');
+}

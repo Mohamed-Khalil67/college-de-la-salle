@@ -1,40 +1,14 @@
 import { expect, type Browser, type Page, test } from '@playwright/test';
-import { PASSWORD, clearFirestore, registerStudent, registerTeacher, uniqueEmail } from './support';
+import { PASSWORD, addEvent, announce, clearFirestore, isoDay, registerStudent, registerTeacher, uniqueEmail } from './support';
 
 /*
- * The student space, against the Firebase emulators (`npm run test:e2e` starts them): sign-up, what the
- * teachers publish for the student's class (live), homework, grades, profile, and privacy between students.
+ * The student space, against the Firebase emulators (`npm run test:e2e` starts them): one page with what
+ * is coming, the class calendar, grades and announcements — all written by teachers, live.
  */
 
 test.beforeEach(clearFirestore);
 
-async function freshPage(browser: Browser): Promise<Page> {
-  return (await browser.newContext({ locale: 'fr' })).newPage();
-}
-
-interface PostInput {
-  type: 'announcement' | 'assignment' | 'resource';
-  title: string;
-  body?: string;
-  subject?: string;
-  target: string;
-  due?: string;
-  url?: string;
-}
-
-/** What a teacher does in the « Publier » tab. */
-async function publish(page: Page, post: PostInput): Promise<void> {
-  await page.getByTestId('tab-publish').click();
-  await page.getByTestId(`type-${post.type}`).click();
-  await page.getByLabel('Titre').fill(post.title);
-  await page.getByLabel('Message').fill(post.body ?? '');
-  await page.getByLabel('Matière').selectOption({ label: post.subject ?? '— Aucune —' });
-  await page.getByLabel('Destinataires').selectOption({ label: post.target });
-  if (post.due) await page.getByLabel('À rendre pour le').fill(post.due);
-  if (post.url) await page.getByLabel('Lien (https)').fill(post.url);
-  await page.getByTestId('publish').click();
-  await expect(page.getByTestId('form-message')).toContainText('Publié');
-}
+const freshPage = async (browser: Browser): Promise<Page> => (await browser.newContext({ locale: 'fr' })).newPage();
 
 test('signed out: the student space asks to sign in', async ({ page }) => {
   await page.goto('/espace-eleve');
@@ -65,133 +39,148 @@ test('forms validate in French and sign-in errors are explained', async ({ page 
   await expect(page.getByText('Le mot de passe doit contenir au moins 8 caractères.')).toBeVisible();
 });
 
-test('a new student sees an empty space, then exactly what teachers publish for their class, live', async ({ browser }) => {
+test('one page: next exam, today, homework, calendar and announcements — only for my class, live', async ({ browser }) => {
   const teacher = await freshPage(browser);
   const student = await freshPage(browser);
   await registerTeacher(teacher, { name: 'Marc Dupont', email: uniqueEmail('marc') });
   await registerStudent(student, { name: 'Sara Ibrahim', email: uniqueEmail('sara'), section: 'bac', classe: 'Première' });
 
-  // Profile and navigation reflect the account.
   await expect(student.getByTestId('hello')).toHaveText('Bonjour Sara');
-  await expect(student.getByTestId('chip-section')).toHaveText('Bac français');
-  await expect(student.getByTestId('chip-class')).toHaveText('Première');
   await expect(student.getByTestId('account-link')).toHaveText('Mon espace · Sara');
-  await expect(student.getByTestId('empty')).toContainText('Aucune annonce');
+  await expect(student.getByTestId('next-exam')).toContainText('Aucun examen prévu');
+  await expect(student.getByTestId('todo-empty')).toBeVisible();
+  await expect(student.getByTestId('grades-empty')).toBeVisible();
+  await expect(student.getByTestId('posts-empty')).toBeVisible();
 
-  // An announcement for her class appears without reloading; one for another class does not.
-  await publish(teacher, { type: 'announcement', title: 'Sortie au musée', body: 'Rendez-vous à 8 h devant le collège.', target: 'Bac français — Première' });
-  await expect(student.getByTestId('post-title')).toHaveText('Sortie au musée');
-  await expect(student.getByTestId('post')).toContainText('Marc Dupont');
-  await publish(teacher, { type: 'announcement', title: 'Réunion des Terminales', target: 'Bac français — Terminale' });
-  await publish(teacher, { type: 'announcement', title: 'Bac nationale : calendrier', target: 'Tout le Bac nationale' });
-  await publish(teacher, { type: 'announcement', title: 'Fête du collège', target: 'Tous les élèves' });
-  await expect(student.getByTestId('post-title')).toHaveText(['Fête du collège', 'Sortie au musée']);
-  await expect(student.getByTestId('tab-announcement')).toContainText('(2)');
-
-  // A resource has a safe external link and a subject illustration.
-  await publish(teacher, {
-    type: 'resource', title: 'Cours sur les dérivées', subject: 'Mathématiques', target: 'Tout le Bac français', url: 'https://example.org/derivees.pdf',
+  // The teacher fills the calendar; the student's page updates without reloading.
+  await addEvent(teacher, { kind: 'cours', title: 'Cours de mathématiques', subject: 'Mathématiques', target: 'Bac français — Première', start: '08:00', end: '09:00', place: 'Salle 4', weeklyUntil: isoDay(60) });
+  await addEvent(teacher, {
+    kind: 'examen', title: 'Examen de mathématiques', subject: 'Mathématiques', target: 'Bac français — Première', date: isoDay(3), start: '08:30', end: '10:30',
+    place: 'Salle 12', coefficient: '2', description: 'Calculatrice autorisée.',
+    links: [{ label: 'Correction en vidéo', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }, { label: 'Sujet de l’an dernier', url: 'https://example.org/sujet.pdf' }],
   });
-  await student.getByTestId('tab-resource').click();
-  const resource = student.getByTestId('post').filter({ hasText: 'Cours sur les dérivées' });
-  await expect(resource.getByTestId('post-subject')).toContainText('Mathématiques');
-  await expect(resource.locator('img')).toHaveAttribute('src', /matieres\/mathematiques/);
-  const link = resource.getByRole('link', { name: /Ouvrir la ressource/ });
-  await expect(link).toHaveAttribute('href', 'https://example.org/derivees.pdf');
-  await expect(link).toHaveAttribute('target', '_blank');
-  await expect(link).toHaveAttribute('rel', /noopener/);
+  await addEvent(teacher, { kind: 'examen', title: 'Examen des Terminales', target: 'Bac français — Terminale', date: isoDay(2) });
+  await addEvent(teacher, { kind: 'devoir', title: 'Exercices 12 à 15', subject: 'Mathématiques', target: 'Bac français — Première', date: isoDay(1) });
+  await announce(teacher, { title: 'Sortie au musée', body: 'Rendez-vous à 8 h.', target: 'Bac français — Première' });
+  await announce(teacher, { title: 'Réunion des Terminales', target: 'Bac français — Terminale' });
 
-  await teacher.context().close();
-  await student.context().close();
-});
+  // What is coming: the Première exam (not the Terminale one, although it is sooner), today's class, homework.
+  await expect(student.getByTestId('next-exam')).toContainText('Examen de mathématiques');
+  await expect(student.getByTestId('next-exam-countdown')).toHaveText('Dans 3 jours');
+  await expect(student.getByTestId('today')).toContainText('Cours de mathématiques');
+  await expect(student.getByTestId('todo-title')).toHaveText(['Exercices 12 à 15']);
+  await expect(student.getByTestId('agenda').getByTestId('cal-event-title').filter({ hasText: 'Cours de mathématiques' }).first()).toBeVisible();
+  await expect(student.getByText('Examen des Terminales')).toHaveCount(0);
+  await expect(student.getByTestId('announcements').getByTestId('post-title')).toHaveText(['Sortie au musée']);
 
-test('homework: due dates, class targeting, mark as done, and it survives a reload', async ({ browser }) => {
-  const teacher = await freshPage(browser);
-  const student = await freshPage(browser);
-  await registerTeacher(teacher, { name: 'Léa Martin', email: uniqueEmail('lea') });
-  await registerStudent(student, { name: 'Omar Khalil', email: uniqueEmail('omar'), section: 'bac', classe: 'Première' });
+  // Opening the exam: details, the video plays in the window, documents open safely in a new tab.
+  await student.getByTestId('next-exam').getByRole('button').click();
+  const dialog = student.getByTestId('event-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId('ev-kind')).toHaveText('Examen');
+  await expect(dialog.getByTestId('ev-place')).toHaveText('Salle 12');
+  await expect(dialog.getByTestId('ev-when')).toContainText('08:30 – 10:30');
+  await expect(dialog.getByTestId('ev-description')).toHaveText('Calculatrice autorisée.');
+  await expect(dialog.getByTestId('ev-video')).toHaveAttribute('src', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  const pdf = dialog.getByTestId('ev-link');
+  await expect(pdf).toHaveAttribute('href', 'https://example.org/sujet.pdf');
+  await expect(pdf).toHaveAttribute('rel', /noopener/);
+  await expect(dialog.getByTestId('ev-edit')).toHaveCount(0);
+  await expect(dialog.getByTestId('ev-delete')).toHaveCount(0);
+  await student.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
 
-  await publish(teacher, { type: 'assignment', title: 'Exercices 12 à 15', subject: 'Mathématiques', target: 'Bac français — Première', due: '2026-11-03' });
-  await publish(teacher, { type: 'assignment', title: 'Dissertation', subject: 'Philosophie', target: 'Bac français — Terminale', due: '2026-11-05' });
-
-  await student.getByTestId('tab-assignment').click();
-  const todo = student.getByTestId('todo').getByTestId('post');
-  await expect(todo).toHaveCount(1);
-  await expect(todo.getByTestId('post-title')).toHaveText('Exercices 12 à 15');
-  await expect(todo.getByTestId('post-due')).toContainText('À rendre pour le mardi 3 novembre');
-
-  await todo.getByTestId('mark-done').click();
-  await expect(student.getByTestId('finished').getByTestId('post-title')).toHaveText('Exercices 12 à 15');
-  await expect(student.getByTestId('tab-assignment')).not.toContainText('(1)');
-
-  // Stored, not in memory.
-  await student.reload();
-  await student.getByTestId('tab-assignment').click();
-  await expect(student.getByTestId('finished').getByTestId('post-title')).toHaveText('Exercices 12 à 15');
-  await student.getByTestId('finished').getByTestId('mark-undone').click();
-  await expect(student.getByTestId('todo').getByTestId('post-title')).toHaveText('Exercices 12 à 15');
-
-  // Moving up to Terminale changes what she sees.
+  // A different class sees none of it; moving up to Terminale changes everything.
   await student.getByTestId('edit-profile').click();
   await student.getByTestId('profile-class').selectOption({ label: 'Terminale' });
   await student.getByTestId('save-profile').click();
   await expect(student.getByTestId('chip-class')).toHaveText('Terminale');
-  await student.getByTestId('tab-assignment').click();
-  await expect(student.getByTestId('todo').getByTestId('post-title')).toHaveText('Dissertation');
+  await expect(student.getByTestId('next-exam')).toContainText('Examen des Terminales');
+  await expect(student.getByTestId('announcements').getByTestId('post-title')).toHaveText(['Réunion des Terminales']);
+  await expect(student.getByTestId('todo-empty')).toBeVisible();
 
   await teacher.context().close();
   await student.context().close();
 });
 
-test('grades: the teacher enters them by class and student; the student sees marks, comments and averages', async ({ browser }) => {
+test('homework: tick it as done from the page or the window, and it stays done after a reload', async ({ browser }) => {
+  const teacher = await freshPage(browser);
+  const student = await freshPage(browser);
+  await registerTeacher(teacher, { name: 'Léa Martin', email: uniqueEmail('lea') });
+  await registerStudent(student, { name: 'Omar Khalil', email: uniqueEmail('omar'), section: 'nationale', classe: '2e secondaire' });
+  await addEvent(teacher, { kind: 'devoir', title: 'Résumé du chapitre 3', target: 'Bac nationale — 2e secondaire', date: isoDay(2) });
+  await addEvent(teacher, { kind: 'devoir', title: 'Fiche de lecture', target: 'Tout le Bac nationale', date: isoDay(5) });
+
+  await expect(student.getByTestId('todo-title')).toHaveText(['Résumé du chapitre 3', 'Fiche de lecture']);
+  await student.getByTestId('todo-check').first().check();
+  await expect(student.getByTestId('todo-title')).toHaveText(['Fiche de lecture']);
+
+  await student.reload();
+  await expect(student.getByTestId('todo-title')).toHaveText(['Fiche de lecture']);
+
+  // Undo from the window.
+  const agenda = student.getByTestId('agenda');
+  const day = agenda.locator(`[data-testid="cal-day"][data-day="${isoDay(2)}"]`);
+  if (!(await day.count())) await agenda.getByTestId('cal-next').click();
+  await day.getByTestId('cal-event').filter({ hasText: 'Résumé du chapitre 3' }).click();
+  const done = student.getByTestId('ev-done');
+  await expect(done).toHaveAttribute('aria-pressed', 'true');
+  await done.click();
+  await expect(done).toHaveAttribute('aria-pressed', 'false');
+  await student.keyboard.press('Escape');
+  await expect(student.getByTestId('todo-title')).toHaveText(['Résumé du chapitre 3', 'Fiche de lecture']);
+
+  await teacher.context().close();
+  await student.context().close();
+});
+
+test('grades: entered for an exam in one grid, invisible until published, then shown with coefficient and average', async ({ browser }) => {
   const teacher = await freshPage(browser);
   const sara = await freshPage(browser);
   const omar = await freshPage(browser);
   await registerTeacher(teacher, { name: 'Marc Dupont', email: uniqueEmail('marc') });
   await registerStudent(sara, { name: 'Sara Ibrahim', email: uniqueEmail('sara'), section: 'nationale', classe: '3e secondaire (Thanaweya Amma)' });
   await registerStudent(omar, { name: 'Omar Khalil', email: uniqueEmail('omar'), section: 'nationale', classe: '3e secondaire (Thanaweya Amma)' });
-  await sara.getByTestId('tab-grades').click();
-  await expect(sara.getByTestId('empty')).toContainText('Aucune note');
+  await addEvent(teacher, { kind: 'controle', title: 'Contrôle 1', subject: 'Mathématiques', target: 'Bac nationale — 3e secondaire (Thanaweya Amma)', date: isoDay(-1), coefficient: '2' });
 
-  await teacher.getByTestId('tab-grades').click();
-  await teacher.getByTestId('grade-class').selectOption({ label: 'Bac nationale — 3e secondaire (Thanaweya Amma)' });
-  await teacher.getByTestId('student-button').filter({ hasText: 'Sara Ibrahim' }).click();
+  // The grid lists the class; validation first.
+  await teacher.getByTestId('gradable-event').filter({ hasText: 'Contrôle 1' }).getByTestId('open-grades').click();
+  const grid = teacher.getByTestId('grade-grid');
+  await expect(grid.getByTestId('gg-row')).toHaveCount(2);
+  const row = (name: string) => grid.getByTestId('gg-row').filter({ hasText: name });
+  await row('Sara Ibrahim').getByTestId('gg-score').fill('25');
+  await grid.getByTestId('gg-save').click();
+  await expect(grid.getByTestId('gg-message')).toContainText('La note de Sara Ibrahim doit être un nombre entre 0 et 20');
 
-  // Validation first: the mark must be a number up to the maximum.
-  await teacher.getByTestId('grade-subject').selectOption({ label: 'Mathématiques' });
-  await teacher.getByLabel('Intitulé (devoir, contrôle…)').fill('Contrôle 1');
-  await teacher.getByLabel('Note', { exact: true }).fill('25');
-  await teacher.getByTestId('add-grade').click();
-  await expect(teacher.getByTestId('form-message')).toContainText('La note doit être un nombre entre 0 et 20');
+  // Draft: saved, but students see nothing.
+  await row('Sara Ibrahim').getByTestId('gg-score').fill('14,5');
+  await row('Sara Ibrahim').getByTestId('gg-comment').fill('Bon travail, soignez la rédaction.');
+  await row('Omar Khalil').getByTestId('gg-score').fill('17');
+  await grid.getByTestId('gg-save').click();
+  await expect(grid.getByTestId('gg-message')).toContainText('brouillon');
+  await expect(grid.getByTestId('gg-summary')).toContainText('2 / 2 notes saisies · moyenne de la classe 15,8 / 20');
+  await expect(teacher.getByTestId('gradable-status')).toHaveText('2 notes · brouillon');
+  await expect(sara.getByTestId('grades-empty')).toBeVisible();
 
-  await teacher.getByLabel('Note', { exact: true }).fill('14');
-  await teacher.getByLabel('Commentaire (facultatif)').fill('Bon travail, soignez la rédaction.');
-  await teacher.getByTestId('add-grade').click();
-  await expect(teacher.getByTestId('form-message')).toHaveText('Note enregistrée.');
-  await expect(teacher.getByTestId('given-grade')).toHaveCount(1);
+  // Published: each student sees their own mark only, live.
+  await grid.getByTestId('gg-published').check();
+  await grid.getByTestId('gg-save').click();
+  await expect(grid.getByTestId('gg-message')).toContainText('publiées');
+  await expect(teacher.getByTestId('gradable-status')).toHaveText('2 notes · publiées');
+  await expect(sara.getByTestId('subject-average')).toHaveText('14,5 / 20');
+  await expect(sara.getByTestId('overall')).toContainText('14,5 / 20');
+  await sara.getByTestId('subject-grades').locator('summary').click();
+  await expect(sara.getByTestId('grade')).toContainText('Bon travail, soignez la rédaction.');
+  await expect(sara.getByTestId('grade')).toContainText('(coef. 2)');
+  await expect(omar.getByTestId('subject-average')).toHaveText('17 / 20');
+  await expect(omar.getByText('Bon travail, soignez la rédaction.')).toHaveCount(0);
 
-  await teacher.getByLabel('Intitulé (devoir, contrôle…)').fill('Contrôle 2');
-  await teacher.getByLabel('Note', { exact: true }).fill('17');
-  await teacher.getByTestId('add-grade').click();
-  await expect(teacher.getByTestId('given-grade')).toHaveCount(2);
-
-  // Sara sees them live, with the average on 20.
-  const subject = sara.getByTestId('subject-grades');
-  await expect(subject.getByTestId('grade')).toHaveCount(2);
-  await expect(subject.getByTestId('subject-average')).toHaveText('Moyenne : 15,5 / 20');
-  await expect(sara.getByTestId('overall')).toContainText('15,5 / 20');
-  await expect(subject.getByTestId('grade').filter({ hasText: 'Contrôle 1' })).toContainText('Bon travail, soignez la rédaction.');
-  await expect(subject.getByTestId('grade').filter({ hasText: 'Contrôle 1' }).getByTestId('grade-score')).toHaveText('14 / 20');
-  await expect(subject.locator('img')).toHaveAttribute('src', /matieres\/mathematiques/);
-
-  // Omar, in the same class, sees none of Sara's grades.
-  await omar.getByTestId('tab-grades').click();
-  await expect(omar.getByTestId('empty')).toContainText('Aucune note');
-
-  // A grade can be withdrawn.
-  await teacher.getByTestId('given-grade').filter({ hasText: 'Contrôle 2' }).getByRole('button', { name: /Supprimer/ }).click();
-  await expect(subject.getByTestId('grade')).toHaveCount(1);
-  await expect(subject.getByTestId('subject-average')).toHaveText('Moyenne : 14 / 20');
+  // A correction is a new value in the same grid; emptying a mark removes it.
+  await row('Sara Ibrahim').getByTestId('gg-score').fill('16');
+  await row('Omar Khalil').getByTestId('gg-score').fill('');
+  await grid.getByTestId('gg-save').click();
+  await expect(sara.getByTestId('subject-average')).toHaveText('16 / 20');
+  await expect(omar.getByTestId('grades-empty')).toBeVisible();
 
   await teacher.context().close();
   await sara.context().close();

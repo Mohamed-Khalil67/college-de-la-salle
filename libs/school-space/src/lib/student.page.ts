@@ -3,6 +3,7 @@ import { Component, computed, inject, linkedSignal, signal } from '@angular/core
 import { form, FormField, required } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
 import { matiereById, matiereName } from '@site/content';
+import { addDays, daysBetween, eventsFor, kindInfo, longDay, nextExam, occurrences, timeRange, type Occurrence } from './calendar.model';
 import {
   averageOnTwenty,
   CLASSES,
@@ -13,38 +14,36 @@ import {
   postsFor,
   round1,
   SECTION_LABELS,
-  splitAssignments,
   todayIso,
-  type PostType,
   type SectionId,
 } from './space.model';
 import { SpaceService } from './space.service';
-import { eventsFor } from './calendar.model';
+import { Agenda } from './ui/agenda';
 import { AuthPanel } from './ui/auth-panel';
-import { Calendar } from './ui/calendar';
+import { EventDetails } from './ui/event-details';
 import { PostCard } from './ui/post-card';
-import { SPACE_STYLES } from './ui/space.styles';
-
-type Tab = 'announcement' | 'assignment' | 'calendar' | 'grades' | 'resource';
+import { KIND_STYLES, SPACE_STYLES } from './ui/space.styles';
 
 const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
-/** `/espace-eleve`: sign in, then what the teachers publish for the student's class and their own grades. */
+/**
+ * `/espace-eleve`: sign in, then everything on one page — what is coming (next exam, today, homework),
+ * the class calendar (classes, exams, homework, revision… with their documents and videos), my grades and
+ * the announcements.
+ */
 @Component({
   selector: 'space-student-page',
-  imports: [FormField, RouterLink, AuthPanel, Calendar, PostCard, NgOptimizedImage, NgTemplateOutlet],
+  imports: [FormField, RouterLink, AuthPanel, Agenda, EventDetails, PostCard, NgOptimizedImage, NgTemplateOutlet],
   template: `
     <header class="bg-navy-900 text-cream">
-      <div class="on-dark mx-auto grid max-w-6xl gap-2 px-4 py-12">
+      <div class="on-dark mx-auto grid max-w-6xl gap-2 px-4 py-10">
         <p class="kicker">Collège de la Salle · Daher</p>
         <h1 class="m-0 text-4xl text-white md:text-5xl">Espace élève</h1>
-        <p class="m-0 max-w-2xl text-lg text-cream/90">
-          Les annonces, les devoirs, les ressources et les notes que vos enseignants publient pour votre classe, au même endroit.
-        </p>
+        <p class="m-0 max-w-2xl text-lg text-cream/90">Mon emploi du temps, mes examens, mes devoirs, mes notes et les documents de mes cours, sur une seule page.</p>
       </div>
     </header>
 
-    <div class="mx-auto max-w-5xl px-4 py-12">
+    <div class="mx-auto max-w-6xl px-4 py-10">
       @if (!space.enabled) {
         <p class="m-0 rounded-xl bg-warn-soft p-5 text-warn" role="status" data-testid="unavailable">L’espace élève sera disponible prochainement.</p>
       } @else if (space.unavailable()) {
@@ -58,7 +57,7 @@ const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', 
       } @else if (space.role() === 'teacher' || space.role() === 'teacher-unverified') {
         <div class="mx-auto grid max-w-xl gap-4 rounded-2xl border border-line bg-surface p-6" data-testid="is-teacher">
           <h2 class="m-0 text-2xl">Vous êtes connecté en tant qu’enseignant</h2>
-          <p class="m-0">Votre espace est l’Espace enseignant : vous y publiez les annonces, devoirs, ressources et notes.</p>
+          <p class="m-0">Votre espace est l’Espace enseignant : vous y gérez le calendrier, les annonces et les notes.</p>
           <div class="flex flex-wrap gap-3">
             <a class="btn btn-navy" routerLink="/espace-enseignant">Ouvrir l’Espace enseignant</a>
             <button type="button" class="btn btn-outline-dark" (click)="onLogout()">Se déconnecter</button>
@@ -79,7 +78,7 @@ const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', 
         </form>
       } @else if (space.profile(); as p) {
         <div class="grid gap-8" data-testid="dashboard">
-          <section class="grid gap-3 rounded-2xl border border-line bg-surface p-6" aria-labelledby="hello">
+          <section class="grid gap-3 rounded-2xl border border-line bg-surface p-5" aria-labelledby="hello">
             <div class="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 id="hello" class="m-0 text-2xl" data-testid="hello">Bonjour {{ space.firstName() }}</h2>
@@ -87,9 +86,6 @@ const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', 
                   <span class="rounded-full bg-navy-100 px-3 py-1 font-semibold text-navy-700" data-testid="chip-section">{{ sectionLabel(p.section) }}</span>
                   <span class="rounded-full bg-navy-100 px-3 py-1 font-semibold text-navy-700" data-testid="chip-class">{{ classText(p.section, p.classe) }}</span>
                 </p>
-                @if (space.user(); as u) {
-                  <p class="m-0 mt-2 text-sm text-muted"><bdi>{{ u.email }}</bdi>@if (!u.emailVerified) { · e-mail non vérifié (consultez votre boîte de réception) }</p>
-                }
               </div>
               <div class="flex flex-wrap gap-3">
                 <a class="btn btn-outline-dark" [routerLink]="p.section === 'bac' ? '/bac-francais' : '/bac-nationale'">Ma section</a>
@@ -108,116 +104,118 @@ const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', 
             }
           </section>
 
-          <div class="grid gap-6">
-            <div role="tablist" aria-label="Mon espace" class="flex flex-wrap gap-1 rounded-full bg-navy-100 p-1">
-              @for (t of tabs; track t.id) {
-                <button type="button" role="tab" class="tab" [attr.aria-selected]="tab() === t.id" [attr.aria-controls]="'panel-' + t.id" [id]="'tab-' + t.id" [attr.data-testid]="'tab-' + t.id" (click)="tab.set(t.id)">
-                  {{ t.label }}@if (count(t.id); as n) { <span class="ms-1 text-sm">({{ n }})</span> }
+          <!-- What is coming -->
+          <div class="grid gap-4 md:grid-cols-3" data-testid="upcoming">
+            <section class="card" aria-labelledby="next-exam-title" data-testid="next-exam">
+              <h2 id="next-exam-title" class="card-title">Prochain examen</h2>
+              @if (exam(); as o) {
+                <button type="button" class="item" [class]="'k-' + o.event.kind" (click)="details.open(o)">
+                  <span class="block text-2xl font-bold" data-testid="next-exam-countdown">{{ countdown(o.day) }}</span>
+                  <span class="block font-semibold" dir="auto">{{ o.event.title }}</span>
+                  <span class="block text-sm first-letter:uppercase">{{ longDay(o.day) }} · {{ timeRange(o.event) }}@if (o.event.place) { · {{ o.event.place }} }</span>
                 </button>
+              } @else {
+                <p class="m-0 text-muted">Aucun examen prévu.</p>
               }
-            </div>
+            </section>
 
-            <section role="tabpanel" [id]="'panel-' + tab()" [attr.aria-labelledby]="'tab-' + tab()" class="grid gap-4" tabindex="0">
-              @switch (tab()) {
-                @case ('assignment') {
-                  @if (assignments().todo.length || assignments().finished.length) {
-                    <ul class="m-0 grid list-none gap-3 p-0" data-testid="todo">
-                      @for (a of assignments().todo; track a.id) {
-                        <li>
-                          <space-post-card [post]="a" [today]="today">
-                            <button type="button" class="btn btn-outline-dark justify-self-start" (click)="toggle(a.id)" aria-pressed="false" data-testid="mark-done">Marquer comme fait</button>
-                          </space-post-card>
-                        </li>
-                      }
-                    </ul>
-                    @if (assignments().finished.length) {
-                      <h3 class="m-0 text-lg text-muted">Terminés</h3>
-                      <ul class="m-0 grid list-none gap-3 p-0 opacity-80" data-testid="finished">
-                        @for (a of assignments().finished; track a.id) {
-                          <li>
-                            <space-post-card [post]="a" [today]="today">
-                              <button type="button" class="btn btn-outline-dark justify-self-start" (click)="toggle(a.id)" aria-pressed="true" data-testid="mark-undone">✓ Fait — annuler</button>
-                            </space-post-card>
-                          </li>
-                        }
-                      </ul>
-                    }
-                  } @else {
-                    <p class="m-0 text-muted" data-testid="empty">Aucun devoir pour votre classe pour l’instant.</p>
+            <section class="card" aria-labelledby="today-title" data-testid="today">
+              <h2 id="today-title" class="card-title">Aujourd’hui</h2>
+              @if (todayList().length) {
+                <ul class="m-0 grid list-none gap-1.5 p-0">
+                  @for (o of todayList(); track o.key) {
+                    <li>
+                      <button type="button" class="item" [class]="'k-' + o.event.kind" (click)="details.open(o)">
+                        <span class="text-xs font-bold uppercase">{{ kindLabel(o) }}</span> · <span class="text-sm">{{ timeRange(o.event) }}</span>
+                        <span class="block font-semibold" dir="auto">{{ o.event.title }}</span>
+                      </button>
+                    </li>
                   }
-                }
-                @case ('calendar') {
-                  <space-calendar [events]="myEvents()" />
-                }
-                @case ('resource') {
-                  @if (resourceGroups().length) {
-                    @for (g of resourceGroups(); track g.subject) {
-                      <section class="grid gap-3" [attr.aria-label]="g.name" data-testid="resource-group">
-                        <h3 class="m-0 text-lg text-gold-ink">{{ g.name }}</h3>
-                        <ul class="m-0 grid list-none gap-3 p-0" data-testid="posts">
-                          @for (post of g.posts; track post.id) {
-                            <li><space-post-card [post]="post" /></li>
-                          }
-                        </ul>
-                      </section>
-                    }
-                  } @else {
-                    <p class="m-0 text-muted" data-testid="empty">{{ emptyText() }}</p>
+                </ul>
+              } @else {
+                <p class="m-0 text-muted">Rien de prévu aujourd’hui.</p>
+              }
+            </section>
+
+            <section class="card" aria-labelledby="todo-title" data-testid="todo">
+              <h2 id="todo-title" class="card-title">À rendre</h2>
+              @if (todo().length) {
+                <ul class="m-0 grid list-none gap-2 p-0">
+                  @for (o of todo(); track o.key) {
+                    <li class="flex items-start gap-2">
+                      <input type="checkbox" class="mt-1" [checked]="false" (change)="toggle(o.event.id)" [attr.aria-label]="'Marquer « ' + o.event.title + ' » comme fait'" data-testid="todo-check" />
+                      <button type="button" class="link text-start" (click)="details.open(o)">
+                        <span class="font-semibold" dir="auto" data-testid="todo-title">{{ o.event.title }}</span>
+                        <span class="block text-sm" [class.text-warn]="o.day < today">{{ dueLabel(o.day) }}</span>
+                      </button>
+                    </li>
                   }
+                </ul>
+              } @else {
+                <p class="m-0 text-muted" data-testid="todo-empty">Aucun devoir à rendre. 🎉</p>
+              }
+            </section>
+          </div>
+
+          <space-agenda [events]="myEvents()" [doneIds]="done()" [gradedIds]="gradedIds()" (open)="details.open($event)" />
+
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section class="card" aria-labelledby="grades-title" data-testid="grades">
+              <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 id="grades-title" class="card-title">Mes notes</h2>
+                @if (overall() !== null) {
+                  <p class="m-0 font-semibold" data-testid="overall">Moyenne générale : {{ mark(overall()) }} / 20</p>
                 }
-                @case ('grades') {
-                  @if (grades().length) {
-                    <p class="m-0 text-lg" data-testid="overall">
-                      Moyenne générale : <strong>{{ overall() }} / 20</strong>
-                    </p>
-                    @for (s of grades(); track s.subject) {
-                      <section class="grid gap-3 rounded-xl border border-line bg-surface p-4" data-testid="subject-grades">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                          <div class="flex items-center gap-3">
-                            @if (image(s.subject); as src) {
-                              <img [ngSrc]="src" width="60" height="40" alt="" class="rounded-md object-cover" />
-                            }
-                            <h3 class="m-0 text-lg">{{ name(s.subject) }}</h3>
-                          </div>
-                          <p class="m-0 font-semibold" data-testid="subject-average">Moyenne : {{ mark(s.average) }} / 20</p>
-                        </div>
-                        <ul class="m-0 grid list-none gap-2 p-0">
+              </div>
+              @if (subjects().length) {
+                <ul class="m-0 grid list-none gap-2 p-0">
+                  @for (s of subjects(); track s.subject) {
+                    <li>
+                      <details class="rounded-lg border border-line" data-testid="subject-grades">
+                        <summary class="flex cursor-pointer items-center gap-3 p-3">
+                          @if (image(s.subject); as src) { <img [ngSrc]="src" width="45" height="30" alt="" class="rounded" /> }
+                          <span class="flex-1 font-semibold">{{ name(s.subject) }}</span>
+                          <span class="font-bold" data-testid="subject-average">{{ mark(s.average) }} / 20</span>
+                        </summary>
+                        <ul class="m-0 grid list-none gap-2 border-t border-line p-3">
                           @for (g of s.grades; track g.id) {
-                            <li class="grid gap-0.5 border-t border-line pt-2" data-testid="grade">
+                            <li class="grid gap-0.5" data-testid="grade">
                               <p class="m-0 flex flex-wrap justify-between gap-2">
-                                <span class="font-semibold" dir="auto">{{ g.title }}</span>
-                                <span class="font-bold text-navy-900" data-testid="grade-score">{{ mark(g.score) }} / {{ mark(g.outOf) }}</span>
+                                <span dir="auto">{{ g.title }} <span class="text-sm text-muted">(coef. {{ g.coefficient }})</span></span>
+                                <span class="font-bold" data-testid="grade-score">{{ mark(g.score) }} / {{ mark(g.outOf) }}</span>
                               </p>
-                              @if (g.comment) {
-                                <p class="m-0" dir="auto">{{ g.comment }}</p>
-                              }
-                              <p class="m-0 text-sm text-muted"><bdi dir="auto">{{ g.teacherName }}</bdi> · {{ day(g.createdAt) }}</p>
+                              @if (g.comment) { <p class="m-0 text-sm" dir="auto">« {{ g.comment }} »</p> }
+                              <p class="m-0 text-xs text-muted"><bdi dir="auto">{{ g.teacherName }}</bdi> · {{ day(g.createdAt) }}</p>
                             </li>
                           }
                         </ul>
-                      </section>
-                    }
-                  } @else {
-                    <p class="m-0 text-muted" data-testid="empty">Aucune note pour l’instant.</p>
+                      </details>
+                    </li>
                   }
-                }
-                @default {
-                  @if (posts().length) {
-                    <ul class="m-0 grid list-none gap-3 p-0" data-testid="posts">
-                      @for (post of posts(); track post.id) {
-                        <li><space-post-card [post]="post" /></li>
-                      }
-                    </ul>
-                  } @else {
-                    <p class="m-0 text-muted" data-testid="empty">{{ emptyText() }}</p>
+                </ul>
+              } @else {
+                <p class="m-0 text-muted" data-testid="grades-empty">Aucune note publiée pour l’instant.</p>
+              }
+            </section>
+
+            <section class="card" aria-labelledby="news-title" data-testid="announcements">
+              <h2 id="news-title" class="card-title">Annonces</h2>
+              @if (posts().length) {
+                <ul class="m-0 grid list-none gap-3 p-0">
+                  @for (post of posts(); track post.id) {
+                    <li><space-post-card [post]="post" /></li>
                   }
-                }
+                </ul>
+              } @else {
+                <p class="m-0 text-muted" data-testid="posts-empty">Aucune annonce pour votre classe.</p>
               }
             </section>
           </div>
         </div>
       }
     </div>
+
+    <space-event-details #details mode="student" [grades]="space.grades()" [doneIds]="done()" (toggleDone)="toggle($event.id)" />
 
     <ng-template #profileFields>
       <div class="grid gap-1">
@@ -243,22 +241,25 @@ const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', 
       </div>
     </ng-template>
   `,
-  styles: SPACE_STYLES + `:host { min-block-size: 100dvh; }`,
+  styles: [
+    SPACE_STYLES,
+    KIND_STYLES,
+    `
+      :host { min-block-size: 100dvh; }
+      .card { display: grid; align-content: start; gap: 0.75rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+      .card-title { margin: 0; font-size: 1.25rem; }
+      .item { display: block; inline-size: 100%; padding: 0.6rem 0.75rem; border: 0; border-inline-start: 4px solid; border-radius: 10px; font: inherit; text-align: start; cursor: pointer; }
+      input[type='checkbox'] { inline-size: 1.15rem; block-size: 1.15rem; padding: 0; flex: none; }
+      summary::-webkit-details-marker { display: none; }
+    `,
+  ],
 })
 export class StudentPage {
   protected readonly space = inject(SpaceService);
 
   protected readonly today = todayIso();
-  protected readonly tabs: readonly { readonly id: Tab; readonly label: string }[] = [
-    { id: 'announcement', label: 'Annonces' },
-    { id: 'assignment', label: 'Devoirs' },
-    { id: 'calendar', label: 'Calendrier' },
-    { id: 'grades', label: 'Notes' },
-    { id: 'resource', label: 'Ressources' },
-  ];
   protected readonly sections = (['nationale', 'bac'] as const).map((id) => ({ id, label: SECTION_LABELS[id] }));
 
-  protected readonly tab = signal<Tab>('announcement');
   protected readonly editing = signal(false);
   protected readonly busy = signal(false);
   protected readonly attempted = signal(false);
@@ -274,39 +275,49 @@ export class StudentPage {
   });
   protected readonly classOptions = computed(() => CLASSES[this.profileModel().section]);
 
-  /** What the student sees: posts addressed to their section and class. */
-  readonly #audience = computed(() => {
-    const p = this.space.profile();
-    return (type: PostType) => (p ? postsFor(this.space.posts(), type, p.section, p.classe) : []);
-  });
-  protected readonly posts = computed(() => this.#audience()('announcement'));
+  /* ---------------------------------------------------------------- what the student sees */
   protected readonly myEvents = computed(() => {
     const p = this.space.profile();
     return p ? eventsFor(this.space.events(), p.section, p.classe) : [];
   });
-  /** Course material, organised by subject (subjects in catalogue order, « Autres » last). */
-  protected readonly resourceGroups = computed(() => {
-    const posts = this.#audience()('resource');
-    const subjects = [...new Set(posts.map((p) => p.subject))].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : this.name(a).localeCompare(this.name(b), 'fr')));
-    return subjects.map((subject) => ({ subject, name: subject ? this.name(subject) : 'Autres', posts: posts.filter((p) => p.subject === subject) }));
-  });
-  protected readonly assignments = computed(() =>
-    splitAssignments(this.#audience()('assignment'), this.space.profile()?.done ?? []),
-  );
-  protected readonly grades = computed(() => gradesBySubject(this.space.grades()));
-  protected readonly overall = computed(() => {
-    const avg = averageOnTwenty(this.space.grades());
-    return avg === null ? '–' : FORMAT_MARK.format(avg);
-  });
-  protected readonly emptyText = computed(() =>
-    this.tab() === 'resource' ? 'Aucune ressource pour votre classe pour l’instant.' : 'Aucune annonce pour votre classe pour l’instant.',
+  protected readonly done = computed(() => this.space.profile()?.done ?? []);
+  protected readonly gradedIds = computed(() => this.space.grades().map((g) => g.eventId));
+
+  readonly #coming = computed(() => occurrences(this.myEvents(), this.today, addDays(this.today, 120)));
+  protected readonly exam = computed(() => nextExam(this.#coming(), this.today));
+  protected readonly todayList = computed(() => this.#coming().filter((o) => o.day === this.today));
+  /** Homework not done yet: late ones (last 30 days) first, then the coming ones. */
+  protected readonly todo = computed(() =>
+    occurrences(this.myEvents(), addDays(this.today, -30), addDays(this.today, 120))
+      .filter((o) => o.event.kind === 'devoir' && !this.done().includes(o.event.id))
+      .slice(0, 8),
   );
 
-  protected count(tab: Tab): number {
-    if (tab === 'assignment') return this.assignments().todo.length;
-    if (tab === 'grades') return this.space.grades().length;
-    if (tab === 'calendar') return 0;
-    return this.#audience()(tab).length;
+  protected readonly subjects = computed(() => gradesBySubject(this.space.grades()));
+  protected readonly overall = computed(() => averageOnTwenty(this.space.grades()));
+  protected readonly posts = computed(() => {
+    const p = this.space.profile();
+    return p ? postsFor(this.space.posts(), p.section, p.classe).slice(0, 6) : [];
+  });
+
+  protected readonly longDay = longDay;
+  protected readonly timeRange = timeRange;
+
+  protected kindLabel(o: Occurrence): string {
+    return kindInfo(o.event.kind).label;
+  }
+
+  protected countdown(day: string): string {
+    const n = daysBetween(this.today, day);
+    return n === 0 ? 'Aujourd’hui' : n === 1 ? 'Demain' : `Dans ${n} jours`;
+  }
+
+  protected dueLabel(day: string): string {
+    const n = daysBetween(this.today, day);
+    if (n < 0) return `En retard (${longDay(day)})`;
+    if (n === 0) return 'Pour aujourd’hui';
+    if (n === 1) return 'Pour demain';
+    return `Pour le ${longDay(day)}`;
   }
 
   protected sectionLabel(section: SectionId): string {
@@ -318,7 +329,7 @@ export class StudentPage {
   }
 
   protected name(subject: string): string {
-    return matiereName(subject);
+    return matiereName(subject) || 'Autre';
   }
 
   protected image(subject: string): string | null {

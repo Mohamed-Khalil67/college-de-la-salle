@@ -6,9 +6,11 @@ rules_version = '2';
 //    students/{uid}    a student's profile (own document; teachers can read it to grade).
 //    teachers/{email}  the allow-list of teachers. Written ONLY by the school's administrator, in the
 //                      Firebase console (or with scripts/add-teacher.mjs): clients can never write it.
-//    posts/{id}        announcements, homework and resources published by teachers.
-//    events/{id}       the shared calendar: exams, activities, meetings. Teachers edit; students read theirs.
-//    grades/{id}       a grade a teacher gives to one student; only that student can read it.
+//    posts/{id}        announcements published by teachers.
+//    events/{id}       the shared calendar: classes, exams, homework, revision, activities, meetings.
+//                      Teachers edit it; students read theirs. Attachments are links (no file storage).
+//    grades/{id}       a student's mark for an exam, id `{eventId}_{studentUid}`. Only that student can read
+//                      it, and only once the teacher has published it.
 //
 //  A teacher is someone signed in with a VERIFIED e-mail that is listed in teachers/{email}.
 //  Deny by default.
@@ -70,20 +72,28 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
-    // ------------------------------------------------------------------ posts
+    function validTarget(t) {
+      return t in ['all', 'nationale', 'bac',
+        'nationale-secondaire-1', 'nationale-secondaire-2', 'nationale-secondaire-3',
+        'bac-seconde', 'bac-premiere', 'bac-terminale'];
+    }
+
+    function isDay(v) {
+      return v is string && v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isClock(v) {
+      return v is string && (v == '' || v.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'));
+    }
+
+    // ------------------------------------------------------------------ posts (announcements)
     function isPost(d) {
-      let fields = ['type', 'title', 'body', 'subject', 'target', 'dueDate', 'url', 'authorUid', 'authorName', 'createdAt'];
+      let fields = ['title', 'body', 'subject', 'target', 'authorUid', 'authorName', 'createdAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
-        && d.type in ['announcement', 'assignment', 'resource']
         && shortText(d.title, 120)
         && d.body is string && d.body.size() <= 4000
         && d.subject is string && d.subject.size() <= 40
-        && d.target in ['all', 'nationale', 'bac',
-             'nationale-secondaire-1', 'nationale-secondaire-2', 'nationale-secondaire-3',
-             'bac-seconde', 'bac-premiere', 'bac-terminale']
-        && (d.dueDate == null || (d.type == 'assignment' && d.dueDate is string && d.dueDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')))
-        && (d.type != 'assignment' || d.dueDate != null)
-        && (d.url == null || (d.type == 'resource' && d.url is string && d.url.size() <= 500 && d.url.matches('^https://.+')))
+        && validTarget(d.target)
         && d.authorUid == request.auth.uid
         && shortText(d.authorName, 80)
         && d.createdAt == request.time;
@@ -97,22 +107,23 @@ service cloud.firestore {
     }
 
     // ------------------------------------------------------------------ calendar
-    function validTarget(t) {
-      return t in ['all', 'nationale', 'bac',
-        'nationale-secondaire-1', 'nationale-secondaire-2', 'nationale-secondaire-3',
-        'bac-seconde', 'bac-premiere', 'bac-terminale'];
-    }
-
     function eventFields(d) {
-      let fields = ['kind', 'title', 'date', 'time', 'target', 'subject', 'note', 'authorUid', 'authorName', 'createdAt'];
+      let fields = ['kind', 'title', 'subject', 'target', 'date', 'start', 'end', 'repeatUntil', 'place',
+        'description', 'attachments', 'coefficient', 'authorUid', 'authorName', 'createdAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
-        && d.kind in ['exam', 'activity', 'meeting']
+        && d.kind in ['cours', 'td', 'tp', 'examen', 'controle', 'devoir', 'revision', 'activite', 'reunion']
         && shortText(d.title, 120)
-        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && d.time is string && (d.time == '' || d.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$'))
-        && validTarget(d.target)
         && d.subject is string && d.subject.size() <= 40
-        && d.note is string && d.note.size() <= 1000
+        && validTarget(d.target)
+        && isDay(d.date)
+        && isClock(d.start) && isClock(d.end)
+        && (d.end == '' || (d.start != '' && d.end > d.start))
+        && d.repeatUntil is string && (d.repeatUntil == '' || (isDay(d.repeatUntil) && d.repeatUntil >= d.date))
+        && d.place is string && d.place.size() <= 120
+        && d.description is string && d.description.size() <= 2000
+        // Links only (each one is checked again before it is shown).
+        && d.attachments is list && d.attachments.size() <= 10
+        && d.coefficient is number && d.coefficient > 0 && d.coefficient <= 20
         && shortText(d.authorName, 80);
     }
 
@@ -131,27 +142,39 @@ service cloud.firestore {
 
     // ------------------------------------------------------------------ grades
     function isGrade(d) {
-      let fields = ['studentUid', 'studentName', 'subject', 'title', 'score', 'outOf', 'comment', 'teacherUid', 'teacherName', 'createdAt'];
+      let fields = ['studentUid', 'studentName', 'eventId', 'subject', 'title', 'score', 'outOf', 'coefficient',
+        'comment', 'published', 'teacherUid', 'teacherName', 'createdAt', 'updatedAt'];
       return d.keys().hasAll(fields) && d.keys().hasOnly(fields)
         && d.studentUid is string && exists(/databases/$(database)/documents/students/$(d.studentUid))
         && shortText(d.studentName, 80)
-        && shortText(d.subject, 40)
+        && shortText(d.eventId, 64)
+        && d.subject is string && d.subject.size() <= 40
         && shortText(d.title, 120)
         && d.outOf is number && d.outOf > 0 && d.outOf <= 100
         && d.score is number && d.score >= 0 && d.score <= d.outOf
+        && d.coefficient is number && d.coefficient > 0 && d.coefficient <= 20
         && d.comment is string && d.comment.size() <= 1000
+        && d.published is bool
         && d.teacherUid == request.auth.uid
         && shortText(d.teacherName, 80)
-        && d.createdAt == request.time;
+        && d.updatedAt == request.time;
     }
 
     match /grades/{id} {
-      // A student reads only their own grades; a teacher reads the grades they gave.
-      allow read: if signedIn() && (resource.data.studentUid == request.auth.uid
+      // A student reads only their own grades, once published; a teacher reads the grades they gave.
+      allow read: if signedIn() && ((resource.data.studentUid == request.auth.uid && resource.data.published == true)
         || (isTeacher() && resource.data.teacherUid == request.auth.uid));
-      allow create: if isTeacher() && isGrade(request.resource.data);
+      // The id is {eventId}_{studentUid}: one grade per student and exam.
+      allow create: if isTeacher() && isGrade(request.resource.data)
+        && id == request.resource.data.eventId + '_' + request.resource.data.studentUid
+        && request.resource.data.createdAt == request.time;
+      // Corrections and publishing, by the teacher who gave it: student, exam and creation time never change.
+      allow update: if isTeacher() && resource.data.teacherUid == request.auth.uid
+        && isGrade(request.resource.data)
+        && request.resource.data.studentUid == resource.data.studentUid
+        && request.resource.data.eventId == resource.data.eventId
+        && request.resource.data.createdAt == resource.data.createdAt;
       allow delete: if isTeacher() && resource.data.teacherUid == request.auth.uid;
-      allow update: if false;
     }
   }
 }

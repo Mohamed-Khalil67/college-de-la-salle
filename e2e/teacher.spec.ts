@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { PASSWORD, allowTeacher, clearFirestore, registerTeacher, uniqueEmail, verifyEmail } from './support';
+import { PASSWORD, addEvent, allowTeacher, announce, clearFirestore, isoDay, registerTeacher, uniqueEmail, verifyEmail } from './support';
 
 /*
- * The teacher space: who gets in (listed AND verified), publishing, validation, deletion, and safe
+ * The teacher space: who gets in (listed AND verified), the editable calendar, announcements, and safe
  * rendering of what teachers type. Against the Firebase emulators (`npm run test:e2e` starts them).
  */
 
@@ -52,52 +52,117 @@ test('a listed teacher must verify their e-mail before publishing', async ({ pag
   await expect(page.getByTestId('teacher-link')).toHaveText('Mon espace enseignant');
 });
 
-test('a teacher signs back in and finds their publications; validation explains what is missing', async ({ page }) => {
-  const email = uniqueEmail('lea');
-  await registerTeacher(page, { name: 'Léa Martin', email });
+test('the event form explains what is missing', async ({ page }) => {
+  await registerTeacher(page, { name: 'Léa Martin', email: uniqueEmail('lea') });
+  await page.getByTestId('new-event').click();
+  const form = page.getByTestId('event-form');
+  await form.getByTestId('ef-save').click();
+  await expect(form.getByText('Saisissez un titre.')).toBeVisible();
 
-  // Validation, in French.
-  await page.getByTestId('publish').click();
-  await expect(page.getByText('Saisissez un titre.')).toBeVisible();
-  await page.getByTestId('type-assignment').click();
-  await page.getByLabel('Titre').fill('Exercices');
-  await page.getByTestId('publish').click();
-  await expect(page.getByTestId('form-message')).toHaveText('Choisissez la date à laquelle le devoir est à rendre.');
-  await page.getByTestId('type-resource').click();
-  await page.getByLabel('Lien (https)').fill('http://example.org');
-  await page.getByTestId('publish').click();
-  await expect(page.getByTestId('form-message')).toHaveText('Le lien doit commencer par https://.');
+  await form.getByLabel('Titre').fill('TP de chimie');
+  await form.getByTestId('kind-tp').click();
+  await form.getByTestId('ef-start').fill('10:00');
+  await form.getByTestId('ef-end').fill('09:00');
+  await form.getByTestId('ef-save').click();
+  await expect(form.getByTestId('ef-message')).toHaveText('L’heure de fin doit être après l’heure de début.');
 
-  // Publish, sign out, sign in again: the publication is still there; delete it.
-  await page.getByTestId('type-announcement').click();
-  await page.getByLabel('Titre').fill('Réunion parents-professeurs');
-  await page.getByLabel('Message').fill('Jeudi à 17 h.');
-  await page.getByTestId('publish').click();
-  await expect(page.getByTestId('form-message')).toContainText('Publié');
+  await form.getByTestId('ef-end').fill('12:00');
+  await form.getByTestId('ef-weekly').check();
+  await form.getByTestId('ef-save').click();
+  await expect(form.getByTestId('ef-message')).toContainText('Choisissez jusqu’à quand l’événement se répète');
+
+  await form.getByTestId('ef-weekly').uncheck();
+  await form.getByTestId('ef-att-add').click();
+  await form.getByTestId('ef-att-url').fill('http://example.org/cours.pdf');
+  await form.getByTestId('ef-save').click();
+  await expect(form.getByTestId('ef-message')).toContainText('doit commencer par https://');
+
+  await form.getByTestId('ef-att-url').fill('https://example.org/cours.pdf');
+  await form.getByTestId('ef-save').click();
+  await expect(form).toBeHidden();
+  await expect(page.getByTestId('agenda').getByTestId('cal-event-title').filter({ hasText: 'TP de chimie' })).toBeVisible();
+});
+
+test('a teacher edits and deletes events, signs back in and finds announcements', async ({ page }) => {
+  const email = uniqueEmail('marc');
+  await registerTeacher(page, { name: 'Marc Dupont', email });
+  await addEvent(page, { kind: 'reunion', title: 'Réunion parents-professeurs', start: '17:00', place: 'Salle des fêtes' });
+
+  // Edit: open the event, change the place.
+  const agenda = page.getByTestId('agenda');
+  const meeting = agenda.getByTestId('cal-event').filter({ hasText: 'Réunion parents-professeurs' });
+  await meeting.click();
+  const dialog = page.getByTestId('event-dialog');
+  await dialog.getByTestId('ev-edit').click();
+  const form = page.getByTestId('event-form');
+  await form.getByTestId('ef-place').fill('Chapelle');
+  await form.getByTestId('ef-save').click();
+  await expect(form).toBeHidden();
+  await expect(meeting).toContainText('Chapelle');
+
+  // Deleting asks for a confirmation.
+  await meeting.click();
+  await dialog.getByTestId('ev-delete').click();
+  await dialog.getByTestId('ev-delete-confirm').click();
+  await expect(meeting).toHaveCount(0);
+
+  // Announcements: validation, publish, sign out and back in, delete.
+  const card = page.getByTestId('announcements');
+  await card.getByTestId('publish').click();
+  await expect(card.getByText('Saisissez un titre.')).toBeVisible();
+  await announce(page, { title: 'Journée portes ouvertes', body: 'Samedi de 9 h à 13 h.' });
   await page.getByTestId('logout').click();
-  await expect(page.getByRole('tab', { name: 'Connexion' })).toBeVisible();
-
   await page.getByLabel('Adresse e-mail').fill(email);
   await page.getByLabel('Mot de passe').fill(PASSWORD);
   await page.getByRole('button', { name: 'Se connecter' }).click();
   await expect(page.getByTestId('teacher-dashboard')).toBeVisible();
-  await page.getByTestId('tab-mine').click();
   const mine = page.getByTestId('my-posts').getByTestId('post');
   await expect(mine).toHaveCount(1);
-  await expect(mine).toContainText('Réunion parents-professeurs');
   await mine.getByTestId('delete-post').click();
-  await expect(page.getByTestId('empty')).toContainText('Vous n’avez encore rien publié');
+  await expect(page.getByTestId('my-posts')).toHaveCount(0);
+});
+
+test('the class filter shows a class with its section’s events; weekly classes repeat on the next weeks', async ({ page }) => {
+  await registerTeacher(page, { name: 'Marc Dupont', email: uniqueEmail('marc') });
+  await addEvent(page, { kind: 'cours', title: 'Physique Première', target: 'Bac français — Première', start: '10:00', end: '11:00', weeklyUntil: isoDay(30) });
+  await addEvent(page, { kind: 'td', title: 'TD Terminale', target: 'Bac français — Terminale', start: '13:00', end: '14:00' });
+  await addEvent(page, { kind: 'activite', title: 'Club théâtre', target: 'Tout le Bac français', start: '15:00' });
+
+  const agenda = page.getByTestId('agenda');
+  const titles = agenda.getByTestId('cal-event-title');
+  await expect(titles).toHaveText(['Physique Première', 'TD Terminale', 'Club théâtre']);
+  await agenda.getByTestId('cal-filter').selectOption({ label: 'Bac français — Première' });
+  await expect(titles).toHaveText(['Physique Première', 'Club théâtre']);
+
+  await agenda.getByTestId('cal-next').click();
+  await expect(titles).toHaveText(['Physique Première']);
+  await agenda.getByTestId('cal-today').click();
+
+  // Hovering previews an event (desktop only: on phones a tap opens it).
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
+    await titles.first().hover();
+    await expect(agenda.locator('.preview').first()).toBeVisible();
+  }
+});
+
+test('« Ajouter à mon agenda » downloads an .ics file with the weekly repetition', async ({ page }) => {
+  await registerTeacher(page, { name: 'Marc Dupont', email: uniqueEmail('marc') });
+  await addEvent(page, { kind: 'cours', title: 'Anglais', start: '09:00', end: '10:00', place: 'Salle 7', weeklyUntil: isoDay(21) });
+  await page.getByTestId('agenda').getByTestId('cal-event').filter({ hasText: 'Anglais' }).click();
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('ev-ics').click()]);
+  expect(download.suggestedFilename()).toBe('Anglais.ics');
+  const chunks: Buffer[] = [];
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk as Buffer);
+  const text = Buffer.concat(chunks).toString('utf8');
+  expect(text).toContain('SUMMARY:Cours — Anglais');
+  expect(text).toContain('LOCATION:Salle 7');
+  expect(text).toContain('RRULE:FREQ=WEEKLY');
 });
 
 test('what teachers type is shown as text, and Arabic text reads right-to-left on its own', async ({ page }) => {
   await registerTeacher(page, { name: 'Marc Dupont', email: uniqueEmail('marc') });
-  await page.getByLabel('Titre').fill('<img src=x onerror="window.__pwned=1"> درس اللغة العربية');
-  await page.getByLabel('Message').fill('<script>window.__pwned=1</script>');
-  await page.getByTestId('publish').click();
-  await expect(page.getByTestId('form-message')).toContainText('Publié');
-
-  await page.getByTestId('tab-mine').click();
-  const title = page.getByTestId('post-title');
+  await announce(page, { title: '<img src=x onerror="window.__pwned=1"> درس اللغة العربية', body: '<script>window.__pwned=1</script>' });
+  const title = page.getByTestId('my-posts').getByTestId('post-title');
   await expect(title).toContainText('<img src=x onerror="window.__pwned=1">');
   await expect(title).toHaveAttribute('dir', 'auto');
   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();

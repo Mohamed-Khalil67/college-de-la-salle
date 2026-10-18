@@ -2,8 +2,8 @@ import { isPlatformBrowser } from '@angular/common';
 import { PLATFORM_ID, Service, computed, inject, isDevMode, signal } from '@angular/core';
 import type { Auth, User } from 'firebase/auth';
 import type { DocumentData, Firestore, Unsubscribe } from 'firebase/firestore';
-import type { CalendarEvent, EventKind } from './calendar.model';
-import type { Grade, Post, PostType, SectionId, StudentProfile, StudentSummary, Target } from './space.model';
+import { isEventKind, type Attachment, type CalendarEvent, type EventKind } from './calendar.model';
+import { gradeId, type Grade, type Post, type SectionId, type StudentProfile, type StudentSummary, type Target } from './space.model';
 
 /**
  * Production Firebase web config (public identifiers, not secrets — access is enforced by
@@ -44,32 +44,32 @@ export interface NewProfile {
 }
 
 export interface NewPost {
-  readonly type: PostType;
   readonly title: string;
   readonly body: string;
   readonly subject: string;
   readonly target: Target;
-  readonly dueDate: string | null;
-  readonly url: string | null;
 }
 
 export interface NewEvent {
   readonly kind: EventKind;
   readonly title: string;
-  readonly date: string;
-  readonly time: string;
-  readonly target: Target;
   readonly subject: string;
-  readonly note: string;
+  readonly target: Target;
+  readonly date: string;
+  readonly start: string;
+  readonly end: string;
+  readonly repeatUntil: string;
+  readonly place: string;
+  readonly description: string;
+  readonly attachments: readonly Attachment[];
+  readonly coefficient: number;
 }
 
-export interface NewGrade {
+/** One row of the grade grid: a student's mark for an exam (empty score = no mark). */
+export interface GradeRow {
   readonly studentUid: string;
   readonly studentName: string;
-  readonly subject: string;
-  readonly title: string;
-  readonly score: number;
-  readonly outOf: number;
+  readonly score: number | null;
   readonly comment: string;
 }
 
@@ -81,6 +81,7 @@ interface Sdk {
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 const millis = (v: unknown): number => (typeof v === 'object' && v !== null && 'toMillis' in v ? (v as { toMillis(): number }).toMillis() : 0);
 
 function toProfile(data: DocumentData): StudentProfile | null {
@@ -92,13 +93,10 @@ function toProfile(data: DocumentData): StudentProfile | null {
 function toPost(id: string, d: DocumentData): Post {
   return {
     id,
-    type: d['type'] === 'assignment' || d['type'] === 'resource' ? d['type'] : 'announcement',
     title: str(d['title']),
     body: str(d['body']),
     subject: str(d['subject']),
     target: str(d['target']) || 'all',
-    dueDate: typeof d['dueDate'] === 'string' ? d['dueDate'] : null,
-    url: typeof d['url'] === 'string' ? d['url'] : null,
     authorUid: str(d['authorUid']),
     authorName: str(d['authorName']),
     createdAt: millis(d['createdAt']),
@@ -106,15 +104,26 @@ function toPost(id: string, d: DocumentData): Post {
 }
 
 function toEvent(id: string, d: DocumentData): CalendarEvent {
+  const attachments = Array.isArray(d['attachments'])
+    ? d['attachments'].flatMap((a: unknown) => {
+        const o = (typeof a === 'object' && a !== null ? a : {}) as Record<string, unknown>;
+        return typeof o['url'] === 'string' ? [{ label: str(o['label']), url: o['url'] }] : [];
+      })
+    : [];
   return {
     id,
-    kind: d['kind'] === 'exam' || d['kind'] === 'meeting' ? d['kind'] : 'activity',
+    kind: isEventKind(d['kind']) ? d['kind'] : 'cours',
     title: str(d['title']),
-    date: str(d['date']),
-    time: str(d['time']),
-    target: str(d['target']) || 'all',
     subject: str(d['subject']),
-    note: str(d['note']),
+    target: str(d['target']) || 'all',
+    date: str(d['date']),
+    start: str(d['start']),
+    end: str(d['end']),
+    repeatUntil: str(d['repeatUntil']),
+    place: str(d['place']),
+    description: str(d['description']),
+    attachments,
+    coefficient: num(d['coefficient'], 1),
     authorUid: str(d['authorUid']),
     authorName: str(d['authorName']),
     createdAt: millis(d['createdAt']),
@@ -126,11 +135,14 @@ function toGrade(id: string, d: DocumentData): Grade {
     id,
     studentUid: str(d['studentUid']),
     studentName: str(d['studentName']),
+    eventId: str(d['eventId']),
     subject: str(d['subject']),
     title: str(d['title']),
-    score: Number(d['score']) || 0,
-    outOf: Number(d['outOf']) || 20,
+    score: num(d['score'], 0),
+    outOf: num(d['outOf'], 20),
+    coefficient: num(d['coefficient'], 1),
     comment: str(d['comment']),
+    published: d['published'] === true,
     teacherUid: str(d['teacherUid']),
     teacherName: str(d['teacherName']),
     createdAt: millis(d['createdAt']),
@@ -139,8 +151,8 @@ function toGrade(id: string, d: DocumentData): Grade {
 
 /**
  * The school space as signals: sign-in (e-mail + password), the role of the signed-in person, and the
- * live data they may see — posts and their own grades for a student; posts, the students list and the
- * grades they gave for a teacher.
+ * live data they may see — the calendar, announcements and their published grades for a student; the
+ * calendar, announcements, the students list and the grades they gave for a teacher.
  *
  * Firebase is loaded lazily and only in the browser (after the first render), so the prerendered pages
  * and the initial bundle never contain it. Writes show instantly (Firestore's local cache updates the
@@ -163,9 +175,9 @@ export class SpaceService {
   readonly #role = signal<Role>('loading');
   readonly #profile = signal<StudentProfile | null>(null);
   readonly #posts = signal<readonly Post[]>([]);
+  readonly #events = signal<readonly CalendarEvent[]>([]);
   readonly #grades = signal<readonly Grade[]>([]);
   readonly #students = signal<readonly StudentSummary[]>([]);
-  readonly #events = signal<readonly CalendarEvent[]>([]);
 
   /** The sign-in state is known (a signed-out visitor is « ready » too). */
   readonly ready = this.#ready.asReadonly();
@@ -173,12 +185,12 @@ export class SpaceService {
   readonly user = this.#user.asReadonly();
   readonly role = this.#role.asReadonly();
   readonly profile = this.#profile.asReadonly();
-  /** Newest first. For a student: every post (the page filters by audience). */
+  /** Announcements, newest first. A student's page keeps only those for their class. */
   readonly posts = this.#posts.asReadonly();
-  /** A student: their grades. A teacher: the grades they gave. */
-  readonly grades = this.#grades.asReadonly();
-  /** The shared calendar. Students see only what concerns their class (filtered by the page). */
+  /** The shared calendar. A student's page keeps only what concerns their class. */
   readonly events = this.#events.asReadonly();
+  /** A student: their published grades. A teacher: the grades they gave. */
+  readonly grades = this.#grades.asReadonly();
   /** Teachers only. */
   readonly students = this.#students.asReadonly();
   readonly signedIn = computed(() => this.#user() !== null);
@@ -205,9 +217,9 @@ export class SpaceService {
     this.#detach();
     this.#profile.set(null);
     this.#posts.set([]);
+    this.#events.set([]);
     this.#grades.set([]);
     this.#students.set([]);
-    this.#events.set([]);
     if (!user) {
       this.#user.set(null);
       this.#role.set('loading');
@@ -239,8 +251,21 @@ export class SpaceService {
     this.#listeners = [];
   }
 
+  /** Announcements and the calendar: the same for students and teachers. */
+  #listenShared(sdk: Sdk): Unsubscribe[] {
+    const { onSnapshot, collection, query, orderBy, limit } = sdk.fsFns;
+    return [
+      onSnapshot(query(collection(sdk.db, 'posts'), orderBy('createdAt', 'desc'), limit(100)), (s) =>
+        this.#posts.set(s.docs.map((d) => toPost(d.id, d.data({ serverTimestamps: 'estimate' })))),
+      ),
+      onSnapshot(query(collection(sdk.db, 'events'), orderBy('date'), limit(1000)), (s) =>
+        this.#events.set(s.docs.map((d) => toEvent(d.id, d.data({ serverTimestamps: 'estimate' })))),
+      ),
+    ];
+  }
+
   #listenStudent(sdk: Sdk, uid: string, generation: number): void {
-    const { doc, onSnapshot, collection, query, where, orderBy, limit } = sdk.fsFns;
+    const { doc, onSnapshot, collection, query, where } = sdk.fsFns;
     let dataStarted = false;
     this.#listeners.push(
       onSnapshot(
@@ -257,13 +282,9 @@ export class SpaceService {
           if (profile && !dataStarted && !snap.metadata.hasPendingWrites) {
             dataStarted = true;
             this.#listeners.push(
-              onSnapshot(query(collection(sdk.db, 'posts'), orderBy('createdAt', 'desc'), limit(200)), (s) =>
-                this.#posts.set(s.docs.map((d) => toPost(d.id, d.data({ serverTimestamps: 'estimate' })))),
-              ),
-              onSnapshot(query(collection(sdk.db, 'events'), orderBy('date'), limit(500)), (s) =>
-        this.#events.set(s.docs.map((d) => toEvent(d.id, d.data()))),
-      ),
-              onSnapshot(query(collection(sdk.db, 'grades'), where('studentUid', '==', uid)), (s) =>
+              ...this.#listenShared(sdk),
+              // Only published grades: the rules refuse a query that could return a draft.
+              onSnapshot(query(collection(sdk.db, 'grades'), where('studentUid', '==', uid), where('published', '==', true)), (s) =>
                 this.#grades.set(s.docs.map((d) => toGrade(d.id, d.data({ serverTimestamps: 'estimate' })))),
               ),
             );
@@ -278,14 +299,9 @@ export class SpaceService {
   }
 
   #listenTeacher(sdk: Sdk, uid: string): void {
-    const { onSnapshot, collection, query, where, orderBy, limit } = sdk.fsFns;
+    const { onSnapshot, collection, query, where } = sdk.fsFns;
     this.#listeners.push(
-      onSnapshot(query(collection(sdk.db, 'posts'), orderBy('createdAt', 'desc'), limit(200)), (s) =>
-        this.#posts.set(s.docs.map((d) => toPost(d.id, d.data({ serverTimestamps: 'estimate' })))),
-      ),
-      onSnapshot(query(collection(sdk.db, 'events'), orderBy('date'), limit(500)), (s) =>
-        this.#events.set(s.docs.map((d) => toEvent(d.id, d.data()))),
-      ),
+      ...this.#listenShared(sdk),
       onSnapshot(query(collection(sdk.db, 'grades'), where('teacherUid', '==', uid)), (s) =>
         this.#grades.set(s.docs.map((d) => toGrade(d.id, d.data({ serverTimestamps: 'estimate' })))),
       ),
@@ -373,14 +389,14 @@ export class SpaceService {
 
   /* ---------------------------------------------------------------- student */
 
-  isDone(postId: string): boolean {
-    return this.#profile()?.done.includes(postId) ?? false;
+  isDone(eventId: string): boolean {
+    return this.#profile()?.done.includes(eventId) ?? false;
   }
 
-  async toggleDone(postId: string): Promise<void> {
+  async toggleDone(eventId: string): Promise<void> {
     const sdk = await this.#need();
     const { arrayRemove, arrayUnion } = sdk.fsFns;
-    await this.#patch({ done: this.isDone(postId) ? arrayRemove(postId) : arrayUnion(postId) });
+    await this.#patch({ done: this.isDone(eventId) ? arrayRemove(eventId) : arrayUnion(eventId) });
   }
 
   async #patch(fields: Record<string, unknown>): Promise<void> {
@@ -391,12 +407,11 @@ export class SpaceService {
     await updateDoc(doc(sdk.db, 'students', uid), { ...fields, updatedAt: serverTimestamp() });
   }
 
-  /* ---------------------------------------------------------------- teacher */
+  /* ---------------------------------------------------------------- teacher: announcements */
 
   async publishPost(post: NewPost): Promise<void> {
     const sdk = await this.#need();
-    const user = sdk.auth.currentUser;
-    if (!user) throw new Error('NOT_SIGNED_IN');
+    const user = this.#currentUser(sdk);
     const { addDoc, collection, serverTimestamp } = sdk.fsFns;
     await addDoc(collection(sdk.db, 'posts'), {
       ...post,
@@ -413,12 +428,20 @@ export class SpaceService {
     await sdk.fsFns.deleteDoc(sdk.fsFns.doc(sdk.db, 'posts', id));
   }
 
+  /* ---------------------------------------------------------------- teacher: calendar */
+
+  /** Creates an event, or replaces the content of an existing one (its author and creation time stay). */
   async saveEvent(event: NewEvent, id?: string): Promise<void> {
     const sdk = await this.#need();
-    const user = sdk.auth.currentUser;
-    if (!user) throw new Error('NOT_SIGNED_IN');
+    const user = this.#currentUser(sdk);
     const { addDoc, collection, doc, updateDoc, serverTimestamp } = sdk.fsFns;
-    const content = { ...event, title: event.title.trim(), note: event.note.trim() };
+    const content = {
+      ...event,
+      title: event.title.trim(),
+      place: event.place.trim(),
+      description: event.description.trim(),
+      attachments: event.attachments.map((a) => ({ label: a.label.trim(), url: a.url.trim() })),
+    };
     if (id) {
       await updateDoc(doc(sdk.db, 'events', id), content);
       return;
@@ -436,24 +459,48 @@ export class SpaceService {
     await sdk.fsFns.deleteDoc(sdk.fsFns.doc(sdk.db, 'events', id));
   }
 
-  async addGrade(grade: NewGrade): Promise<void> {
+  /* ---------------------------------------------------------------- teacher: grades */
+
+  /**
+   * Saves the grade grid of an exam in one batch: a mark creates or corrects that student's grade, an
+   * emptied mark removes it. `published` decides whether students see them.
+   */
+  async saveGrades(event: CalendarEvent, outOf: number, rows: readonly GradeRow[], published: boolean): Promise<void> {
     const sdk = await this.#need();
-    const user = sdk.auth.currentUser;
-    if (!user) throw new Error('NOT_SIGNED_IN');
-    const { addDoc, collection, serverTimestamp } = sdk.fsFns;
-    await addDoc(collection(sdk.db, 'grades'), {
-      ...grade,
-      title: grade.title.trim(),
-      comment: grade.comment.trim(),
-      teacherUid: user.uid,
-      teacherName: user.displayName || user.email || 'Enseignant',
-      createdAt: serverTimestamp(),
-    });
+    const user = this.#currentUser(sdk);
+    const { doc, writeBatch, serverTimestamp } = sdk.fsFns;
+    const existing = new Map(this.#grades().filter((g) => g.eventId === event.id).map((g) => [g.studentUid, g]));
+    const batch = writeBatch(sdk.db);
+    for (const row of rows) {
+      const ref = doc(sdk.db, 'grades', gradeId(event.id, row.studentUid));
+      const before = existing.get(row.studentUid);
+      if (row.score === null) {
+        if (before) batch.delete(ref);
+        continue;
+      }
+      const content = {
+        studentName: row.studentName,
+        subject: event.subject,
+        title: event.title,
+        score: row.score,
+        outOf,
+        coefficient: event.coefficient,
+        comment: row.comment.trim(),
+        published,
+        teacherName: user.displayName || user.email || 'Enseignant',
+        updatedAt: serverTimestamp(),
+      };
+      // A correction updates the mark and keeps who, which exam and when it was first given.
+      if (before) batch.update(ref, content);
+      else batch.set(ref, { ...content, studentUid: row.studentUid, eventId: event.id, teacherUid: user.uid, createdAt: serverTimestamp() });
+    }
+    await batch.commit();
   }
 
-  async deleteGrade(id: string): Promise<void> {
-    const sdk = await this.#need();
-    await sdk.fsFns.deleteDoc(sdk.fsFns.doc(sdk.db, 'grades', id));
+  #currentUser(sdk: Sdk): User {
+    const user = sdk.auth.currentUser;
+    if (!user) throw new Error('NOT_SIGNED_IN');
+    return user;
   }
 
   /* ---------------------------------------------------------------- plumbing */

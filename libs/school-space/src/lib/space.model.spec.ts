@@ -12,7 +12,7 @@ import {
   onTwenty,
   parseNumber,
   postsFor,
-  splitAssignments,
+  gradeId,
   TARGET_OPTIONS,
   targetLabel,
   todayIso,
@@ -22,28 +22,28 @@ import {
 
 const post = (id: string, over: Partial<Post> = {}): Post => ({
   id,
-  type: 'announcement',
   title: id,
   body: '',
   subject: '',
   target: 'all',
-  dueDate: null,
-  url: null,
   authorUid: 'u',
   authorName: 'Marc',
   createdAt: 1,
   ...over,
 });
 
-const grade = (id: string, subject: string, score: number, outOf: number, createdAt = 1): Grade => ({
+const grade = (id: string, subject: string, score: number, outOf: number, createdAt = 1, coefficient = 1): Grade => ({
   id,
   studentUid: 's',
   studentName: 'Sara',
+  eventId: `e-${id}`,
   subject,
   title: id,
   score,
   outOf,
+  coefficient,
   comment: '',
+  published: true,
   teacherUid: 't',
   teacherName: 'Marc',
   createdAt,
@@ -75,24 +75,12 @@ describe('audiences', () => {
       post('old', { createdAt: 1 }),
       post('new', { createdAt: 3 }),
       post('other-class', { target: 'bac-terminale', createdAt: 4 }),
-      post('homework', { type: 'assignment', createdAt: 5 }),
     ];
-    expect(postsFor(posts, 'announcement', 'bac', 'premiere').map((p) => p.id)).toEqual(['new', 'old']);
+    expect(postsFor(posts, 'bac', 'premiere').map((p) => p.id)).toEqual(['new', 'old']);
   });
 });
 
 describe('homework', () => {
-  it('splits to-do (soonest due first) from done', () => {
-    const list = [
-      post('b', { type: 'assignment', dueDate: '2026-11-05' }),
-      post('a', { type: 'assignment', dueDate: '2026-11-02' }),
-      post('c', { type: 'assignment', dueDate: '2026-11-09' }),
-    ];
-    const { todo, finished } = splitAssignments(list, ['c']);
-    expect(todo.map((p) => p.id)).toEqual(['a', 'b']);
-    expect(finished.map((p) => p.id)).toEqual(['c']);
-  });
-
   it('describes the due date relative to today', () => {
     expect(dueState('2026-11-01', '2026-11-02')).toBe('overdue');
     expect(dueState('2026-11-02', '2026-11-02')).toBe('today');
@@ -120,6 +108,16 @@ describe('grades', () => {
     expect(onTwenty({ score: 7, outOf: 10 })).toBe(14);
     expect(onTwenty({ score: 15, outOf: 20 })).toBe(15);
     expect(onTwenty({ score: 40, outOf: 50 })).toBe(16);
+  });
+
+  it('weights the average by coefficient', () => {
+    // 10/20 with coefficient 1 and 16/20 with coefficient 2 → (10 + 32) / 3 = 14
+    expect(averageOnTwenty([{ score: 10, outOf: 20, coefficient: 1 }, { score: 16, outOf: 20, coefficient: 2 }])).toBe(14);
+    expect(gradesBySubject([grade('a', 'maths', 10, 20, 1, 1), grade('b', 'maths', 16, 20, 2, 2)])[0]!.average).toBe(14);
+  });
+
+  it('one grade per student and exam: the id is {eventId}_{studentUid}', () => {
+    expect(gradeId('exam1', 'uid42')).toBe('exam1_uid42');
   });
 
   it('averages on 20 to one decimal, and has no average without grades', () => {

@@ -77,29 +77,16 @@ export function audienceMatches(target: Target, section: SectionId, classe: stri
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Posts: announcements, homework, resources
+ * Announcements (everything with a date lives in the calendar)
  * ---------------------------------------------------------------------------------------------- */
-
-export type PostType = 'announcement' | 'assignment' | 'resource';
-
-export const POST_TYPES: readonly { readonly id: PostType; readonly label: string; readonly plural: string }[] = [
-  { id: 'announcement', label: 'Annonce', plural: 'Annonces' },
-  { id: 'assignment', label: 'Devoir', plural: 'Devoirs' },
-  { id: 'resource', label: 'Ressource', plural: 'Ressources' },
-];
 
 export interface Post {
   readonly id: string;
-  readonly type: PostType;
   readonly title: string;
   readonly body: string;
   /** A catalogue subject id (see site-content/matieres.ts), or '' for none. */
   readonly subject: string;
   readonly target: Target;
-  /** YYYY-MM-DD; assignments only. */
-  readonly dueDate: string | null;
-  /** https link; resources only. */
-  readonly url: string | null;
   readonly authorUid: string;
   readonly authorName: string;
   readonly createdAt: number;
@@ -116,7 +103,9 @@ export const LIMITS = {
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isCalendarDay(value: string): boolean {
-  return DAY.test(value) && !Number.isNaN(Date.parse(`${value}T12:00:00Z`));
+  if (!DAY.test(value)) return false;
+  const d = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
 }
 
 /** https links only: never `javascript:`, `data:` or plain http. */
@@ -153,42 +142,37 @@ export function dueState(dueDate: string, today: string): DueState {
   return days <= 3 ? 'soon' : 'later';
 }
 
-/** Posts of a type that concern a student, newest first. */
-export function postsFor(posts: readonly Post[], type: PostType, section: SectionId, classe: string): Post[] {
-  return posts
-    .filter((p) => p.type === type && audienceMatches(p.target, section, classe))
-    .sort((a, b) => b.createdAt - a.createdAt);
-}
-
-/** Homework split for the « Devoirs » tab: to do (soonest due first), then done (latest first). */
-export function splitAssignments(
-  assignments: readonly Post[],
-  done: readonly string[],
-): { readonly todo: Post[]; readonly finished: Post[] } {
-  const doneSet = new Set(done);
-  const byDue = (a: Post, b: Post) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999');
-  return {
-    todo: assignments.filter((a) => !doneSet.has(a.id)).sort(byDue),
-    finished: assignments.filter((a) => doneSet.has(a.id)).sort((a, b) => byDue(b, a)),
-  };
+/** Announcements that concern a student, newest first. */
+export function postsFor(posts: readonly Post[], section: SectionId, classe: string): Post[] {
+  return posts.filter((p) => audienceMatches(p.target, section, classe)).sort((a, b) => b.createdAt - a.createdAt);
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Grades
+ * Grades: entered per exam (a calendar event), published when the teacher decides
  * ---------------------------------------------------------------------------------------------- */
 
 export interface Grade {
   readonly id: string;
   readonly studentUid: string;
   readonly studentName: string;
+  /** The calendar event (examen, contrôle, TP, devoir) it belongs to. */
+  readonly eventId: string;
   readonly subject: string;
   readonly title: string;
   readonly score: number;
   readonly outOf: number;
+  readonly coefficient: number;
   readonly comment: string;
+  /** Students only see published grades. */
+  readonly published: boolean;
   readonly teacherUid: string;
   readonly teacherName: string;
   readonly createdAt: number;
+}
+
+/** One grade document per student and exam, so entering a mark again corrects it. */
+export function gradeId(eventId: string, studentUid: string): string {
+  return `${eventId}_${studentUid}`;
 }
 
 /** A grade ramped to a mark out of 20 (the French/Egyptian convention), unrounded. */
@@ -200,10 +184,11 @@ export function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Average of several grades on 20, to one decimal; null when there are none. */
-export function averageOnTwenty(grades: readonly Pick<Grade, 'score' | 'outOf'>[]): number | null {
-  if (!grades.length) return null;
-  return round1(grades.reduce((sum, g) => sum + onTwenty(g), 0) / grades.length);
+/** Weighted average on 20 (coefficient 1 when absent), to one decimal; null when there are none. */
+export function averageOnTwenty(grades: readonly (Pick<Grade, 'score' | 'outOf'> & { readonly coefficient?: number })[]): number | null {
+  const weight = grades.reduce((sum, g) => sum + (g.coefficient ?? 1), 0);
+  if (!grades.length || weight <= 0) return null;
+  return round1(grades.reduce((sum, g) => sum + onTwenty(g) * (g.coefficient ?? 1), 0) / weight);
 }
 
 export interface SubjectGrades {
@@ -241,7 +226,7 @@ export interface StudentProfile {
   readonly displayName: string;
   readonly section: SectionId;
   readonly classe: string;
-  /** Ids of the homework the student marked as done. */
+  /** Ids of the « devoir » events the student marked as done. */
   readonly done: readonly string[];
 }
 

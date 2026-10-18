@@ -4,8 +4,8 @@
  *   npm run test:rules
  *
  * Proves: a student reaches only their own data; only a VERIFIED, ALLOW-LISTED teacher can publish and
- * grade; nobody can edit the allow-list from a client; a grade is readable only by its student and the
- * teacher who gave it.
+ * grade; nobody can edit the allow-list from a client; a grade is readable only by its student, once
+ * published, and by the teacher who gave it.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -35,6 +35,7 @@ const OMAR = 'student-omar';
 const MARC = 'teacher-marc';
 const LEA = 'teacher-lea';
 const MARC_EMAIL = 'marc@lasalle.test';
+const EXAM = 'exam1';
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
@@ -78,13 +79,10 @@ const studentDoc = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const postDoc = (authorUid = MARC, overrides: Record<string, unknown> = {}) => ({
-  type: 'announcement',
   title: 'Sortie au musée',
   body: 'Rendez-vous à 8 h.',
   subject: '',
   target: 'all',
-  dueDate: null,
-  url: null,
   authorUid,
   authorName: 'Marc Dupont',
   createdAt: serverTimestamp(),
@@ -94,16 +92,22 @@ const postDoc = (authorUid = MARC, overrides: Record<string, unknown> = {}) => (
 const gradeDoc = (studentUid = SARA, overrides: Record<string, unknown> = {}) => ({
   studentUid,
   studentName: 'Sara Ibrahim',
+  eventId: EXAM,
   subject: 'mathematiques',
   title: 'Contrôle 1',
   score: 14.5,
   outOf: 20,
+  coefficient: 2,
   comment: 'Bon travail.',
+  published: false,
   teacherUid: MARC,
   teacherName: 'Marc Dupont',
   createdAt: serverTimestamp(),
+  updatedAt: serverTimestamp(),
   ...overrides,
 });
+
+const gradeRef = (db: Firestore, studentUid = SARA, eventId = EXAM) => doc(db, 'grades', `${eventId}_${studentUid}`);
 
 async function seed(path: [string, string], data: Record<string, unknown>): Promise<void> {
   await env.withSecurityRulesDisabled(async (ctx) => {
@@ -114,12 +118,15 @@ async function seed(path: [string, string], data: Record<string, unknown>): Prom
 const seedStudent = (uid: string, overrides: Record<string, unknown> = {}) =>
   seed(['students', uid], { ...studentDoc(), createdAt: Timestamp.fromMillis(1_000), updatedAt: Timestamp.fromMillis(1_000), ...overrides });
 
+const seedGrade = (studentUid: string, overrides: Record<string, unknown> = {}) =>
+  seed(['grades', `${EXAM}_${studentUid}`], { ...gradeDoc(studentUid), createdAt: Timestamp.fromMillis(1_000), updatedAt: Timestamp.fromMillis(1_000), ...overrides });
+
 describe('students: own document only', () => {
   it('a student creates, reads, updates and deletes their own profile', async () => {
     const db = student(SARA);
     await assertSucceeds(setDoc(doc(db, 'students', SARA), studentDoc()));
     await assertSucceeds(getDoc(doc(db, 'students', SARA)));
-    await assertSucceeds(updateDoc(doc(db, 'students', SARA), { done: arrayUnion('post-1'), updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db, 'students', SARA), { done: arrayUnion('devoir-1'), updatedAt: serverTimestamp() }));
     await assertSucceeds(updateDoc(doc(db, 'students', SARA), { classe: 'terminale', updatedAt: serverTimestamp() }));
     await assertSucceeds(deleteDoc(doc(db, 'students', SARA)));
   });
@@ -173,40 +180,28 @@ describe('teachers: the allow-list is read-only for clients', () => {
   });
 });
 
-describe('posts', () => {
-  it('a verified, listed teacher publishes an announcement, a homework and a resource', async () => {
-    const db = teacher();
-    await assertSucceeds(addDoc(collection(db, 'posts'), postDoc()));
-    await assertSucceeds(addDoc(collection(db, 'posts'), postDoc(MARC, { type: 'assignment', dueDate: '2026-11-03', subject: 'mathematiques', target: 'bac-premiere' })));
-    await assertSucceeds(addDoc(collection(db, 'posts'), postDoc(MARC, { type: 'resource', url: 'https://example.org/cours.pdf', target: 'nationale' })));
-  });
-
-  it('nobody else can publish: students, outsiders, unverified teachers, visitors', async () => {
+describe('announcements', () => {
+  it('a verified, listed teacher publishes; nobody else can', async () => {
+    await assertSucceeds(addDoc(collection(teacher(), 'posts'), postDoc()));
+    await assertSucceeds(addDoc(collection(teacher(), 'posts'), postDoc(MARC, { target: 'bac-premiere', subject: 'mathematiques' })));
     for (const db of [student(SARA), outsider(), unverifiedTeacher(), anonymousUser(), visitor()]) {
       await assertFails(addDoc(collection(db, 'posts'), postDoc(SARA)));
       await assertFails(addDoc(collection(db, 'posts'), postDoc(MARC)));
     }
   });
 
-  it('rejects malformed posts', async () => {
+  it('rejects malformed announcements', async () => {
     const posts = collection(teacher(), 'posts');
     await assertFails(addDoc(posts, postDoc(LEA)));
-    await assertFails(addDoc(posts, postDoc(MARC, { type: 'poll' })));
     await assertFails(addDoc(posts, postDoc(MARC, { title: '' })));
     await assertFails(addDoc(posts, postDoc(MARC, { title: 'x'.repeat(121) })));
     await assertFails(addDoc(posts, postDoc(MARC, { body: 'x'.repeat(4001) })));
     await assertFails(addDoc(posts, postDoc(MARC, { target: 'cm2' })));
     await assertFails(addDoc(posts, postDoc(MARC, { type: 'assignment' })));
-    await assertFails(addDoc(posts, postDoc(MARC, { type: 'assignment', dueDate: 'demain' })));
-    await assertFails(addDoc(posts, postDoc(MARC, { dueDate: '2026-11-03' })));
-    await assertFails(addDoc(posts, postDoc(MARC, { type: 'resource', url: 'javascript:alert(1)' })));
-    await assertFails(addDoc(posts, postDoc(MARC, { type: 'resource', url: 'http://example.org' })));
-    await assertFails(addDoc(posts, postDoc(MARC, { url: 'https://example.org' })));
     await assertFails(addDoc(posts, postDoc(MARC, { createdAt: Timestamp.fromMillis(5) })));
-    await assertFails(addDoc(posts, postDoc(MARC, { extra: 1 })));
   });
 
-  it('students and teachers read posts; visitors, outsiders and anonymous users do not', async () => {
+  it('students and teachers read them; visitors, outsiders and anonymous users do not', async () => {
     await seedStudent(SARA);
     await seed(['posts', 'p1'], { ...postDoc(), createdAt: Timestamp.fromMillis(1_000) });
     await assertSucceeds(getDocs(collection(student(SARA), 'posts')));
@@ -217,7 +212,7 @@ describe('posts', () => {
     await assertFails(getDoc(doc(visitor(), 'posts', 'p1')));
   });
 
-  it('posts are never edited; only the author deletes theirs', async () => {
+  it('are never edited; only the author deletes theirs', async () => {
     await seed(['posts', 'p1'], { ...postDoc(), createdAt: Timestamp.fromMillis(1_000) });
     await assertFails(updateDoc(doc(teacher(), 'posts', 'p1'), { title: 'Changé' }));
     await assertFails(deleteDoc(doc(teacher(LEA, 'lea@lasalle.test'), 'posts', 'p1')));
@@ -250,60 +245,83 @@ describe('grades', () => {
     await seedStudent(OMAR);
   });
 
-  it('a verified, listed teacher grades an existing student', async () => {
-    await assertSucceeds(addDoc(collection(teacher(), 'grades'), gradeDoc()));
-    await assertSucceeds(addDoc(collection(teacher(), 'grades'), gradeDoc(SARA, { score: 0, outOf: 10, comment: '' })));
+  it('a verified, listed teacher enters a grade for an existing student, as a draft or published', async () => {
+    await assertSucceeds(setDoc(gradeRef(teacher()), gradeDoc()));
+    await assertSucceeds(setDoc(gradeRef(teacher(), OMAR), gradeDoc(OMAR, { score: 0, outOf: 10, comment: '', published: true })));
+  });
+
+  it('the document id must be {eventId}_{studentUid}', async () => {
+    await assertFails(setDoc(doc(teacher(), 'grades', 'anything'), gradeDoc()));
+    await assertFails(setDoc(gradeRef(teacher(), OMAR), gradeDoc(SARA)));
   });
 
   it('nobody else can grade', async () => {
     for (const db of [student(SARA), outsider(), unverifiedTeacher(), visitor()]) {
-      await assertFails(addDoc(collection(db, 'grades'), gradeDoc()));
+      await assertFails(setDoc(gradeRef(db), gradeDoc()));
     }
   });
 
   it('rejects malformed grades', async () => {
-    const grades = collection(teacher(), 'grades');
-    await assertFails(addDoc(grades, gradeDoc('ghost')));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { score: 21 })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { score: -1 })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { outOf: 0 })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { outOf: 101 })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { score: '14' })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { subject: '' })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { title: '' })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { comment: 'x'.repeat(1001) })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { teacherUid: LEA })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { createdAt: Timestamp.fromMillis(5) })));
-    await assertFails(addDoc(grades, gradeDoc(SARA, { extra: 1 })));
+    const db = teacher();
+    await assertFails(setDoc(gradeRef(db, 'ghost'), gradeDoc('ghost')));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { score: 21 })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { score: -1 })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { outOf: 0 })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { outOf: 101 })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { score: '14' })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { coefficient: 0 })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { coefficient: 21 })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { published: 'yes' })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { title: '' })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { comment: 'x'.repeat(1001) })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { teacherUid: LEA })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { createdAt: Timestamp.fromMillis(5) })));
+    await assertFails(setDoc(gradeRef(db), gradeDoc(SARA, { extra: 1 })));
   });
 
-  it('a student reads only their own grades', async () => {
-    await seed(['grades', 'g1'], { ...gradeDoc(SARA), createdAt: Timestamp.fromMillis(1_000) });
-    await seed(['grades', 'g2'], { ...gradeDoc(OMAR), createdAt: Timestamp.fromMillis(1_000) });
-    await assertSucceeds(getDoc(doc(student(SARA), 'grades', 'g1')));
-    await assertFails(getDoc(doc(student(SARA), 'grades', 'g2')));
-    await assertSucceeds(getDocs(query(collection(student(SARA), 'grades'), where('studentUid', '==', SARA))));
+  it('a student sees their grade only once it is published, and never another student’s', async () => {
+    await seedGrade(SARA, { published: false });
+    await seedGrade(OMAR, { published: true });
+    await assertFails(getDoc(gradeRef(student(SARA))));
+    await assertFails(getDoc(gradeRef(student(SARA), OMAR)));
+    await assertSucceeds(getDocs(query(collection(student(SARA), 'grades'), where('studentUid', '==', SARA), where('published', '==', true))));
+    // A query that could return a draft is refused.
+    await assertFails(getDocs(query(collection(student(SARA), 'grades'), where('studentUid', '==', SARA))));
     await assertFails(getDocs(collection(student(SARA), 'grades')));
-    await assertFails(getDocs(query(collection(student(SARA), 'grades'), where('studentUid', '==', OMAR))));
-    await assertFails(getDoc(doc(visitor(), 'grades', 'g1')));
+
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(gradeRef(ctx.firestore() as unknown as Firestore), { published: true });
+    });
+    await assertSucceeds(getDoc(gradeRef(student(SARA))));
+    await assertFails(getDoc(gradeRef(visitor())));
   });
 
-  it('a teacher reads only the grades they gave', async () => {
-    await seed(['grades', 'g1'], { ...gradeDoc(SARA), createdAt: Timestamp.fromMillis(1_000) });
-    await seed(['grades', 'g2'], { ...gradeDoc(SARA, { teacherUid: LEA, teacherName: 'Léa' }), createdAt: Timestamp.fromMillis(1_000) });
+  it('a teacher reads only the grades they gave, drafts included', async () => {
+    await seedGrade(SARA, { published: false });
+    await seed(['grades', `exam2_${SARA}`], { ...gradeDoc(SARA, { eventId: 'exam2', teacherUid: LEA, teacherName: 'Léa' }), createdAt: Timestamp.fromMillis(1_000), updatedAt: Timestamp.fromMillis(1_000) });
     await assertSucceeds(getDocs(query(collection(teacher(), 'grades'), where('teacherUid', '==', MARC))));
-    await assertSucceeds(getDoc(doc(teacher(), 'grades', 'g1')));
-    await assertFails(getDoc(doc(teacher(), 'grades', 'g2')));
+    await assertSucceeds(getDoc(gradeRef(teacher())));
+    await assertFails(getDoc(doc(teacher(), 'grades', `exam2_${SARA}`)));
     await assertFails(getDocs(collection(teacher(), 'grades')));
   });
 
-  it('grades are never edited; only the teacher who gave one deletes it', async () => {
-    await seed(['grades', 'g1'], { ...gradeDoc(SARA), createdAt: Timestamp.fromMillis(1_000) });
-    await assertFails(updateDoc(doc(teacher(), 'grades', 'g1'), { score: 20 }));
-    await assertFails(updateDoc(doc(student(SARA), 'grades', 'g1'), { score: 20 }));
-    await assertFails(deleteDoc(doc(student(SARA), 'grades', 'g1')));
-    await assertFails(deleteDoc(doc(teacher(LEA, 'lea@lasalle.test'), 'grades', 'g1')));
-    await assertSucceeds(deleteDoc(doc(teacher(), 'grades', 'g1')));
+  it('the teacher who gave a grade corrects and publishes it; student, exam and date never change', async () => {
+    await seedGrade(SARA);
+    const ref = gradeRef(teacher());
+    await assertSucceeds(updateDoc(ref, { score: 16, comment: 'Corrigé', published: true, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { score: 17, updatedAt: Timestamp.fromMillis(5) }));
+    await assertFails(updateDoc(ref, { studentUid: OMAR, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { eventId: 'other', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { createdAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(gradeRef(teacher(LEA, 'lea@lasalle.test')), { score: 20, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(gradeRef(student(SARA)), { score: 20, updatedAt: serverTimestamp() }));
+  });
+
+  it('only the teacher who gave a grade deletes it', async () => {
+    await seedGrade(SARA, { published: true });
+    await assertFails(deleteDoc(gradeRef(student(SARA))));
+    await assertFails(deleteDoc(gradeRef(teacher(LEA, 'lea@lasalle.test'))));
+    await assertSucceeds(deleteDoc(gradeRef(teacher())));
   });
 });
 

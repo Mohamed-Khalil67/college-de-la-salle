@@ -1,49 +1,37 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { form, FormField, maxLength, required } from '@angular/forms/signals';
-import { MATIERES, matiereName } from '@site/content';
-import {
-  CLASSES,
-  FORMAT_MARK,
-  frenchError,
-  isCalendarDay,
-  isHttpsUrl,
-  LIMITS,
-  parseNumber,
-  POST_TYPES,
-  SECTION_LABELS,
-  TARGET_OPTIONS,
-  todayIso,
-  type PostType,
-} from './space.model';
+import { MATIERES } from '@site/content';
+import { kindInfo, longDay, type CalendarEvent } from './calendar.model';
+import { frenchError, LIMITS, TARGET_OPTIONS, targetLabel } from './space.model';
 import { SpaceService } from './space.service';
+import { Agenda } from './ui/agenda';
 import { AuthPanel } from './ui/auth-panel';
-import { Calendar } from './ui/calendar';
+import { EventDetails } from './ui/event-details';
+import { EventForm } from './ui/event-form';
+import { GradeGrid } from './ui/grade-grid';
 import { PostCard } from './ui/post-card';
-import { SPACE_STYLES } from './ui/space.styles';
-
-type Tab = 'publish' | 'mine' | 'calendar' | 'grades';
-
-const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+import { KIND_STYLES, SPACE_STYLES } from './ui/space.styles';
 
 /**
- * `/espace-enseignant`: sign in, then publish announcements, homework and resources to a class or a
- * section, and enter grades. Only e-mails listed by the school (teachers/{email}) can do this.
+ * `/espace-enseignant`: the same single page as the students', editable. The shared calendar (add, edit,
+ * move, delete classes, exams, homework… with documents and videos), the grades of each exam in one grid,
+ * and announcements. Only e-mails listed by the school (teachers/{email}) and verified can do this.
  */
 @Component({
   selector: 'space-teacher-page',
-  imports: [FormField, AuthPanel, Calendar, PostCard],
+  imports: [FormField, AuthPanel, Agenda, EventDetails, EventForm, GradeGrid, PostCard],
   template: `
     <header class="bg-navy-900 text-cream">
-      <div class="on-dark mx-auto grid max-w-6xl gap-2 px-4 py-12">
+      <div class="on-dark mx-auto grid max-w-6xl gap-2 px-4 py-10">
         <p class="kicker">Collège de la Salle · Daher</p>
         <h1 class="m-0 text-4xl text-white md:text-5xl">Espace enseignant</h1>
         <p class="m-0 max-w-2xl text-lg text-cream/90">
-          Publiez des annonces, des devoirs et des ressources pour une classe ou une section, et saisissez les notes de vos élèves.
+          Le calendrier des classes, les examens et leurs notes, les annonces : tout ce que vos élèves voient, en modifiable.
         </p>
       </div>
     </header>
 
-    <div class="mx-auto max-w-5xl px-4 py-12">
+    <div class="mx-auto max-w-6xl px-4 py-10">
       @if (!space.enabled) {
         <p class="m-0 rounded-xl bg-warn-soft p-5 text-warn" role="status" data-testid="unavailable">L’espace enseignant sera disponible prochainement.</p>
       } @else if (space.unavailable()) {
@@ -84,222 +72,121 @@ const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', 
         </div>
       } @else {
         <div class="grid gap-8" data-testid="teacher-dashboard">
-          <section class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-6" aria-labelledby="hello">
+          <section class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-5" aria-labelledby="hello">
             <div>
               <h2 id="hello" class="m-0 text-2xl" data-testid="hello">Bonjour {{ space.firstName() }}</h2>
               <p class="m-0 mt-1 text-sm text-muted"><bdi>{{ space.user()?.email }}</bdi> · enseignant</p>
             </div>
-            <button type="button" class="btn btn-outline-dark" (click)="onLogout()" data-testid="logout">Se déconnecter</button>
+            <div class="flex flex-wrap gap-3">
+              <button type="button" class="btn btn-navy" (click)="eventForm.open()" data-testid="new-event">+ Ajouter un événement</button>
+              <button type="button" class="btn btn-outline-dark" (click)="onLogout()" data-testid="logout">Se déconnecter</button>
+            </div>
           </section>
 
-          <div class="grid gap-6">
-            <div role="tablist" aria-label="Espace enseignant" class="flex flex-wrap gap-1 rounded-full bg-navy-100 p-1">
-              @for (t of tabs; track t.id) {
-                <button type="button" role="tab" class="tab" [attr.aria-selected]="tab() === t.id" [attr.aria-controls]="'panel-' + t.id" [id]="'tab-' + t.id" [attr.data-testid]="'tab-' + t.id" (click)="tab.set(t.id)">{{ t.label }}</button>
-              }
-            </div>
+          <space-agenda [events]="space.events()" [editable]="true" (open)="details.open($event)" (add)="eventForm.open(null, $event)" />
 
-            <section role="tabpanel" [id]="'panel-' + tab()" [attr.aria-labelledby]="'tab-' + tab()" class="grid gap-4" tabindex="0">
-              @switch (tab()) {
-                @case ('publish') {
-                  <form class="grid gap-4 rounded-2xl border border-line bg-surface p-6" novalidate (submit)="onPublish($event)" aria-label="Publier">
-                    <fieldset class="m-0 grid gap-2 border-0 p-0">
-                      <legend class="mb-1 p-0 font-semibold">Type de publication</legend>
-                      <div class="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Type">
-                        @for (t of postTypes; track t.id) {
-                          <button type="button" role="radio" class="choice" [attr.aria-checked]="postModel().type === t.id" [attr.data-testid]="'type-' + t.id" (click)="setType(t.id)">{{ t.label }}</button>
-                        }
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section class="card" aria-labelledby="exams-title" data-testid="exams">
+              <h2 id="exams-title" class="card-title">Examens et notes</h2>
+              <p class="m-0 text-sm text-muted">Les examens, contrôles, TP et devoirs du calendrier. Les élèves ne voient une note qu’une fois publiée.</p>
+              @if (gradable().length) {
+                <ul class="m-0 grid list-none gap-2 p-0">
+                  @for (g of gradable(); track g.event.id) {
+                    <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3" data-testid="gradable-event">
+                      <div class="min-w-0">
+                        <p class="m-0"><span class="rounded-full border px-2 py-0.5 text-xs font-bold" [class]="'k-' + g.event.kind">{{ kindLabel(g.event) }}</span> <span class="font-semibold" dir="auto">{{ g.event.title }}</span></p>
+                        <p class="m-0 mt-1 text-sm text-muted first-letter:uppercase">{{ longDay(g.event.date) }} · {{ audience(g.event) }}</p>
+                        <p class="m-0 text-sm" data-testid="gradable-status">{{ g.status }}</p>
                       </div>
-                    </fieldset>
-                    <div class="grid gap-1">
-                      <label for="post-title" class="font-semibold">Titre</label>
-                      <input id="post-title" type="text" [formField]="postForm.title" [attr.aria-invalid]="attempted() && postForm.title().invalid()" />
-                      <p class="err" role="alert">{{ attempted() ? (postForm.title().errors()[0]?.message ?? '') : '' }}</p>
-                    </div>
-                    <div class="grid gap-1">
-                      <label for="post-body" class="font-semibold">Message</label>
-                      <textarea id="post-body" [formField]="postForm.body"></textarea>
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                      <div class="grid gap-1">
-                        <label for="post-subject" class="font-semibold">Matière</label>
-                        <select id="post-subject" [formField]="postForm.subject" data-testid="post-subject-select">
-                          <option value="">— Aucune —</option>
-                          @for (m of matieres; track m.id) {
-                            <option [value]="m.id">{{ m.name }}</option>
-                          }
-                        </select>
-                      </div>
-                      <div class="grid gap-1">
-                        <label for="post-target" class="font-semibold">Destinataires</label>
-                        <select id="post-target" [formField]="postForm.target" data-testid="post-target-select">
-                          @for (t of targets; track t.value) {
-                            <option [value]="t.value">{{ t.label }}</option>
-                          }
-                        </select>
-                      </div>
-                    </div>
-                    @if (postModel().type === 'assignment') {
-                      <div class="grid gap-1">
-                        <label for="post-due" class="font-semibold">À rendre pour le</label>
-                        <input id="post-due" type="date" [formField]="postForm.dueDate" />
-                      </div>
-                    }
-                    @if (postModel().type === 'resource') {
-                      <div class="grid gap-1">
-                        <label for="post-url" class="font-semibold">Lien (https)</label>
-                        <input id="post-url" type="url" placeholder="https://" [formField]="postForm.url" />
-                      </div>
-                    }
-                    @if (message(); as m) {
-                      <p class="m-0 rounded-lg px-3 py-2" [class]="ok() ? 'bg-ok-soft text-ok' : 'bg-warn-soft text-warn'" role="alert" data-testid="form-message">{{ m }}</p>
-                    }
-                    <div><button type="submit" class="btn btn-navy" [disabled]="busy()" data-testid="publish">{{ busy() ? 'Publication…' : 'Publier' }}</button></div>
-                  </form>
-                }
-                @case ('mine') {
-                  @if (myPosts().length) {
-                    <ul class="m-0 grid list-none gap-3 p-0" data-testid="my-posts">
-                      @for (p of myPosts(); track p.id) {
-                        <li>
-                          <space-post-card [post]="p" [today]="today">
-                            <button type="button" class="btn btn-outline-dark justify-self-start" (click)="onDeletePost(p.id)" [attr.aria-label]="'Supprimer ' + p.title" data-testid="delete-post">Supprimer</button>
-                          </space-post-card>
-                        </li>
-                      }
-                    </ul>
-                  } @else {
-                    <p class="m-0 text-muted" data-testid="empty">Vous n’avez encore rien publié.</p>
+                      <button type="button" class="btn btn-outline-dark" (click)="grid.open(g.event)" data-testid="open-grades">Notes</button>
+                    </li>
                   }
-                }
-                @case ('calendar') {
-                  <p class="m-0 text-muted">
-                    Le calendrier de l’école est commun : tous les enseignants peuvent l’ajouter, le corriger ou le supprimer.
-                    Les élèves y voient, sans pouvoir le modifier, ce qui concerne leur classe.
-                  </p>
-                  <space-calendar [events]="space.events()" [editable]="true" />
-                }
-                @case ('grades') {
-                  <div class="grid gap-4">
-                    <div class="grid gap-1">
-                      <label for="grade-class" class="font-semibold">Classe</label>
-                      <select id="grade-class" data-testid="grade-class" (change)="onPickClass($any($event.target).value)">
-                        <option value="">— Choisir une classe —</option>
-                        @for (c of classTargets; track c.value) {
-                          <option [value]="c.value" [selected]="pickedClass() === c.value">{{ c.label }}</option>
-                        }
-                      </select>
-                    </div>
+                </ul>
+              } @else {
+                <p class="m-0 text-muted" data-testid="exams-empty">Ajoutez un examen, un contrôle, un TP ou un devoir au calendrier pour saisir des notes.</p>
+              }
+            </section>
 
-                    @if (pickedClass()) {
-                      @if (classStudents().length) {
-                        <ul class="m-0 flex list-none flex-wrap gap-2 p-0" data-testid="students" aria-label="Élèves de la classe">
-                          @for (s of classStudents(); track s.uid) {
-                            <li>
-                              <button type="button" class="choice" [attr.aria-pressed]="pickedStudent() === s.uid" (click)="pickedStudent.set(s.uid)" data-testid="student-button">{{ s.displayName }}</button>
-                            </li>
-                          }
-                        </ul>
-                      } @else {
-                        <p class="m-0 text-muted" data-testid="empty">Aucun élève inscrit dans cette classe pour l’instant.</p>
+            <section class="card" aria-labelledby="news-title" data-testid="announcements">
+              <h2 id="news-title" class="card-title">Annonces</h2>
+              <form class="grid gap-3" novalidate (submit)="onPublish($event)" aria-label="Publier une annonce">
+                <div class="grid gap-1">
+                  <label for="post-title" class="font-semibold">Titre</label>
+                  <input id="post-title" type="text" [formField]="postForm.title" [attr.aria-invalid]="attempted() && postForm.title().invalid()" />
+                  <p class="err" role="alert">{{ attempted() ? (postForm.title().errors()[0]?.message ?? '') : '' }}</p>
+                </div>
+                <div class="grid gap-1">
+                  <label for="post-body" class="font-semibold">Message</label>
+                  <textarea id="post-body" [formField]="postForm.body"></textarea>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div class="grid gap-1">
+                    <label for="post-subject" class="font-semibold">Matière</label>
+                    <select id="post-subject" [formField]="postForm.subject">
+                      <option value="">— Aucune —</option>
+                      @for (m of matieres; track m.id) {
+                        <option [value]="m.id">{{ m.name }}</option>
                       }
-                    }
-
-                    @if (student(); as s) {
-                      <form class="grid gap-4 rounded-2xl border border-line bg-surface p-6" novalidate (submit)="onAddGrade($event)" [attr.aria-label]="'Nouvelle note pour ' + s.displayName">
-                        <h3 class="m-0 text-xl" dir="auto">Nouvelle note — {{ s.displayName }}</h3>
-                        <div class="grid gap-4 sm:grid-cols-2">
-                          <div class="grid gap-1">
-                            <label for="grade-subject" class="font-semibold">Matière</label>
-                            <select id="grade-subject" [formField]="gradeForm.subject" data-testid="grade-subject">
-                              <option value="">— Choisir —</option>
-                              @for (m of matieres; track m.id) {
-                                <option [value]="m.id">{{ m.name }}</option>
-                              }
-                            </select>
-                            <p class="err" role="alert">{{ gradeAttempted() ? (gradeForm.subject().errors()[0]?.message ?? '') : '' }}</p>
-                          </div>
-                          <div class="grid gap-1">
-                            <label for="grade-title" class="font-semibold">Intitulé (devoir, contrôle…)</label>
-                            <input id="grade-title" type="text" [formField]="gradeForm.title" />
-                            <p class="err" role="alert">{{ gradeAttempted() ? (gradeForm.title().errors()[0]?.message ?? '') : '' }}</p>
-                          </div>
-                          <div class="grid gap-1">
-                            <label for="grade-score" class="font-semibold">Note</label>
-                            <input id="grade-score" type="text" inputmode="decimal" [formField]="gradeForm.score" />
-                          </div>
-                          <div class="grid gap-1">
-                            <label for="grade-out-of" class="font-semibold">Sur</label>
-                            <input id="grade-out-of" type="text" inputmode="decimal" [formField]="gradeForm.outOf" />
-                          </div>
-                        </div>
-                        <div class="grid gap-1">
-                          <label for="grade-comment" class="font-semibold">Commentaire (facultatif)</label>
-                          <textarea id="grade-comment" [formField]="gradeForm.comment"></textarea>
-                        </div>
-                        @if (message(); as m) {
-                          <p class="m-0 rounded-lg px-3 py-2" [class]="ok() ? 'bg-ok-soft text-ok' : 'bg-warn-soft text-warn'" role="alert" data-testid="form-message">{{ m }}</p>
-                        }
-                        <div><button type="submit" class="btn btn-navy" [disabled]="busy()" data-testid="add-grade">Enregistrer la note</button></div>
-                      </form>
-
-                      @if (studentGrades().length) {
-                        <ul class="m-0 grid list-none gap-2 p-0" data-testid="given-grades">
-                          @for (g of studentGrades(); track g.id) {
-                            <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-3" data-testid="given-grade">
-                              <span><strong>{{ subjectName(g.subject) }}</strong> · <span dir="auto">{{ g.title }}</span> · {{ mark(g.score) }} / {{ mark(g.outOf) }} <span class="text-sm text-muted">· {{ day(g.createdAt) }}</span></span>
-                              <button type="button" class="link" (click)="onDeleteGrade(g.id)" [attr.aria-label]="'Supprimer la note ' + g.title">Supprimer</button>
-                            </li>
-                          }
-                        </ul>
-                      }
-                    }
+                    </select>
                   </div>
+                  <div class="grid gap-1">
+                    <label for="post-target" class="font-semibold">Pour</label>
+                    <select id="post-target" [formField]="postForm.target" data-testid="post-target">
+                      @for (t of targets; track t.value) {
+                        <option [value]="t.value">{{ t.label }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+                @if (message(); as m) {
+                  <p class="m-0 rounded-lg px-3 py-2" [class]="ok() ? 'bg-ok-soft text-ok' : 'bg-warn-soft text-warn'" role="alert" data-testid="form-message">{{ m }}</p>
                 }
+                <div><button type="submit" class="btn btn-navy" [disabled]="busy()" data-testid="publish">Publier l’annonce</button></div>
+              </form>
+
+              @if (myPosts().length) {
+                <ul class="m-0 grid list-none gap-3 border-t border-line p-0 pt-3" data-testid="my-posts">
+                  @for (p of myPosts(); track p.id) {
+                    <li>
+                      <space-post-card [post]="p">
+                        <button type="button" class="link justify-self-start" (click)="onDeletePost(p.id)" [attr.aria-label]="'Supprimer ' + p.title" data-testid="delete-post">Supprimer</button>
+                      </space-post-card>
+                    </li>
+                  }
+                </ul>
               }
             </section>
           </div>
         </div>
       }
     </div>
+
+    <space-event-details #details mode="teacher" (edit)="eventForm.open($event)" (remove)="onDeleteEvent($event)" (openGrades)="grid.open($event)" />
+    <space-event-form #eventForm />
+    <space-grade-grid #grid />
   `,
-  styles: SPACE_STYLES + `:host { min-block-size: 100dvh; }`,
+  styles: [
+    SPACE_STYLES,
+    KIND_STYLES,
+    `
+      :host { min-block-size: 100dvh; }
+      .card { display: grid; align-content: start; gap: 0.75rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+      .card-title { margin: 0; font-size: 1.25rem; }
+    `,
+  ],
 })
 export class TeacherPage {
   protected readonly space = inject(SpaceService);
 
-  protected readonly today = todayIso();
-  protected readonly tabs: readonly { readonly id: Tab; readonly label: string }[] = [
-    { id: 'publish', label: 'Publier' },
-    { id: 'mine', label: 'Mes publications' },
-    { id: 'calendar', label: 'Calendrier' },
-    { id: 'grades', label: 'Notes' },
-  ];
-  protected readonly postTypes = POST_TYPES;
   protected readonly matieres = MATIERES;
   protected readonly targets = TARGET_OPTIONS;
-  /** Only whole classes can be picked for grading. */
-  protected readonly classTargets = (['nationale', 'bac'] as const).flatMap((section) =>
-    CLASSES[section].map((c) => ({ value: `${section}:${c.value}`, label: `${SECTION_LABELS[section]} — ${c.label}` })),
-  );
 
-  protected readonly tab = signal<Tab>('publish');
   protected readonly busy = signal(false);
   protected readonly ok = signal(false);
   protected readonly message = signal<string | null>(null);
   protected readonly attempted = signal(false);
-  protected readonly gradeAttempted = signal(false);
 
-  /* ---------------------------------------------------------------- publish */
-  protected readonly postModel = signal({
-    type: 'announcement' as PostType,
-    title: '',
-    body: '',
-    subject: '',
-    target: 'all',
-    dueDate: '',
-    url: '',
-  });
+  protected readonly postModel = signal({ title: '', body: '', subject: '', target: 'all' });
   protected readonly postForm = form(this.postModel, (p) => {
     required(p.title, { message: 'Saisissez un titre.' });
     maxLength(p.title, LIMITS.title, { message: 'Titre trop long (120 caractères maximum).' });
@@ -311,109 +198,53 @@ export class TeacherPage {
     return this.space.posts().filter((p) => p.authorUid === uid);
   });
 
-  /* ---------------------------------------------------------------- grades */
-  protected readonly pickedClass = signal('');
-  protected readonly pickedStudent = signal('');
-  protected readonly gradeModel = signal({ subject: '', title: '', score: '', outOf: '20', comment: '' });
-  protected readonly gradeForm = form(this.gradeModel, (p) => {
-    required(p.subject, { message: 'Choisissez la matière.' });
-    required(p.title, { message: 'Saisissez un intitulé.' });
-    maxLength(p.title, LIMITS.title, { message: 'Intitulé trop long (120 caractères maximum).' });
-    maxLength(p.comment, LIMITS.comment, { message: 'Commentaire trop long.' });
-  });
-
-  protected readonly classStudents = computed(() => {
-    const [section, classe] = this.pickedClass().split(':');
+  /** Gradable events, latest first, with where their grades stand. */
+  protected readonly gradable = computed(() => {
+    const grades = this.space.grades();
     return this.space
-      .students()
-      .filter((s) => s.section === section && s.classe === classe)
-      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'fr'));
+      .events()
+      .filter((e) => kindInfo(e.kind).gradable)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((event) => {
+        const mine = grades.filter((g) => g.eventId === event.id);
+        const status = !mine.length
+          ? 'Aucune note saisie'
+          : `${mine.length} note${mine.length > 1 ? 's' : ''} · ${mine.every((g) => g.published) ? 'publiées' : 'brouillon'}`;
+        return { event, status };
+      });
   });
-  protected readonly student = computed(() => this.classStudents().find((s) => s.uid === this.pickedStudent()) ?? null);
-  protected readonly studentGrades = computed(() =>
-    this.space.grades().filter((g) => g.studentUid === this.pickedStudent()).sort((a, b) => b.createdAt - a.createdAt),
-  );
 
-  protected setType(type: PostType): void {
-    this.postModel.update((m) => ({ ...m, type }));
+  protected readonly longDay = longDay;
+
+  protected kindLabel(e: CalendarEvent): string {
+    return kindInfo(e.kind).label;
   }
 
-  protected subjectName(id: string): string {
-    return matiereName(id);
-  }
-
-  protected mark(n: number): string {
-    return FORMAT_MARK.format(n);
-  }
-
-  protected day(ms: number): string {
-    return ms ? DATE.format(ms) : '';
-  }
-
-  protected onPickClass(value: string): void {
-    this.pickedClass.set(value);
-    this.pickedStudent.set('');
-    this.message.set(null);
+  protected audience(e: CalendarEvent): string {
+    return targetLabel(e.target);
   }
 
   protected async onPublish(event: Event): Promise<void> {
     event.preventDefault();
     this.attempted.set(true);
-    const m = this.postModel();
     if (this.postForm().invalid()) return;
-    const problem = this.#postProblem(m);
-    if (problem) return this.#say(problem, false);
+    const m = this.postModel();
     await this.#run(async () => {
-      await this.space.publishPost({
-        type: m.type,
-        title: m.title,
-        body: m.body,
-        subject: m.subject,
-        target: m.target,
-        dueDate: m.type === 'assignment' ? m.dueDate : null,
-        url: m.type === 'resource' && m.url.trim() ? m.url.trim() : null,
-      });
-      this.postModel.update((x) => ({ ...x, title: '', body: '', dueDate: '', url: '' }));
+      await this.space.publishPost(m);
+      this.postModel.update((x) => ({ ...x, title: '', body: '' }));
       this.attempted.set(false);
-      this.#say('Publié : vos élèves le voient tout de suite.', true);
+      this.#say('Annonce publiée : vos élèves la voient tout de suite.', true);
     });
-  }
-
-  #postProblem(m: { type: PostType; body: string; dueDate: string; url: string }): string | null {
-    if (m.body.length > LIMITS.body) return 'Le message est trop long.';
-    if (m.type === 'assignment' && !isCalendarDay(m.dueDate)) return 'Choisissez la date à laquelle le devoir est à rendre.';
-    if (m.type === 'resource' && m.url.trim() && !isHttpsUrl(m.url)) return 'Le lien doit commencer par https://.';
-    if (m.type === 'resource' && !m.url.trim() && !m.body.trim()) return 'Ajoutez un lien ou un message.';
-    return null;
   }
 
   protected async onDeletePost(id: string): Promise<void> {
     await this.space.deletePost(id).catch(() => undefined);
   }
 
-  protected async onAddGrade(event: Event): Promise<void> {
-    event.preventDefault();
-    this.gradeAttempted.set(true);
-    const s = this.student();
-    const m = this.gradeModel();
-    if (!s || this.gradeForm().invalid()) return;
-    const score = parseNumber(m.score);
-    const outOf = parseNumber(m.outOf);
-    if (Number.isNaN(outOf) || outOf <= 0 || outOf > 100) return this.#say('« Sur » doit être un nombre entre 1 et 100.', false);
-    if (Number.isNaN(score) || score > outOf) return this.#say('La note doit être un nombre entre 0 et ' + FORMAT_MARK.format(outOf) + '.', false);
-    await this.#run(async () => {
-      await this.space.addGrade({ studentUid: s.uid, studentName: s.displayName, subject: m.subject, title: m.title, score, outOf, comment: m.comment });
-      this.gradeModel.update((x) => ({ ...x, title: '', score: '', comment: '' }));
-      this.gradeAttempted.set(false);
-      this.#say('Note enregistrée.', true);
-    });
+  protected async onDeleteEvent(e: CalendarEvent): Promise<void> {
+    await this.space.deleteEvent(e.id).catch(() => undefined);
   }
 
-  protected async onDeleteGrade(id: string): Promise<void> {
-    await this.space.deleteGrade(id).catch(() => undefined);
-  }
-
-  /* ---------------------------------------------------------------- account */
   protected async onRefresh(): Promise<void> {
     await this.#run(() => this.space.refresh());
   }
