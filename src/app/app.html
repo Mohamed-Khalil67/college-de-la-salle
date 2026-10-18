@@ -24,10 +24,10 @@
     <nav
       id="primary-nav"
       aria-label="Navigation principale"
-      class="primary-nav w-full xl:flex xl:w-auto"
+      class="primary-nav w-full xl:flex xl:w-auto xl:flex-1"
       [class.hidden]="!menuOpen()"
     >
-      <ul class="m-0 flex list-none flex-col gap-1 p-0 xl:flex-row xl:items-center">
+      <ul class="m-0 flex list-none flex-col gap-1 p-0 xl:w-full xl:flex-row xl:items-center xl:justify-between">
         @for (item of nav; track item.link) {
           <li>
             <a
