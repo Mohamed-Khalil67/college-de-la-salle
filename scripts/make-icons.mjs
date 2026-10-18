@@ -6,10 +6,14 @@
  *
  * Output: public/favicon.ico (16, 32, 48), public/icon-32.png, public/icon-192.png, public/apple-touch-icon.png
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
-const source = readFileSync('public/images/school/logo-source.jpg').toString('base64');
+const sourcePath = existsSync('public/images/CDLS.png')
+  ? 'public/images/CDLS.png'
+  : 'public/images/school/logo-source.jpg';
+const mime = sourcePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+const source = readFileSync(sourcePath).toString('base64');
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -18,9 +22,9 @@ await page.setContent('<canvas id="c"></canvas>');
 /** Renders the logo into a size×size PNG (data URL), transparent unless `background` is given. */
 const render = (size, background) =>
   page.evaluate(
-    async ({ source, size, background }) => {
+    async ({ source, mime, size, background }) => {
       const img = new Image();
-      img.src = `data:image/jpeg;base64,${source}`;
+      img.src = `data:${mime};base64,${source}`;
       await img.decode();
 
       // 1. Make the white outside the shield transparent: flood fill from the borders over near-white pixels.
@@ -66,7 +70,7 @@ const render = (size, background) =>
       for (const b of buf) s += String.fromCharCode(b);
       return btoa(s);
     },
-    { source, size, background },
+    { source, mime, size, background },
   );
 
 const png = async (size, background) => Buffer.from(await render(size, background), 'base64');
