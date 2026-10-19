@@ -84,15 +84,22 @@ The repo is an npm-workspaces monorepo (Node 22.18+):
 
 ```
 apps/web         The Angular site (still on Firebase until the API replaces it)
-apps/api         NestJS 12 + Prisma 7 API (PostgreSQL), see apps/api/CLAUDE.md
+apps/api         NestJS 12 + Prisma 7 API (PostgreSQL 18), see apps/api/CLAUDE.md
 packages/shared  Framework-free domain code (@cdls/shared) used by both apps
 ```
 
 ```bash
 npm install
-cp apps/api/.env.example apps/api/.env   # then set DATABASE_URL to your local PostgreSQL
+cp apps/api/.env.example apps/api/.env   # then put the cdls role's password in DATABASE_URL
+npm run db:migrate -w @cdls/api -- --name init   # first time only (creates the tables)
+npm run db:seed                          # demo data
 npm run dev                              # shared (watch) + API on :3000 + site on :4200
 ```
+
+The API needs PostgreSQL 18 running locally (Windows installer, service `postgresql-x64-18`). Create
+its role and database once, as `postgres`, with [apps/api/prisma/setup-database.sql](apps/api/prisma/setup-database.sql)
+(in pgAdmin's Query Tool, or with psql as shown at the top of that file), after replacing `CHANGE_ME` with
+a password of your choice.
 
 Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
 health: `/api/health` (process) and `/api/health/db` (database). To try the Firebase spaces locally,

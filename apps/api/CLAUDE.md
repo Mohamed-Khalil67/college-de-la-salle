@@ -1,6 +1,6 @@
 # apps/api — NestJS conventions
 
-NestJS 12 (ESM), Prisma 7 with PostgreSQL, Vitest. Read the `nestjs-best-practices` skill before larger changes.
+NestJS 12 (ESM), Prisma 7 with PostgreSQL 18 (native Windows service `postgresql-x64-18`, no Docker), Vitest. Read the `nestjs-best-practices` skill before larger changes.
 
 ## Layout
 
@@ -23,6 +23,7 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL, Vitest. Read the `nestjs-best-practic
 
 ## Database (Prisma)
 
+- Local dev database: `cdls_dev`, owned by the `cdls` role (`prisma/setup-database.sql`, run once by the user as `postgres`). The URL is in `apps/api/.env` (gitignored). Never ask for, guess or store the `postgres` superuser password.
 - Use `PrismaService` (global `PrismaModule`); never `new PrismaClient()` in app code. The client is generated into `src/generated/prisma` (gitignored): `npm run prisma:generate`.
 - Schema changes go through migrations: edit `prisma/schema.prisma`, then `npm run db:migrate -- --name <change>`. Never edit an applied migration.
 - snake_case tables and columns (`@@map` / `@map`), camelCase in TypeScript. Index every foreign key and common filter.
