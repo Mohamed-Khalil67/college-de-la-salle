@@ -13,7 +13,9 @@ export class HealthService {
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: 'ok' };
     } catch (error) {
-      this.logger.warn(`Database check failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Database check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new ServiceUnavailableException('Database unreachable');
     }
   }

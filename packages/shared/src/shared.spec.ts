@@ -1,8 +1,20 @@
 import { occurrences, toIcs, type CalendarEvent } from './calendar.js';
-import { audienceMatches, averageOnTwenty, gradesBySubject, TARGET_OPTIONS, type Grade } from './space.js';
+import {
+  audienceMatches,
+  averageOnTwenty,
+  gradesBySubject,
+  TARGET_OPTIONS,
+  type Grade,
+} from './space.js';
 import { MATIERES, matieresFor } from './subjects.js';
 
-const grade = (subject: string, score: number, outOf = 20, coefficient = 1, createdAt = 0): Grade => ({
+const grade = (
+  subject: string,
+  score: number,
+  outOf = 20,
+  coefficient = 1,
+  createdAt = 0,
+): Grade => ({
   id: `${subject}-${score}`,
   studentUid: 's1',
   studentName: 'Élève',
@@ -46,7 +58,11 @@ describe('grades', () => {
   });
 
   it('groups grades by subject, newest first', () => {
-    const groups = gradesBySubject([grade('svt', 12, 20, 1, 1), grade('arabe', 15), grade('svt', 18, 20, 1, 2)]);
+    const groups = gradesBySubject([
+      grade('svt', 12, 20, 1, 1),
+      grade('arabe', 15),
+      grade('svt', 18, 20, 1, 2),
+    ]);
     expect(groups.map((g) => g.subject)).toEqual(['arabe', 'svt']);
     expect(groups[1]?.grades.map((g) => g.score)).toEqual([18, 12]);
     expect(groups[1]?.average).toBe(15);

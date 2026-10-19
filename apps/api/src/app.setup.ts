@@ -14,7 +14,10 @@ export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix(API_PREFIX);
   app.use(helmet());
   app.enableCors({
-    origin: config.get('CORS_ORIGIN', { infer: true }).split(',').map((o) => o.trim()),
+    origin: config
+      .get('CORS_ORIGIN', { infer: true })
+      .split(',')
+      .map((o) => o.trim()),
     credentials: true,
   });
   app.useGlobalPipes(

@@ -1,5 +1,15 @@
 import { plainToInstance, Transform } from 'class-transformer';
-import { IsIn, IsInt, IsNotEmpty, IsString, Matches, Max, Min, MinLength, validateSync } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  MinLength,
+  validateSync,
+} from 'class-validator';
 
 const PLACEHOLDER = /^replace-with-/;
 
@@ -15,7 +25,9 @@ export class Env {
   PORT = 3000;
 
   @IsString()
-  @Matches(/^postgres(ql)?:\/\//, { message: 'DATABASE_URL must be a postgresql:// connection string' })
+  @Matches(/^postgres(ql)?:\/\//, {
+    message: 'DATABASE_URL must be a postgresql:// connection string',
+  })
   DATABASE_URL: string;
 
   /** Comma-separated origins. */
@@ -55,8 +67,13 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     const details = errors.flatMap((e) => Object.values(e.constraints ?? {})).join('\n  - ');
     throw new Error(`Invalid environment (see apps/api/.env.example):\n  - ${details}`);
   }
-  if (env.NODE_ENV === 'production' && [env.JWT_ACCESS_SECRET, env.JWT_REFRESH_SECRET].some((s) => PLACEHOLDER.test(s))) {
-    throw new Error('JWT secrets still hold the .env.example placeholders; set real random values in production.');
+  if (
+    env.NODE_ENV === 'production' &&
+    [env.JWT_ACCESS_SECRET, env.JWT_REFRESH_SECRET].some((s) => PLACEHOLDER.test(s))
+  ) {
+    throw new Error(
+      'JWT secrets still hold the .env.example placeholders; set real random values in production.',
+    );
   }
   return env;
 }

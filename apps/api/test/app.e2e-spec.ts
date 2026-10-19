@@ -19,7 +19,8 @@ describe('App (e2e)', () => {
     await app.close();
   });
 
-  it('GET /api/health answers ok', () => request(app.getHttpServer()).get('/api/health').expect(200, { status: 'ok' }));
+  it('GET /api/health answers ok', () =>
+    request(app.getHttpServer()).get('/api/health').expect(200, { status: 'ok' }));
 
   it('serves the OpenAPI document', async () => {
     const res = await request(app.getHttpServer()).get('/api/docs-json').expect(200);

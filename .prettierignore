@@ -1,0 +1,4 @@
+**/dist
+**/.angular
+apps/api/src/generated
+package-lock.json

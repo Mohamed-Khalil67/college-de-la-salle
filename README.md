@@ -80,25 +80,39 @@ prerendered pages and the initial bundle never contain it. Changes appear live o
 
 ## Run it
 
-```bash
-npm install
-npm start
+The repo is an npm-workspaces monorepo (Node 22.18+):
+
+```
+apps/web         The Angular site (still on Firebase until the API replaces it)
+apps/api         NestJS 12 + Prisma 7 API (PostgreSQL), see apps/api/CLAUDE.md
+packages/shared  Framework-free domain code (@cdls/shared) used by both apps
 ```
 
-Open http://localhost:4200. To try the spaces locally, start the Firebase emulators too (needs
-Java 21+) in a second terminal: `npm run emulators`.
+```bash
+npm install
+cp apps/api/.env.example apps/api/.env   # then set DATABASE_URL to your local PostgreSQL
+npm run dev                              # shared (watch) + API on :3000 + site on :4200
+```
+
+Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
+health: `/api/health` (process) and `/api/health/db` (database). To try the Firebase spaces locally,
+start the emulators too (needs Java 21+): `npm run emulators -w @cdls/web`.
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Production build; the 5 content pages are prerendered into `dist/college-website/browser` |
-| `npm run deploy` | Build, then `firebase deploy --only hosting,firestore` |
+| `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
+| `npm run lint` / `npm test` | oxlint and Vitest in every workspace |
+| `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
+| `npm run db:seed` | Demo data; the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
+| `npm run deploy -w @cdls/web` | Build, then `firebase deploy --only hosting,firestore` |
 
 ## Where the content lives
 
-Typed data in `src/app/school/`: `school-info.ts` (name, milestones, directors, phones),
+Typed data in `apps/web/src/app/school/`: `school-info.ts` (name, milestones, directors, phones),
 `tracks.ts` (the two track pages), `photos.ts` (26 photos: file, size, alt, credit, source) and
-**`subjects.ts`, the subject catalogue**: one entry per subject plus its illustration in
-`public/images/matieres/` (`node scripts/subject-images.mjs` regenerates the illustrations). The
+**the subject catalogue** (`packages/shared/src/subjects.ts`, shared with the API): one entry per
+subject plus its illustration in `apps/web/public/images/matieres/` (`node scripts/subject-images.mjs`,
+run from `apps/web`, regenerates the illustrations). The
 catalogue is what teachers pick from when they publish or grade, and what the track pages show: trim
 or extend it there. Subject illustrations are original drawings; replace them with school photos only
 with the right to use them.
@@ -109,7 +123,7 @@ Deployment is manual for now (no CI/CD and no automated AI review yet; they were
 and can be restored from git history, commit `273f3a3`, when the project grows):
 
 ```bash
-npm run deploy     # build, then firebase deploy --only hosting,firestore
+npm run deploy -w @cdls/web     # build, then firebase deploy --only hosting,firestore
 ```
 
 Live site: https://college-de-la-salle-daher.web.app (Firebase project `college-de-la-salle-daher`,
@@ -117,21 +131,20 @@ Firestore in `europe-west1`). Sign in first with `npx firebase login`.
 
 ## Architecture
 
-All the application code is in `src/app/`, organised by feature (Angular style guide):
+The web application code is in `apps/web/src/app/`, organised by feature (Angular style guide):
 
 ```
 src/app/
   app.ts · app.html · app.scss     Shell: header (school · pages · account pill), footer
   app.routes.ts                    Routes (pages prerendered, spaces lazy and client-rendered)
-  school/                          Typed content: school info, tracks, photos, subject catalogue
+  school/                          Typed content: school info, tracks, photos (+ subjects from @cdls/shared)
   pages/
     pages.routes.ts                Public routes, titles and meta descriptions
     site-photo.ts                  Credited photo in a reserved box (no layout shift)
     home/  history/  contact/      One page per folder
     section/                       Bac nationale / Bac français (+ subject card)
   space/                           The school space
-    space.model.ts                 Classes, audiences, announcements, grades (pure functions)
-    calendar.model.ts              Event categories, weekly repetition, videos, .ics (pure functions)
+    firebase-errors.ts             French messages for Firebase error codes
     space.service.ts               Firebase (lazy): sign-in, role, live data, writes
     space-styles.ts                Shared form styles and category colours
     auth/                          Sign in / create an account
@@ -139,7 +152,8 @@ src/app/
     grades/                        Grade grid (per exam, publish step)
     announcements/                 Announcement card
     student-space/ teacher-space/  The two pages
-public/           Images (school, archives, matieres), fonts, icons
+packages/shared/src/  space.ts (classes, audiences, grades), calendar.ts (events, repetition, .ics), subjects.ts
+apps/web/public/  Images (school, archives, matieres), fonts, icons
 firestore.rules   Security rules
 scripts/          add-teacher (emulator), make-icons, subject-images
 ```
