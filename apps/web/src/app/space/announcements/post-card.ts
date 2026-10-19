@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { matiereName } from '../../school';
-import { targetLabel, type Post } from '../space.model';
+import { targetLabel, type Post } from '@cdls/shared';
 
 const DATE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 

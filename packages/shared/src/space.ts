@@ -1,11 +1,6 @@
 /**
- * Model of the school space: who the users are, what teachers publish and what they grade.
- * Pure types and functions (no Angular, no Firebase), so it is easy to test.
- *
- * Roles
- *  - student: signs up, picks a section and a class; sees what is meant for them and their own grades.
- *  - teacher: an account whose verified e-mail is listed in `teachers/{email}` (added by the school's
- *    administrator in the Firebase console). Publishes posts and enters grades.
+ * Model of the school space: sections and classes, audiences, announcements and grades.
+ * Pure types and functions (no Angular, no Firebase, no Nest), shared by apps/web and apps/api.
  */
 
 export type SectionId = 'nationale' | 'bac';
@@ -235,30 +230,4 @@ export interface StudentSummary {
   readonly displayName: string;
   readonly section: SectionId;
   readonly classe: string;
-}
-
-/** French messages for Firebase Auth / Firestore error codes; never leaks codes. */
-export function frenchError(error: unknown): string {
-  const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: unknown }).code) : '';
-  switch (code) {
-    case 'auth/email-already-in-use':
-      return 'Un compte existe déjà avec cette adresse e-mail. Connectez-vous.';
-    case 'auth/invalid-email':
-      return 'Adresse e-mail invalide.';
-    case 'auth/weak-password':
-      return 'Mot de passe trop faible : 8 caractères minimum.';
-    case 'auth/invalid-credential':
-    case 'auth/wrong-password':
-    case 'auth/user-not-found':
-      return 'E-mail ou mot de passe incorrect.';
-    case 'auth/too-many-requests':
-      return 'Trop de tentatives. Réessayez dans quelques minutes.';
-    case 'auth/network-request-failed':
-    case 'unavailable':
-      return 'Connexion impossible. Vérifiez votre réseau et réessayez.';
-    case 'permission-denied':
-      return 'Action non autorisée.';
-    default:
-      return 'Une erreur est survenue. Réessayez.';
-  }
 }

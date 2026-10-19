@@ -3,7 +3,7 @@
  * publish homework or enter grades, and what the track pages show.
  *
  * This is a catalogue of subjects a teacher *can* use. Trim or extend it here: one entry per subject,
- * plus its illustration in public/images/matieres/ (see scripts/subject-images.mjs). Which subjects
+ * plus its illustration in apps/web/public/images/matieres/ (see apps/web/scripts/subject-images.mjs). Which subjects
  * each class actually follows is decided by the teachers' posts, not by this list.
  */
 
@@ -11,7 +11,7 @@ export type MatiereGroup = 'Langues' | 'Sciences' | 'Lettres et sciences humaine
 export type Track = 'nationale' | 'bac';
 
 export interface Matiere {
-  /** Stable id stored in Firestore posts and grades (never rename it). */
+  /** Stable id stored in posts, grades and the `subjects` table (never rename it). */
   readonly id: string;
   readonly name: string;
   readonly group: MatiereGroup;

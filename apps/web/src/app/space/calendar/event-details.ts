@@ -2,8 +2,19 @@ import { DOCUMENT, NgOptimizedImage } from '@angular/common';
 import { Component, computed, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { matiereById, matiereName } from '../../school';
-import { kindInfo, longDay, safeAttachments, timeRange, toIcs, videoEmbed, type CalendarEvent, type Occurrence } from '../calendar.model';
-import { FORMAT_MARK, targetLabel, type Grade } from '../space.model';
+import {
+  type CalendarEvent,
+  FORMAT_MARK,
+  type Grade,
+  kindInfo,
+  longDay,
+  type Occurrence,
+  safeAttachments,
+  targetLabel,
+  timeRange,
+  toIcs,
+  videoEmbed,
+} from '@cdls/shared';
 import { KIND_STYLES, SPACE_STYLES } from '../space-styles';
 
 interface ShownAttachment {

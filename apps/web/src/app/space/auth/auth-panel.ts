@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { email, form, FormField, minLength, required } from '@angular/forms/signals';
-import { CLASSES, frenchError, SECTION_LABELS, type SectionId } from '../space.model';
+import { CLASSES, SECTION_LABELS, type SectionId } from '@cdls/shared';
+import { frenchError } from '../firebase-errors';
 import { SpaceService } from '../space.service';
 import { SPACE_STYLES } from '../space-styles';
 

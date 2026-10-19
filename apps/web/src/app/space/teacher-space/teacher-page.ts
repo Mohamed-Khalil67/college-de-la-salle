@@ -1,8 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { form, FormField, maxLength, required } from '@angular/forms/signals';
 import { MATIERES } from '../../school';
-import { kindInfo, longDay, type CalendarEvent } from '../calendar.model';
-import { frenchError, LIMITS, TARGET_OPTIONS, targetLabel } from '../space.model';
+import { type CalendarEvent, kindInfo, LIMITS, longDay, TARGET_OPTIONS, targetLabel } from '@cdls/shared';
+import { frenchError } from '../firebase-errors';
 import { SpaceService } from '../space.service';
 import { Agenda } from '../calendar/agenda';
 import { AuthPanel } from '../auth/auth-panel';

@@ -1,8 +1,22 @@
 import { Component, computed, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { form, FormField, maxLength, required } from '@angular/forms/signals';
 import { MATIERES } from '../../school';
-import { EVENT_KINDS, EVENT_LIMITS, isClockTime, kindInfo, longDay, type Attachment, type CalendarEvent, type EventKind } from '../calendar.model';
-import { frenchError, isCalendarDay, isHttpsUrl, parseNumber, TARGET_OPTIONS, todayIso } from '../space.model';
+import {
+  type Attachment,
+  type CalendarEvent,
+  EVENT_KINDS,
+  EVENT_LIMITS,
+  type EventKind,
+  isCalendarDay,
+  isClockTime,
+  isHttpsUrl,
+  kindInfo,
+  longDay,
+  parseNumber,
+  TARGET_OPTIONS,
+  todayIso,
+} from '@cdls/shared';
+import { frenchError } from '../firebase-errors';
 import { SpaceService } from '../space.service';
 import { KIND_STYLES, SPACE_STYLES } from '../space-styles';
 

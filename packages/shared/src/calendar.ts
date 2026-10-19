@@ -1,4 +1,4 @@
-import { audienceMatches, isHttpsUrl, type SectionId, type Target } from './space.model';
+import { audienceMatches, isHttpsUrl, type SectionId, type Target } from './space.js';
 
 /**
  * The calendar is the backbone of the school space: classes (cours, TD, TP), exams, homework deadlines,

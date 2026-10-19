@@ -1,7 +1,18 @@
 import { Component, computed, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { matiereName } from '../../school';
-import { kindInfo, longDay, type CalendarEvent } from '../calendar.model';
-import { audienceMatches, averageOnTwenty, classLabel, FORMAT_MARK, frenchError, LIMITS, parseNumber, targetLabel } from '../space.model';
+import {
+  audienceMatches,
+  averageOnTwenty,
+  type CalendarEvent,
+  classLabel,
+  FORMAT_MARK,
+  kindInfo,
+  LIMITS,
+  longDay,
+  parseNumber,
+  targetLabel,
+} from '@cdls/shared';
+import { frenchError } from '../firebase-errors';
 import { SpaceService } from '../space.service';
 import { SPACE_STYLES } from '../space-styles';
 

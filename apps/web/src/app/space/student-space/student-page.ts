@@ -3,20 +3,28 @@ import { Component, computed, inject, linkedSignal, signal } from '@angular/core
 import { form, FormField, required } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
 import { matiereById, matiereName } from '../../school';
-import { addDays, daysBetween, eventsFor, kindInfo, longDay, nextExam, occurrences, timeRange, type Occurrence } from '../calendar.model';
 import {
+  addDays,
   averageOnTwenty,
   CLASSES,
   classLabel,
+  daysBetween,
+  eventsFor,
   FORMAT_MARK,
-  frenchError,
   gradesBySubject,
+  kindInfo,
+  longDay,
+  nextExam,
+  type Occurrence,
+  occurrences,
   postsFor,
   round1,
   SECTION_LABELS,
-  todayIso,
   type SectionId,
-} from '../space.model';
+  timeRange,
+  todayIso,
+} from '@cdls/shared';
+import { frenchError } from '../firebase-errors';
 import { SpaceService } from '../space.service';
 import { Agenda } from '../calendar/agenda';
 import { AuthPanel } from '../auth/auth-panel';

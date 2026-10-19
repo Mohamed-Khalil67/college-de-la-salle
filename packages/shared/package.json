@@ -1,0 +1,19 @@
+{
+  "name": "@cdls/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Framework-free types and pure functions shared by apps/web and apps/api.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "lint": "oxlint src",
+    "test": "vitest run"
+  }
+}

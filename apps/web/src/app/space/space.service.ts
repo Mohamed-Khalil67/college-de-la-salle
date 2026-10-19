@@ -2,8 +2,19 @@ import { isPlatformBrowser } from '@angular/common';
 import { PLATFORM_ID, Service, computed, inject, isDevMode, signal } from '@angular/core';
 import type { Auth, User } from 'firebase/auth';
 import type { DocumentData, Firestore, Unsubscribe } from 'firebase/firestore';
-import { isEventKind, type Attachment, type CalendarEvent, type EventKind } from './calendar.model';
-import { gradeId, type Grade, type Post, type SectionId, type StudentProfile, type StudentSummary, type Target } from './space.model';
+import {
+  type Attachment,
+  type CalendarEvent,
+  type EventKind,
+  type Grade,
+  gradeId,
+  isEventKind,
+  type Post,
+  type SectionId,
+  type StudentProfile,
+  type StudentSummary,
+  type Target,
+} from '@cdls/shared';
 
 /**
  * Production Firebase web config (public identifiers, not secrets — access is enforced by

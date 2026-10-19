@@ -1,42 +1,33 @@
 {
-  "name": "college-website",
+  "name": "cdls",
   "version": "0.0.0",
-  "scripts": {
-    "ng": "ng",
-    "start": "ng serve",
-    "build": "ng build",
-    "watch": "ng build --watch --configuration development",
-    "emulators": "firebase emulators:start --project demo-lasalle",
-    "deploy": "ng build && firebase deploy --only hosting,firestore"
-  },
   "private": true,
   "packageManager": "npm@12.0.2",
-  "dependencies": {
-    "@angular/common": "^22.2.0",
-    "@angular/compiler": "^22.2.0",
-    "@angular/core": "^22.2.0",
-    "@angular/forms": "^22.2.3",
-    "@angular/platform-browser": "^22.2.0",
-    "@angular/platform-server": "^22.2.0",
-    "@angular/router": "^22.2.0",
-    "@angular/ssr": "^22.2.3",
-    "@tailwindcss/postcss": "^4.3.3",
-    "firebase": "^12.19.0",
-    "postcss": "^8.5.30",
-    "rxjs": "~7.8.0",
-    "tailwindcss": "^4.3.3",
-    "tslib": "^2.3.0"
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @cdls/shared && concurrently --kill-others-on-fail --names shared,api,web --prefix-colors gray,magenta,cyan \"npm:dev:shared\" \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:shared": "npm run watch -w @cdls/shared",
+    "dev:api": "npm run start:dev -w @cdls/api",
+    "dev:web": "npm start -w @cdls/web",
+    "start": "npm start -w @cdls/web",
+    "build": "npm run build -w @cdls/shared && npm run build -w @cdls/api && npm run build -w @cdls/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run build -w @cdls/shared && npm run test --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w @cdls/api",
+    "db:seed": "npm run db:seed -w @cdls/api",
+    "format": "prettier --write \"{apps,packages}/*/src/**/*.{ts,html,scss}\""
   },
   "devDependencies": {
-    "@angular/build": "^22.2.3",
-    "@angular/cli": "^22.2.3",
-    "@angular/compiler-cli": "^22.2.0",
-    "@fontsource-variable/inter": "^5.3.0",
-    "@fontsource/cairo": "^5.3.0",
-    "@playwright/test": "^1.64.1",
     "@types/node": "^22.12.0",
-    "firebase-tools": "^15.34.0",
+    "concurrently": "^10.0.6",
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2004",
     "prettier": "^3.8.1",
-    "typescript": "~6.0.2"
+    "typescript": "~6.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^4.1.12"
   }
 }

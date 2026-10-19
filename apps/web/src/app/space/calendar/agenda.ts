@@ -3,22 +3,23 @@ import { matiereName } from '../../school';
 import {
   addDays,
   byDay,
+  type CalendarEvent,
   EVENT_KINDS,
+  type EventKind,
   eventsForTarget,
   kindInfo,
   longDay,
   monthGrid,
   monthTitle,
+  type Occurrence,
   occurrences,
   shiftMonth,
   shortDay,
+  TARGET_OPTIONS,
   timeRange,
+  todayIso,
   weekDays,
-  type CalendarEvent,
-  type EventKind,
-  type Occurrence,
-} from '../calendar.model';
-import { TARGET_OPTIONS, todayIso } from '../space.model';
+} from '@cdls/shared';
 import { KIND_STYLES, SPACE_STYLES } from '../space-styles';
 
 type View = 'week' | 'month';

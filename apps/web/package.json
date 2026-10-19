@@ -1,0 +1,40 @@
+{
+  "name": "@cdls/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "lint": "oxlint src",
+    "emulators": "firebase emulators:start --project demo-lasalle",
+    "deploy": "ng build && firebase deploy --only hosting,firestore"
+  },
+  "dependencies": {
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/forms": "^22.2.3",
+    "@angular/platform-browser": "^22.2.0",
+    "@angular/platform-server": "^22.2.0",
+    "@angular/router": "^22.2.0",
+    "@angular/ssr": "^22.2.3",
+    "@cdls/shared": "*",
+    "@tailwindcss/postcss": "^4.3.3",
+    "firebase": "^12.19.0",
+    "postcss": "^8.5.30",
+    "rxjs": "~7.8.0",
+    "tailwindcss": "^4.3.3",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.3",
+    "@angular/cli": "^22.2.3",
+    "@angular/compiler-cli": "^22.2.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/cairo": "^5.3.0",
+    "@playwright/test": "^1.64.1",
+    "firebase-tools": "^15.34.0"
+  }
+}
