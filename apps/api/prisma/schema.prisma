@@ -1,0 +1,421 @@
+// CDLS data model: one school (Collège de la Salle, Daher). ERD: docs/brainstorm.md, section 4.
+// Tables and columns are snake_case in PostgreSQL (@@map / @map); models and fields stay camelCase in TypeScript.
+// The connection URL lives in prisma.config.ts (Prisma 7), read from DATABASE_URL.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------------------------------
+
+enum Role {
+  admin
+  teacher
+  student
+
+  @@map("role")
+}
+
+/// Must match EventKind in packages/shared (checked by src/prisma/enums.spec.ts).
+enum EventKind {
+  cours
+  td
+  tp
+  examen
+  controle
+  devoir
+  revision
+  activite
+  reunion
+
+  @@map("event_kind")
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused
+
+  @@map("attendance_status")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------------------------------
+
+/// An account. Created by an admin (no open sign-up). A teacher or student also has a profile row.
+model User {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  /// Stored lower-cased.
+  email        String    @unique @db.VarChar(254)
+  passwordHash String    @map("password_hash")
+  role         Role
+  firstName    String    @map("first_name") @db.VarChar(80)
+  lastName     String    @map("last_name") @db.VarChar(80)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  student   Student?
+  teacher   Teacher?
+  posts     Post[]
+  auditLogs AuditLog[]
+
+  @@index([role])
+  @@map("users")
+}
+
+model Student {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  userId        String    @unique @map("user_id") @db.Uuid
+  /// School registration number (matricule).
+  studentNumber String?   @unique @map("student_number") @db.VarChar(32)
+  birthDate     DateTime? @map("birth_date") @db.Date
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments         Enrollment[]
+  grades              Grade[]
+  homeworkCompletions HomeworkCompletion[]
+  attendance          Attendance[]
+  reportCards         ReportCard[]
+
+  @@map("students")
+}
+
+model Teacher {
+  id     String @id @default(uuid(7)) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments        TeachingAssignment[]
+  events             Event[]
+  gradesEntered      Grade[]
+  attendanceRecorded Attendance[]
+
+  @@map("teachers")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// School structure
+// ---------------------------------------------------------------------------------------------------
+
+model SchoolYear {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  /// « 2026-2027 »
+  label     String   @unique @db.VarChar(20)
+  startsOn  DateTime @map("starts_on") @db.Date
+  endsOn    DateTime @map("ends_on") @db.Date
+  /// Exactly one year is current (enforced by the service).
+  isCurrent Boolean  @default(false) @map("is_current")
+
+  terms       Term[]
+  classes     SchoolClass[]
+  enrollments Enrollment[]
+
+  @@index([isCurrent])
+  @@map("school_years")
+}
+
+model Term {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  schoolYearId String    @map("school_year_id") @db.Uuid
+  /// 1, 2 or 3.
+  number       Int       @db.SmallInt
+  label        String    @db.VarChar(40)
+  startsOn     DateTime  @map("starts_on") @db.Date
+  endsOn       DateTime  @map("ends_on") @db.Date
+  /// Set when the admin closes the term; report cards are generated after that.
+  closedAt     DateTime? @map("closed_at") @db.Timestamptz(3)
+
+  schoolYear  SchoolYear   @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  reportCards ReportCard[]
+
+  @@unique([schoolYearId, number])
+  @@index([startsOn, endsOn])
+  @@map("terms")
+}
+
+/// A track: `nationale` (Bac nationale) or `bac` (Bac français). Codes match SectionId in packages/shared.
+model Section {
+  id    String @id @default(uuid(7)) @db.Uuid
+  code  String @unique @db.VarChar(20)
+  label String @db.VarChar(80)
+
+  classes SchoolClass[]
+  events  Event[]
+  posts   Post[]
+
+  @@map("sections")
+}
+
+/// A class of one section for one school year, e.g. Bac français — Première, 2026-2027.
+model SchoolClass {
+  id           String @id @default(uuid(7)) @db.Uuid
+  schoolYearId String @map("school_year_id") @db.Uuid
+  sectionId    String @map("section_id") @db.Uuid
+  /// Matches CLASSES[section][].value in packages/shared (`premiere`, `secondaire-1`…).
+  code         String @db.VarChar(40)
+  label        String @db.VarChar(80)
+
+  schoolYear  SchoolYear           @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+  section     Section              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  enrollments Enrollment[]
+  assignments TeachingAssignment[]
+  events      Event[]
+  posts       Post[]
+  reportCards ReportCard[]
+
+  @@unique([schoolYearId, sectionId, code])
+  @@index([sectionId])
+  @@map("school_classes")
+}
+
+/// A student in a class. One class per student per school year.
+model Enrollment {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  classId      String    @map("class_id") @db.Uuid
+  /// Same as the class's school year; denormalised so the unique constraint below can hold.
+  schoolYearId String    @map("school_year_id") @db.Uuid
+  enrolledOn   DateTime  @default(now()) @map("enrolled_on") @db.Date
+  leftOn       DateTime? @map("left_on") @db.Date
+
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  schoolYear  SchoolYear  @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, schoolYearId])
+  @@index([classId])
+  @@index([schoolYearId])
+  @@map("enrollments")
+}
+
+/// A catalogue subject. `id` is the stable slug from packages/shared MATIERES (`mathematiques`…).
+model Subject {
+  id    String @id @db.VarChar(40)
+  name  String @db.VarChar(120)
+  /// MatiereGroup in packages/shared.
+  group String @db.VarChar(60)
+
+  assignments TeachingAssignment[]
+  events      Event[]
+  posts       Post[]
+
+  @@map("subjects")
+}
+
+/// Who teaches which subject in which class. Drives the « a teacher only edits the classes they teach » guards.
+model TeachingAssignment {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  teacherId   String  @map("teacher_id") @db.Uuid
+  classId     String  @map("class_id") @db.Uuid
+  subjectId   String  @map("subject_id") @db.VarChar(40)
+  /// Weight of this subject in the class's general average (report cards).
+  coefficient Decimal @default(1) @db.Decimal(4, 2)
+
+  teacher     Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@unique([teacherId, classId, subjectId])
+  @@index([classId, subjectId])
+  @@index([subjectId])
+  @@map("teaching_assignments")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Calendar, homework, grades, attendance
+// ---------------------------------------------------------------------------------------------------
+
+/// A calendar event (CalendarEvent in packages/shared): course slot, exam, homework deadline, meeting…
+/// Audience: classId set → one class; only sectionId set → a whole section; both null → the whole school.
+model Event {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  kind        EventKind
+  title       String    @db.VarChar(120)
+  subjectId   String?   @map("subject_id") @db.VarChar(40)
+  classId     String?   @map("class_id") @db.Uuid
+  sectionId   String?   @map("section_id") @db.Uuid
+  /// The day, or the first day of a weekly series.
+  date        DateTime  @db.Date
+  /// HH:MM, null for an all-day event.
+  startTime   String?   @map("start_time") @db.VarChar(5)
+  endTime     String?   @map("end_time") @db.VarChar(5)
+  /// Repeats every week until this day (included); null for a single event. Only repeatable kinds.
+  repeatUntil DateTime? @map("repeat_until") @db.Date
+  place       String    @default("") @db.VarChar(120)
+  description String    @default("") @db.VarChar(2000)
+  /// [{ label, url }], https links only (validated by the API).
+  attachments Json      @default("[]")
+  /// Weight of the grades given for it (gradable kinds).
+  coefficient Decimal   @default(1) @db.Decimal(4, 2)
+  authorId    String    @map("author_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  schoolClass         SchoolClass?         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section             Section?             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  author              Teacher              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  grades              Grade[]
+  homeworkCompletions HomeworkCompletion[]
+  attendance          Attendance[]
+
+  @@index([classId, date])
+  @@index([sectionId, date])
+  @@index([date])
+  @@index([authorId])
+  @@index([subjectId])
+  @@index([kind, date])
+  @@map("events")
+}
+
+/// One mark per student per gradable event; entering it again corrects it.
+model Grade {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  eventId    String   @map("event_id") @db.Uuid
+  studentId  String   @map("student_id") @db.Uuid
+  score      Decimal  @db.Decimal(5, 2)
+  outOf      Decimal  @default(20) @map("out_of") @db.Decimal(5, 2)
+  comment    String   @default("") @db.VarChar(1000)
+  /// Students only see published grades.
+  published  Boolean  @default(false)
+  gradedById String   @map("graded_by_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  gradedBy Teacher @relation(fields: [gradedById], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, studentId])
+  @@index([studentId, published])
+  @@index([gradedById])
+  @@map("grades")
+}
+
+/// A student ticked a « devoir » as done.
+model HomeworkCompletion {
+  eventId   String   @map("event_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  doneAt    DateTime @default(now()) @map("done_at") @db.Timestamptz(3)
+
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, studentId])
+  @@index([studentId])
+  @@map("homework_completions")
+}
+
+/// Roll call for one occurrence of a course event (`date`, since weekly events repeat).
+model Attendance {
+  id           String           @id @default(uuid(7)) @db.Uuid
+  eventId      String           @map("event_id") @db.Uuid
+  studentId    String           @map("student_id") @db.Uuid
+  date         DateTime         @db.Date
+  status       AttendanceStatus
+  minutesLate  Int?             @map("minutes_late") @db.SmallInt
+  note         String           @default("") @db.VarChar(500)
+  recordedById String           @map("recorded_by_id") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  event      Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student    Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recordedBy Teacher @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@unique([eventId, studentId, date])
+  @@index([studentId, date])
+  @@index([eventId, date])
+  @@index([recordedById])
+  @@map("attendance")
+}
+
+/// A student's report card for a term (bulletin), generated after the term is closed.
+model ReportCard {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  studentId    String    @map("student_id") @db.Uuid
+  termId       String    @map("term_id") @db.Uuid
+  /// The class the student was in for that term.
+  classId      String    @map("class_id") @db.Uuid
+  /// General average on 20, null when there were no grades.
+  average      Decimal?  @db.Decimal(4, 2)
+  rank         Int?      @db.SmallInt
+  appreciation String    @default("") @db.VarChar(2000)
+  /// Snapshot of the per-subject averages and coefficients at generation time.
+  subjects     Json      @default("[]")
+  generatedAt  DateTime  @default(now()) @map("generated_at") @db.Timestamptz(3)
+  /// Students only see published report cards.
+  publishedAt  DateTime? @map("published_at") @db.Timestamptz(3)
+
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term        Term        @relation(fields: [termId], references: [id], onDelete: Restrict)
+  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, termId])
+  @@index([termId, classId])
+  @@index([classId])
+  @@map("report_cards")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Announcements and audit
+// ---------------------------------------------------------------------------------------------------
+
+/// An announcement. Same audience rule as Event: class, section, or whole school when both are null.
+model Post {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  title     String   @db.VarChar(120)
+  body      String   @db.VarChar(4000)
+  subjectId String?  @map("subject_id") @db.VarChar(40)
+  classId   String?  @map("class_id") @db.Uuid
+  sectionId String?  @map("section_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  subject     Subject?     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  schoolClass SchoolClass? @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section     Section?     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  author      User         @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([classId, createdAt])
+  @@index([sectionId, createdAt])
+  @@index([authorId])
+  @@map("posts")
+}
+
+/// Who changed what (grade changes from day one). `before` / `after` hold the changed fields.
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  /// Null for system actions.
+  actorId   String?  @map("actor_id") @db.Uuid
+  /// e.g. `grade.update`, `report_card.publish`.
+  action    String   @db.VarChar(80)
+  entity    String   @db.VarChar(60)
+  entityId  String   @map("entity_id") @db.VarChar(64)
+  before    Json?
+  after     Json?
+  ip        String?  @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
