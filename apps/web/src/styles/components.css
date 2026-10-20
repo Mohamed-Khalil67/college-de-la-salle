@@ -32,6 +32,10 @@ svg {
   display: block;
   max-width: 100%;
 }
+/* Keep the intrinsic ratio when CSS sets the width or an aspect-ratio (the HTML height attribute would win otherwise). */
+img {
+  height: auto;
+}
 h1,
 h2,
 h3,
