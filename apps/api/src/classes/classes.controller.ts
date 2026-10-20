@@ -27,6 +27,7 @@ import {
   EnrollmentDto,
   EnrollStudentDto,
   SectionDto,
+  ClassStudentDto,
   StudentSummaryDto,
   UpdateClassDto,
 } from './dto/class.dto.js';
@@ -73,11 +74,11 @@ export class ClassesController {
   /** The class list (admins and the class's teachers). */
   @Roles('admin', 'teacher')
   @Get('classes/:id/students')
-  @ApiOkResponse({ type: [StudentSummaryDto] })
+  @ApiOkResponse({ type: [ClassStudentDto] })
   students(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthUser,
-  ): Promise<StudentSummaryDto[]> {
+  ): Promise<ClassStudentDto[]> {
     return this.classes.students(id, user);
   }
 

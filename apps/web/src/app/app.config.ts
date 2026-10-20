@@ -1,3 +1,5 @@
+import { registerLocaleData } from '@angular/common';
+import localeFr from '@angular/common/locales/fr';
 import { Injectable, inject } from '@angular/core';
 import {
   ApplicationConfig,
@@ -28,6 +30,9 @@ class SiteTitleStrategy extends TitleStrategy {
     this.#title.setTitle(page ? `${page} — ${site}` : `${site} · Bac nationale et Bac français`);
   }
 }
+
+/** French dates, numbers and plurals for the pipes (DatePipe, DecimalPipe…), on the server and in the browser. */
+registerLocaleData(localeFr);
 
 export const appConfig: ApplicationConfig = {
   providers: [

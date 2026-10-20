@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { StudentSummaryDto } from '@cdls/shared';
+import type { ClassStudentDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Avatar, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
@@ -130,7 +130,7 @@ export class ClassDetailPage {
 
   protected readonly notice = signal<string | null>(null);
   protected readonly removeOpen = signal(false);
-  protected readonly removing = signal<StudentSummaryDto | null>(null);
+  protected readonly removing = signal<ClassStudentDto | null>(null);
   protected readonly removingName = computed(() => {
     const student = this.removing();
     return student ? fullName(student) : '';
@@ -138,7 +138,7 @@ export class ClassDetailPage {
   protected readonly busy = signal(false);
   protected readonly actionError = signal<string | null>(null);
 
-  protected name(student: StudentSummaryDto): string {
+  protected name(student: ClassStudentDto): string {
     return fullName(student);
   }
 
@@ -152,7 +152,7 @@ export class ClassDetailPage {
     this.schoolClass.reload();
   }
 
-  protected startRemove(student: StudentSummaryDto): void {
+  protected startRemove(student: ClassStudentDto): void {
     this.removing.set(student);
     this.actionError.set(null);
     this.removeOpen.set(true);
@@ -164,9 +164,7 @@ export class ClassDetailPage {
     this.busy.set(true);
     this.actionError.set(null);
     try {
-      // The roster has no enrolment ids: enrolling again in the same class is a no-op that returns it.
-      const enrollment = await this.#api.school.enroll(this.id(), student.id);
-      await this.#api.school.unenroll(enrollment.id);
+      await this.#api.school.unenroll(student.enrollmentId);
       this.removeOpen.set(false);
       this.notice.set(`${fullName(student)} a été retiré de la classe.`);
       this.roster.reload();

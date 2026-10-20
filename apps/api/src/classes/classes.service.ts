@@ -11,6 +11,7 @@ import type {
   CreateClassDto,
   EnrollmentDto,
   SectionDto,
+  ClassStudentDto,
   StudentSummaryDto,
   UpdateClassDto,
 } from './dto/class.dto.js';
@@ -78,15 +79,21 @@ export class ClassesService {
   }
 
   /** The class list: admins and the class's teachers. */
-  async students(classId: string, user: AuthUser): Promise<StudentSummaryDto[]> {
+  async students(classId: string, user: AuthUser): Promise<ClassStudentDto[]> {
     await this.get(classId);
     await this.access.assertTeachesClass(user, classId);
-    return this.roster(classId);
+    const enrollments = await this.#enrollments(classId);
+    return enrollments.map((e) => ({ ...toStudentSummary(e.student), enrollmentId: e.id }));
   }
 
   /** Students currently enrolled in a class, by name. */
   async roster(classId: string): Promise<StudentSummaryDto[]> {
-    const enrollments = await this.prisma.enrollment.findMany({
+    const enrollments = await this.#enrollments(classId);
+    return enrollments.map((e) => toStudentSummary(e.student));
+  }
+
+  #enrollments(classId: string) {
+    return this.prisma.enrollment.findMany({
       where: { classId, leftOn: null },
       include: { student: { include: { user: true } } },
       orderBy: [
@@ -94,7 +101,6 @@ export class ClassesService {
         { student: { user: { firstName: 'asc' } } },
       ],
     });
-    return enrollments.map((e) => toStudentSummary(e.student));
   }
 
   /** Enrols a student; moves them if they were in another class of the same year. */

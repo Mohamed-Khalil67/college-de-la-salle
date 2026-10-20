@@ -8,6 +8,7 @@ import type {
   SectionDto as SectionContract,
   SectionId,
   StudentSummaryDto as StudentSummaryContract,
+  ClassStudentDto as ClassStudentContract,
 } from '@cdls/shared';
 import { trim } from '../../common/transforms.js';
 
@@ -34,6 +35,10 @@ export class StudentSummaryDto implements StudentSummaryContract {
   firstName: string;
   lastName: string;
   studentNumber: string | null;
+}
+
+export class ClassStudentDto extends StudentSummaryDto implements ClassStudentContract {
+  enrollmentId: string;
 }
 
 export class EnrollmentDto implements EnrollmentContract {
