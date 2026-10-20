@@ -22,7 +22,7 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 ## Auth and permissions
 
 - Every route needs a Bearer access token (global `JwtAuthGuard`) unless marked `@Public()`. `@Roles('admin', …)` restricts by role (global `RolesGuard`). `@CurrentUser()` gives the `AuthUser` (`id`, `role`, `studentId`, `teacherId`).
-- **Ownership is checked in services through `AccessService`** (`src/access/`), the API's version of `apps/web/firestore.rules`: students see their own records and the events/posts of their audience (`audienceFor`); teachers write grades, attendance and class events only where they have a `TeachingAssignment` (`assertTeachesClass(user, classId, subjectId)`); `assertCanReadStudent` for anything about one student. A role check alone is never enough.
+- **Ownership is checked in services through `AccessService`** (`src/access/`), the API's version of `docs/legacy/firestore.rules`: students see their own records and the events/posts of their audience (`audienceFor`); teachers write grades, attendance and class events only where they have a `TeachingAssignment` (`assertTeachesClass(user, classId, subjectId)`); `assertCanReadStudent` for anything about one student. A role check alone is never enough.
 - Refresh tokens: opaque, in the `cdls_refresh` httpOnly SameSite=Strict cookie (path `/api/auth`), stored as an HMAC, rotated on each refresh; reuse revokes the family. Deactivating a user or changing their password calls `AuthService.revokeAll`.
 - Never log passwords, tokens or full request bodies. Hash passwords with `argon2`. Login is limited to 5 attempts a minute.
 

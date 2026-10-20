@@ -14,7 +14,7 @@ export interface StudentPlacement {
 }
 
 /**
- * Who may see or change what. The API's version of apps/web/firestore.rules, made stricter:
+ * Who may see or change what. The API's version of docs/legacy/firestore.rules, made stricter:
  * - a student sees their own grades (published only), attendance, homework and report cards, and the
  *   events and posts addressed to the whole school, their section or their class;
  * - a teacher reads every event and post, but writes grades, attendance and class events only for the

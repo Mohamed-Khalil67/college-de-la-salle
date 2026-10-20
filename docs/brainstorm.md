@@ -82,7 +82,7 @@ erDiagram
   USER ||--o{ AUDIT_LOG : acts
 ```
 
-Mapping from today's Firestore code: `Grade` and `averageOnTwenty` ([space.model.ts](../src/app/space/space.model.ts)) → `GRADE`; `CalendarEvent` and `EventKind` ([calendar.model.ts](../src/app/space/calendar.model.ts)) → `EVENT`; `students.done[]` → `HOMEWORK_COMPLETION`; `firestore.rules` → the API's role guards.
+Mapping from today's Firestore code: `Grade` and `averageOnTwenty` ([space.model.ts](../packages/shared/src/space.ts)) → `GRADE`; `CalendarEvent` and `EventKind` ([calendar.model.ts](../packages/shared/src/calendar.ts)) → `EVENT`; `students.done[]` → `HOMEWORK_COMPLETION`; `docs/legacy/firestore.rules` → the API's role guards.
 
 ## 5. Architecture and agent lanes
 
