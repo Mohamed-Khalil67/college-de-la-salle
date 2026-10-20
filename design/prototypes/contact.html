@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact et inscriptions | Collège de la Salle, Daher</title>
+  <meta name="description" content="Écrire au secrétariat du Collège de la Salle, Daher, ou appeler le cycle concerné.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="site-header" data-component="site-header">
+    <div class="site-header__utility on-inverse">
+      <div class="container">
+        <a class="site-header__hide-sm" href="tel:+20225904740">Standard +20 2 2590 47 40</a>
+        <a class="site-header__hide-sm" href="mailto:delasalle@lasalle-eg.net">delasalle@lasalle-eg.net</a>
+        <a class="site-header__lang" href="#" lang="ar" hreflang="ar">العربية</a>
+      </div>
+    </div>
+    <div class="site-header__main">
+      <div class="container">
+        <a class="wordmark" href="home.html" data-component="wordmark">
+          <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest"/></svg>
+          <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire, depuis 1898</span></span>
+        </a>
+        <button class="btn btn--secondary btn--icon site-header__toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-disclosure data-component="button">
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#i-menu"/></svg><span class="visually-hidden">Menu</span>
+        </button>
+        <nav id="site-nav" class="site-header__nav" aria-label="Navigation principale">
+          <ul role="list">
+            <li><a class="nav-link" href="home.html" data-component="nav-link">Accueil</a></li>
+            <li><a class="nav-link" href="home.html#histoire" data-component="nav-link">Histoire</a></li>
+            <li><a class="nav-link" href="home.html#filieres" data-component="nav-link">Bac nationale</a></li>
+            <li><a class="nav-link" href="bac-francais.html" data-component="nav-link">Bac français</a></li>
+            <li><a class="nav-link" href="home.html#actualites" data-component="nav-link">Actualités</a></li>
+            <li><a class="nav-link" href="contact.html" aria-current="page" data-component="nav-link">Contact</a></li>
+          </ul>
+          <a class="btn btn--primary site-header__cta-sm" href="connexion.html" data-component="button">Connexion</a>
+        </nav>
+        <a class="btn btn--secondary site-header__cta" href="connexion.html" data-component="button">Connexion</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu">
+    <section class="section section--subtle page-intro page-intro--compact" aria-labelledby="page-title">
+      <div class="container stack">
+        <nav class="breadcrumb" aria-label="Fil d’Ariane" data-component="breadcrumb"><ol role="list"><li><a href="home.html">Accueil</a></li><li><span aria-current="page">Contact</span></li></ol></nav>
+        <h1 id="page-title" class="t-display-l">Contact et inscriptions</h1>
+        <p class="t-body-l prose-width">Une question sur la scolarité ou une demande d’inscription ? Écrivez au secrétariat ou appelez directement le cycle concerné.</p>
+      </div>
+    </section>
+
+    <div class="section">
+      <div class="container content-grid">
+        <form class="form-card form-card--outlined" action="contact.html" aria-labelledby="form-title" novalidate>
+          <h2 id="form-title" class="t-h2">Écrire au secrétariat</h2>
+          <div class="alert alert--success" role="status" hidden data-component="alert"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-check"/></svg><span>Message envoyé. Le secrétariat vous répondra sous deux jours ouvrés.</span></div>
+          <div class="grid-2 grid-2--tight">
+            <div class="field" data-component="field">
+              <label class="field__label" for="c-name">Nom du parent ou de l’élève</label>
+              <input class="field__control" id="c-name" name="name" autocomplete="name" required value="Mariam Saad">
+            </div>
+            <div class="field" data-component="field">
+              <label class="field__label" for="c-phone">Téléphone <span class="t-muted">(facultatif)</span></label>
+              <input class="field__control" id="c-phone" name="phone" type="tel" autocomplete="tel" value="+20 10 0123 4567">
+            </div>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="c-email">Adresse e-mail</label>
+            <input class="field__control" id="c-email" name="email" type="email" autocomplete="email" required value="mariam.saad@gmail" aria-invalid="true" aria-describedby="c-email-error">
+            <p class="field__error" id="c-email-error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Saisissez une adresse complète, par exemple nom@domaine.com.</span></p>
+          </div>
+          <div class="grid-2 grid-2--tight">
+            <div class="field" data-component="field">
+              <label class="field__label" for="c-subject">Objet</label>
+              <select class="field__control" id="c-subject" name="subject">
+                <option selected>Demande d’inscription</option>
+                <option>Scolarité d’un élève</option>
+                <option>Accès à l’espace élève</option>
+                <option>Autre question</option>
+              </select>
+            </div>
+            <div class="field" data-component="field">
+              <label class="field__label" for="c-track">Filière et classe</label>
+              <select class="field__control" id="c-track" name="track">
+                <option>Bac nationale, jardin d’enfants</option>
+                <option>Bac nationale, primaire</option>
+                <option>Bac nationale, préparatoire</option>
+                <option>Bac nationale, secondaire</option>
+                <option>Bac français, maternelle ou élémentaire</option>
+                <option selected>Bac français, Seconde</option>
+                <option>Bac français, Première ou Terminale</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="c-msg">Message</label>
+            <textarea class="field__control" id="c-msg" name="message" rows="5" aria-describedby="c-msg-help">Bonjour, nous souhaitons inscrire notre fils en Seconde pour la rentrée 2027. Quelles sont les dates d’inscription et les pièces à fournir ?</textarea>
+            <p class="field__helper" id="c-msg-help">1 000 caractères au plus.</p>
+          </div>
+          <p><button class="btn btn--primary" type="submit" data-component="button">Envoyer le message</button></p>
+        </form>
+
+        <aside class="stack" aria-label="Coordonnées">
+          <section class="card card--panel" aria-labelledby="s-title" data-component="card">
+            <h2 id="s-title" class="t-h3">Secrétariat</h2>
+            <ul class="contact-lines contact-lines--light" role="list">
+              <li><svg class="icon" aria-hidden="true"><use href="icons.svg#i-map-pin"/></svg><span>6 El Beshnini St., El-Zaher, Le Caire</span></li>
+              <li><svg class="icon" aria-hidden="true"><use href="icons.svg#i-clock"/></svg><span>Du dimanche au jeudi, de 8 h à 14 h</span></li>
+              <li><svg class="icon" aria-hidden="true"><use href="icons.svg#i-mail"/></svg><a href="mailto:delasalle@lasalle-eg.net">delasalle@lasalle-eg.net</a></li>
+            </ul>
+          </section>
+          <section class="card card--panel" aria-labelledby="t-title" data-component="card">
+            <h2 id="t-title" class="t-h3">Téléphones par service</h2>
+            <dl class="phone-list">
+              <div><dt>Standard</dt><dd><a href="tel:+20225904740">+20 2 2590 47 40</a></dd></div>
+              <div><dt>Frère Directeur du collège</dt><dd><a href="tel:+20225928070">+20 2 2592 80 70</a></dd></div>
+              <div><dt>Bac français</dt><dd><a href="tel:+20225929598">+20 2 2592 95 98</a></dd></div>
+              <div><dt>Cycle secondaire</dt><dd><a href="tel:+20225922403">+20 2 2592 24 03</a></dd></div>
+              <div><dt>Cycle préparatoire</dt><dd><a href="tel:+20225885651">+20 2 2588 56 51</a></dd></div>
+              <div><dt>Grand primaire</dt><dd><a href="tel:+20225885650">+20 2 2588 56 50</a></dd></div>
+              <div><dt>Petit primaire</dt><dd><a href="tel:+20225885649">+20 2 2588 56 49</a></dd></div>
+              <div><dt>Jardin d’enfants</dt><dd><a href="tel:+20225885652">+20 2 2588 56 52</a></dd></div>
+            </dl>
+          </section>
+          <section class="card card--panel" aria-labelledby="i-title" data-component="card">
+            <h2 id="i-title" class="t-h3">Inscriptions au Bac nationale</h2>
+            <p class="t-body-s">Les ouvertures d’inscription, la liste des pièces à fournir et le formulaire de demande sont publiés en arabe sur le site officiel du collège.</p>
+            <a class="t-label" href="http://www.lasalle-eg.net/">Voir les annonces sur lasalle-eg.net</a>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer on-inverse" data-component="site-footer">
+    <div class="container">
+      <div class="site-footer__grid">
+        <div class="site-footer__about">
+          <a class="wordmark" href="home.html" data-component="wordmark">
+            <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+            <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire, depuis 1898</span></span>
+          </a>
+          <p>Un collège lasallien au cœur du Caire depuis 1898. Bac nationale et Bac français, du jardin d’enfants à la Terminale.</p>
+        </div>
+        <nav aria-labelledby="f-college"><h2 id="f-college">Le collège</h2><ul role="list"><li><a href="home.html#histoire">Histoire</a></li><li><a href="home.html#filieres">Bac nationale</a></li><li><a href="bac-francais.html">Bac français</a></li><li><a href="home.html#actualites">Actualités</a></li></ul></nav>
+        <nav aria-labelledby="f-espaces"><h2 id="f-espaces">Espaces</h2><ul role="list"><li><a href="connexion.html">Espace élève</a></li><li><a href="connexion.html">Espace enseignant</a></li><li><a href="connexion.html">Administration</a></li></ul></nav>
+        <div><h2>Nous trouver</h2><ul role="list"><li>6 El Beshnini St., El-Zaher, Le Caire</li><li><a href="tel:+20225904740">+20 2 2590 47 40</a></li><li><a href="mailto:delasalle@lasalle-eg.net">delasalle@lasalle-eg.net</a></li></ul></div>
+      </div>
+      <div class="site-footer__legal">
+        <p>© 2026 Collège de la Salle, Daher. Frères des Écoles chrétiennes.</p>
+        <p>Photographies : archives lasalliennes, avec l’accord du collège.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
