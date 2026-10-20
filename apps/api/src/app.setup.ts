@@ -13,6 +13,14 @@ export const DOCS_PATH = `${API_PREFIX}/docs`;
 export function configureApp(app: INestApplication): void {
   const config = app.get<ConfigService<Env, true>>(ConfigService);
 
+  const proxies = config.get('TRUST_PROXY', { infer: true });
+  if (proxies > 0) {
+    // Behind the school's reverse proxy: req.ip (and so the rate limits) is the visitor's address.
+    (app.getHttpAdapter().getInstance() as { set(key: string, value: unknown): void }).set(
+      'trust proxy',
+      proxies,
+    );
+  }
   app.setGlobalPrefix(API_PREFIX);
   app.use(helmet());
   app.use(cookieParser());

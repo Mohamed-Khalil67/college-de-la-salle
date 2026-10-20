@@ -512,6 +512,11 @@ export interface ContactMessageRequest {
   readonly phone?: string;
   /** Track and class the message is about (« Bac français, lycée »). */
   readonly track?: string;
+  /**
+   * Honeypot: a field hidden from people. Robots that fill it get the usual 204, and their message is
+   * dropped. The site always sends it empty.
+   */
+  readonly website?: string;
 }
 
 export interface ContactMessageDto {

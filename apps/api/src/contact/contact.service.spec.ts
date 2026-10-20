@@ -37,9 +37,14 @@ describe('ContactService', () => {
       findMany: vi.fn(),
       count: vi.fn(),
       findUnique: vi.fn(),
-      update: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      updateMany: vi.fn(),
     },
-    $transaction: vi.fn((queries: Promise<unknown>[]) => Promise.all(queries)),
+    auditLog: { createMany: vi.fn() },
+    // Array form (list) or interactive form (setHandled, run against this same mock).
+    $transaction: vi.fn((work: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>)) =>
+      typeof work === 'function' ? work(prisma) : Promise.all(work),
+    ),
   };
   let contact: ContactService;
 
@@ -68,6 +73,19 @@ describe('ContactService', () => {
         track: '',
       },
     });
+  });
+
+  it('drops a message whose honeypot is filled in, with the same answer', async () => {
+    await expect(
+      contact.create({
+        name: 'Bot',
+        email: 'bot@example.com',
+        subject: 'Promo',
+        message: 'Buy now',
+        website: 'https://spam.example',
+      }),
+    ).resolves.toBeUndefined();
+    expect(prisma.contactMessage.create).not.toHaveBeenCalled();
   });
 
   it('lists newest first, filtered by state, paginated', async () => {
@@ -104,29 +122,47 @@ describe('ContactService', () => {
     );
   });
 
-  it('marks a message handled by the admin, keeps the first handler, and reopens it', async () => {
-    prisma.contactMessage.findUnique.mockResolvedValue(row());
-    prisma.contactMessage.update.mockResolvedValue(row());
+  it('marks a message handled by the admin (audited), keeps an earlier handler, and reopens it', async () => {
+    prisma.contactMessage.findUnique.mockResolvedValue({ id: 'm1' });
+    prisma.contactMessage.findUniqueOrThrow.mockResolvedValue(row());
+    prisma.contactMessage.updateMany.mockResolvedValue({ count: 1 });
     await contact.setHandled('m1', true, ADMIN);
-    const first = prisma.contactMessage.update.mock.calls[0]![0] as {
+    const first = prisma.contactMessage.updateMany.mock.calls[0]![0] as {
+      where: object;
       data: { handledAt: Date; handledById: string };
     };
+    // Only a waiting message is marked: a concurrent admin who got there first stays the handler.
+    expect(first.where).toEqual({ id: 'm1', handledAt: null });
     expect(first.data.handledAt).toBeInstanceOf(Date);
     expect(first.data.handledById).toBe('u-admin');
+    expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          actorId: 'u-admin',
+          action: 'contact_message.handle',
+          entity: 'contact_message',
+          entityId: 'm1',
+        },
+      ],
+    });
 
-    const earlier = new Date('2026-10-19T10:00:00Z');
-    prisma.contactMessage.findUnique.mockResolvedValue(
-      row({ handledAt: earlier, handledById: 'u-other' }),
-    );
+    // Already handled: nothing changes, nothing is audited.
+    vi.clearAllMocks();
+    prisma.contactMessage.findUnique.mockResolvedValue({ id: 'm1' });
+    prisma.contactMessage.findUniqueOrThrow.mockResolvedValue(row());
+    prisma.contactMessage.updateMany.mockResolvedValue({ count: 0 });
     await contact.setHandled('m1', true, ADMIN);
-    expect(prisma.contactMessage.update).toHaveBeenLastCalledWith(
-      expect.objectContaining({ data: { handledAt: earlier, handledById: 'u-other' } }),
-    );
+    expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
 
+    prisma.contactMessage.updateMany.mockResolvedValue({ count: 1 });
     await contact.setHandled('m1', false, ADMIN);
-    expect(prisma.contactMessage.update).toHaveBeenLastCalledWith(
-      expect.objectContaining({ data: { handledAt: null, handledById: null } }),
-    );
+    expect(prisma.contactMessage.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'm1', handledAt: { not: null } },
+      data: { handledAt: null, handledById: null },
+    });
+    expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ action: 'contact_message.reopen' })],
+    });
   });
 
   it('answers 404 for an unknown message', async () => {

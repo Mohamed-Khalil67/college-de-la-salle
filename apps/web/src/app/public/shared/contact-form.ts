@@ -115,6 +115,14 @@ type SendState =
       </cdls-field>
     </div>
 
+    <!-- Honeypot for robots: hidden from people and from assistive technologies, out of the tab order. -->
+    <div class="contact-trap" aria-hidden="true">
+      <label>
+        Site web
+        <input type="text" name="website" tabindex="-1" autocomplete="off" [value]="trap()" (input)="onTrap($event)" />
+      </label>
+    </div>
+
     <cdls-field label="Message" helper="1 000 caractères au plus." [error]="messageError()">
       <textarea cdlsControl rows="5" [formField]="contactForm.message"></textarea>
     </cdls-field>
@@ -125,6 +133,13 @@ type SendState =
     </p>
   `,
   styles: `
+    .contact-trap {
+      position: absolute;
+      inset-inline-start: -10000px;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+    }
     .contact-fallback {
       display: flex;
       flex-wrap: wrap;
@@ -163,6 +178,8 @@ export class ContactForm {
   protected readonly messageError = computed(() => shownError(this.contactForm.message()));
   protected readonly phoneError = computed(() => shownError(this.contactForm.phone()));
   protected readonly state = signal<SendState>({ kind: 'idle' });
+  /** The honeypot's value: stays empty for people. */
+  protected readonly trap = signal('');
   protected readonly sending = computed(() => this.contactForm().submitting());
   protected readonly sentTo = computed(() => {
     const state = this.state();
@@ -173,6 +190,10 @@ export class ContactForm {
     return state.kind === 'failed' ? state : null;
   });
 
+  protected onTrap(event: Event): void {
+    this.trap.set((event.target as HTMLInputElement).value);
+  }
+
   protected onSubmit(event: Event): void {
     event.preventDefault();
     if (this.sending()) return;
@@ -181,7 +202,7 @@ export class ContactForm {
       const raw = this.model();
       const value = this.full() ? raw : { ...raw, phone: '', subject: '' };
       try {
-        await this.#api.contact.send(contactRequest(value));
+        await this.#api.contact.send(contactRequest(value, this.trap()));
         this.state.set({ kind: 'sent', email: value.email.trim() });
         this.contactForm().reset(blankMessage());
       } catch (error) {

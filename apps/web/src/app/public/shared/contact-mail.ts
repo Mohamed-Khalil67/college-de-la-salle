@@ -18,8 +18,11 @@ export interface ContactMessage {
 /** Subject used when the form has no subject field (home page block). */
 export const DEFAULT_CONTACT_SUBJECT = 'Message depuis le site';
 
-/** The body of POST /api/contact: trimmed, without the empty optional fields. */
-export function contactRequest(message: ContactMessage): ContactMessageRequest {
+/**
+ * The body of POST /api/contact: trimmed, without the empty optional fields. `website` is the hidden
+ * honeypot field, sent only when something (a robot) filled it in.
+ */
+export function contactRequest(message: ContactMessage, website = ''): ContactMessageRequest {
   const phone = message.phone.trim();
   const track = message.track.trim();
   return {
@@ -29,6 +32,7 @@ export function contactRequest(message: ContactMessage): ContactMessageRequest {
     message: message.message.trim(),
     ...(phone ? { phone } : {}),
     ...(track ? { track } : {}),
+    ...(website ? { website } : {}),
   };
 }
 

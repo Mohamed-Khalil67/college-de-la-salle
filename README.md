@@ -68,7 +68,7 @@ by one or by CSV import); there is no open sign-up. Sign-in returns a 15-minute 
 | Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
 | Report cards | `/terms/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
-| Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute, 5 by default), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
+| Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
 
 Who may do what mirrors the old Firestore rules (`docs/legacy/firestore.rules`): students only see their own records and what is addressed
 to their class, section or the whole school; teachers only grade, take attendance and post for the classes

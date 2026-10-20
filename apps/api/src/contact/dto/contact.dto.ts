@@ -57,6 +57,12 @@ export class CreateContactMessageDto implements ContactMessageRequest {
   @IsString()
   @MaxLength(CONTACT_LIMITS.track, { message: 'Filière et classe : texte trop long.' })
   track?: string;
+
+  /** Honeypot, hidden from people: filled in by robots only. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  website?: string;
 }
 
 export class ContactMessageDto implements ContactMessageContract {

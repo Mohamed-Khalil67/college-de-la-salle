@@ -37,6 +37,11 @@ describe('contactRequest', () => {
     });
   });
 
+  it('sends the honeypot only when it was filled in', () => {
+    expect(contactRequest(base, '')).not.toHaveProperty('website');
+    expect(contactRequest(base, 'https://spam.example')).toMatchObject({ website: 'https://spam.example' });
+  });
+
   it('keeps the phone, the subject and the track when given', () => {
     expect(contactRequest({ ...base, phone: '+20 100', subject: 'Autre question', track: 'Bac français, lycée' })).toMatchObject({
       phone: '+20 100',

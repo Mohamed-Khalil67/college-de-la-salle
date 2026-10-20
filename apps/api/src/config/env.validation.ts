@@ -71,6 +71,17 @@ export class Env {
   @IsInt()
   @Min(1)
   CONTACT_THROTTLE_LIMIT = 5;
+
+  /**
+   * Reverse proxies in front of the API (Express `trust proxy` hops), so rate limits see the visitor's
+   * address from X-Forwarded-For. 0 (default) when clients connect directly; set it to the number of
+   * proxies, never more, or anyone could forge their address.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(0)
+  @Max(5)
+  TRUST_PROXY = 0;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {

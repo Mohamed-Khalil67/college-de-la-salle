@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AccessModule } from './access/access.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { clientKey } from './common/client-key.js';
 import { RolesGuard } from './common/roles.guard.js';
 import { validateEnv, type Env } from './config/env.validation.js';
 import { HealthModule } from './health/health.module.js';
@@ -34,6 +35,8 @@ import { UsersModule } from './users/users.module.js';
             limit: config.get('THROTTLE_LIMIT', { infer: true }),
           },
         ],
+        // One counter per IPv4 address or IPv6 /64 (a client could rotate through its /64).
+        getTracker: (req: Record<string, unknown>) => clientKey(req['ip'] as string | undefined),
       }),
     }),
     PrismaModule,

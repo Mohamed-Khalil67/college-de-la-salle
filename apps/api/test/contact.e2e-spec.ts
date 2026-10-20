@@ -18,7 +18,7 @@ describe('Contact messages (e2e)', () => {
     t = await createTestApp();
     limitBefore = process.env['CONTACT_THROTTLE_LIMIT'];
     // Read per request: enough for this file's messages, low enough to test the limit.
-    process.env['CONTACT_THROTTLE_LIMIT'] = '4';
+    process.env['CONTACT_THROTTLE_LIMIT'] = '5';
   });
 
   afterAll(async () => {
@@ -58,6 +58,11 @@ describe('Contact messages (e2e)', () => {
       .expect(200);
     expect((handled.body as ContactMessageDto).handledAt).not.toBeNull();
     expect((handled.body as ContactMessageDto).handledByName).toBe('Nadia Fahmy');
+    expect(
+      await t.prisma.auditLog.count({
+        where: { action: 'contact_message.handle', entityId: stored!.id },
+      }),
+    ).toBe(1);
 
     const waiting = await t
       .http()
@@ -130,8 +135,18 @@ describe('Contact messages (e2e)', () => {
       .expect(404);
   });
 
+  it('answers a robot that fills the honeypot like anyone else, and drops its message', async () => {
+    const before = await t.prisma.contactMessage.count();
+    await t
+      .http()
+      .post('/api/contact')
+      .send({ ...MESSAGE, email: 'robot@example.com', website: 'https://spam.example' })
+      .expect(204);
+    expect(await t.prisma.contactMessage.count()).toBe(before);
+  });
+
   it('limits how many messages one client sends a minute', async () => {
-    // 4 a minute in this file; the 400s above count too, so the limit is already reached.
+    // 5 a minute in this file; the 400s and the robot above count too, so the limit is reached.
     const res = await t.http().post('/api/contact').send(MESSAGE);
     expect(res.status).toBe(429);
   });
