@@ -90,16 +90,18 @@ packages/shared  Framework-free domain code (@cdls/shared) used by both apps
 
 ```bash
 npm install
-cp apps/api/.env.example apps/api/.env   # then put the cdls role's password in DATABASE_URL
-npm run db:migrate -w @cdls/api -- --name init   # first time only (creates the tables)
+npm run db:dev                           # dev PostgreSQL 18 on :5433 (own terminal; writes apps/api/.env)
+npm run db:migrate                       # applies the migrations (creates the tables)
 npm run db:seed                          # demo data
 npm run dev                              # shared (watch) + API on :3000 + site on :4200
 ```
 
-The API needs PostgreSQL 18 running locally (Windows installer, service `postgresql-x64-18`). Create
-its role and database once, as `postgres`, with [apps/api/prisma/setup-database.sql](apps/api/prisma/setup-database.sql)
+`npm run db:dev` starts a project-local PostgreSQL 18 from npm (embedded-postgres, data in
+`apps/api/.dev-db/`, gitignored), so nothing has to be installed. To use the system PostgreSQL 18 instead
+(Windows installer, service `postgresql-x64-18`), copy `apps/api/.env.example` to `apps/api/.env`, create
+the app's role and database once, as `postgres`, with [apps/api/prisma/setup-database.sql](apps/api/prisma/setup-database.sql)
 (in pgAdmin's Query Tool, or with psql as shown at the top of that file), after replacing `CHANGE_ME` with
-a password of your choice.
+a password of your choice, and put that password in `DATABASE_URL`; `db:dev` then leaves `.env` alone.
 
 Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
 health: `/api/health` (process) and `/api/health/db` (database). To try the Firebase spaces locally,

@@ -18,7 +18,8 @@
     "test": "npm run build -w @cdls/shared && npm run test --workspaces --if-present",
     "db:migrate": "npm run db:migrate -w @cdls/api",
     "db:seed": "npm run db:seed -w @cdls/api",
-    "format": "prettier --write \"{apps,packages}/*/src/**/*.{ts,html,scss}\""
+    "format": "prettier --write \"{apps,packages}/*/src/**/*.{ts,html,scss}\"",
+    "db:dev": "npm run db:dev -w @cdls/api"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",
