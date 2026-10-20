@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prototypes | Collège de la Salle, Daher</title>
+  <meta name="description" content="Prototypes HTML de la refonte du Collège de la Salle, Daher : 10 écrans responsive construits avec les tokens du design system.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="section section--inverse on-inverse index-head">
+    <div class="container stack">
+      <span class="wordmark" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire, depuis 1898</span></span>
+      </span>
+      <h1 class="t-display-l">Prototypes de la refonte</h1>
+      <p class="t-body-l prose-width">Dix écrans en HTML et CSS, construits avec les tokens de <code>tokens.css</code> et les composants de <code>components.css</code>. Chaque écran s’adapte du mobile (390 px) au bureau (1 440 px).</p>
+    </div>
+  </header>
+
+  <main id="contenu" class="section">
+    <div class="container stack index-groups">
+      <section aria-labelledby="g-public" class="stack stack--sm">
+        <h2 id="g-public" class="t-h2">Site public</h2>
+        <ul class="index-list" role="list">
+          <li><a href="home.html">Accueil</a><span>Hero, histoire en frise, les deux filières, actualités, inscriptions et contact.</span></li>
+          <li><a href="bac-francais.html">Page filière : Bac français</a><span>Modèle des pages de filière (le Bac nationale utilise le même gabarit).</span></li>
+          <li><a href="contact.html">Contact et inscriptions</a><span>Formulaire avec un champ en erreur, téléphones par service.</span></li>
+          <li><a href="connexion.html">Connexion</a><span>État d’erreur d’identification, mot de passe affichable.</span></li>
+        </ul>
+      </section>
+      <section aria-labelledby="g-eleve" class="stack stack--sm">
+        <h2 id="g-eleve" class="t-h2">Espace élève</h2>
+        <ul class="index-list" role="list">
+          <li><a href="eleve-tableau-de-bord.html">Tableau de bord</a><span>Journée, devoirs à cocher, dernières notes, moyennes, absences, annonces.</span></li>
+          <li><a href="eleve-notes.html">Mes notes</a><span>Onglets par trimestre, notes par matière, état vide pour les trimestres à venir.</span></li>
+          <li><a href="eleve-bulletin.html">Bulletin</a><span>Bulletin trimestriel imprimable, avis du conseil de classe.</span></li>
+        </ul>
+      </section>
+      <section aria-labelledby="g-ens" class="stack stack--sm">
+        <h2 id="g-ens" class="t-h2">Espace enseignant</h2>
+        <ul class="index-list" role="list">
+          <li><a href="enseignant-saisie-notes.html">Saisie des notes</a><span>Grille avec validation 0 à 20, moyennes recalculées, publication par dialogue.</span></li>
+          <li><a href="enseignant-appel.html">Appel</a><span>Présent, absent ou en retard pour chaque élève, totaux en direct.</span></li>
+        </ul>
+      </section>
+      <section aria-labelledby="g-admin" class="stack stack--sm">
+        <h2 id="g-admin" class="t-h2">Administration</h2>
+        <ul class="index-list" role="list">
+          <li><a href="admin-utilisateurs.html">Utilisateurs</a><span>Recherche et filtres, tableau paginé, import CSV dans un dialogue.</span></li>
+        </ul>
+      </section>
+      <p class="t-body-s t-muted">Le blason est provisoire : il sera remplacé par le logo officiel quand le collège en aura autorisé l’usage. Données fictives, à l’exception des informations publiques du collège.</p>
+    </div>
+  </main>
+</body>
+</html>
