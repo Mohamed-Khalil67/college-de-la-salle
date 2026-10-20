@@ -285,6 +285,6 @@ These are blocked by the rate limit. Each screen is planned at 1440 (desktop pag
    - Upgrade the team to **Professional** and give your account a **Full or Dev seat**. The MCP limit then becomes up to 200 calls per day (10 per minute).
    - Wait for the monthly reset.
    - Allow the build in another workspace, for example StudentGator, where you have a Dev seat on a Pro plan.
-2. **Logo rights.** Ask the school for written permission and the original logo file, ideally vector (AI, EPS, SVG or PDF), or the high-resolution image behind the Facebook profile picture. Until then, the placeholder crest stays.
+2. **Logo: decided.** The owner reviewed the crest and wordmark in the app and approved them as they are (2026-10-20): no logo from the web is needed. If the school later supplies an official vector, swap it in `icons.svg` (`#crest`, `#crest-on-dark`).
 3. **Photo rights.** Confirm that the approval noted in `photos.ts` covers the new platform. Consider a campus photo shoot.
 4. **Palette sign-off.** Navy `#13294B` with gold `#C9A13B` and brick `#8E3A2B` on ivory, as above.

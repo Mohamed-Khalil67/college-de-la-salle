@@ -68,7 +68,7 @@ Every instance in the HTML carries `data-component="name"`. Suggested home: shar
 | `grade-input` | `cdls-grade-input`, `value = model<number \| null>()`, `absent = input<boolean>()`. Parses with `parseNumber` from `packages/shared` (decimal comma), validates 0 to 20, sets `aria-invalid`. | The row error message lives in the next `<tr>` (see `enseignant-saisie-notes.html`). |
 | `card` | `cdls-card`, `variant = input<'news' \| 'panel'>()`, with slots for media, header (title and link) and body. | A news card is one link (the title's link covers the card, so focus goes there). A panel card is a `<section>` labelled by its title. |
 | `nav-link` | Plain `<a>` with `routerLink`, `routerLinkActive` and `ariaCurrentWhenActive="page"`. | Shows a 2px underline when current (gold on navy). |
-| `wordmark` | `cdls-wordmark`, `tone = input<'light' \| 'dark'>()`, `subtitle = input<string>()`. | The crest is a **placeholder** until the school authorises the logo. When the text is hidden (app bar on mobile), the link needs an `aria-label`. |
+| `wordmark` | `cdls-wordmark`, `tone = input<'light' \| 'dark'>()`, `subtitle = input<string>()`. | The crest is approved as it is. When the text is hidden (app bar on mobile), the link needs an `aria-label`. |
 | `site-header` | Public layout header. `menuOpen = signal(false)`. Close it on Escape and on `NavigationEnd`, and return focus to the toggle. | Navy utility strip with the Arabic switch (`lang="ar"`, `hreflang`). |
 | `site-footer` | Static. | Lists the credits for logo and photos. |
 | `app-bar` | Space layout header. `nav = input<NavItem[]>()` per role, account and notifications. | From 1024px down, the links move to `bottom-nav` and the page title shows instead. |
@@ -97,7 +97,7 @@ Every instance in the HTML carries `data-component="name"`. Suggested home: shar
 
 ## Open decisions and known gaps
 
-1. **Logo rights:** the crest is a placeholder drawn from the shield. It needs written permission and the original vector file from the school.
+1. **Logo:** the crest and wordmark are approved as they are; no web logo is needed. An official vector can replace `#crest` later.
 2. **Photos:** every photo is low resolution (≤ 1,166 px) and from archives. A campus shoot would replace the hero and the track images.
 3. **Figma:** the screens aren't in Figma, and `gold/700` needs updating there (see `docs/brand.md`, Open decisions).
 4. **Template reuse:** `bac-francais.html` stands in for both track pages; the Bac nationale page uses the same template. Links to pages that don't exist yet point to `#`.
