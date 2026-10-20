@@ -1,0 +1,209 @@
+import { Component, ElementRef, computed, inject, input, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
+import { AuthStore } from '../core/auth/auth-store';
+import { Avatar, Icon, type IconName, Wordmark } from '../ui';
+
+export interface SpaceNavItem {
+  readonly label: string;
+  /** Relative to the area (e.g. 'notes'); '' is the area's home. */
+  readonly path: string;
+  /** Shown in the phone's bottom bar (at most five items). */
+  readonly icon?: IconName;
+  readonly short?: string;
+}
+
+/**
+ * The frame of the student, teacher and admin spaces: navy app bar with the area's navigation, the
+ * account menu (sign out), and a bottom bar on phones. Each area passes its navigation in route data.
+ */
+@Component({
+  selector: 'app-space-layout',
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar],
+  template: `
+    <div class="has-bottom-nav">
+      <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+      <header class="app-bar on-inverse">
+        <div class="app-bar__inner">
+          <cdls-wordmark tone="dark" [subtitle]="areaLabel()" [link]="base()" [label]="'Collège de la Salle, ' + areaLabel() + ' : accueil'" />
+          <p class="app-bar__title" aria-hidden="true">{{ pageTitle() }}</p>
+          <nav class="app-bar__nav" [attr.aria-label]="areaLabel()">
+            <ul role="list">
+              @for (item of nav(); track item.path) {
+                <li>
+                  <a
+                    class="nav-link"
+                    [routerLink]="link(item)"
+                    routerLinkActive
+                    [routerLinkActiveOptions]="{ exact: item.path === '' }"
+                    ariaCurrentWhenActive="page"
+                    >{{ item.label }}</a
+                  >
+                </li>
+              }
+            </ul>
+          </nav>
+          <div class="app-bar__end account">
+            <button
+              #accountButton
+              type="button"
+              class="app-bar__account"
+              aria-controls="account-menu"
+              [attr.aria-expanded]="accountOpen()"
+              (click)="accountOpen.set(!accountOpen())"
+            >
+              <cdls-avatar [name]="auth.displayName()" [gold]="true" />
+              <span class="app-bar__account-text">{{ auth.displayName() }}<small>{{ roleLabel() }}</small></span>
+              <span class="visually-hidden">Compte de {{ auth.displayName() }}</span>
+              <cdls-icon name="chevron-down" />
+            </button>
+            @if (accountOpen()) {
+              <div id="account-menu" class="account-menu">
+                <p class="account-menu__who">{{ auth.user()?.email }}</p>
+                <button type="button" class="account-menu__item" (click)="logout()">
+                  <cdls-icon name="log-out" /> Se déconnecter
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      </header>
+
+      <main id="contenu" class="page" tabindex="-1">
+        <router-outlet />
+      </main>
+
+      <nav class="bottom-nav" aria-label="Navigation mobile">
+        <ul role="list">
+          @for (item of mobileNav(); track item.path) {
+            <li>
+              <a [routerLink]="link(item)" routerLinkActive [routerLinkActiveOptions]="{ exact: item.path === '' }" ariaCurrentWhenActive="page">
+                <cdls-icon [name]="item.icon ?? 'more'" />{{ item.short ?? item.label }}
+              </a>
+            </li>
+          }
+        </ul>
+      </nav>
+    </div>
+  `,
+  styles: `
+    .account {
+      position: relative;
+    }
+    .app-bar__account {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+    .account-menu {
+      position: absolute;
+      inset-inline-end: 0;
+      top: calc(100% + var(--space-2));
+      z-index: 40;
+      min-width: 16rem;
+      padding: var(--space-2);
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      color: var(--color-body);
+      box-shadow: var(--shadow-overlay);
+    }
+    .account-menu__who {
+      padding: var(--space-2) var(--space-3);
+      color: var(--color-muted);
+      font-size: var(--text-body-s);
+      overflow-wrap: anywhere;
+    }
+    .account-menu__item {
+      display: flex;
+      gap: var(--space-2);
+      align-items: center;
+      width: 100%;
+      min-height: 2.75rem;
+      padding: var(--space-2) var(--space-3);
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-heading);
+      font: inherit;
+      cursor: pointer;
+    }
+    .account-menu__item:hover {
+      background: var(--color-subtle);
+    }
+  `,
+  host: { '(document:keydown.escape)': 'closeAccount()', '(document:click)': 'onDocumentClick($event)' },
+})
+export class SpaceLayout {
+  /** From route data. */
+  readonly areaLabel = input('Espace');
+  readonly nav = input<readonly SpaceNavItem[]>([]);
+
+  protected readonly auth = inject(AuthStore);
+  readonly #router = inject(Router);
+  readonly #route = inject(ActivatedRoute);
+  private readonly accountButton = viewChild.required<ElementRef<HTMLButtonElement>>('accountButton');
+
+  protected readonly accountOpen = signal(false);
+  protected readonly base = computed(() => '/' + (this.#route.snapshot.pathFromRoot.flatMap((r) => r.url.map((s) => s.path)).join('/') || ''));
+  protected readonly mobileNav = computed(() => this.nav().filter((item) => item.icon).slice(0, 5));
+  protected readonly roleLabel = computed(() => {
+    switch (this.auth.role()) {
+      case 'student':
+        return 'Élève';
+      case 'teacher':
+        return 'Enseignant';
+      case 'admin':
+        return 'Administration';
+      default:
+        return '';
+    }
+  });
+
+  /** The current page's title, shown in the app bar on phones (where the navigation moves to the bottom bar). */
+  protected readonly pageTitle = toSignal(
+    this.#router.events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      map(() => this.#deepestTitle()),
+    ),
+    { initialValue: this.#deepestTitle() },
+  );
+
+  constructor() {
+    this.#router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe(() => this.accountOpen.set(false));
+  }
+
+  protected link(item: SpaceNavItem): string {
+    return item.path ? `${this.base()}/${item.path}` : this.base();
+  }
+
+  protected async logout(): Promise<void> {
+    await this.auth.logout();
+    await this.#router.navigateByUrl('/connexion');
+  }
+
+  protected closeAccount(): void {
+    if (!this.accountOpen()) return;
+    this.accountOpen.set(false);
+    this.accountButton().nativeElement.focus();
+  }
+
+  protected onDocumentClick(event: MouseEvent): void {
+    if (this.accountOpen() && !(event.target as HTMLElement).closest('.account')) this.accountOpen.set(false);
+  }
+
+  #deepestTitle(): string {
+    let route = this.#router.routerState.snapshot.root;
+    while (route.firstChild) route = route.firstChild;
+    return route.title ?? this.areaLabel();
+  }
+}

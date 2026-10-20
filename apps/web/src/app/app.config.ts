@@ -13,7 +13,9 @@ import {
   withComponentInputBinding,
   withInMemoryScrolling,
 } from '@angular/router';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
+import { authInterceptor } from './core/auth/auth.interceptor';
 
 /** « Page — Collège de la Salle Daher » in the browser tab. */
 @Injectable()
@@ -23,7 +25,7 @@ class SiteTitleStrategy extends TitleStrategy {
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const page = this.buildTitle(snapshot);
     const site = 'Collège de la Salle — Daher';
-    this.#title.setTitle(page ? `${page} — ${site}` : `${site} · Bac nationale & Bac français`);
+    this.#title.setTitle(page ? `${page} — ${site}` : `${site} · Bac nationale et Bac français`);
   }
 }
 
@@ -40,6 +42,7 @@ export const appConfig: ApplicationConfig = {
     ),
     { provide: TitleStrategy, useClass: SiteTitleStrategy },
     { provide: LOCALE_ID, useValue: 'fr' },
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     // Every page is prerendered; hydration reuses that DOM (no flash, no layout shift) and event
     // replay keeps clicks made before the bundle finishes loading.
     provideClientHydration(withEventReplay()),

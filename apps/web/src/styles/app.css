@@ -1,0 +1,59 @@
+/*
+ * Additions the Angular app needs on top of design/prototypes/components.css. Keep this file small:
+ * anything that is a design decision belongs in the prototypes first.
+ */
+
+/* Destructive action (delete an account, remove an event). Red 700 on white is 6.6:1. */
+.btn--danger {
+  --btn-bg: var(--color-surface);
+  --btn-fg: var(--color-danger);
+  --btn-border: var(--color-danger);
+}
+.btn--danger:hover {
+  --btn-bg: var(--color-danger-tint);
+}
+
+/* Component hosts that only wrap their template's root element. */
+cdls-icon,
+cdls-badge,
+cdls-alert,
+cdls-avatar,
+cdls-wordmark {
+  display: contents;
+}
+
+/* Router pages fill the outlet; the spaces' <main> gets the page padding from .page. */
+router-outlet + * {
+  display: block;
+}
+
+/* Loading placeholder for data panels: a quiet line, no spinner. */
+.loading-line {
+  color: var(--color-muted);
+  font-size: var(--text-body-s);
+}
+
+/* Pagination with buttons (the list is client-side state, not URLs): same look as the prototype's links. */
+.pagination button {
+  display: grid;
+  place-items: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-body);
+  font: inherit;
+  cursor: pointer;
+}
+.pagination button:hover {
+  background: var(--color-subtle);
+}
+.pagination button[aria-current='page'] {
+  background: var(--color-primary);
+  color: var(--color-on-inverse);
+}
+.pagination button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

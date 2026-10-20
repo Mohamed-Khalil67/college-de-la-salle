@@ -1,0 +1,132 @@
+/*
+ * Global styles. Design tokens come from design/prototypes/tokens.css (source: docs/brand.md) and are
+ * declared as a Tailwind 4 theme, so they exist both as CSS custom properties (var(--color-page)) and as
+ * utilities (bg-page, text-heading, font-display, text-h1, p-6, rounded-md, shadow-raised).
+ * Component classes (.btn, .card, .field…) come from design/prototypes/components.css; they live in the
+ * `components` layer so utilities always win.
+ *
+ * Use logical utilities (ms-, me-, ps-, pe-, start-, end-, text-start, text-end): the Arabic content is RTL.
+ */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@import './styles/fonts.css' layer(base);
+@import './styles/helpers.css' layer(base);
+@import './styles/components.css' layer(components);
+@import './styles/app.css' layer(components);
+
+@theme static {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --container-*: initial;
+  /* ---------- Colour: primitives ---------- */
+  --color-navy-900: #13294b; /* Bleu Daher */
+  --color-navy-700: #22406e; /* Bleu encre */
+  --color-navy-100: #e3e9f2;
+  --color-gold-500: #c9a13b; /* Or du blason */
+  --color-gold-700: #806218; /* Or patiné (darkened from Figma #8A6A1E to pass 4.5:1 on parchment) */
+  --color-gold-800: #73570f;
+  --color-gold-100: #f4ead0;
+  --color-brick-700: #8e3a2b; /* Brique 1905 */
+  --color-ivory-50: #fbf8f1; /* Ivoire */
+  --color-parchment-100: #f1ebdd; /* Parchemin */
+  --color-stone-300: #d8cfbd;
+  --color-stone-500: #8c8471;
+  --color-ink-900: #1e2430; /* Encre */
+  --color-ink-600: #565d6b;
+  --color-white: #ffffff;
+  --color-green-700: #2e6b45;
+  --color-green-100: #e4eee6;
+  --color-red-700: #a3262a;
+  --color-red-100: #f7e4e1;
+
+  /* ---------- Colour: semantic ---------- */
+  --color-page: var(--color-ivory-50);
+  --color-subtle: var(--color-parchment-100);
+  --color-surface: var(--color-white);
+  --color-inverse: var(--color-navy-900);
+  --color-info-tint: var(--color-navy-100);
+  --color-success-tint: var(--color-green-100);
+  --color-danger-tint: var(--color-red-100);
+  --color-warning-tint: var(--color-gold-100);
+
+  --color-primary: var(--color-navy-900);
+  --color-primary-hover: var(--color-navy-700);
+  --color-accent: var(--color-gold-500); /* gold fill, rules, and text on navy only */
+  --color-accent-hover: #d8b45a;
+
+  --color-body: var(--color-ink-900);
+  --color-muted: var(--color-ink-600);
+  --color-heading: var(--color-navy-900);
+  --color-link: var(--color-navy-700);
+  --color-on-inverse: var(--color-ivory-50);
+  --color-accent-text: var(--color-gold-700); /* gold as text on light surfaces */
+  --color-heritage: var(--color-brick-700);
+  --color-success: var(--color-green-700);
+  --color-danger: var(--color-red-700);
+  --color-warning: var(--color-gold-800);
+
+  --color-line: var(--color-stone-300);
+  --color-line-strong: var(--color-stone-500);
+  --color-focus: var(--color-navy-700);
+
+  /* ---------- Type ---------- */
+  --font-display: "Cormorant Garamond", "EB Garamond", Garamond, Georgia, serif;
+  --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-arabic: "Cairo", "Segoe UI", Tahoma, sans-serif;
+
+  --text-display-xl: clamp(2.75rem, 1.6rem + 3.2vw, 4.5rem); /* 44 → 72 */
+  --text-display-xl--line-height: 1.06;
+  --text-display-xl--letter-spacing: -0.014em;
+  --text-display-xl--font-weight: 500;
+  --text-display-l: clamp(2.5rem, 1.9rem + 1.6vw, 3.5rem); /* 40 → 56 */
+  --text-display-l--line-height: 1.07;
+  --text-display-l--letter-spacing: -0.009em;
+  --text-display-l--font-weight: 500;
+  --text-h1: clamp(2rem, 1.7rem + 0.8vw, 2.5rem); /* 32 → 40 */
+  --text-h1--line-height: 1.15;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.875rem; /* 30 */
+  --text-h2--line-height: 1.2;
+  --text-h2--font-weight: 600;
+  --text-h3: 1.25rem; /* 20, Inter */
+  --text-h3--line-height: 1.4;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+  --text-body-l: 1.125rem; /* 18 */
+  --text-body-l--line-height: 1.667;
+  --text-body-m: 1rem; /* 16 */
+  --text-body-m--line-height: 1.625;
+  --text-body-s: 0.875rem; /* 14 */
+  --text-body-s--line-height: 1.571;
+  --text-label-m: 0.9375rem; /* 15 */
+  --text-label-m--line-height: 1.333;
+  --text-label-m--font-weight: 500;
+  --text-label-s: 0.8125rem; /* 13 */
+  --text-label-s--line-height: 1.385;
+  --text-label-s--font-weight: 500;
+  --text-caption: 0.75rem; /* 12 */
+  --text-caption--line-height: 1.5;
+  --text-quote: 1.625rem; /* 26, Cormorant italic */
+  --text-quote--line-height: 1.31;
+  --text-arabic-h: 1.875rem;
+  --text-arabic-h--line-height: 1.467;
+  --text-arabic-body: 1rem;
+  --text-arabic-body--line-height: 1.75;
+
+  /* ---------- Spacing, radius, elevation ---------- */
+  --spacing: 0.25rem; /* 4px base: Figma space/N = N × 4px */
+  --radius-sm: 4px; /* buttons, inputs, grade cells */
+  --radius-md: 10px; /* cards, panels */
+  --radius-lg: 16px; /* modals, sheets */
+  --radius-full: 999px; /* badges, avatars */
+  --shadow-raised: 0 1px 2px rgb(19 41 75 / 0.08), 0 12px 32px -8px rgb(19 41 75 / 0.1);
+  --shadow-overlay: 0 24px 48px -12px rgb(19 41 75 / 0.18);
+
+  /* ---------- Layout ---------- */
+  --container-content: 75rem; /* 1200px */
+  --container-prose: 45rem; /* ≈ 72 characters */
+}

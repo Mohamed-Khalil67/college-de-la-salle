@@ -1,0 +1,16 @@
+/* ---------- Helpers (not for @theme: Tailwind derives these) ---------- */
+:root {
+  --space-1: calc(var(--spacing) * 1);
+  --space-2: calc(var(--spacing) * 2);
+  --space-3: calc(var(--spacing) * 3);
+  --space-4: calc(var(--spacing) * 4);
+  --space-6: calc(var(--spacing) * 6);
+  --space-8: calc(var(--spacing) * 8);
+  --space-12: calc(var(--spacing) * 12);
+  --space-16: calc(var(--spacing) * 16);
+  --space-24: calc(var(--spacing) * 24);
+  --space-32: calc(var(--spacing) * 32);
+  --gutter: clamp(1rem, 0.2rem + 4vw, 7.5rem); /* 16px mobile → 120px at 1440 */
+  --section-y: clamp(4rem, 2.7rem + 3.6vw, 6rem); /* 64 → 96 */
+  --focus-ring: 0 0 0 2px var(--color-page), 0 0 0 4px var(--color-focus);
+}
