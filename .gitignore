@@ -56,13 +56,13 @@ functions/.env.local
 functions/.secret.local
 
 # Playwright
-/test-results/
-/playwright-report/
+test-results/
+playwright-report/
 /blob-report/
 
 # Test and emulator output
-/test-results
-/playwright-report
+test-results/
+playwright-report/
 *-debug.log
 /.firebase
 
