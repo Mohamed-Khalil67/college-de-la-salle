@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saisie des notes | Collège de la Salle, Daher</title>
+  <meta name="description" content="Espace enseignant : saisir et publier les notes d’une évaluation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="has-bottom-nav">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="app-bar on-inverse" data-component="app-bar">
+    <div class="app-bar__inner">
+      <a class="wordmark" href="enseignant-saisie-notes.html" aria-label="Collège de la Salle, Espace enseignant : accueil" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Espace enseignant</span></span>
+      </a>
+      <p class="app-bar__title" aria-hidden="true">Saisie des notes</p>
+      <nav class="app-bar__nav" aria-label="Espace enseignant">
+        <ul role="list">
+          <li><a class="nav-link" href="#" data-component="nav-link">Mes classes</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Agenda</a></li>
+          <li><a class="nav-link" href="enseignant-saisie-notes.html" aria-current="page" data-component="nav-link">Saisie des notes</a></li>
+          <li><a class="nav-link" href="enseignant-appel.html" data-component="nav-link">Appel</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Annonces</a></li>
+        </ul>
+      </nav>
+      <div class="app-bar__end">
+        <button class="app-bar__icon-btn" type="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-bell"/></svg><span class="app-bar__dot"></span><span class="visually-hidden">Notifications, 2 nouvelles</span></button>
+        <a class="app-bar__account" href="connexion.html">
+          <span class="avatar avatar--gold" aria-hidden="true" data-component="avatar">RH</span>
+          <span class="app-bar__account-text">Rami Hanna<small>Mathématiques</small></span>
+          <span class="visually-hidden">Compte de Rami Hanna : se déconnecter</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu" class="page">
+    <div class="page__header">
+      <div class="page__header-text">
+        <nav class="breadcrumb" aria-label="Fil d’Ariane" data-component="breadcrumb"><ol role="list"><li><a href="#">Mes classes</a></li><li><a href="#">Seconde B</a></li><li><span aria-current="page">Mathématiques</span></li></ol></nav>
+        <h1 class="t-h1">Contrôle n° 3 : fonctions affines</h1>
+        <p class="t-muted">Mardi 20 octobre 2026, coefficient 2, noté sur 20</p>
+      </div>
+      <div class="page__actions">
+        <button class="btn btn--secondary" type="button" data-component="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-download"/></svg>Exporter</button>
+        <button class="btn btn--primary" type="button" data-dialog-open="publish" data-component="button">Publier les notes</button>
+      </div>
+    </div>
+
+    <div class="toolbar" data-component="grade-toolbar">
+      <div class="toolbar__status">
+        <span class="badge badge--warning" data-component="badge">Brouillon, invisible pour les élèves</span>
+        <span role="status" data-save-status>Enregistré à 10 h 42</span>
+      </div>
+      <p class="t-body-s t-muted">Saisissez une note de 0 à 20 (virgule acceptée). Passez d’un élève à l’autre avec Tab.</p>
+    </div>
+
+    <div class="table-wrap" role="region" aria-labelledby="grid-caption" tabindex="0" data-component="grade-grid">
+      <table class="table table--sticky-first grade-grid" data-grade-grid>
+        <caption id="grid-caption" class="visually-hidden">Notes de mathématiques de la Seconde B, trimestre 1</caption>
+        <thead>
+          <tr>
+            <th scope="col">Élève <span class="t-muted">(26)</span></th>
+            <th scope="col" class="num">DM n° 1<span class="cell-sub">×1, publié</span></th>
+            <th scope="col" class="num">Contrôle n° 1<span class="cell-sub">×2, publié</span></th>
+            <th scope="col" class="num">Contrôle n° 2<span class="cell-sub">×2, publié</span></th>
+            <th scope="col">Contrôle n° 3<span class="cell-sub">×2, brouillon</span></th>
+            <th scope="col" class="num">Moyenne T1</th>
+          </tr>
+        </thead>
+        <tbody>
+              <tr data-error-row="err-s1"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">NA</span>Nour Abdel-Malek</span></th><td class="num" data-grade="9.5" data-coef="1">9,5</td><td class="num" data-grade="12.5" data-coef="2">12,5</td><td class="num" data-grade="9.0" data-coef="2">9</td><td><input class="grade-input" id="g-s1" aria-describedby="err-s1" inputmode="decimal" autocomplete="off" data-coef="2" value="12" aria-label="Contrôle n° 3, Nour Abdel-Malek" data-component="grade-input"></td><td class="num"><b data-average>10,9</b></td></tr>
+              <tr class="grade-row-error" id="err-s1" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Nour Abdel-Malek : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s2"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">HA</span>Habiba Amin</span></th><td class="num" data-grade="9.5" data-coef="1">9,5</td><td class="num" data-grade="12.0" data-coef="2">12</td><td class="num" data-grade="9.0" data-coef="2">9</td><td><input class="grade-input" id="g-s2" aria-describedby="err-s2" inputmode="decimal" autocomplete="off" data-coef="2" value="11,5" aria-label="Contrôle n° 3, Habiba Amin" data-component="grade-input"></td><td class="num"><b data-average>10,6</b></td></tr>
+              <tr class="grade-row-error" id="err-s2" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Habiba Amin : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s3"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">YA</span>Yasmine Aziz</span></th><td class="num" data-grade="7.0" data-coef="1">7</td><td class="num" data-grade="9.0" data-coef="2">9</td><td class="num" data-grade="11.5" data-coef="2">11,5</td><td><input class="grade-input" id="g-s3" aria-describedby="err-s3" inputmode="decimal" autocomplete="off" data-coef="2" value="7,5" aria-label="Contrôle n° 3, Yasmine Aziz" data-component="grade-input"></td><td class="num"><b data-average>9,0</b></td></tr>
+              <tr class="grade-row-error" id="err-s3" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Yasmine Aziz : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s4"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">MB</span>Mina Botros</span></th><td class="num" data-grade="11.5" data-coef="1">11,5</td><td class="num" data-grade="13.5" data-coef="2">13,5</td><td class="num" data-grade="11.0" data-coef="2">11</td><td><input class="grade-input" id="g-s4" aria-describedby="err-s4" inputmode="decimal" autocomplete="off" data-coef="2" value="10" aria-label="Contrôle n° 3, Mina Botros" data-component="grade-input"></td><td class="num"><b data-average>11,5</b></td></tr>
+              <tr class="grade-row-error" id="err-s4" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Mina Botros : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s5"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">MB</span>Marc Boutros</span></th><td class="num" data-grade="14.0" data-coef="1">14</td><td class="num" data-grade="19.0" data-coef="2">19</td><td class="num" data-grade="15.5" data-coef="2">15,5</td><td><input class="grade-input" id="g-s5" aria-describedby="err-s5" inputmode="decimal" autocomplete="off" data-coef="2" value="14,5" aria-label="Contrôle n° 3, Marc Boutros" data-component="grade-input"></td><td class="num"><b data-average>16,0</b></td></tr>
+              <tr class="grade-row-error" id="err-s5" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Marc Boutros : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s6"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">OE</span>Omar El-Sayed</span></th><td class="num" data-grade="9.0" data-coef="1">9</td><td class="num" data-grade="12.0" data-coef="2">12</td><td class="num" data-grade="8.0" data-coef="2">8</td><td><input class="grade-input" id="g-s6" aria-describedby="err-s6" inputmode="decimal" autocomplete="off" data-coef="2" value="10,5" aria-label="Contrôle n° 3, Omar El-Sayed" data-component="grade-input"></td><td class="num"><b data-average>10,0</b></td></tr>
+              <tr class="grade-row-error" id="err-s6" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Omar El-Sayed : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s7"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">ZF</span>Ziad Fahmy</span></th><td class="num" data-grade="13.5" data-coef="1">13,5</td><td class="num" data-grade="14.5" data-coef="2">14,5</td><td class="num" data-grade="11.5" data-coef="2">11,5</td><td><input class="grade-input" id="g-s7" aria-describedby="err-s7" inputmode="decimal" autocomplete="off" data-coef="2" value="11,5" aria-label="Contrôle n° 3, Ziad Fahmy" data-component="grade-input"></td><td class="num"><b data-average>12,6</b></td></tr>
+              <tr class="grade-row-error" id="err-s7" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Ziad Fahmy : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s8"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">JF</span>Jana Farid</span></th><td class="num" data-grade="11.5" data-coef="1">11,5</td><td class="num" data-grade="10.0" data-coef="2">10</td><td class="num" data-grade="9.5" data-coef="2">9,5</td><td><input class="grade-input" id="g-s8" aria-describedby="err-s8" inputmode="decimal" autocomplete="off" data-coef="2" value="11" aria-label="Contrôle n° 3, Jana Farid" data-component="grade-input"></td><td class="num"><b data-average>10,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s8" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Jana Farid : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s9"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">NF</span>Nadia Fawzy</span></th><td class="num" data-grade="15" data-coef="1">15</td><td class="num" data-grade="12" data-coef="2">12</td><td class="num" data-grade="16" data-coef="2">16</td><td><input class="grade-input" id="g-s9" aria-describedby="err-s9" inputmode="decimal" autocomplete="off" data-coef="2" value="11" aria-label="Contrôle n° 3, Nadia Fawzy" data-component="grade-input"></td><td class="num"><b data-average>13,3</b></td></tr>
+              <tr class="grade-row-error" id="err-s9" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Nadia Fawzy : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s10"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">MG</span>Mariam Gerges</span></th><td class="num" data-grade="13.5" data-coef="1">13,5</td><td class="num" data-grade="16.0" data-coef="2">16</td><td class="num" data-grade="15.0" data-coef="2">15</td><td><input class="grade-input" id="g-s10" aria-describedby="err-s10" inputmode="decimal" autocomplete="off" data-coef="2" value="12,5" aria-label="Contrôle n° 3, Mariam Gerges" data-component="grade-input"></td><td class="num"><b data-average>14,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s10" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Mariam Gerges : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s11"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">FG</span>Fady Ghaly</span></th><td class="num" data-grade="14.5" data-coef="1">14,5</td><td class="num" data-grade="16.5" data-coef="2">16,5</td><td class="num" data-grade="18.5" data-coef="2">18,5</td><td><input class="grade-input" id="g-s11" aria-describedby="err-s11" inputmode="decimal" autocomplete="off" data-coef="2" value="15" aria-label="Contrôle n° 3, Fady Ghaly" data-component="grade-input"></td><td class="num"><b data-average>16,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s11" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Fady Ghaly : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s12"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">LH</span>Lina Haddad</span></th><td class="num" data-grade="10.0" data-coef="1">10</td><td class="num" data-grade="14.0" data-coef="2">14</td><td class="num" data-grade="14.5" data-coef="2">14,5</td><td><input class="grade-input" id="g-s12" aria-describedby="err-s12" inputmode="decimal" autocomplete="off" data-coef="2" value="13,5" aria-label="Contrôle n° 3, Lina Haddad" data-component="grade-input"></td><td class="num"><b data-average>13,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s12" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Lina Haddad : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s13"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">YH</span>Youssef Hanna</span></th><td class="num" data-grade="15.0" data-coef="1">15</td><td class="num" data-grade="17.0" data-coef="2">17</td><td class="num" data-grade="16.5" data-coef="2">16,5</td><td><input class="grade-input" id="g-s13" aria-describedby="err-s13" inputmode="decimal" autocomplete="off" data-coef="2" value="16,5" aria-label="Contrôle n° 3, Youssef Hanna" data-component="grade-input"></td><td class="num"><b data-average>16,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s13" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Youssef Hanna : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s14"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">SI</span>Salma Ibrahim</span></th><td class="num" data-grade="14.5" data-coef="1">14,5</td><td class="num" data-grade="15.5" data-coef="2">15,5</td><td class="num" data-grade="12.5" data-coef="2">12,5</td><td><input class="grade-input" id="g-s14" aria-describedby="err-s14" inputmode="decimal" autocomplete="off" data-coef="2" value="13,5" aria-label="Contrôle n° 3, Salma Ibrahim" data-component="grade-input"></td><td class="num"><b data-average>13,9</b></td></tr>
+              <tr class="grade-row-error" id="err-s14" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Salma Ibrahim : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s15"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">SK</span>Sherif Kamel</span></th><td class="num" data-grade="10.5" data-coef="1">10,5</td><td class="num" data-grade="10.5" data-coef="2">10,5</td><td class="num" data-grade="12.5" data-coef="2">12,5</td><td><input class="grade-input" id="g-s15" aria-describedby="err-s15" inputmode="decimal" autocomplete="off" data-coef="2" value="11,5" aria-label="Contrôle n° 3, Sherif Kamel" data-component="grade-input"></td><td class="num"><b data-average>11,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s15" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Sherif Kamel : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s16"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AK</span>Ahmed Khalil</span></th><td class="num" data-grade="10.5" data-coef="1">10,5</td><td class="num" data-grade="12.5" data-coef="2">12,5</td><td class="num" data-grade="8.5" data-coef="2">8,5</td><td><input class="grade-input" id="g-s16" aria-describedby="err-s16" inputmode="decimal" autocomplete="off" data-coef="2" value="11" aria-label="Contrôle n° 3, Ahmed Khalil" data-component="grade-input"></td><td class="num"><b data-average>10,6</b></td></tr>
+              <tr class="grade-row-error" id="err-s16" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Ahmed Khalil : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s17"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">KM</span>Karim Mansour</span></th><td class="num" data-grade="8.0" data-coef="1">8</td><td class="num" data-grade="7.5" data-coef="2">7,5</td><td class="num" data-grade="12.0" data-coef="2">12</td><td><input class="grade-input" id="g-s17" aria-describedby="err-s17" inputmode="decimal" autocomplete="off" data-coef="2" value="24" aria-label="Contrôle n° 3, Karim Mansour" aria-invalid="true" data-component="grade-input"></td><td class="num"><b data-average>9,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s17"><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Karim Mansour : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s18"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">HM</span>Hana Mikhail</span></th><td class="num" data-grade="10.5" data-coef="1">10,5</td><td class="num" data-grade="13.0" data-coef="2">13</td><td class="num" data-grade="8.5" data-coef="2">8,5</td><td><input class="grade-input" id="g-s18" aria-describedby="err-s18" inputmode="decimal" autocomplete="off" data-coef="2" value="10,5" aria-label="Contrôle n° 3, Hana Mikhail" data-component="grade-input"></td><td class="num"><b data-average>10,6</b></td></tr>
+              <tr class="grade-row-error" id="err-s18" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Hana Mikhail : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s19"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">LN</span>Laila Nassif</span></th><td class="num" data-grade="15.5" data-coef="1">15,5</td><td class="num" data-grade="15.5" data-coef="2">15,5</td><td class="num" data-grade="15.5" data-coef="2">15,5</td><td><input class="grade-input" id="g-s19" aria-describedby="err-s19" inputmode="decimal" autocomplete="off" data-coef="2" value="12" aria-label="Contrôle n° 3, Laila Nassif" data-component="grade-input"></td><td class="num"><b data-average>14,5</b></td></tr>
+              <tr class="grade-row-error" id="err-s19" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Laila Nassif : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s20"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">SR</span>Sami Rafla</span></th><td class="num" data-grade="11.5" data-coef="1">11,5</td><td class="num" data-grade="14.5" data-coef="2">14,5</td><td class="num" data-grade="15.0" data-coef="2">15</td><td><input class="grade-input" id="g-s20" aria-describedby="err-s20" inputmode="decimal" autocomplete="off" data-coef="2" value="" aria-label="Contrôle n° 3, Sami Rafla" data-component="grade-input"></td><td class="num"><b data-average>14,1</b></td></tr>
+              <tr class="grade-row-error" id="err-s20" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Sami Rafla : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s21"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AR</span>Amira Rizk</span></th><td class="num" data-grade="9.0" data-coef="1">9</td><td class="num" data-grade="9.0" data-coef="2">9</td><td class="num" data-grade="10.5" data-coef="2">10,5</td><td><input class="grade-input" id="g-s21" aria-describedby="err-s21" inputmode="decimal" autocomplete="off" data-coef="2" value="11" aria-label="Contrôle n° 3, Amira Rizk" data-component="grade-input"></td><td class="num"><b data-average>10,0</b></td></tr>
+              <tr class="grade-row-error" id="err-s21" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Amira Rizk : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s22"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">CS</span>Carla Saad</span></th><td class="num" data-grade="8.0" data-coef="1">8</td><td class="num" data-grade="10.5" data-coef="2">10,5</td><td class="num" data-grade="10.5" data-coef="2">10,5</td><td><input class="grade-input" id="g-s22" aria-describedby="err-s22" inputmode="decimal" autocomplete="off" data-coef="2" value="11,5" aria-label="Contrôle n° 3, Carla Saad" data-component="grade-input"></td><td class="num"><b data-average>10,4</b></td></tr>
+              <tr class="grade-row-error" id="err-s22" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Carla Saad : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s23"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">RS</span>Rana Saleh</span></th><td class="num" data-grade="18.0" data-coef="1">18</td><td class="num" data-grade="16.5" data-coef="2">16,5</td><td class="num" data-grade="17.5" data-coef="2">17,5</td><td><input class="grade-input" id="g-s23" aria-describedby="err-s23" inputmode="decimal" autocomplete="off" data-coef="2" value="17,5" aria-label="Contrôle n° 3, Rana Saleh" data-component="grade-input"></td><td class="num"><b data-average>17,3</b></td></tr>
+              <tr class="grade-row-error" id="err-s23" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Rana Saleh : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s24"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AT</span>Adam Tawfik</span></th><td class="num" data-grade="12.0" data-coef="1">12</td><td class="num" data-grade="11.0" data-coef="2">11</td><td class="num" data-grade="11.5" data-coef="2">11,5</td><td><input class="grade-input" id="g-s24" aria-describedby="err-s24" inputmode="decimal" autocomplete="off" data-coef="2" value="11" aria-label="Contrôle n° 3, Adam Tawfik" data-component="grade-input"></td><td class="num"><b data-average>11,3</b></td></tr>
+              <tr class="grade-row-error" id="err-s24" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Adam Tawfik : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s25"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">PW</span>Peter Wissa</span></th><td class="num" data-grade="11.5" data-coef="1">11,5</td><td class="num" data-grade="10.0" data-coef="2">10</td><td class="num" data-grade="13.0" data-coef="2">13</td><td><input class="grade-input" id="g-s25" aria-describedby="err-s25" data-absent readonly value="Abs." aria-label="Contrôle n° 3, Peter Wissa : absent, excusé" data-component="grade-input"></td><td class="num"><b data-average>11,5</b></td></tr>
+              <tr class="grade-row-error" id="err-s25" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Peter Wissa : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+              <tr data-error-row="err-s26"><th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">TY</span>Tamer Youssef</span></th><td class="num" data-grade="8.0" data-coef="1">8</td><td class="num" data-grade="7.5" data-coef="2">7,5</td><td class="num" data-grade="8.5" data-coef="2">8,5</td><td><input class="grade-input" id="g-s26" aria-describedby="err-s26" inputmode="decimal" autocomplete="off" data-coef="2" value="7" aria-label="Contrôle n° 3, Tamer Youssef" data-component="grade-input"></td><td class="num"><b data-average>7,7</b></td></tr>
+              <tr class="grade-row-error" id="err-s26" hidden><td colspan="6"><p class="field__error"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>Tamer Youssef : la note doit être comprise entre 0 et 20.</span></p></td></tr>
+        </tbody>
+        <tfoot>
+          <tr><th scope="row">Moyenne de la classe</th><td class="num">11,6</td><td class="num">12,8</td><td class="num">12,4</td><td class="tabular">11,9 <span class="t-muted">(23 notes sur 26)</span></td><td></td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <dialog class="modal" id="publish" aria-labelledby="publish-title" aria-describedby="publish-desc" data-component="modal">
+      <div class="modal__header">
+        <h2 id="publish-title" class="t-h2">Publier les notes du contrôle ?</h2>
+        <button class="modal__close" type="button" data-dialog-close><svg class="icon" aria-hidden="true"><use href="icons.svg#i-close"/></svg><span class="visually-hidden">Fermer</span></button>
+      </div>
+      <div class="stack stack--sm">
+        <p id="publish-desc">Les 26 élèves de Seconde B verront leur note et leur nouvelle moyenne en mathématiques. Vous pourrez encore corriger une note après publication.</p>
+        <div class="alert alert--warning" data-component="alert"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg><span>1 note est hors barème (Karim Mansour) et 1 note manque (Sami Rafla). Corrigez-les ou publiez sans elles.</span></div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--secondary" type="button" data-dialog-close data-component="button">Annuler</button>
+        <button class="btn btn--primary" type="button" data-dialog-close data-component="button">Publier les notes</button>
+      </div>
+    </dialog>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigation mobile" data-component="bottom-nav">
+    <ul role="list">
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-users"/></svg>Classes</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-calendar"/></svg>Agenda</a></li>
+      <li><a href="enseignant-saisie-notes.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-edit"/></svg>Notes</a></li>
+      <li><a href="enseignant-appel.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-check"/></svg>Appel</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-more"/></svg>Plus</a></li>
+    </ul>
+  </nav>
+</body>
+</html>

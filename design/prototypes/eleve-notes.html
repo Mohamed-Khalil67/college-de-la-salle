@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mes notes | Collège de la Salle, Daher</title>
+  <meta name="description" content="Espace élève : notes et moyennes par matière et par trimestre.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="has-bottom-nav">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="app-bar on-inverse" data-component="app-bar">
+    <div class="app-bar__inner">
+      <a class="wordmark" href="eleve-tableau-de-bord.html" aria-label="Collège de la Salle, Espace élève : accueil" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Espace élève</span></span>
+      </a>
+      <p class="app-bar__title" aria-hidden="true">Mes notes</p>
+      <nav class="app-bar__nav" aria-label="Espace élève">
+        <ul role="list">
+          <li><a class="nav-link" href="eleve-tableau-de-bord.html" data-component="nav-link">Tableau de bord</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Emploi du temps</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Devoirs</a></li>
+          <li><a class="nav-link" href="eleve-notes.html" aria-current="page" data-component="nav-link">Notes</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Absences</a></li>
+          <li><a class="nav-link" href="eleve-bulletin.html" data-component="nav-link">Bulletins</a></li>
+        </ul>
+      </nav>
+      <div class="app-bar__end">
+        <button class="app-bar__icon-btn" type="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-bell"/></svg><span class="app-bar__dot"></span><span class="visually-hidden">Notifications, 2 nouvelles</span></button>
+        <a class="app-bar__account" href="connexion.html">
+          <span class="avatar avatar--gold" aria-hidden="true" data-component="avatar">NF</span>
+          <span class="app-bar__account-text">Nadia Fawzy<small>Seconde B, Bac français</small></span>
+          <span class="visually-hidden">Compte de Nadia Fawzy : se déconnecter</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu" class="page">
+    <div class="page__header">
+      <div class="page__header-text">
+        <h1 class="t-h1">Mes notes</h1>
+        <p class="t-muted">Seconde B, Bac français, année 2026-2027</p>
+      </div>
+      <div class="page__actions"><a class="btn btn--secondary" href="eleve-bulletin.html" data-component="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg>Bulletins</a></div>
+    </div>
+
+    <div class="tabs" data-component="tabs">
+      <div class="tabs__list" role="tablist" aria-label="Trimestres">
+        <button class="tabs__tab" role="tab" id="tab-t1" aria-selected="true" aria-controls="panel-t1" tabindex="0">Trimestre 1</button>
+        <button class="tabs__tab" role="tab" id="tab-t2" aria-selected="false" aria-controls="panel-t2" tabindex="-1">Trimestre 2</button>
+        <button class="tabs__tab" role="tab" id="tab-t3" aria-selected="false" aria-controls="panel-t3" tabindex="-1">Trimestre 3</button>
+      </div>
+
+      <section class="tabs__panel" id="panel-t1" role="tabpanel" aria-labelledby="tab-t1" tabindex="0">
+        <div class="avg-summary avg-summary--band">
+          <div class="stat"><span class="stat__value tabular">14,3</span><span class="stat__label">Ma moyenne générale</span></div>
+          <div class="stat"><span class="stat__value stat__value--muted tabular">13,0</span><span class="stat__label">Moyenne de la classe</span></div>
+          <p class="t-body-s t-muted avg-summary__note">Les moyennes sont calculées sur 20 avec les coefficients de chaque évaluation. Une note apparaît ici dès que l’enseignant la publie.</p>
+        </div>
+
+        <div class="table-wrap" role="region" aria-labelledby="t1-caption" tabindex="0" data-component="data-table">
+          <table class="table grades-table table--stack">
+            <caption id="t1-caption">Notes du trimestre 1 par matière</caption>
+            <thead>
+              <tr><th scope="col">Matière</th><th scope="col">Évaluations</th><th scope="col" class="num">Ma moyenne</th><th scope="col" class="num">Classe</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Mathématiques<span class="cell-sub">M. Hanna</span></th><td><ul class="chips" role="list"><li>DM n° 1 <b>15</b></li><li>Contrôle n° 1 <b>12</b> <span class="t-muted">×2</span></li><li>Contrôle n° 2 <b>16</b> <span class="t-muted">×2</span> <span class="badge badge--success" data-component="badge">Nouvelle</span></li></ul></td><td class="num" data-label="Ma moyenne"><b>14,2</b></td><td class="num t-muted" data-label="Classe">12,4</td></tr>
+              <tr><th scope="row">Français<span class="cell-sub">Mme Lefèvre</span></th><td><ul class="chips" role="list"><li>Commentaire <b>14</b> <span class="t-muted">×2</span></li><li>Dissertation <b>13,5</b> <span class="t-muted">×2</span></li><li>Oral <b>15</b></li></ul></td><td class="num" data-label="Ma moyenne"><b>14,0</b></td><td class="num t-muted" data-label="Classe">11,8</td></tr>
+              <tr><th scope="row">Physique-Chimie<span class="cell-sub">M. Girgis</span></th><td><ul class="chips" role="list"><li>TP n° 1 <b>17</b></li><li>Contrôle n° 1 <b>13</b> <span class="t-muted">×2</span></li></ul></td><td class="num" data-label="Ma moyenne"><b>14,3</b></td><td class="num t-muted" data-label="Classe">12,1</td></tr>
+              <tr><th scope="row">SVT<span class="cell-sub">Mme Wahba</span></th><td><ul class="chips" role="list"><li>Interrogation <b>17</b></li><li>Contrôle <b>15</b> <span class="t-muted">×2</span></li></ul></td><td class="num" data-label="Ma moyenne"><b>15,7</b></td><td class="num t-muted" data-label="Classe">14,2</td></tr>
+              <tr><th scope="row">Anglais<span class="cell-sub">Mme Adly</span></th><td><ul class="chips" role="list"><li>Vocabulary <b>18</b></li><li>Essay <b>15,5</b> <span class="t-muted">×2</span></li></ul></td><td class="num" data-label="Ma moyenne"><b>16,3</b></td><td class="num t-muted" data-label="Classe">13,9</td></tr>
+              <tr><th scope="row">Langue arabe<span class="cell-sub">M. Mounir</span></th><td><ul class="chips" role="list"><li>Expression écrite <b>14</b> <span class="t-muted">×2</span></li><li>Grammaire <b>12</b></li></ul></td><td class="num" data-label="Ma moyenne"><b>13,3</b></td><td class="num t-muted" data-label="Classe">13,0</td></tr>
+              <tr><th scope="row">Histoire-Géographie<span class="cell-sub">M. Daoud</span></th><td><ul class="chips" role="list"><li>Croquis <b>15</b></li><li>Contrôle <b>11</b> <span class="t-muted">×2</span></li></ul></td><td class="num" data-label="Ma moyenne"><b>12,3</b></td><td class="num t-muted" data-label="Classe">12,0</td></tr>
+              <tr><th scope="row">Sciences économiques et sociales<span class="cell-sub">Mme Nassar</span></th><td><ul class="chips" role="list"><li>Contrôle <b>14</b></li></ul></td><td class="num" data-label="Ma moyenne"><b>14,0</b></td><td class="num t-muted" data-label="Classe">12,6</td></tr>
+              <tr><th scope="row">Espagnol<span class="cell-sub">Mme Ruiz</span></th><td><ul class="chips" role="list"><li>Compréhension orale <b>12,5</b></li></ul></td><td class="num" data-label="Ma moyenne"><b>12,5</b></td><td class="num t-muted" data-label="Classe">13,2</td></tr>
+              <tr><th scope="row">Éducation physique et sportive<span class="cell-sub">M. Selim</span></th><td><ul class="chips" role="list"><li>Demi-fond <b>16</b></li></ul></td><td class="num" data-label="Ma moyenne"><b>16,0</b></td><td class="num t-muted" data-label="Classe">15,1</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><th scope="row">Moyenne générale</th><td class="grades-table__empty"></td><td class="num" data-label="Ma moyenne">14,3</td><td class="num" data-label="Classe">13,0</td></tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      <section class="tabs__panel" id="panel-t2" role="tabpanel" aria-labelledby="tab-t2" tabindex="0" hidden>
+        <div class="empty-state" data-component="empty-state">
+          <div class="empty-state__icon"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg></div>
+          <h2 class="t-h3">Pas encore de notes au trimestre 2</h2>
+          <p>Le trimestre 2 commence le dimanche 10 janvier 2027. Vos notes apparaîtront ici dès leur publication.</p>
+          <a class="btn btn--secondary" href="eleve-bulletin.html" data-component="button">Voir le bulletin du trimestre 1</a>
+        </div>
+      </section>
+      <section class="tabs__panel" id="panel-t3" role="tabpanel" aria-labelledby="tab-t3" tabindex="0" hidden>
+        <div class="empty-state" data-component="empty-state">
+          <div class="empty-state__icon"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg></div>
+          <h2 class="t-h3">Pas encore de notes au trimestre 3</h2>
+          <p>Le trimestre 3 commence le dimanche 4 avril 2027. Vos notes apparaîtront ici dès leur publication.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigation mobile" data-component="bottom-nav">
+    <ul role="list">
+      <li><a href="eleve-tableau-de-bord.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-home"/></svg>Accueil</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-calendar"/></svg>Agenda</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-book"/></svg>Devoirs</a></li>
+      <li><a href="eleve-notes.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg>Notes</a></li>
+      <li><a href="eleve-bulletin.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-more"/></svg>Plus</a></li>
+    </ul>
+  </nav>
+</body>
+</html>
