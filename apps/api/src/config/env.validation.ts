@@ -65,6 +65,12 @@ export class Env {
   @IsInt()
   @Min(1)
   LOGIN_THROTTLE_LIMIT = 5;
+
+  /** Contact-form messages per minute and client (public POST /contact). */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  CONTACT_THROTTLE_LIMIT = 5;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {

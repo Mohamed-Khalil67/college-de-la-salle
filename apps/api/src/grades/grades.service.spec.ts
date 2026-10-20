@@ -14,6 +14,7 @@ const TEACHER: AuthUser = {
   lastName: 'T',
   studentId: null,
   teacherId: 't1',
+  classId: null,
 };
 
 const event = (overrides = {}) => ({
@@ -67,9 +68,13 @@ describe('GradesService', () => {
   const prisma = {
     event: { findUnique: vi.fn() },
     grade: { findMany: vi.fn().mockResolvedValue([]) },
+    student: { findUnique: vi.fn() },
+    term: { findUnique: vi.fn() },
+    enrollment: { findUnique: vi.fn() },
+    teachingAssignment: { findMany: vi.fn() },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
-  const access = { assertTeachesClass: vi.fn() };
+  const access = { assertTeachesClass: vi.fn(), assertCanReadStudent: vi.fn(), placement: vi.fn() };
   const classes = {
     roster: vi.fn().mockResolvedValue([
       { id: 's1', userId: 'u1', firstName: 'A', lastName: 'A', studentNumber: null },
@@ -147,6 +152,74 @@ describe('GradesService', () => {
     await grades.save('e1', { entries: [{ studentId: 's2', score: 11 }] }, TEACHER);
     expect(tx.grade.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ studentId: 's2', score: 11, published: true }),
+    });
+  });
+
+  describe('forStudent', () => {
+    const STUDENT: AuthUser = {
+      ...TEACHER,
+      id: 'u-s',
+      role: 'student',
+      studentId: 's1',
+      teacherId: null,
+      classId: 'c1',
+    };
+    const published = (subjectId: string, score: number) => ({
+      ...grade('s1', score, true),
+      id: `g-${subjectId}-${score}`,
+      event: { ...event({ subjectId, coefficient: 1 }), id: `e-${subjectId}` },
+    });
+
+    beforeEach(() => {
+      prisma.student.findUnique.mockResolvedValue({ id: 's1' });
+      prisma.grade.findMany.mockResolvedValue([
+        published('mathematiques', 14),
+        published('dessin', 12),
+      ]);
+      prisma.teachingAssignment.findMany.mockResolvedValue([
+        { subjectId: 'mathematiques', coefficient: 3, subject: { name: 'Mathématiques' } },
+        { subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
+      ]);
+    });
+
+    it("gives each subject the coefficient of the student's current class, null when not taught there", async () => {
+      access.placement.mockResolvedValue({ classId: 'c1' });
+      const result = await grades.forStudent('s1', {}, STUDENT);
+      expect(access.assertCanReadStudent).toHaveBeenCalledWith(STUDENT, 's1');
+      expect(prisma.teachingAssignment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { classId: 'c1' } }),
+      );
+      expect(result.subjects.map((s) => [s.subjectId, s.average, s.coefficient])).toEqual([
+        ['dessin', 12, null],
+        ['mathematiques', 14, 4],
+      ]);
+    });
+
+    it("uses the class of the term's school year", async () => {
+      prisma.term.findUnique.mockResolvedValue({
+        id: 'tm1',
+        schoolYearId: 'y0',
+        startsOn: new Date('2025-09-01T00:00:00Z'),
+        endsOn: new Date('2025-12-20T00:00:00Z'),
+      });
+      prisma.enrollment.findUnique.mockResolvedValue({ classId: 'c-old' });
+      await grades.forStudent('s1', { termId: 'tm1' }, STUDENT);
+      expect(prisma.enrollment.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { studentId_schoolYearId: { studentId: 's1', schoolYearId: 'y0' } },
+        }),
+      );
+      expect(prisma.teachingAssignment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { classId: 'c-old' } }),
+      );
+      expect(access.placement).not.toHaveBeenCalled();
+    });
+
+    it('has no coefficients for a student without a class', async () => {
+      access.placement.mockResolvedValue(null);
+      const result = await grades.forStudent('s1', {}, STUDENT);
+      expect(result.subjects.every((s) => s.coefficient === null)).toBe(true);
+      expect(prisma.teachingAssignment.findMany).not.toHaveBeenCalled();
     });
   });
 });

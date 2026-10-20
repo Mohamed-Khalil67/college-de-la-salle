@@ -13,6 +13,7 @@ const USER: AuthUser = {
   lastName: 'B',
   studentId: 's1',
   teacherId: null,
+  classId: 'c1',
 };
 
 function context(authorization?: string) {

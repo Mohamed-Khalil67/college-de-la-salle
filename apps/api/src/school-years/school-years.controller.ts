@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -11,12 +12,15 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { Roles } from '../common/decorators.js';
+import type { AuthUser } from '../common/auth-user.js';
+import { CurrentUser, Roles } from '../common/decorators.js';
 import {
   CreateSchoolYearDto,
   CreateTermDto,
@@ -54,11 +58,33 @@ export class SchoolYearsController {
     return this.years.makeCurrent(id);
   }
 
+  /** Deletes a school year that is not the current one and has no classes; 409 otherwise. */
+  @Roles('admin')
+  @Delete('school-years/:id')
+  @HttpCode(204)
+  @ApiNoContentResponse()
+  @ApiConflictResponse({ description: 'The current year, or a year that still has classes.' })
+  removeYear(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    return this.years.removeYear(id, user);
+  }
+
   @Roles('admin')
   @Post('school-years/:id/terms')
   @ApiCreatedResponse({ type: TermDto })
   addTerm(@Param('id', ParseUUIDPipe) id: string, @Body() body: CreateTermDto): Promise<TermDto> {
     return this.years.addTerm(id, body);
+  }
+
+  /** Deletes a term without grades or report cards; 409 otherwise. */
+  @Roles('admin')
+  @Delete('terms/:id')
+  @HttpCode(204)
+  @ApiNoContentResponse()
+  @ApiConflictResponse({
+    description: 'Grades were entered during the term, or it has report cards.',
+  })
+  removeTerm(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    return this.years.removeTerm(id, user);
   }
 
   /** Closes a term (`?closed=false` reopens it). */

@@ -1,5 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import type { SchoolYear, Term } from '../generated/prisma/client.js';
+import { audit } from '../common/audit.js';
+import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay, toIso } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -82,6 +84,66 @@ export class SchoolYearsService {
       data: { closedAt: closed ? new Date() : null },
     });
     return toTermDto(updated);
+  }
+
+  /** Deletes a school year created by mistake: not the current one, and without classes. Its terms go with it. */
+  async removeYear(id: string, user: AuthUser): Promise<void> {
+    const year = await this.find(id);
+    if (year.isCurrent)
+      throw new ConflictException(
+        'L’année en cours ne peut pas être supprimée : définissez d’abord une autre année en cours.',
+      );
+    if (await this.prisma.schoolClass.count({ where: { schoolYearId: id } }))
+      throw new ConflictException(
+        `L’année ${year.label} a encore des classes : supprimez-les avant de supprimer l’année.`,
+      );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.schoolYear.delete({ where: { id } });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'school_year.delete',
+          entity: 'school_year',
+          entityId: id,
+          before: { label: year.label, startsOn: toDay(year.startsOn), endsOn: toDay(year.endsOn) },
+        },
+      ]);
+    });
+  }
+
+  /** Deletes a term without grades or report cards (grades of its year's classes dated in the term). */
+  async removeTerm(id: string, user: AuthUser): Promise<void> {
+    const term = await this.prisma.term.findUnique({ where: { id } });
+    if (!term) throw notFound('Trimestre');
+    const [reportCards, grades] = await Promise.all([
+      this.prisma.reportCard.count({ where: { termId: id } }),
+      this.prisma.grade.count({
+        where: {
+          event: {
+            date: { gte: term.startsOn, lte: term.endsOn },
+            schoolClass: { schoolYearId: term.schoolYearId },
+          },
+        },
+      }),
+    ]);
+    if (reportCards)
+      throw new ConflictException('Ce trimestre a des bulletins : il ne peut pas être supprimé.');
+    if (grades)
+      throw new ConflictException(
+        'Des notes ont déjà été saisies pendant ce trimestre : il ne peut pas être supprimé.',
+      );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.term.delete({ where: { id } });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'term.delete',
+          entity: 'term',
+          entityId: id,
+          before: { schoolYearId: term.schoolYearId, number: term.number, label: term.label },
+        },
+      ]);
+    });
   }
 
   private async find(id: string): Promise<SchoolYear> {

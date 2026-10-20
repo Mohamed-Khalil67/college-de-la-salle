@@ -9,6 +9,8 @@ export interface AuthUser {
   readonly lastName: string;
   readonly studentId: string | null;
   readonly teacherId: string | null;
+  /** Students: their class in the current school year (null when not enrolled). */
+  readonly classId: string | null;
 }
 
 export interface AuthedRequest {

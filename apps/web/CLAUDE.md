@@ -33,9 +33,9 @@ a colour; gold (`--color-accent`) is never text on light surfaces (use `--color-
 ## Data
 
 - `ApiClient` (`core/api/api-client.ts`): one promise method per endpoint, grouped (`api.school`, `api.users`,
-  `api.calendar`, `api.grades`, `api.attendance`, `api.reportCards`). Types come from `@cdls/shared` (`api.ts`).
+  `api.calendar`, `api.grades`, `api.attendance`, `api.reportCards`, `api.contact`). Types come from `@cdls/shared` (`api.ts`).
   Read with `resource({ params, loader })`; write in async handlers. Show errors with `apiMessage(error)`.
-- `AuthStore` (`core/auth/auth-store.ts`): `user()` (with `studentId`/`teacherId`), `role()`, `displayName()`.
+- `AuthStore` (`core/auth/auth-store.ts`): `user()` (with `studentId`/`teacherId`, and `classId` for students), `role()`, `displayName()`.
   The access token is memory-only; the interceptor adds it and refreshes once on a 401.
 - Guards: `roleGuard('student' | 'teacher' | 'admin')` on each area, `anonymousGuard` on `/connexion`.
 

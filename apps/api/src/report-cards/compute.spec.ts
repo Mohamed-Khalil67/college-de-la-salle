@@ -1,4 +1,4 @@
-import { computeReportCards } from './compute.js';
+import { computeReportCards, subjectWeights } from './compute.js';
 
 const subjects = [
   { subjectId: 'maths', subjectName: 'Mathématiques', coefficient: 4 },
@@ -41,6 +41,21 @@ describe('computeReportCards', () => {
       ['b', 15, 1],
       ['c', 12, 2],
       ['d', null, null],
+    ]);
+  });
+});
+
+describe('subjectWeights', () => {
+  it('keeps one weight per subject, the highest when two teachers share it', () => {
+    expect(
+      subjectWeights([
+        { subjectId: 'maths', coefficient: 3, subject: { name: 'Mathématiques' } },
+        { subjectId: 'arabe', coefficient: 2, subject: { name: 'Arabe' } },
+        { subjectId: 'maths', coefficient: 4, subject: { name: 'Mathématiques' } },
+      ]),
+    ).toEqual([
+      { subjectId: 'maths', subjectName: 'Mathématiques', coefficient: 4 },
+      { subjectId: 'arabe', subjectName: 'Arabe', coefficient: 2 },
     ]);
   });
 });

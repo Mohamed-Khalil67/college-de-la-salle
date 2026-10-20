@@ -108,6 +108,9 @@ class SubjectGradesDto {
   subjectId: string;
   @ApiProperty({ type: Number, nullable: true })
   average: number | null;
+  /** Weight in the class's general average (report card); null when the class has no such subject. */
+  @ApiProperty({ type: Number, nullable: true })
+  coefficient: number | null;
   @ApiProperty({ type: [StudentGradeDto] })
   grades: StudentGradeDto[];
 }

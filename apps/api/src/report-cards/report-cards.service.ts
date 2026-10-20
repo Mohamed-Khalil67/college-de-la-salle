@@ -7,7 +7,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { toIso } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { computeReportCards, type SubjectWeight } from './compute.js';
+import { computeReportCards, type SubjectWeight, subjectWeights } from './compute.js';
 import type {
   ReportCardBatchResultDto,
   ReportCardDto,
@@ -227,19 +227,7 @@ export class ReportCardsService {
       include: { subject: true },
       orderBy: { subject: { name: 'asc' } },
     });
-    const bySubject = new Map<string, SubjectWeight>();
-    for (const r of rows) {
-      const coefficient = Number(r.coefficient);
-      const current = bySubject.get(r.subjectId);
-      if (!current || coefficient > current.coefficient) {
-        bySubject.set(r.subjectId, {
-          subjectId: r.subjectId,
-          subjectName: r.subject.name,
-          coefficient,
-        });
-      }
-    }
-    return [...bySubject.values()];
+    return subjectWeights(rows.map((r) => ({ ...r, coefficient: Number(r.coefficient) })));
   }
 }
 

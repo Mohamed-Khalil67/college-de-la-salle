@@ -1,10 +1,35 @@
-import { averageOnTwenty, round1 } from '@cdls/shared';
+import { averageOnTwenty, generalAverage } from '@cdls/shared';
 
 export interface SubjectWeight {
   readonly subjectId: string;
   readonly subjectName: string;
   /** Weight of the subject in the general average. */
   readonly coefficient: number;
+}
+
+/**
+ * A class's subjects and their coefficients from its teaching assignments (in their order); when two
+ * teachers share a subject, the highest coefficient counts.
+ */
+export function subjectWeights(
+  assignments: readonly {
+    readonly subjectId: string;
+    readonly coefficient: number;
+    readonly subject: { readonly name: string };
+  }[],
+): SubjectWeight[] {
+  const bySubject = new Map<string, SubjectWeight>();
+  for (const a of assignments) {
+    const current = bySubject.get(a.subjectId);
+    if (!current || a.coefficient > current.coefficient) {
+      bySubject.set(a.subjectId, {
+        subjectId: a.subjectId,
+        subjectName: a.subject.name,
+        coefficient: a.coefficient,
+      });
+    }
+  }
+  return [...bySubject.values()];
 }
 
 export interface TermGrade {
@@ -45,13 +70,7 @@ export function computeReportCards(
       const list = mine.filter((g) => g.subjectId === s.subjectId);
       return { ...s, average: averageOnTwenty(list), gradeCount: list.length };
     });
-    const graded = perSubject.filter((s) => s.average !== null && s.coefficient > 0);
-    const weight = graded.reduce((sum, s) => sum + s.coefficient, 0);
-    const average =
-      weight > 0
-        ? round1(graded.reduce((sum, s) => sum + s.average! * s.coefficient, 0) / weight)
-        : null;
-    return { studentId, average, subjects: perSubject };
+    return { studentId, average: generalAverage(perSubject), subjects: perSubject };
   });
   const ranked = cards.filter((c) => c.average !== null).sort((a, b) => b.average! - a.average!);
   return cards.map((c) => ({

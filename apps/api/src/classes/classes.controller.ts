@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiOkResponse,
@@ -68,6 +69,18 @@ export class ClassesController {
   @ApiOkResponse({ type: ClassDto })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateClassDto): Promise<ClassDto> {
     return this.classes.update(id, body);
+  }
+
+  /** Deletes an empty class (no student, grade, attendance or report card); 409 otherwise. */
+  @Roles('admin')
+  @Delete('classes/:id')
+  @HttpCode(204)
+  @ApiNoContentResponse()
+  @ApiConflictResponse({
+    description: 'The class has students, grades, attendance or report cards.',
+  })
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    return this.classes.remove(id, user);
   }
 
   /** The class list (admins and the class's teachers). */

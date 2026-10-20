@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import type { SectionId } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
+import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
@@ -78,12 +79,53 @@ export class ClassesService {
     );
   }
 
+  /**
+   * Deletes a class created by mistake. Only an empty one: no enrolment (current or past), no grade,
+   * attendance or report card. Its events, announcements and teaching assignments go with it.
+   */
+  async remove(id: string, user: AuthUser): Promise<void> {
+    const schoolClass = await this.prisma.schoolClass.findUnique({ where: { id } });
+    if (!schoolClass) throw notFound('Classe');
+    const [enrollments, reportCards, grades, attendance] = await Promise.all([
+      this.prisma.enrollment.count({ where: { classId: id } }),
+      this.prisma.reportCard.count({ where: { classId: id } }),
+      this.prisma.grade.count({ where: { event: { classId: id } } }),
+      this.prisma.attendance.count({ where: { event: { classId: id } } }),
+    ]);
+    if (enrollments)
+      throw new ConflictException(
+        'Cette classe a encore des élèves inscrits : retirez-les avant de la supprimer.',
+      );
+    if (reportCards || grades || attendance)
+      throw new ConflictException(
+        'Cette classe a déjà des notes, des absences ou des bulletins : elle ne peut pas être supprimée.',
+      );
+    await this.prisma.$transaction(async (tx) => {
+      await tx.schoolClass.delete({ where: { id } });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'class.delete',
+          entity: 'school_class',
+          entityId: id,
+          before: {
+            schoolYearId: schoolClass.schoolYearId,
+            code: schoolClass.code,
+            label: schoolClass.label,
+          },
+        },
+      ]);
+    });
+  }
+
   /** The class list: admins and the class's teachers. */
   async students(classId: string, user: AuthUser): Promise<ClassStudentDto[]> {
     await this.get(classId);
     await this.access.assertTeachesClass(user, classId);
     const enrollments = await this.#enrollments(classId);
-    return enrollments.map((e) => Object.assign(toStudentSummary(e.student), { enrollmentId: e.id }));
+    return enrollments.map((e) =>
+      Object.assign(toStudentSummary(e.student), { enrollmentId: e.id }),
+    );
   }
 
   /** Students currently enrolled in a class, by name. */

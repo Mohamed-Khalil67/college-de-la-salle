@@ -1,12 +1,14 @@
 import type { Routes } from '@angular/router';
 import type { SpaceNavItem } from '../layout/space-layout';
 
+/** Items with an icon also go in the phone's bottom bar (five at most): assignments stay desktop-only. */
 export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Utilisateurs', path: 'utilisateurs', icon: 'users' },
   { label: 'Classes', path: 'classes', icon: 'book' },
-  { label: 'Affectations', path: 'affectations', icon: 'edit' },
+  { label: 'Affectations', path: 'affectations' },
   { label: 'Années et trimestres', path: 'annees', icon: 'calendar', short: 'Années' },
   { label: 'Bulletins', path: 'bulletins', icon: 'printer' },
+  { label: 'Messages', path: 'messages', icon: 'mail' },
 ];
 
 /** The administration (/admin). Pages are ported from design/prototypes/admin-*.html. */
@@ -41,5 +43,10 @@ export const ADMIN_ROUTES: Routes = [
     path: 'bulletins',
     title: 'Bulletins',
     loadComponent: () => import('./bulletins/report-cards-page').then((m) => m.ReportCardsPage),
+  },
+  {
+    path: 'messages',
+    title: 'Messages',
+    loadComponent: () => import('./messages/messages-page').then((m) => m.MessagesPage),
   },
 ];

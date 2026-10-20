@@ -17,9 +17,8 @@ let nextId = 0;
         <span class="stat__label">Ma moyenne générale</span>
       </div>
       <p class="t-body-s t-muted avg-summary__note">
-        Chaque moyenne est calculée sur 20 avec les coefficients des évaluations. La moyenne générale est la moyenne de
-        vos matières ; le bulletin tient aussi compte du coefficient de chaque matière. Une note apparaît ici dès que
-        l’enseignant la publie.
+        Chaque moyenne est calculée sur 20 avec les coefficients des évaluations. La moyenne générale pondère vos
+        matières par leur coefficient, comme le bulletin. Une note apparaît ici dès que l’enseignant la publie.
       </p>
     </div>
 

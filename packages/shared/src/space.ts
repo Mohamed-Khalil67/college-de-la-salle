@@ -186,6 +186,20 @@ export function averageOnTwenty(grades: readonly (Pick<Grade, 'score' | 'outOf'>
   return round1(grades.reduce((sum, g) => sum + onTwenty(g) * (g.coefficient ?? 1), 0) / weight);
 }
 
+/**
+ * General average on 20, as on the report card: the subject averages weighted by the subjects'
+ * coefficients, ignoring subjects without an average or without a (positive) coefficient; one decimal.
+ */
+export function generalAverage(
+  subjects: readonly { readonly average: number | null; readonly coefficient: number | null }[],
+): number | null {
+  const graded = subjects.filter(
+    (s): s is { average: number; coefficient: number } => s.average !== null && s.coefficient !== null && s.coefficient > 0,
+  );
+  const weight = graded.reduce((sum, s) => sum + s.coefficient, 0);
+  return weight > 0 ? round1(graded.reduce((sum, s) => sum + s.average * s.coefficient, 0) / weight) : null;
+}
+
 export interface SubjectGrades {
   readonly subject: string;
   readonly grades: readonly Grade[];

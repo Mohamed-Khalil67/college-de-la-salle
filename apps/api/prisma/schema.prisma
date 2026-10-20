@@ -67,11 +67,13 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  student       Student?
-  teacher       Teacher?
-  posts         Post[]
-  auditLogs     AuditLog[]
-  refreshTokens RefreshToken[]
+  student                Student?
+  teacher                Teacher?
+  posts                  Post[]
+  auditLogs              AuditLog[]
+  refreshTokens          RefreshToken[]
+  /// Contact messages this admin marked handled.
+  contactMessagesHandled ContactMessage[]
 
   @@index([role])
   @@map("users")
@@ -440,4 +442,32 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Public site
+// ---------------------------------------------------------------------------------------------------
+
+/// A message sent from the public contact form (POST /api/contact), read by the admins.
+model ContactMessage {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  name        String    @db.VarChar(120)
+  /// Stored as typed (trimmed); the secretariat replies to it.
+  email       String    @db.VarChar(254)
+  phone       String    @default("") @db.VarChar(40)
+  subject     String    @db.VarChar(120)
+  /// Track and class the message is about, empty when not given.
+  track       String    @default("") @db.VarChar(120)
+  message     String    @db.VarChar(1000)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Set when an admin marks it handled.
+  handledAt   DateTime? @map("handled_at") @db.Timestamptz(3)
+  handledById String?   @map("handled_by_id") @db.Uuid
+
+  handledBy User? @relation(fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([handledAt, createdAt])
+  @@index([handledById])
+  @@map("contact_messages")
 }

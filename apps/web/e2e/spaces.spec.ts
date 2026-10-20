@@ -82,3 +82,30 @@ test('a teacher takes the roll and saves it', async ({ page }) => {
   await expect(page.getByRole('status').filter({ hasText: /enregistr/i }).first()).toBeVisible();
   await expectNoAxeViolations(page);
 });
+
+test('a visitor writes to the secretariat; an admin reads the message and marks it handled', async ({ page }, info) => {
+  const email = `parent.${info.project.name}.${Date.now()}@example.com`;
+  await page.goto('/contact');
+  await page.getByLabel('Nom du parent ou de l’élève').fill('Mariam Saad');
+  await page.getByLabel('Adresse e-mail').fill(email);
+  await page.getByLabel('Message').fill('Bonjour, je souhaite inscrire mon fils en Seconde.');
+  await page.getByRole('button', { name: 'Envoyer le message' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'message a bien été envoyé' })).toContainText(email);
+  await expect(page.getByLabel('Message')).toHaveValue('');
+  await expectNoAxeViolations(page);
+
+  await signInTo(page, ACCOUNTS.admin, '/admin/messages');
+  await expect(page.getByRole('heading', { level: 1, name: 'Messages' })).toBeVisible();
+  const message = page.getByRole('article').filter({ hasText: email });
+  await expect(message).toBeVisible();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoAxeViolations(page);
+  }
+  await message.getByRole('button', { name: /Marquer comme traité/ }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'marqué comme traité' })).toBeVisible();
+  await expect(message).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Traités' }).click();
+  await expect(page.getByRole('article').filter({ hasText: email })).toContainText('Traité le');
+  await expectNoAxeViolations(page);
+});

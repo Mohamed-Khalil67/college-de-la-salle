@@ -109,9 +109,9 @@ describe('grades', () => {
   const data: StudentGradesDto = {
     studentId: 's',
     subjects: [
-      { subjectId: 'mathematiques', average: 15, grades: [g('a', 'mathematiques', '2026-10-01', 14), g('b', 'mathematiques', '2026-10-15', 16)] },
-      { subjectId: 'anglais', average: null, grades: [] },
-      { subjectId: 'francais', average: 12, grades: [g('c', 'francais', '2026-10-10', 12)] },
+      { subjectId: 'mathematiques', average: 15, coefficient: 3, grades: [g('a', 'mathematiques', '2026-10-01', 14), g('b', 'mathematiques', '2026-10-15', 16)] },
+      { subjectId: 'anglais', average: null, coefficient: 2, grades: [] },
+      { subjectId: 'francais', average: 12, coefficient: 1, grades: [g('c', 'francais', '2026-10-10', 12)] },
     ],
   };
   it('sorts subjects by name and grades newest first', () => {
@@ -122,8 +122,12 @@ describe('grades', () => {
   it('lists the latest grades', () => {
     expect(latestGrades(data, 2).map((x) => x.grade.id)).toEqual(['b', 'c']);
   });
-  it('averages subject averages and ignores empty subjects', () => {
-    expect(overallAverage(data.subjects)).toBe(13.5);
+  it('weights subject averages by their coefficient, like the report card', () => {
+    // (15 × 3 + 12 × 1) / 4; anglais has no grade
+    expect(overallAverage(data.subjects)).toBe(14.3);
+    // A subject not taught in the class (no coefficient) is left out, as on the report card.
+    expect(overallAverage([...data.subjects, { average: 20, coefficient: null }])).toBe(14.3);
+    expect(overallAverage([{ average: 11, coefficient: null }])).toBeNull();
     expect(overallAverage([])).toBeNull();
   });
   it('flags recent grades and sizes meters', () => {

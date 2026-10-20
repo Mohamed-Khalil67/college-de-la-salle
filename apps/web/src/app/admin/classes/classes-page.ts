@@ -3,13 +3,14 @@ import { RouterLink } from '@angular/router';
 import type { ClassDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, EmptyState, Icon } from '../../ui';
+import { ConfirmModal } from '../shared/confirm-modal';
 import { groupBySection, plural } from '../shared/admin-format';
 import { ClassFormModal } from './class-form-modal';
 
 /** Classes of the current school year by section, with their head counts. */
 @Component({
   selector: 'app-classes-page',
-  imports: [RouterLink, Alert, Button, EmptyState, Icon, ClassFormModal],
+  imports: [RouterLink, Alert, Button, EmptyState, Icon, ClassFormModal, ConfirmModal],
   template: `
     <div class="page__header">
       <div class="page__header-text">
@@ -67,6 +68,9 @@ import { ClassFormModal } from './class-form-modal';
                             <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startRename(item)">
                               Renommer<span class="visually-hidden"> {{ item.label }}</span>
                             </button>
+                            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDelete(item)">
+                              Supprimer<span class="visually-hidden"> {{ item.label }}</span>
+                            </button>
                           </span>
                         </td>
                       </tr>
@@ -90,6 +94,23 @@ import { ClassFormModal } from './class-form-modal';
       [editing]="editing()"
       (saved)="onSaved($event)"
     />
+
+    <app-confirm-modal
+      title="Supprimer cette classe ?"
+      confirmLabel="Supprimer la classe"
+      [danger]="true"
+      [busy]="busy()"
+      [error]="actionError()"
+      [(open)]="deleteOpen"
+      (confirmed)="deleteClass()"
+    >
+      <p>
+        <strong>{{ deleting()?.label }}</strong> sera supprimée avec son emploi du temps, ses affectations et ses annonces.
+      </p>
+      <p class="t-body-s t-muted">
+        Seule une classe vide peut être supprimée : sans élève inscrit, ni note, absence ou bulletin.
+      </p>
+    </app-confirm-modal>
   `,
   styles: `
     .sections {
@@ -123,6 +144,10 @@ export class ClassesPage {
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<ClassDto | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly deleteOpen = signal(false);
+  protected readonly deleting = signal<ClassDto | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly actionError = signal<string | null>(null);
 
   protected errorText(error: unknown): string {
     return apiMessage(error, 'Impossible de charger les classes. Réessayez dans un instant.');
@@ -136,6 +161,29 @@ export class ClassesPage {
   protected startRename(item: ClassDto): void {
     this.editing.set(item);
     this.formOpen.set(true);
+  }
+
+  protected startDelete(item: ClassDto): void {
+    this.deleting.set(item);
+    this.actionError.set(null);
+    this.deleteOpen.set(true);
+  }
+
+  protected async deleteClass(): Promise<void> {
+    const item = this.deleting();
+    if (!item) return;
+    this.busy.set(true);
+    this.actionError.set(null);
+    try {
+      await this.#api.school.deleteClass(item.id);
+      this.deleteOpen.set(false);
+      this.notice.set(`Classe « ${item.label} » supprimée.`);
+      this.classes.reload();
+    } catch (error) {
+      this.actionError.set(apiMessage(error));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected onSaved(item: ClassDto): void {

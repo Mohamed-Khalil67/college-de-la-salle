@@ -7,7 +7,7 @@ import { formatDay, formatRange } from '../shared/admin-format';
 import { TermCreateModal } from './term-create-modal';
 import { YearCreateModal } from './year-create-modal';
 
-/** School years and their terms: create, set the current year, add and close terms. */
+/** School years and their terms: create, set the current year, add, close and delete terms, delete unused years. */
 @Component({
   selector: 'app-years-page',
   imports: [Alert, Badge, Button, EmptyState, Icon, ConfirmModal, TermCreateModal, YearCreateModal],
@@ -54,6 +54,11 @@ import { YearCreateModal } from './year-create-modal';
                       <cdls-icon name="plus" />Ajouter un trimestre<span class="visually-hidden"> à {{ year.label }}</span>
                     </button>
                   }
+                  @if (!year.isCurrent) {
+                    <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDeleteYear(year)">
+                      Supprimer l’année<span class="visually-hidden"> {{ year.label }}</span>
+                    </button>
+                  }
                 </div>
               </div>
 
@@ -82,13 +87,18 @@ import { YearCreateModal } from './year-create-modal';
                             }
                           </td>
                           <td class="num">
-                            @if (!term.closedAt) {
-                              <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startClose(term, year)">
-                                Clôturer<span class="visually-hidden"> le {{ term.label }} {{ year.label }}</span>
+                            <span class="row-actions">
+                              @if (!term.closedAt) {
+                                <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startClose(term, year)">
+                                  Clôturer<span class="visually-hidden"> le {{ term.label }} {{ year.label }}</span>
+                                </button>
+                              } @else {
+                                <span class="t-body-s t-muted">Le {{ day(term.closedAt) }}</span>
+                              }
+                              <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDeleteTerm(term, year)">
+                                Supprimer<span class="visually-hidden"> le {{ term.label }} {{ year.label }}</span>
                               </button>
-                            } @else {
-                              <span class="t-body-s t-muted">Le {{ day(term.closedAt) }}</span>
-                            }
+                            </span>
                           </td>
                         </tr>
                       }
@@ -142,6 +152,32 @@ import { YearCreateModal } from './year-create-modal';
       </p>
       <p>Clôturez seulement quand tous les enseignants ont saisi et publié leurs notes.</p>
     </app-confirm-modal>
+
+    <app-confirm-modal
+      title="Supprimer cette année ?"
+      confirmLabel="Supprimer l’année"
+      [danger]="true"
+      [busy]="busy()"
+      [error]="actionError()"
+      [(open)]="deleteYearOpen"
+      (confirmed)="deleteYear()"
+    >
+      <p>L’année <strong>{{ pendingYear()?.label }}</strong> et ses trimestres seront supprimés.</p>
+      <p class="t-body-s t-muted">Seule une année sans classe, qui n’est pas l’année en cours, peut être supprimée.</p>
+    </app-confirm-modal>
+
+    <app-confirm-modal
+      title="Supprimer ce trimestre ?"
+      confirmLabel="Supprimer le trimestre"
+      [danger]="true"
+      [busy]="busy()"
+      [error]="actionError()"
+      [(open)]="deleteTermOpen"
+      (confirmed)="deleteTerm()"
+    >
+      <p>Le <strong>{{ pendingTerm()?.label }} {{ pendingYear()?.label }}</strong> sera supprimé.</p>
+      <p class="t-body-s t-muted">Seul un trimestre sans note ni bulletin peut être supprimé.</p>
+    </app-confirm-modal>
   `,
   styles: `
     .years {
@@ -157,6 +193,13 @@ import { YearCreateModal } from './year-create-modal';
       align-items: flex-start;
       justify-content: space-between;
       gap: var(--space-4);
+    }
+    .row-actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-1) var(--space-3);
     }
     .year h2 {
       display: flex;
@@ -176,6 +219,8 @@ export class YearsPage {
   protected readonly termYear = signal<SchoolYearDto | null>(null);
   protected readonly currentOpen = signal(false);
   protected readonly closeOpen = signal(false);
+  protected readonly deleteYearOpen = signal(false);
+  protected readonly deleteTermOpen = signal(false);
   protected readonly pendingYear = signal<SchoolYearDto | null>(null);
   protected readonly pendingTerm = signal<TermDto | null>(null);
   protected readonly busy = signal(false);
@@ -221,6 +266,40 @@ export class YearsPage {
     this.pendingYear.set(year);
     this.actionError.set(null);
     this.closeOpen.set(true);
+  }
+
+  protected startDeleteYear(year: SchoolYearDto): void {
+    this.pendingYear.set(year);
+    this.actionError.set(null);
+    this.deleteYearOpen.set(true);
+  }
+
+  protected startDeleteTerm(term: TermDto, year: SchoolYearDto): void {
+    this.pendingTerm.set(term);
+    this.pendingYear.set(year);
+    this.actionError.set(null);
+    this.deleteTermOpen.set(true);
+  }
+
+  protected async deleteYear(): Promise<void> {
+    const year = this.pendingYear();
+    if (!year) return;
+    await this.#run(async () => {
+      await this.#api.school.deleteYear(year.id);
+      this.deleteYearOpen.set(false);
+      this.notice.set(`Année ${year.label} supprimée.`);
+    });
+  }
+
+  protected async deleteTerm(): Promise<void> {
+    const term = this.pendingTerm();
+    const year = this.pendingYear();
+    if (!term || !year) return;
+    await this.#run(async () => {
+      await this.#api.school.deleteTerm(term.id);
+      this.deleteTermOpen.set(false);
+      this.notice.set(`${term.label} ${year.label} supprimé.`);
+    });
   }
 
   protected async setCurrent(): Promise<void> {

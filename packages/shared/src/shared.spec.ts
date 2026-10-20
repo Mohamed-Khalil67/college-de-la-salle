@@ -2,6 +2,7 @@ import { occurrences, toIcs, type CalendarEvent } from './calendar.js';
 import {
   audienceMatches,
   averageOnTwenty,
+  generalAverage,
   gradesBySubject,
   TARGET_OPTIONS,
   type Grade,
@@ -55,6 +56,21 @@ describe('grades', () => {
   it('weights the average on 20 by coefficient', () => {
     expect(averageOnTwenty([grade('maths', 10), grade('maths', 8, 10, 2)])).toBe(14);
     expect(averageOnTwenty([])).toBeNull();
+  });
+
+  it('weights the general average by subject coefficient, like the report card', () => {
+    expect(
+      generalAverage([
+        { average: 12, coefficient: 3 },
+        { average: 16, coefficient: 1 },
+        { average: null, coefficient: 4 },
+        { average: 5, coefficient: null },
+        { average: 2, coefficient: 0 },
+      ]),
+    ).toBe(13);
+    expect(generalAverage([{ average: 14.25, coefficient: 1 }])).toBe(14.3);
+    expect(generalAverage([{ average: 10, coefficient: null }])).toBeNull();
+    expect(generalAverage([])).toBeNull();
   });
 
   it('groups grades by subject, newest first', () => {

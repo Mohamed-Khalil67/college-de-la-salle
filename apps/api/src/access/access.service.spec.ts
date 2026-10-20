@@ -12,6 +12,7 @@ const user = (role: AuthUser['role'], ids: Partial<AuthUser> = {}): AuthUser => 
   lastName: 'Y',
   studentId: null,
   teacherId: null,
+  classId: null,
   ...ids,
 });
 

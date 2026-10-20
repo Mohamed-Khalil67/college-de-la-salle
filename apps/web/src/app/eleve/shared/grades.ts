@@ -1,7 +1,7 @@
 import {
   addDays,
+  generalAverage,
   matiereName,
-  round1,
   type StudentAttendanceDto,
   type StudentGradeDto,
   type StudentGradesDto,
@@ -29,12 +29,12 @@ function byNewest(a: StudentGradeDto, b: StudentGradeDto): number {
 }
 
 /**
- * The general average shown to the student: the mean of the subject averages, one decimal. The report
- * card weights subjects by their coefficient, which the student's API does not expose.
+ * The general average shown to the student, computed like the report card's: the subject averages
+ * weighted by each subject's coefficient in the student's class (subjects not taught in the class are
+ * left out), one decimal.
  */
-export function overallAverage(subjects: readonly { readonly average: number | null }[]): number | null {
-  const values = subjects.map((s) => s.average).filter((a): a is number => a !== null);
-  return values.length ? round1(values.reduce((sum, a) => sum + a, 0) / values.length) : null;
+export function overallAverage(subjects: readonly Pick<SubjectGrades, 'average' | 'coefficient'>[]): number | null {
+  return generalAverage(subjects);
 }
 
 /** A grade published or corrected in the last `days` days is flagged « Nouvelle ». */

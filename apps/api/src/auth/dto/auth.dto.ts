@@ -1,4 +1,5 @@
 import type { LoginRequest, Role, SessionResponse, SessionUser } from '@cdls/shared';
+import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class LoginDto implements LoginRequest {
@@ -21,6 +22,8 @@ export class SessionUserDto implements SessionUser {
   lastName: string;
   studentId: string | null;
   teacherId: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Students: their current class.' })
+  classId: string | null;
 }
 
 export class SessionDto implements SessionResponse {

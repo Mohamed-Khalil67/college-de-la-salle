@@ -9,6 +9,7 @@ import { fromDay, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { eventInclude, type EventRow, toEventDto } from '../events/event.mapper.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { subjectWeights } from '../report-cards/compute.js';
 import type {
   GradeDto,
   GradeSheetDto,
@@ -163,10 +164,12 @@ export class GradesService {
       throw notFound('Élève');
 
     const eventWhere: Prisma.EventWhereInput = {};
+    let schoolYearId: string | null = null;
     if (query.termId) {
       const term = await this.prisma.term.findUnique({ where: { id: query.termId } });
       if (!term) throw notFound('Trimestre');
       eventWhere.date = { gte: term.startsOn, lte: term.endsOn };
+      schoolYearId = term.schoolYearId;
     } else if (query.from || query.to) {
       eventWhere.date = {
         ...(query.from ? { gte: fromDay(query.from) } : {}),
@@ -194,12 +197,14 @@ export class GradesService {
       const key = g.event.subjectId ?? '';
       bySubject.set(key, [...(bySubject.get(key) ?? []), g]);
     }
+    const coefficients = await this.subjectCoefficients(studentId, schoolYearId);
     return {
       studentId,
       subjects: [...bySubject]
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([subjectId, list]) => ({
           subjectId,
+          coefficient: coefficients.get(subjectId) ?? null,
           average: averageOnTwenty(
             list.map((g) => ({
               score: Number(g.score),
@@ -220,6 +225,31 @@ export class GradesService {
           })),
         })),
     };
+  }
+
+  /**
+   * Subject coefficients of the student's class, as the report card weighs them: the class of the given
+   * school year (the term's), or the current class. Empty when the student is not enrolled.
+   */
+  private async subjectCoefficients(
+    studentId: string,
+    schoolYearId: string | null,
+  ): Promise<Map<string, number>> {
+    const classId = schoolYearId
+      ? (
+          await this.prisma.enrollment.findUnique({
+            where: { studentId_schoolYearId: { studentId, schoolYearId } },
+            select: { classId: true },
+          })
+        )?.classId
+      : (await this.access.placement(studentId))?.classId;
+    if (!classId) return new Map();
+    const rows = await this.prisma.teachingAssignment.findMany({
+      where: { classId },
+      include: { subject: true },
+    });
+    const weights = subjectWeights(rows.map((r) => ({ ...r, coefficient: Number(r.coefficient) })));
+    return new Map(weights.map((w) => [w.subjectId, w.coefficient]));
   }
 
   /** A gradable class event that this user may grade (a teacher of that class and subject, or an admin). */

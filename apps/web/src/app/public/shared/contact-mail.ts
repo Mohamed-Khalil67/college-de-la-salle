@@ -1,3 +1,5 @@
+import type { ContactMessageRequest } from '@cdls/shared';
+
 /**
  * Pure helpers for the public contact blocks. No Angular here, so they are unit-tested in
  * contact-mail.spec.ts.
@@ -13,17 +15,34 @@ export interface ContactMessage {
   readonly message: string;
 }
 
+/** Subject used when the form has no subject field (home page block). */
+export const DEFAULT_CONTACT_SUBJECT = 'Message depuis le site';
+
+/** The body of POST /api/contact: trimmed, without the empty optional fields. */
+export function contactRequest(message: ContactMessage): ContactMessageRequest {
+  const phone = message.phone.trim();
+  const track = message.track.trim();
+  return {
+    name: message.name.trim(),
+    email: message.email.trim(),
+    subject: message.subject.trim() || DEFAULT_CONTACT_SUBJECT,
+    message: message.message.trim(),
+    ...(phone ? { phone } : {}),
+    ...(track ? { track } : {}),
+  };
+}
+
 /** `tel:` target for a displayed number: `+20 2 2590 47 40` gives `tel:+20225904740`. */
 export function telHref(phone: string): string {
   return 'tel:' + phone.replace(/[^\d+]/g, '');
 }
 
 /**
- * A `mailto:` link that opens the visitor's e-mail app with the message ready to send. The public
- * site has no message endpoint yet, so the visitor sends it from their own address.
+ * A `mailto:` link that opens the visitor's e-mail app with the message ready to send: the fallback
+ * when the message could not be sent to the site (server unreachable).
  */
 export function contactMailto(to: string, message: ContactMessage): string {
-  const subject = [message.subject || 'Message depuis le site', message.track].filter(Boolean).join(', ');
+  const subject = [message.subject || DEFAULT_CONTACT_SUBJECT, message.track].filter(Boolean).join(', ');
   const lines = [
     message.message.trim(),
     '',

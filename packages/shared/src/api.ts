@@ -63,6 +63,8 @@ export interface SessionUser {
   readonly studentId: string | null;
   /** Set for teachers. */
   readonly teacherId: string | null;
+  /** Students: their class in the current school year (null when not enrolled or not a student). */
+  readonly classId: string | null;
 }
 
 /** Returned by POST /auth/login and POST /auth/refresh. Send `Authorization: Bearer <accessToken>`. */
@@ -376,6 +378,12 @@ export interface StudentGradesDto {
     readonly subjectId: string;
     /** Weighted average on 20 (shared averageOnTwenty), null without grades. */
     readonly average: number | null;
+    /**
+     * Weight of the subject in the general average of the student's class (its teaching assignment), as
+     * on the report card; null when the subject is not taught in that class (left out, like the report card).
+     * Combine with the shared generalAverage().
+     */
+    readonly coefficient: number | null;
     readonly grades: readonly StudentGradeDto[];
   }[];
 }
@@ -480,4 +488,53 @@ export interface ReportCardBatchRequest {
 
 export interface ReportCardBatchResponse {
   readonly count: number;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Contact messages: POST /api/contact (public, rate-limited), /api/contact-messages (admin)
+ * ---------------------------------------------------------------------------------------------- */
+
+export const CONTACT_LIMITS = {
+  name: 120,
+  email: 254,
+  phone: 40,
+  subject: 120,
+  track: 120,
+  message: 1000,
+} as const;
+
+/** POST /contact: a message from the public site to the secretariat. */
+export interface ContactMessageRequest {
+  readonly name: string;
+  readonly email: string;
+  readonly subject: string;
+  readonly message: string;
+  readonly phone?: string;
+  /** Track and class the message is about (« Bac français, lycée »). */
+  readonly track?: string;
+}
+
+export interface ContactMessageDto {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly phone: string;
+  readonly subject: string;
+  readonly track: string;
+  readonly message: string;
+  readonly createdAt: string;
+  /** When an admin marked it handled; null while it is waiting. */
+  readonly handledAt: string | null;
+  readonly handledByName: string | null;
+}
+
+/** GET /contact-messages (newest first). */
+export interface ContactMessageListQuery extends PageQuery {
+  /** true: handled only; false: waiting only; omitted: all. */
+  readonly handled?: boolean;
+}
+
+/** PATCH /contact-messages/:id */
+export interface UpdateContactMessageRequest {
+  readonly handled: boolean;
 }

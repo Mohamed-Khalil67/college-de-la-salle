@@ -65,10 +65,19 @@ describe('Auth (e2e)', () => {
   });
 
   it('rate-limits login attempts', async () => {
-    const attempt = () =>
-      t.http().post('/api/auth/login').send({ email: ADMIN, password: 'wrong-password' });
-    const statuses: number[] = [];
-    for (let i = 0; i < 6; i++) statuses.push((await attempt()).status);
-    expect(statuses).toContain(429);
+    // The limit is read per request: test the production default whatever .env says (the browser
+    // tests raise it).
+    const before = process.env['LOGIN_THROTTLE_LIMIT'];
+    process.env['LOGIN_THROTTLE_LIMIT'] = '5';
+    try {
+      const attempt = () =>
+        t.http().post('/api/auth/login').send({ email: ADMIN, password: 'wrong-password' });
+      const statuses: number[] = [];
+      for (let i = 0; i < 6; i++) statuses.push((await attempt()).status);
+      expect(statuses).toContain(429);
+    } finally {
+      if (before === undefined) delete process.env['LOGIN_THROTTLE_LIMIT'];
+      else process.env['LOGIN_THROTTLE_LIMIT'] = before;
+    }
   });
 });

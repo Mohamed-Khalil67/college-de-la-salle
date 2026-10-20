@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capitalize, contactMailto, telHref } from './contact-mail';
+import { capitalize, contactMailto, contactRequest, telHref } from './contact-mail';
 
 describe('telHref', () => {
   it('keeps the plus sign and the digits', () => {
@@ -22,6 +22,27 @@ describe('contactMailto', () => {
     const body = decodeURIComponent(url.split('body=')[1]);
     expect(subject).toBe('Demande d’inscription, Bac français, Seconde');
     expect(body).toBe('Bonjour\n\n--\nMariam Saad\nmariam@example.com\nFilière et classe : Bac français, Seconde');
+  });
+});
+
+describe('contactRequest', () => {
+  const base = { name: ' Mariam Saad ', email: ' mariam@example.com', phone: ' ', subject: '', track: '', message: ' Bonjour \n' };
+
+  it('trims the fields, defaults the subject and leaves out empty optional fields', () => {
+    expect(contactRequest(base)).toEqual({
+      name: 'Mariam Saad',
+      email: 'mariam@example.com',
+      subject: 'Message depuis le site',
+      message: 'Bonjour',
+    });
+  });
+
+  it('keeps the phone, the subject and the track when given', () => {
+    expect(contactRequest({ ...base, phone: '+20 100', subject: 'Autre question', track: 'Bac français, lycée' })).toMatchObject({
+      phone: '+20 100',
+      subject: 'Autre question',
+      track: 'Bac français, lycée',
+    });
   });
 });
 

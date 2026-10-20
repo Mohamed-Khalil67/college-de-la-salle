@@ -25,7 +25,17 @@ const INVALID_LOGIN = 'E-mail ou mot de passe incorrect.';
 const INVALID_SESSION = 'Session expirée. Reconnectez-vous.';
 
 const userInclude = {
-  student: { select: { id: true } },
+  student: {
+    select: {
+      id: true,
+      // The current class (one enrollment per student and school year).
+      enrollments: {
+        where: { leftOn: null, schoolYear: { isCurrent: true } },
+        select: { classId: true },
+        take: 1,
+      },
+    },
+  },
   teacher: { select: { id: true } },
 } as const;
 
@@ -171,7 +181,7 @@ type UserWithProfiles = {
   role: AuthUser['role'];
   firstName: string;
   lastName: string;
-  student: { id: string } | null;
+  student: { id: string; enrollments?: readonly { classId: string }[] } | null;
   teacher: { id: string } | null;
 };
 
@@ -184,6 +194,7 @@ export function toAuthUser(u: UserWithProfiles): AuthUser {
     lastName: u.lastName,
     studentId: u.student?.id ?? null,
     teacherId: u.teacher?.id ?? null,
+    classId: u.student?.enrollments?.[0]?.classId ?? null,
   };
 }
 

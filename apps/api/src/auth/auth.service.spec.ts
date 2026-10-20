@@ -70,6 +70,24 @@ describe('AuthService', () => {
     expect(issued.refreshToken).not.toContain(stored);
   });
 
+  it("gives a student's session their current class", async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      await user({
+        role: 'student',
+        teacher: null,
+        student: { id: 's1', enrollments: [{ classId: 'c1' }] },
+      }),
+    );
+    const issued = await auth.login('eleve@demo.cdls.test', 'correct horse');
+    expect(issued.session.user).toMatchObject({ studentId: 's1', classId: 'c1', teacherId: null });
+
+    prisma.user.findUnique.mockResolvedValue(
+      await user({ role: 'student', teacher: null, student: { id: 's2', enrollments: [] } }),
+    );
+    const unenrolled = await auth.login('eleve@demo.cdls.test', 'correct horse');
+    expect(unenrolled.session.user.classId).toBeNull();
+  });
+
   it('refuses a wrong password, an unknown e-mail and an inactive account', async () => {
     prisma.user.findUnique.mockResolvedValue(await user());
     await expect(auth.login('prof@demo.cdls.test', 'wrong')).rejects.toBeInstanceOf(

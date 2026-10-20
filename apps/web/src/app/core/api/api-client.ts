@@ -6,6 +6,9 @@ import type {
   AttendanceSheetDto,
   ClassStudentDto,
   ClassDto,
+  ContactMessageDto,
+  ContactMessageListQuery,
+  ContactMessageRequest,
   CreateClassRequest,
   CreatedUserResponse,
   CreatePostRequest,
@@ -91,13 +94,19 @@ export class ApiClient {
     years: () => this.#get<SchoolYearDto[]>('/school-years'),
     createYear: (body: CreateSchoolYearRequest) => this.#post<SchoolYearDto>('/school-years', body),
     setCurrentYear: (id: string) => this.#post<SchoolYearDto>(`/school-years/${id}/current`),
+    /** A year that is not the current one and has no classes (409 otherwise). */
+    deleteYear: (id: string) => this.#delete(`/school-years/${id}`),
     createTerm: (yearId: string, body: CreateTermRequest) => this.#post<TermDto>(`/school-years/${yearId}/terms`, body),
+    /** A term without grades or report cards (409 otherwise). */
+    deleteTerm: (termId: string) => this.#delete(`/terms/${termId}`),
     closeTerm: (termId: string) => this.#post<TermDto>(`/terms/${termId}/close`),
     reopenTerm: (termId: string) => this.#post<TermDto>(`/terms/${termId}/close?closed=false`),
     classes: (query: { schoolYearId?: string } = {}) => this.#get<ClassDto[]>('/classes', query),
     class: (id: string) => this.#get<ClassDto>(`/classes/${id}`),
     createClass: (body: CreateClassRequest) => this.#post<ClassDto>('/classes', body),
     updateClass: (id: string, body: Partial<Pick<CreateClassRequest, 'code' | 'label'>>) => this.#patch<ClassDto>(`/classes/${id}`, body),
+    /** An empty class: no student, grade, attendance or report card (409 otherwise). */
+    deleteClass: (id: string) => this.#delete(`/classes/${id}`),
     classStudents: (id: string) => this.#get<ClassStudentDto[]>(`/classes/${id}/students`),
     enroll: (classId: string, studentId: string) => this.#post<EnrollmentDto>(`/classes/${classId}/enrollments`, { studentId }),
     unenroll: (enrollmentId: string) => this.#delete(`/enrollments/${enrollmentId}`),
@@ -155,6 +164,13 @@ export class ApiClient {
     save: (eventId: string, body: SaveAttendanceRequest) => this.#put<AttendanceSheetDto>(`/events/${eventId}/attendance`, body),
     ofStudent: (studentId: string, query: { from?: string; to?: string } = {}) =>
       this.#get<StudentAttendanceDto[]>(`/students/${studentId}/attendance`, query),
+  };
+
+  /* Contact form (public) and its messages (admin) */
+  readonly contact = {
+    send: (body: ContactMessageRequest) => this.#post<void>('/contact', body),
+    messages: (query: ContactMessageListQuery = {}) => this.#get<Paginated<ContactMessageDto>>('/contact-messages', { ...query }),
+    setHandled: (id: string, handled: boolean) => this.#patch<ContactMessageDto>(`/contact-messages/${id}`, { handled }),
   };
 
   /* Report cards */
