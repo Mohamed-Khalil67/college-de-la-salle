@@ -2,9 +2,18 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AccessModule } from './access/access.module.js';
+import { AuthModule } from './auth/auth.module.js';
+import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { RolesGuard } from './common/roles.guard.js';
 import { validateEnv, type Env } from './config/env.validation.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { ClassesModule } from './classes/classes.module.js';
+import { SchoolYearsModule } from './school-years/school-years.module.js';
+import { SubjectsModule } from './subjects/subjects.module.js';
+import { TeachingAssignmentsModule } from './teaching-assignments/teaching-assignments.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -21,10 +30,20 @@ import { PrismaModule } from './prisma/prisma.module.js';
       }),
     }),
     PrismaModule,
-    // Feature modules (one folder each under src/): auth, users, classes, subjects, events, grades,
-    // attendance, report-cards, posts.
+    AccessModule,
+    AuthModule,
     HealthModule,
+    UsersModule,
+    SchoolYearsModule,
+    ClassesModule,
+    SubjectsModule,
+    TeachingAssignmentsModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    // Order matters: rate limit, then authentication, then roles.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useExisting: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule {}

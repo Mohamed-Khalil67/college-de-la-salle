@@ -10,6 +10,7 @@ import {
   MinLength,
   validateSync,
 } from 'class-validator';
+import { DURATION } from '../common/duration.js';
 
 const PLACEHOLDER = /^replace-with-/;
 
@@ -43,10 +44,10 @@ export class Env {
   @MinLength(32)
   JWT_REFRESH_SECRET: string;
 
-  @IsString()
+  @Matches(DURATION, { message: 'JWT_ACCESS_TTL must look like 15m, 1h' })
   JWT_ACCESS_TTL = '15m';
 
-  @IsString()
+  @Matches(DURATION, { message: 'JWT_REFRESH_TTL must look like 7d, 12h' })
   JWT_REFRESH_TTL = '7d';
 
   @Transform(({ value }) => Number(value))

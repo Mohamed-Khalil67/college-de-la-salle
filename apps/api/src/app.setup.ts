@@ -1,10 +1,12 @@
 import { type INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { API_PREFIX } from './app.prefix.js';
 import type { Env } from './config/env.validation.js';
 
-export const API_PREFIX = 'api';
+export { API_PREFIX };
 export const DOCS_PATH = `${API_PREFIX}/docs`;
 
 /** Cross-cutting HTTP setup, shared by main.ts and the e2e tests so both run the same app. */
@@ -13,6 +15,7 @@ export function configureApp(app: INestApplication): void {
 
   app.setGlobalPrefix(API_PREFIX);
   app.use(helmet());
+  app.use(cookieParser());
   app.enableCors({
     origin: config
       .get('CORS_ORIGIN', { infer: true })
@@ -37,6 +40,7 @@ export function configureApp(app: INestApplication): void {
         .setDescription('Collège de la Salle, Daher: school space API.')
         .setVersion('0.1.0')
         .addBearerAuth()
+        .addCookieAuth('cdls_refresh')
         .build(),
     );
     SwaggerModule.setup(DOCS_PATH, app, document);

@@ -67,10 +67,11 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  student   Student?
-  teacher   Teacher?
-  posts     Post[]
-  auditLogs AuditLog[]
+  student       Student?
+  teacher       Teacher?
+  posts         Post[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
 
   @@index([role])
   @@map("users")
@@ -104,6 +105,27 @@ model Teacher {
   attendanceRecorded Attendance[]
 
   @@map("teachers")
+}
+
+/// A refresh token (opaque, sent only in an httpOnly cookie). Only an HMAC of its secret is stored.
+/// Every refresh rotates it; presenting a revoked token revokes its whole family (theft detection).
+model RefreshToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// All the tokens descended from one login.
+  familyId  String    @map("family_id") @db.Uuid
+  tokenHash String    @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  userAgent String    @default("") @map("user_agent") @db.VarChar(255)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 // ---------------------------------------------------------------------------------------------------

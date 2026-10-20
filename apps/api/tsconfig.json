@@ -20,7 +20,7 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "strictPropertyInitialization": false,
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node", "multer"]
   },
   "include": ["src", "test", "prisma", "prisma.config.ts", "vitest.config*.ts"]
 }
