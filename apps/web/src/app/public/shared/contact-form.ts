@@ -31,7 +31,6 @@ const TRACKS = [
 /** What happened to the last message sent. */
 type SendState =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'sending' }
   | { readonly kind: 'sent'; readonly email: string }
   | { readonly kind: 'failed'; readonly reason: string; readonly mailto: string };
 
@@ -164,7 +163,7 @@ export class ContactForm {
   protected readonly messageError = computed(() => shownError(this.contactForm.message()));
   protected readonly phoneError = computed(() => shownError(this.contactForm.phone()));
   protected readonly state = signal<SendState>({ kind: 'idle' });
-  protected readonly sending = computed(() => this.state().kind === 'sending');
+  protected readonly sending = computed(() => this.contactForm().submitting());
   protected readonly sentTo = computed(() => {
     const state = this.state();
     return state.kind === 'sent' ? state.email : '';
@@ -181,7 +180,6 @@ export class ContactForm {
     void submit(this.contactForm, async () => {
       const raw = this.model();
       const value = this.full() ? raw : { ...raw, phone: '', subject: '' };
-      this.state.set({ kind: 'sending' });
       try {
         await this.#api.contact.send(contactRequest(value));
         this.state.set({ kind: 'sent', email: value.email.trim() });

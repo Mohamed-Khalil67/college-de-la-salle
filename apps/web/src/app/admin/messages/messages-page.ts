@@ -7,6 +7,7 @@ import {
   formatReceived,
   handledQuery,
   isMessageFilter,
+  mailtoAddress,
   MESSAGE_FILTERS,
   type MessageFilter,
   replyMailto,
@@ -62,7 +63,7 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
                     <div>
                       <dt>De</dt>
                       <dd>
-                        {{ m.name }}, <a [href]="'mailto:' + m.email">{{ m.email }}</a>
+                        {{ m.name }}, <a [href]="'mailto:' + address(m.email)">{{ m.email }}</a>
                       </dd>
                     </div>
                     @if (m.phone) {
@@ -219,6 +220,10 @@ export class MessagesPage {
 
   protected received(iso: string): string {
     return formatReceived(iso);
+  }
+
+  protected address(email: string): string {
+    return mailtoAddress(email);
   }
 
   protected reply(message: ContactMessageDto): string {

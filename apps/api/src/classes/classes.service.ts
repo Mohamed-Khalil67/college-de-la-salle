@@ -5,7 +5,7 @@ import { AccessService } from '../access/access.service.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { toDay } from '../common/dates.js';
-import { notFound } from '../common/errors.js';
+import { conflictOnReference, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   ClassDto,
@@ -23,6 +23,9 @@ const classInclude = {
 } satisfies Prisma.SchoolClassInclude;
 
 type ClassRow = Prisma.SchoolClassGetPayload<{ include: typeof classInclude }>;
+
+const CLASS_HAS_STUDENTS =
+  'Cette classe a encore des élèves inscrits : retirez-les avant de la supprimer.';
 
 @Injectable()
 export class ClassesService {
@@ -84,23 +87,25 @@ export class ClassesService {
    * attendance or report card. Its events, announcements and teaching assignments go with it.
    */
   async remove(id: string, user: AuthUser): Promise<void> {
-    const schoolClass = await this.prisma.schoolClass.findUnique({ where: { id } });
-    if (!schoolClass) throw notFound('Classe');
-    const [enrollments, reportCards, grades, attendance] = await Promise.all([
-      this.prisma.enrollment.count({ where: { classId: id } }),
-      this.prisma.reportCard.count({ where: { classId: id } }),
-      this.prisma.grade.count({ where: { event: { classId: id } } }),
-      this.prisma.attendance.count({ where: { event: { classId: id } } }),
-    ]);
-    if (enrollments)
-      throw new ConflictException(
-        'Cette classe a encore des élèves inscrits : retirez-les avant de la supprimer.',
-      );
-    if (reportCards || grades || attendance)
-      throw new ConflictException(
-        'Cette classe a déjà des notes, des absences ou des bulletins : elle ne peut pas être supprimée.',
-      );
-    await this.prisma.$transaction(async (tx) => {
+    const work = this.prisma.$transaction(async (tx) => {
+      // Lock the class and its events first: a grade or roll call saved meanwhile waits for this
+      // transaction instead of being deleted with the events after the checks below.
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM school_classes WHERE id = ${id}::uuid FOR UPDATE`;
+      if (!locked.length) throw notFound('Classe');
+      await tx.$queryRaw`SELECT id FROM events WHERE class_id = ${id}::uuid FOR UPDATE`;
+      const schoolClass = await tx.schoolClass.findUniqueOrThrow({ where: { id } });
+      const [enrollments, reportCards, grades, attendance] = await Promise.all([
+        tx.enrollment.count({ where: { classId: id } }),
+        tx.reportCard.count({ where: { classId: id } }),
+        tx.grade.count({ where: { event: { classId: id } } }),
+        tx.attendance.count({ where: { event: { classId: id } } }),
+      ]);
+      if (enrollments) throw new ConflictException(CLASS_HAS_STUDENTS);
+      if (reportCards || grades || attendance)
+        throw new ConflictException(
+          'Cette classe a déjà des notes, des absences ou des bulletins : elle ne peut pas être supprimée.',
+        );
       await tx.schoolClass.delete({ where: { id } });
       await audit(tx, [
         {
@@ -116,6 +121,8 @@ export class ClassesService {
         },
       ]);
     });
+    // A student enrolled between the checks and the delete (restrict foreign key).
+    await conflictOnReference(work, CLASS_HAS_STUDENTS);
   }
 
   /** The class list: admins and the class's teachers. */

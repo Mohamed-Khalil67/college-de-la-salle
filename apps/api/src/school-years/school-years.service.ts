@@ -3,7 +3,7 @@ import type { SchoolYear, Term } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay, toIso } from '../common/dates.js';
-import { notFound } from '../common/errors.js';
+import { conflictOnReference, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   CreateSchoolYearDto,
@@ -89,15 +89,18 @@ export class SchoolYearsService {
   /** Deletes a school year created by mistake: not the current one, and without classes. Its terms go with it. */
   async removeYear(id: string, user: AuthUser): Promise<void> {
     const year = await this.find(id);
-    if (year.isCurrent)
-      throw new ConflictException(
-        'L’année en cours ne peut pas être supprimée : définissez d’abord une autre année en cours.',
-      );
-    if (await this.prisma.schoolClass.count({ where: { schoolYearId: id } }))
-      throw new ConflictException(
-        `L’année ${year.label} a encore des classes : supprimez-les avant de supprimer l’année.`,
-      );
-    await this.prisma.$transaction(async (tx) => {
+    const hasClasses = `L’année ${year.label} a encore des classes : supprimez-les avant de supprimer l’année.`;
+    const work = this.prisma.$transaction(async (tx) => {
+      // Lock and re-read the year: it may have become the current one meanwhile.
+      await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${id}::uuid FOR UPDATE`;
+      const current = await tx.schoolYear.findUnique({ where: { id } });
+      if (!current) throw notFound('Année scolaire');
+      if (current.isCurrent)
+        throw new ConflictException(
+          'L’année en cours ne peut pas être supprimée : définissez d’abord une autre année en cours.',
+        );
+      if (await tx.schoolClass.count({ where: { schoolYearId: id } }))
+        throw new ConflictException(hasClasses);
       await tx.schoolYear.delete({ where: { id } });
       await audit(tx, [
         {
@@ -109,30 +112,32 @@ export class SchoolYearsService {
         },
       ]);
     });
+    // A class created between the check and the delete (restrict foreign key).
+    await conflictOnReference(work, hasClasses);
   }
 
   /** Deletes a term without grades or report cards (grades of its year's classes dated in the term). */
   async removeTerm(id: string, user: AuthUser): Promise<void> {
-    const term = await this.prisma.term.findUnique({ where: { id } });
-    if (!term) throw notFound('Trimestre');
-    const [reportCards, grades] = await Promise.all([
-      this.prisma.reportCard.count({ where: { termId: id } }),
-      this.prisma.grade.count({
-        where: {
-          event: {
-            date: { gte: term.startsOn, lte: term.endsOn },
-            schoolClass: { schoolYearId: term.schoolYearId },
+    const hasReportCards = 'Ce trimestre a des bulletins : il ne peut pas être supprimé.';
+    const work = this.prisma.$transaction(async (tx) => {
+      const term = await tx.term.findUnique({ where: { id } });
+      if (!term) throw notFound('Trimestre');
+      const [reportCards, grades] = await Promise.all([
+        tx.reportCard.count({ where: { termId: id } }),
+        tx.grade.count({
+          where: {
+            event: {
+              date: { gte: term.startsOn, lte: term.endsOn },
+              schoolClass: { schoolYearId: term.schoolYearId },
+            },
           },
-        },
-      }),
-    ]);
-    if (reportCards)
-      throw new ConflictException('Ce trimestre a des bulletins : il ne peut pas être supprimé.');
-    if (grades)
-      throw new ConflictException(
-        'Des notes ont déjà été saisies pendant ce trimestre : il ne peut pas être supprimé.',
-      );
-    await this.prisma.$transaction(async (tx) => {
+        }),
+      ]);
+      if (reportCards) throw new ConflictException(hasReportCards);
+      if (grades)
+        throw new ConflictException(
+          'Des notes ont déjà été saisies pendant ce trimestre : il ne peut pas être supprimé.',
+        );
       await tx.term.delete({ where: { id } });
       await audit(tx, [
         {
@@ -144,6 +149,8 @@ export class SchoolYearsService {
         },
       ]);
     });
+    // Report cards generated between the check and the delete (restrict foreign key).
+    await conflictOnReference(work, hasReportCards);
   }
 
   private async find(id: string): Promise<SchoolYear> {

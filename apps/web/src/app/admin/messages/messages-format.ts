@@ -22,9 +22,20 @@ export function handledQuery(filter: MessageFilter): boolean | undefined {
   return filter === 'all' ? undefined : filter === 'handled';
 }
 
+/**
+ * A visitor's address made safe for a `mailto:` link. An address typed on the public form may hold
+ * `?`, `&` or `%` (valid in e-mail addresses), which would otherwise add headers such as `bcc=` to the
+ * reply (RFC 6068): each part is percent-encoded, the `@` kept.
+ */
+export function mailtoAddress(email: string): string {
+  const at = email.lastIndexOf('@');
+  const encode = (part: string) => encodeURIComponent(part);
+  return at < 0 ? encode(email) : `${encode(email.slice(0, at))}@${encode(email.slice(at + 1))}`;
+}
+
 /** A `mailto:` link to answer the visitor, the subject prefixed with « Re : ». */
 export function replyMailto(message: Pick<ContactMessageDto, 'email' | 'subject'>): string {
-  return `mailto:${message.email}?subject=${encodeURIComponent(`Re : ${message.subject}`)}`;
+  return `mailto:${mailtoAddress(message.email)}?subject=${encodeURIComponent(`Re : ${message.subject}`)}`;
 }
 
 const RECEIVED = new Intl.DateTimeFormat('fr-FR', {
