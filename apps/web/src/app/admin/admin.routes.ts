@@ -9,14 +9,37 @@ export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Bulletins', path: 'bulletins', icon: 'printer' },
 ];
 
-const placeholder = () => import('../layout/page-placeholder').then((m) => m.PagePlaceholder);
-
 /** The administration (/admin). Pages are ported from design/prototypes/admin-*.html. */
 export const ADMIN_ROUTES: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'utilisateurs' },
-  { path: 'utilisateurs', title: 'Utilisateurs', loadComponent: placeholder },
-  { path: 'classes', title: 'Classes', loadComponent: placeholder },
-  { path: 'affectations', title: 'Affectations', loadComponent: placeholder },
-  { path: 'annees', title: 'Années et trimestres', loadComponent: placeholder },
-  { path: 'bulletins', title: 'Bulletins', loadComponent: placeholder },
+  {
+    path: 'utilisateurs',
+    title: 'Utilisateurs',
+    loadComponent: () => import('./utilisateurs/users-page').then((m) => m.UsersPage),
+  },
+  {
+    path: 'classes',
+    title: 'Classes',
+    loadComponent: () => import('./classes/classes-page').then((m) => m.ClassesPage),
+  },
+  {
+    path: 'classes/:id',
+    title: 'Classe',
+    loadComponent: () => import('./classes/class-detail-page').then((m) => m.ClassDetailPage),
+  },
+  {
+    path: 'affectations',
+    title: 'Affectations',
+    loadComponent: () => import('./affectations/assignments-page').then((m) => m.AssignmentsPage),
+  },
+  {
+    path: 'annees',
+    title: 'Années et trimestres',
+    loadComponent: () => import('./annees/years-page').then((m) => m.YearsPage),
+  },
+  {
+    path: 'bulletins',
+    title: 'Bulletins',
+    loadComponent: () => import('./bulletins/report-cards-page').then((m) => m.ReportCardsPage),
+  },
 ];
