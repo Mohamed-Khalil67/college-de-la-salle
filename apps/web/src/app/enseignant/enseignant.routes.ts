@@ -9,13 +9,31 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Annonces', path: 'annonces', icon: 'bell' },
 ];
 
-const placeholder = () => import('../layout/page-placeholder').then((m) => m.PagePlaceholder);
-
 /** The teacher space (/enseignant). Pages are ported from design/prototypes/enseignant-*.html. */
 export const ENSEIGNANT_ROUTES: Routes = [
-  { path: '', title: 'Mes classes', loadComponent: placeholder },
-  { path: 'agenda', title: 'Agenda', loadComponent: placeholder },
-  { path: 'notes', title: 'Saisie des notes', loadComponent: placeholder },
-  { path: 'appel', title: 'Appel', loadComponent: placeholder },
-  { path: 'annonces', title: 'Annonces', loadComponent: placeholder },
+  {
+    path: '',
+    title: 'Mes classes',
+    loadComponent: () => import('./mes-classes/classes-page').then((m) => m.ClassesPage),
+  },
+  {
+    path: 'agenda',
+    title: 'Agenda',
+    loadComponent: () => import('./agenda/agenda-page').then((m) => m.AgendaPage),
+  },
+  {
+    path: 'notes',
+    title: 'Saisie des notes',
+    loadComponent: () => import('./notes/grade-entry-page').then((m) => m.GradeEntryPage),
+  },
+  {
+    path: 'appel',
+    title: 'Appel',
+    loadComponent: () => import('./appel/attendance-page').then((m) => m.AttendancePage),
+  },
+  {
+    path: 'annonces',
+    title: 'Annonces',
+    loadComponent: () => import('./annonces/posts-page').then((m) => m.PostsPage),
+  },
 ];
