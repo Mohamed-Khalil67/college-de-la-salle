@@ -103,7 +103,7 @@ Primitives live in the Figma collection `Primitives`. Semantic tokens live in `C
 | Bleu Daher | `navy/900` | `#13294B` | Brand, headings, primary buttons, app bar, footer |
 | Bleu encre | `navy/700` | `#22406E` | Hover, links, focus ring |
 | Or du blason | `gold/500` | `#C9A13B` | Accent: rules, star, button and text **on navy only** |
-| Or patiné | `gold/700` | `#8A6A1E` | Gold as text on light backgrounds |
+| Or patiné | `gold/700` | `#806218` | Gold as text on light backgrounds. Darkened from `#8A6A1E` (4.25:1 on parchment failed Axe); the Figma variable still holds the old value until the next Figma session. |
 | Brique 1905 | `brick/700` | `#8E3A2B` | Heritage accent: timeline years, history |
 | Ivoire | `ivory/50` | `#FBF8F1` | Page background |
 | Parchemin | `parchment/100` | `#F1EBDD` | Alternate sections, table headers, disabled fills |
@@ -138,7 +138,7 @@ Normal text needs 4.5:1. Large text and UI parts need 3:1.
 | Ivoire | Bleu Daher | 13.69 | AA, AAA |
 | Or du blason `#C9A13B` | Bleu Daher | 5.98 | AA |
 | Bleu Daher (gold button label) | Or du blason | 5.98 | AA |
-| Or patiné `#8A6A1E` | Ivoire / white | 4.76 / 5.05 | AA |
+| Or patiné `#806218` | Ivoire / Parchemin / white | 5.38 / 4.80 / 5.71 | AA |
 | Brique `#8E3A2B` | Ivoire / Parchemin | 7.10 / 6.33 | AA |
 | Success `#2E6B45` | `#E4EEE6` | 5.35 | AA |
 | Danger `#A3262A` | `#F7E4E1` / white | 5.98 / 7.32 | AA |
