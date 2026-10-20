@@ -19,7 +19,8 @@
     "db:migrate": "npm run db:migrate -w @cdls/api",
     "db:seed": "npm run db:seed -w @cdls/api",
     "format": "prettier --write \"{apps,packages}/*/src/**/*.{ts,html,scss}\"",
-    "db:dev": "npm run db:dev -w @cdls/api"
+    "db:dev": "npm run db:dev -w @cdls/api",
+    "test:e2e": "npm run build -w @cdls/shared && npm run test:e2e -w @cdls/api"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",

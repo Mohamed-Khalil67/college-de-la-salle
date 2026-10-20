@@ -110,10 +110,32 @@ start the emulators too (needs Java 21+): `npm run emulators -w @cdls/web`.
 | Command | What it does |
 | --- | --- |
 | `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
-| `npm run lint` / `npm test` | oxlint and Vitest in every workspace |
+| `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
+| `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
+| `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
-| `npm run db:seed` | Demo data; the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
+| `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
 | `npm run deploy -w @cdls/web` | Build, then `firebase deploy --only hosting,firestore` |
+
+## The API
+
+`apps/api` serves `/api` (docs at http://localhost:3000/api/docs). Accounts are created by the admin (one
+by one or by CSV import); there is no open sign-up. Sign-in returns a 15-minute access token (send it as
+`Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
+
+| Area | Endpoints |
+| --- | --- |
+| Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` |
+| Admin | `/users` (CRUD, `POST /users/import` CSV), `/school-years`, `/terms/:id/close`, `/classes`, `/enrollments`, `/subjects`, `/teaching-assignments` |
+| Calendar | `/events` (range, `/occurrences` with weekly repeats, `/:id/ics`), `/homework` (done ticks), `/posts` |
+| Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
+| Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
+| Report cards | `/terms/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
+
+Who may do what mirrors `apps/web/firestore.rules`: students only see their own records and what is addressed
+to their class, section or the whole school; teachers only grade, take attendance and post for the classes
+and subjects they are assigned; admins manage everything. The request and response types are in
+`packages/shared/src/api.ts` for the web app to import.
 
 ## Where the content lives
 

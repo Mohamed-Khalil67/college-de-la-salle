@@ -15,7 +15,11 @@ import { CLASSES, MATIERES, matieresFor, SECTION_LABELS, type SectionId } from '
 import { hash } from 'argon2';
 import { PrismaClient, Role, type Prisma } from '../src/generated/prisma/client.js';
 
-const CREDENTIALS_FILE = fileURLToPath(new URL('../demo-credentials.local.md', import.meta.url));
+// The e2e tests seed their own database with a known password and a temporary credentials file.
+const CREDENTIALS_FILE =
+  process.env['SEED_CREDENTIALS_FILE'] ??
+  fileURLToPath(new URL('../demo-credentials.local.md', import.meta.url));
+const FIXED_PASSWORD = process.env['SEED_PASSWORD'];
 const DOMAIN = 'demo.cdls.test';
 const STUDENTS_PER_CLASS = 10;
 
@@ -46,9 +50,16 @@ const slug = (s: string) =>
     .replace(/[^a-z]+/g, '-')
     .replace(/^-|-$/g, '');
 
-const TEACHERS: readonly { first: string; last: string; subjects: readonly string[] }[] = [
+/** `sections` limits a teacher to one track (French is taught by a different teacher in each). */
+const TEACHERS: readonly {
+  first: string;
+  last: string;
+  subjects: readonly string[];
+  sections?: readonly SectionId[];
+}[] = [
   { first: 'Hany', last: 'Mansour', subjects: ['mathematiques'] },
-  { first: 'Claire', last: 'Dubois', subjects: ['francais', 'humanites'] },
+  { first: 'Claire', last: 'Dubois', subjects: ['francais', 'humanites'], sections: ['bac'] },
+  { first: 'Samia', last: 'Ramzy', subjects: ['francais'], sections: ['nationale'] },
   { first: 'Mona', last: 'Abdelmalek', subjects: ['arabe', 'education-religieuse'] },
   { first: 'Peter', last: 'Ghali', subjects: ['anglais', 'espagnol'] },
   { first: 'Sherif', last: 'Nassar', subjects: ['physique-chimie'] },
@@ -150,7 +161,8 @@ async function wipe(): Promise<void> {
 
 async function main(): Promise<void> {
   await wipe();
-  const credentials = { admin: password(), teacher: password(), student: password() };
+  const secret = () => FIXED_PASSWORD ?? password();
+  const credentials = { admin: secret(), teacher: secret(), student: secret() };
 
   // School structure --------------------------------------------------------------------------------
   const year = await prisma.schoolYear.create({
@@ -203,11 +215,15 @@ async function main(): Promise<void> {
       include: { teacher: true },
     });
     teacherEmails.push(`${email} (${t.subjects.join(', ')})`);
-    for (const s of t.subjects) teacherBySubject.set(s, { id: user.teacher!.id, userId: user.id });
+    for (const s of t.subjects) {
+      for (const section of t.sections ?? ['*']) {
+        teacherBySubject.set(`${section}:${s}`, { id: user.teacher!.id, userId: user.id });
+      }
+    }
   }
-  const teacherFor = (subject: string) => {
-    const t = teacherBySubject.get(subject);
-    if (!t) throw new Error(`No demo teacher for subject ${subject}`);
+  const teacherFor = (subject: string, section?: SectionId) => {
+    const t = teacherBySubject.get(`${section}:${subject}`) ?? teacherBySubject.get(`*:${subject}`);
+    if (!t) throw new Error(`No demo teacher for ${subject} in ${section ?? 'any section'}`);
     return t;
   };
 
@@ -227,7 +243,7 @@ async function main(): Promise<void> {
 
       await prisma.teachingAssignment.createMany({
         data: matieresFor(code).map((m) => ({
-          teacherId: teacherFor(m.id).id,
+          teacherId: teacherFor(m.id, code).id,
           classId: schoolClass.id,
           subjectId: m.id,
           coefficient: COEFFICIENTS[m.id] ?? 1,
@@ -295,7 +311,7 @@ async function main(): Promise<void> {
           endTime: '11:45',
           repeatUntil: day(term1.endsOn),
           place: 'Salle 8',
-          authorId: teacherFor(second).id,
+          authorId: teacherFor(second, code).id,
         },
         {
           kind: 'examen',
@@ -318,7 +334,7 @@ async function main(): Promise<void> {
           date: day('2026-10-15'),
           startTime: '10:15',
           endTime: '11:15',
-          authorId: teacherFor(second).id,
+          authorId: teacherFor(second, code).id,
         },
         {
           kind: 'devoir',
@@ -342,7 +358,7 @@ async function main(): Promise<void> {
       startTime: '14:00',
       endTime: '15:30',
       place: 'Grande salle',
-      authorId: teacherFor('francais').id,
+      authorId: teacherFor('francais', 'bac').id,
     },
     {
       kind: 'activite',
@@ -423,7 +439,7 @@ async function main(): Promise<void> {
         body: 'Procurez-vous « Le Petit Prince » pour la rentrée de novembre.',
         classId: classRosters.find((r) => r.section === 'bac' && r.code === 'seconde')!.classId,
         subjectId: 'francais',
-        authorId: teacherFor('francais').userId,
+        authorId: teacherFor('francais', 'bac').userId,
       },
     ],
   });
@@ -463,7 +479,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Seeded ${YEAR.label}: ${classRosters.length} classes, ${TEACHERS.length} teachers, ${studentNumber} students, ` +
-      `${createdEvents.length} events, ${grades.length} grades. Demo credentials written to apps/api/demo-credentials.local.md`,
+      `${createdEvents.length} events, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
   );
 }
 
