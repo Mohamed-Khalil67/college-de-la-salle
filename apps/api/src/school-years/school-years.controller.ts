@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseBoolPipe,
   ParseUUIDPipe,
@@ -47,6 +48,7 @@ export class SchoolYearsController {
   /** Makes this the current school year. */
   @Roles('admin')
   @Post('school-years/:id/current')
+  @HttpCode(200)
   @ApiOkResponse({ type: SchoolYearDto })
   makeCurrent(@Param('id', ParseUUIDPipe) id: string): Promise<SchoolYearDto> {
     return this.years.makeCurrent(id);
@@ -62,6 +64,7 @@ export class SchoolYearsController {
   /** Closes a term (`?closed=false` reopens it). */
   @Roles('admin')
   @Post('terms/:id/close')
+  @HttpCode(200)
   @ApiQuery({ name: 'closed', required: false, type: Boolean })
   @ApiOkResponse({ type: TermDto })
   close(

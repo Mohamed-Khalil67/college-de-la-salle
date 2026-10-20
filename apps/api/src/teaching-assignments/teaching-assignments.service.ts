@@ -52,7 +52,8 @@ export class TeachingAssignmentsService {
     if (!teacher) throw notFound('Enseignant');
     if (!schoolClass) throw notFound('Classe');
     if (!subject) throw notFound('Matière');
-    return toDto(await this.prisma.teachingAssignment.create({ data: { ...dto }, include }));
+    const data = { ...key, coefficient: dto.coefficient ?? 1 };
+    return toDto(await this.prisma.teachingAssignment.create({ data, include }));
   }
 
   async remove(id: string): Promise<void> {

@@ -9,7 +9,13 @@ import { RolesGuard } from './common/roles.guard.js';
 import { validateEnv, type Env } from './config/env.validation.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { AttendanceModule } from './attendance/attendance.module.js';
 import { ClassesModule } from './classes/classes.module.js';
+import { EventsModule } from './events/events.module.js';
+import { GradesModule } from './grades/grades.module.js';
+import { HomeworkModule } from './homework/homework.module.js';
+import { PostsModule } from './posts/posts.module.js';
+import { ReportCardsModule } from './report-cards/report-cards.module.js';
 import { SchoolYearsModule } from './school-years/school-years.module.js';
 import { SubjectsModule } from './subjects/subjects.module.js';
 import { TeachingAssignmentsModule } from './teaching-assignments/teaching-assignments.module.js';
@@ -38,6 +44,12 @@ import { UsersModule } from './users/users.module.js';
     ClassesModule,
     SubjectsModule,
     TeachingAssignmentsModule,
+    EventsModule,
+    HomeworkModule,
+    GradesModule,
+    AttendanceModule,
+    PostsModule,
+    ReportCardsModule,
   ],
   providers: [
     // Order matters: rate limit, then authentication, then roles.

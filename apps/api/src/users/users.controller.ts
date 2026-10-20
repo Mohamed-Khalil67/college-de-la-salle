@@ -23,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import type { AuthUser } from '../common/auth-user.js';
 import { CurrentUser, Roles } from '../common/decorators.js';
+import { ApiPaginatedResponse } from '../common/pagination.js';
 import {
   CreatedUserDto,
   CreateUserDto,
@@ -42,6 +43,7 @@ export class UsersController {
 
   /** Paginated list, filterable by role and searchable by name or e-mail. */
   @Get()
+  @ApiPaginatedResponse(UserDto)
   list(@Query() query: UserListQueryDto) {
     return this.users.list(query);
   }
