@@ -543,3 +543,17 @@ export interface ContactMessageListQuery extends PageQuery {
 export interface UpdateContactMessageRequest {
   readonly handled: boolean;
 }
+
+/** Most ids POST /contact-messages/handle takes at once. */
+export const CONTACT_BULK_MAX = 100;
+
+/** POST /contact-messages/handle: marks several messages handled at once (admins). */
+export interface HandleContactMessagesRequest {
+  /** 1 to CONTACT_BULK_MAX message ids. Unknown or already handled ones are skipped. */
+  readonly ids: readonly string[];
+}
+
+export interface HandleContactMessagesResponse {
+  /** How many messages this request marked handled (already handled or deleted ones are not counted). */
+  readonly handled: number;
+}

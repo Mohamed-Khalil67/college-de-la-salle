@@ -1,8 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import {
+  CONTACT_BULK_MAX,
   CONTACT_LIMITS,
+  type HandleContactMessagesRequest,
+  type HandleContactMessagesResponse,
   type ContactMessageDto as ContactMessageContract,
   type ContactMessageListQuery,
   type ContactMessageRequest,
@@ -99,4 +114,20 @@ export class ContactMessageListQueryDto
 export class UpdateContactMessageDto implements UpdateContactMessageRequest {
   @IsBoolean()
   handled: boolean;
+}
+
+export class HandleContactMessagesDto implements HandleContactMessagesRequest {
+  /** @example ["0193f1a2-7c4e-7d1a-9b2f-3c5d6e7f8a9b"] */
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Sélectionnez au moins un message.' })
+  @ArrayMaxSize(CONTACT_BULK_MAX, {
+    message: `${CONTACT_BULK_MAX} messages au plus à la fois.`,
+  })
+  @ArrayUnique({ message: 'Chaque message ne figure qu’une fois dans la sélection.' })
+  @IsUUID('all', { each: true, message: 'Identifiant de message invalide.' })
+  ids: string[];
+}
+
+export class HandleContactMessagesResponseDto implements HandleContactMessagesResponse {
+  handled: number;
 }

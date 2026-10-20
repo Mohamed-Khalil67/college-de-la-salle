@@ -53,3 +53,44 @@ export function formatReceived(iso: string): string {
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('day')} ${part('month')} ${part('year')} à ${Number(part('hour'))} h ${part('minute')}`;
 }
+
+/** Ids of the messages on a page that can be selected for bulk handling: the waiting ones. */
+export function selectableIds(messages: readonly Pick<ContactMessageDto, 'id' | 'handledAt'>[]): string[] {
+  return messages.filter((m) => !m.handledAt).map((m) => m.id);
+}
+
+/** The selection with `id` added or removed (a new set: signals compare by reference). */
+export function toggleSelected(selected: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  const next = new Set(selected);
+  if (on) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+/** Drops from the selection what is no longer on screen or no longer waiting (handled, deleted, other page). */
+export function keepSelectable(selected: ReadonlySet<string>, selectable: readonly string[]): ReadonlySet<string> {
+  return new Set(selectable.filter((id) => selected.has(id)));
+}
+
+/** State of the « select the whole page » box. */
+export function selectAllState(selected: ReadonlySet<string>, selectable: readonly string[]): 'none' | 'some' | 'all' {
+  const count = selectable.filter((id) => selected.has(id)).length;
+  return count === 0 ? 'none' : count === selectable.length ? 'all' : 'some';
+}
+
+/** Confirmation after a bulk handling: how many were marked, and why some were not. */
+export function bulkHandledNotice(handled: number, asked: number): string {
+  if (handled === 0) return 'Aucun message marqué comme traité : ils l’étaient déjà ou ont été supprimés.';
+  const done = handled > 1 ? `${handled} messages marqués comme traités.` : '1 message marqué comme traité.';
+  const skipped = asked - handled;
+  if (skipped <= 0) return done;
+  return `${done} ${skipped > 1 ? `${skipped} autres l’étaient déjà ou ont été supprimés.` : 'Un autre l’était déjà ou a été supprimé.'}`;
+}
+
+/**
+ * The page to show after `removed` messages left a page of `onPage`: the previous one when the page
+ * would be left empty (and is not the first).
+ */
+export function pageAfterRemoval(page: number, onPage: number, removed: number): number {
+  return page > 1 && removed >= onPage ? page - 1 : page;
+}

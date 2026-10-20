@@ -39,6 +39,8 @@ describe('ContactService', () => {
       findUnique: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       updateMany: vi.fn(),
+      updateManyAndReturn: vi.fn(),
+      deleteMany: vi.fn(),
     },
     auditLog: { createMany: vi.fn() },
     // Array form (list) or interactive form (setHandled, run against this same mock).
@@ -168,5 +170,90 @@ describe('ContactService', () => {
   it('answers 404 for an unknown message', async () => {
     prisma.contactMessage.findUnique.mockResolvedValue(null);
     await expect(contact.setHandled('nope', true, ADMIN)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('marks a selection handled in one statement and audits each message it marked', async () => {
+    prisma.contactMessage.updateManyAndReturn.mockResolvedValue([{ id: 'm1' }, { id: 'm3' }]);
+    await expect(contact.handleMany(['m1', 'm2', 'm3'], ADMIN)).resolves.toEqual({ handled: 2 });
+    const call = prisma.contactMessage.updateManyAndReturn.mock.calls[0]![0] as {
+      where: object;
+      data: { handledAt: Date; handledById: string };
+    };
+    // Only waiting messages: one already handled (m2) keeps its handler and is not audited again.
+    expect(call.where).toEqual({ id: { in: ['m1', 'm2', 'm3'] }, handledAt: null });
+    expect(call.data.handledAt).toBeInstanceOf(Date);
+    expect(call.data.handledById).toBe('u-admin');
+    expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+      data: ['m1', 'm3'].map((entityId) => ({
+        actorId: 'u-admin',
+        action: 'contact_message.handle',
+        entity: 'contact_message',
+        entityId,
+      })),
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks nothing and audits nothing when the whole selection is already handled', async () => {
+    prisma.contactMessage.updateManyAndReturn.mockResolvedValue([]);
+    await expect(contact.handleMany(['m1'], ADMIN)).resolves.toEqual({ handled: 0 });
+    expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  it('deletes a message, audited without the visitor’s details', async () => {
+    prisma.contactMessage.findUnique.mockResolvedValue({
+      createdAt: new Date('2026-10-20T08:00:00Z'),
+      handledAt: null,
+    });
+    prisma.contactMessage.deleteMany.mockResolvedValue({ count: 1 });
+    await contact.remove('m1', ADMIN);
+    expect(prisma.contactMessage.deleteMany).toHaveBeenCalledWith({ where: { id: 'm1' } });
+    expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          actorId: 'u-admin',
+          action: 'contact_message.delete',
+          entity: 'contact_message',
+          entityId: 'm1',
+          before: { createdAt: '2026-10-20T08:00:00.000Z', handledAt: null },
+        },
+      ],
+    });
+  });
+
+  it('answers 404 when deleting an unknown message, or one deleted meanwhile', async () => {
+    prisma.contactMessage.findUnique.mockResolvedValue(null);
+    await expect(contact.remove('nope', ADMIN)).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.contactMessage.deleteMany).not.toHaveBeenCalled();
+
+    prisma.contactMessage.findUnique.mockResolvedValue({ createdAt: new Date(), handledAt: null });
+    prisma.contactMessage.deleteMany.mockResolvedValue({ count: 0 });
+    await expect(contact.remove('m1', ADMIN)).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  it('purges only messages handled before the cutoff, with one system audit row', async () => {
+    const cutoff = new Date('2025-10-20T00:00:00Z');
+    prisma.contactMessage.deleteMany.mockResolvedValue({ count: 3 });
+    await expect(contact.purgeHandledBefore(cutoff)).resolves.toBe(3);
+    expect(prisma.contactMessage.deleteMany).toHaveBeenCalledWith({
+      where: { handledAt: { lt: cutoff } },
+    });
+    expect(prisma.auditLog.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          actorId: null,
+          action: 'contact_message.purge',
+          entity: 'contact_message',
+          entityId: 'retention',
+          after: { handledBefore: '2025-10-20T00:00:00.000Z', count: 3 },
+        },
+      ],
+    });
+
+    vi.clearAllMocks();
+    prisma.contactMessage.deleteMany.mockResolvedValue({ count: 0 });
+    await expect(contact.purgeHandledBefore(cutoff)).resolves.toBe(0);
+    expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
   });
 });

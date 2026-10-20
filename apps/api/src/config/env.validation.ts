@@ -72,6 +72,13 @@ export class Env {
   @Min(1)
   CONTACT_THROTTLE_LIMIT = 5;
 
+  /** Handled contact messages are deleted this many days after they were handled (checked daily). */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(3650)
+  CONTACT_RETENTION_DAYS = 365;
+
   /**
    * Reverse proxies in front of the API (Express `trust proxy` hops), so rate limits see the visitor's
    * address from X-Forwarded-For. 0 (default) when clients connect directly; set it to the number of

@@ -49,7 +49,7 @@ health: `/api/health` (process) and `/api/health/db` (database).
 | `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
-| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe) against the running `npm run dev`; needs the seeded demo accounts and `LOGIN_THROTTLE_LIMIT=100` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default) |
+| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe) against the running `npm run dev`; needs the seeded demo accounts and `LOGIN_THROTTLE_LIMIT=100` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default); the run sends 4 contact messages, so wait a minute between runs or raise `CONTACT_THROTTLE_LIMIT` |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
 | `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
@@ -68,7 +68,7 @@ by one or by CSV import); there is no open sign-up. Sign-in returns a 15-minute 
 | Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
 | Report cards | `/terms/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
-| Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
+| Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages`, `PATCH` and `DELETE /contact-messages/:id`, `POST /contact-messages/handle` (up to 100 at once) (admins, audited); handled messages are deleted `CONTACT_RETENTION_DAYS` (365) days after handling, checked daily |
 
 Who may do what mirrors the old Firestore rules (`docs/legacy/firestore.rules`): students only see their own records and what is addressed
 to their class, section or the whole school; teachers only grade, take attendance and post for the classes

@@ -21,6 +21,8 @@ import type {
   EventInput,
   EventRangeQuery,
   GradeSheetDto,
+  HandleContactMessagesRequest,
+  HandleContactMessagesResponse,
   HomeworkCompletionDto,
   HomeworkDto,
   ImportUsersResponse,
@@ -171,6 +173,9 @@ export class ApiClient {
     send: (body: ContactMessageRequest) => this.#post<void>('/contact', body),
     messages: (query: ContactMessageListQuery = {}) => this.#get<Paginated<ContactMessageDto>>('/contact-messages', { ...query }),
     setHandled: (id: string, handled: boolean) => this.#patch<ContactMessageDto>(`/contact-messages/${id}`, { handled }),
+    handleMany: (ids: readonly string[]) =>
+      this.#post<HandleContactMessagesResponse>('/contact-messages/handle', { ids } satisfies HandleContactMessagesRequest),
+    remove: (id: string) => this.#delete(`/contact-messages/${id}`),
   };
 
   /* Report cards */
