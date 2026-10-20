@@ -1,0 +1,167 @@
+/*
+ * CDLS design tokens (source of truth: docs/brand.md and the Figma file
+ * https://www.figma.com/design/yFkLrkPr3tbhkhhbqf42pm).
+ *
+ * Every custom property below uses a Tailwind 4 theme namespace, so porting is a copy:
+ *
+ *   @import "tailwindcss";
+ *   @theme {
+ *     --color-*: …;        → bg-*, text-*, border-*  (e.g. --color-page → bg-page, --color-heading → text-heading)
+ *     --font-*: …;         → font-display, font-sans, font-arabic
+ *     --text-*: …;         → text-display-xl, text-h1 … (each with --line-height / --letter-spacing / --font-weight)
+ *     --spacing: 0.25rem;  → p-1 = 4px … p-32 = 128px (matches Figma space/1 … space/32)
+ *     --radius-*: …;       → rounded-sm (4), rounded-md (10), rounded-lg (16), rounded-full
+ *     --shadow-*: …;       → shadow-raised, shadow-overlay
+ *   }
+ *
+ * Paste the :root block into @theme unchanged; drop the "Helpers" block (Tailwind derives those).
+ *
+ * Figma variable → CSS custom property
+ *   Primitives navy/900 … white        → --color-navy-900 … --color-white
+ *   bg/page, bg/subtle, bg/surface      → --color-page, --color-subtle, --color-surface
+ *   bg/inverse, bg/accent, bg/info      → --color-inverse, --color-accent, --color-info-tint
+ *   bg/success, bg/danger, bg/warning   → --color-success-tint, --color-danger-tint, --color-warning-tint
+ *   action/primary(-hover), action/accent, action/danger
+ *                                       → --color-primary, --color-primary-hover, --color-accent, --color-danger
+ *   text/primary, text/muted, text/heading, text/link, text/inverse
+ *                                       → --color-body, --color-muted, --color-heading, --color-link, --color-on-inverse
+ *   text/accent, text/on-inverse-accent, text/heritage
+ *                                       → --color-accent-text, --color-accent (gold on navy), --color-heritage
+ *   text/success, text/danger, text/warning
+ *                                       → --color-success, --color-danger, --color-warning
+ *   border/default, border/strong, border/focus, border/accent, border/danger
+ *                                       → --color-line, --color-line-strong, --color-focus, --color-accent, --color-danger
+ *   space/N                             → calc(var(--spacing) * N)   (helpers: --space-N)
+ *   radius/sm|md|lg|full                → --radius-sm|md|lg|full
+ *   Text styles Display/XL … Arabic/Body → --text-display-xl … --text-arabic-body
+ *
+ * Contrast (WCAG 2.1, all pass AA unless noted): see docs/brand.md § Contrast results.
+ * Gold #C9A13B is 2.29:1 on ivory: never use --color-accent as text, icon or sole indicator on light surfaces.
+ */
+
+:root {
+  /* ---------- Colour: primitives ---------- */
+  --color-navy-900: #13294b; /* Bleu Daher */
+  --color-navy-700: #22406e; /* Bleu encre */
+  --color-navy-100: #e3e9f2;
+  --color-gold-500: #c9a13b; /* Or du blason */
+  --color-gold-700: #806218; /* Or patiné (darkened from Figma #8A6A1E to pass 4.5:1 on parchment) */
+  --color-gold-800: #73570f;
+  --color-gold-100: #f4ead0;
+  --color-brick-700: #8e3a2b; /* Brique 1905 */
+  --color-ivory-50: #fbf8f1; /* Ivoire */
+  --color-parchment-100: #f1ebdd; /* Parchemin */
+  --color-stone-300: #d8cfbd;
+  --color-stone-500: #8c8471;
+  --color-ink-900: #1e2430; /* Encre */
+  --color-ink-600: #565d6b;
+  --color-white: #ffffff;
+  --color-green-700: #2e6b45;
+  --color-green-100: #e4eee6;
+  --color-red-700: #a3262a;
+  --color-red-100: #f7e4e1;
+
+  /* ---------- Colour: semantic ---------- */
+  --color-page: var(--color-ivory-50);
+  --color-subtle: var(--color-parchment-100);
+  --color-surface: var(--color-white);
+  --color-inverse: var(--color-navy-900);
+  --color-info-tint: var(--color-navy-100);
+  --color-success-tint: var(--color-green-100);
+  --color-danger-tint: var(--color-red-100);
+  --color-warning-tint: var(--color-gold-100);
+
+  --color-primary: var(--color-navy-900);
+  --color-primary-hover: var(--color-navy-700);
+  --color-accent: var(--color-gold-500); /* gold fill, rules, and text on navy only */
+  --color-accent-hover: #d8b45a;
+
+  --color-body: var(--color-ink-900);
+  --color-muted: var(--color-ink-600);
+  --color-heading: var(--color-navy-900);
+  --color-link: var(--color-navy-700);
+  --color-on-inverse: var(--color-ivory-50);
+  --color-accent-text: var(--color-gold-700); /* gold as text on light surfaces */
+  --color-heritage: var(--color-brick-700);
+  --color-success: var(--color-green-700);
+  --color-danger: var(--color-red-700);
+  --color-warning: var(--color-gold-800);
+
+  --color-line: var(--color-stone-300);
+  --color-line-strong: var(--color-stone-500);
+  --color-focus: var(--color-navy-700);
+
+  /* ---------- Type ---------- */
+  --font-display: "Cormorant Garamond", "EB Garamond", Garamond, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-arabic: "Cairo", "Segoe UI", Tahoma, sans-serif;
+
+  --text-display-xl: clamp(2.75rem, 1.6rem + 3.2vw, 4.5rem); /* 44 → 72 */
+  --text-display-xl--line-height: 1.06;
+  --text-display-xl--letter-spacing: -0.014em;
+  --text-display-xl--font-weight: 500;
+  --text-display-l: clamp(2.5rem, 1.9rem + 1.6vw, 3.5rem); /* 40 → 56 */
+  --text-display-l--line-height: 1.07;
+  --text-display-l--letter-spacing: -0.009em;
+  --text-display-l--font-weight: 500;
+  --text-h1: clamp(2rem, 1.7rem + 0.8vw, 2.5rem); /* 32 → 40 */
+  --text-h1--line-height: 1.15;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.875rem; /* 30 */
+  --text-h2--line-height: 1.2;
+  --text-h2--font-weight: 600;
+  --text-h3: 1.25rem; /* 20, Inter */
+  --text-h3--line-height: 1.4;
+  --text-h3--letter-spacing: -0.01em;
+  --text-h3--font-weight: 600;
+  --text-body-l: 1.125rem; /* 18 */
+  --text-body-l--line-height: 1.667;
+  --text-body-m: 1rem; /* 16 */
+  --text-body-m--line-height: 1.625;
+  --text-body-s: 0.875rem; /* 14 */
+  --text-body-s--line-height: 1.571;
+  --text-label-m: 0.9375rem; /* 15 */
+  --text-label-m--line-height: 1.333;
+  --text-label-m--font-weight: 500;
+  --text-label-s: 0.8125rem; /* 13 */
+  --text-label-s--line-height: 1.385;
+  --text-label-s--font-weight: 500;
+  --text-caption: 0.75rem; /* 12 */
+  --text-caption--line-height: 1.5;
+  --text-quote: 1.625rem; /* 26, Cormorant italic */
+  --text-quote--line-height: 1.31;
+  --text-arabic-h: 1.875rem;
+  --text-arabic-h--line-height: 1.467;
+  --text-arabic-body: 1rem;
+  --text-arabic-body--line-height: 1.75;
+
+  /* ---------- Spacing, radius, elevation ---------- */
+  --spacing: 0.25rem; /* 4px base: Figma space/N = N × 4px */
+  --radius-sm: 4px; /* buttons, inputs, grade cells */
+  --radius-md: 10px; /* cards, panels */
+  --radius-lg: 16px; /* modals, sheets */
+  --radius-full: 999px; /* badges, avatars */
+  --shadow-raised: 0 1px 2px rgb(19 41 75 / 0.08), 0 12px 32px -8px rgb(19 41 75 / 0.1);
+  --shadow-overlay: 0 24px 48px -12px rgb(19 41 75 / 0.18);
+
+  /* ---------- Layout ---------- */
+  --container-content: 75rem; /* 1200px */
+  --container-prose: 45rem; /* ≈ 72 characters */
+}
+
+/* ---------- Helpers (not for @theme: Tailwind derives these) ---------- */
+:root {
+  --space-1: calc(var(--spacing) * 1);
+  --space-2: calc(var(--spacing) * 2);
+  --space-3: calc(var(--spacing) * 3);
+  --space-4: calc(var(--spacing) * 4);
+  --space-6: calc(var(--spacing) * 6);
+  --space-8: calc(var(--spacing) * 8);
+  --space-12: calc(var(--spacing) * 12);
+  --space-16: calc(var(--spacing) * 16);
+  --space-24: calc(var(--spacing) * 24);
+  --space-32: calc(var(--spacing) * 32);
+  --gutter: clamp(1rem, 0.2rem + 4vw, 7.5rem); /* 16px mobile → 120px at 1440 */
+  --section-y: clamp(4rem, 2.7rem + 3.6vw, 6rem); /* 64 → 96 */
+  --focus-ring: 0 0 0 2px var(--color-page), 0 0 0 4px var(--color-focus);
+}

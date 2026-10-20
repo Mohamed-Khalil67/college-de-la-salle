@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tableau de bord | Collège de la Salle, Daher</title>
+  <meta name="description" content="Espace élève : la journée, les devoirs à rendre et les dernières notes.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="has-bottom-nav">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="app-bar on-inverse" data-component="app-bar">
+    <div class="app-bar__inner">
+      <a class="wordmark" href="eleve-tableau-de-bord.html" aria-label="Collège de la Salle, Espace élève : accueil" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Espace élève</span></span>
+      </a>
+      <p class="app-bar__title" aria-hidden="true">Tableau de bord</p>
+      <nav class="app-bar__nav" aria-label="Espace élève">
+        <ul role="list">
+          <li><a class="nav-link" href="eleve-tableau-de-bord.html" aria-current="page" data-component="nav-link">Tableau de bord</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Emploi du temps</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Devoirs</a></li>
+          <li><a class="nav-link" href="eleve-notes.html" data-component="nav-link">Notes</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Absences</a></li>
+          <li><a class="nav-link" href="eleve-bulletin.html" data-component="nav-link">Bulletins</a></li>
+        </ul>
+      </nav>
+      <div class="app-bar__end">
+        <button class="app-bar__icon-btn" type="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-bell"/></svg><span class="app-bar__dot"></span><span class="visually-hidden">Notifications, 2 nouvelles</span></button>
+        <a class="app-bar__account" href="connexion.html">
+          <span class="avatar avatar--gold" aria-hidden="true" data-component="avatar">NF</span>
+          <span class="app-bar__account-text">Nadia Fawzy<small>Seconde B, Bac français</small></span>
+          <span class="visually-hidden">Compte de Nadia Fawzy : se déconnecter</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu" class="page">
+    <div class="page__header">
+      <div class="page__header-text">
+        <h1 class="t-h1">Bonjour Nadia</h1>
+        <p class="t-muted">Mardi 20 octobre 2026, Seconde B, trimestre 1</p>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <section class="card card--panel" aria-labelledby="today" data-component="card">
+        <div class="card__header"><h2 id="today" class="t-h3">Aujourd’hui</h2><a class="t-body-s" href="#">Emploi du temps</a></div>
+        <ol class="list" role="list">
+          <li><span class="list__time">8 h 00</span><div class="list__main"><p>Mathématiques</p><p class="list__meta">Salle 204, M. Hanna</p></div></li>
+          <li><span class="list__time">8 h 55</span><div class="list__main"><p>Français</p><p class="list__meta">Salle 204, Mme Lefèvre</p></div></li>
+          <li><span class="list__time">10 h 05</span><div class="list__main"><p>Physique-Chimie <span class="badge badge--info" data-component="badge">En cours</span></p><p class="list__meta">Laboratoire 2, M. Girgis</p></div></li>
+          <li><span class="list__time">11 h 00</span><div class="list__main"><p>Anglais</p><p class="list__meta">Salle 112, Mme Adly</p></div></li>
+          <li><span class="list__time">12 h 50</span><div class="list__main"><p>Langue arabe</p><p class="list__meta">Salle 204, M. Mounir</p></div></li>
+          <li><span class="list__time">13 h 45</span><div class="list__main"><p>Éducation physique et sportive</p><p class="list__meta">Gymnase, M. Selim</p></div></li>
+        </ol>
+      </section>
+
+      <section class="card card--panel" aria-labelledby="hw" data-component="card">
+        <div class="card__header"><h2 id="hw" class="t-h3">Devoirs à rendre</h2><a class="t-body-s" href="#">Tous les devoirs</a></div>
+        <ul class="list" role="list">
+          <li><label class="check" data-component="checkbox"><input type="checkbox"><span><span class="d-block">Exercices 12 à 18, page 54</span><span class="list__meta">Mathématiques, pour mercredi 21 octobre</span></span></label><span class="badge badge--warning" data-component="badge">Demain</span></li>
+          <li><label class="check" data-component="checkbox"><input type="checkbox"><span><span class="d-block">Commentaire : « Mignonne, allons voir si la rose »</span><span class="list__meta">Français, pour lundi 26 octobre</span></span></label></li>
+          <li><label class="check" data-component="checkbox"><input type="checkbox"><span><span class="d-block">Compte rendu du TP sur les solutions</span><span class="list__meta">Physique-Chimie, pour mercredi 28 octobre</span></span></label></li>
+          <li><label class="check" data-component="checkbox"><input type="checkbox" checked><span><span class="d-block is-done">Vocabulary, unit 3</span><span class="list__meta">Anglais, fait</span></span></label></li>
+        </ul>
+      </section>
+
+      <section class="card card--panel" aria-labelledby="last" data-component="card">
+        <div class="card__header"><h2 id="last" class="t-h3">Dernières notes</h2><a class="t-body-s" href="eleve-notes.html">Toutes mes notes</a></div>
+        <ul class="list" role="list">
+          <li><div class="list__main"><p>Mathématiques <span class="badge badge--success" data-component="badge">Nouvelle</span></p><p class="list__meta">Contrôle n° 2, moyenne de la classe 12,4</p></div><p class="grade-figure tabular">16<span>/20</span></p></li>
+          <li><div class="list__main"><p>SVT</p><p class="list__meta">Interrogation, moyenne de la classe 14,5</p></div><p class="grade-figure tabular">17<span>/20</span></p></li>
+          <li><div class="list__main"><p>Anglais</p><p class="list__meta">Essay, moyenne de la classe 13,2</p></div><p class="grade-figure tabular">15,5<span>/20</span></p></li>
+        </ul>
+      </section>
+
+      <section class="card card--panel span-2" aria-labelledby="avg" data-component="card">
+        <div class="card__header"><h2 id="avg" class="t-h3">Moyennes du trimestre 1</h2><a class="t-body-s" href="eleve-notes.html">Détail par matière</a></div>
+        <div class="avg-summary">
+          <div class="stat"><span class="stat__value tabular">14,3</span><span class="stat__label">Ma moyenne générale</span></div>
+          <div class="stat"><span class="stat__value stat__value--muted tabular">13,0</span><span class="stat__label">Moyenne de la classe</span></div>
+        </div>
+        <ul class="bars" role="list">
+          <li><span>Anglais</span><span class="meter" aria-hidden="true"><span style="width: 81.5%"></span></span><span class="tabular">16,3</span></li>
+          <li><span>Éducation physique et sportive</span><span class="meter" aria-hidden="true"><span style="width: 80%"></span></span><span class="tabular">16,0</span></li>
+          <li><span>SVT</span><span class="meter" aria-hidden="true"><span style="width: 78.5%"></span></span><span class="tabular">15,7</span></li>
+          <li><span>Physique-Chimie</span><span class="meter" aria-hidden="true"><span style="width: 71.5%"></span></span><span class="tabular">14,3</span></li>
+          <li><span>Mathématiques</span><span class="meter" aria-hidden="true"><span style="width: 71%"></span></span><span class="tabular">14,2</span></li>
+          <li><span>Français</span><span class="meter" aria-hidden="true"><span style="width: 70%"></span></span><span class="tabular">14,0</span></li>
+        </ul>
+      </section>
+
+      <div class="stack">
+        <section class="card card--panel" aria-labelledby="abs" data-component="card">
+          <div class="card__header"><h2 id="abs" class="t-h3">Absences</h2><a class="t-body-s" href="#">Détail</a></div>
+          <ul class="list" role="list">
+            <li><div class="list__main"><p>Mardi 6 octobre, matinée</p><p class="list__meta">Absence, certificat médical reçu</p></div><span class="badge badge--success" data-component="badge">Justifiée</span></li>
+            <li><div class="list__main"><p>Mardi 13 octobre, 8 h 00</p><p class="list__meta">Retard de 10 minutes</p></div><span class="badge badge--warning" data-component="badge">Retard</span></li>
+          </ul>
+        </section>
+        <section class="card card--panel" aria-labelledby="news" data-component="card">
+          <h2 id="news" class="t-h3">Annonces</h2>
+          <ul class="list" role="list">
+            <li><div class="list__main"><p>Sortie au Musée copte le jeudi 29 octobre</p><p class="list__meta">Mme Lefèvre, pour la Seconde B</p></div></li>
+            <li><div class="list__main"><p>Rencontres parents-professeurs le jeudi 5 novembre</p><p class="list__meta">Direction, pour tout le Bac français</p></div></li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigation mobile" data-component="bottom-nav">
+    <ul role="list">
+      <li><a href="eleve-tableau-de-bord.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-home"/></svg>Accueil</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-calendar"/></svg>Agenda</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-book"/></svg>Devoirs</a></li>
+      <li><a href="eleve-notes.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg>Notes</a></li>
+      <li><a href="eleve-bulletin.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-more"/></svg>Plus</a></li>
+    </ul>
+  </nav>
+</body>
+</html>

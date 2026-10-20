@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Appel | Collège de la Salle, Daher</title>
+  <meta name="description" content="Espace enseignant : faire l’appel d’une classe pour un cours.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="has-bottom-nav">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="app-bar on-inverse" data-component="app-bar">
+    <div class="app-bar__inner">
+      <a class="wordmark" href="enseignant-saisie-notes.html" aria-label="Collège de la Salle, Espace enseignant : accueil" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Espace enseignant</span></span>
+      </a>
+      <p class="app-bar__title" aria-hidden="true">Appel</p>
+      <nav class="app-bar__nav" aria-label="Espace enseignant">
+        <ul role="list">
+          <li><a class="nav-link" href="#" data-component="nav-link">Mes classes</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Agenda</a></li>
+          <li><a class="nav-link" href="enseignant-saisie-notes.html" data-component="nav-link">Saisie des notes</a></li>
+          <li><a class="nav-link" href="enseignant-appel.html" aria-current="page" data-component="nav-link">Appel</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Annonces</a></li>
+        </ul>
+      </nav>
+      <div class="app-bar__end">
+        <button class="app-bar__icon-btn" type="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-bell"/></svg><span class="app-bar__dot"></span><span class="visually-hidden">Notifications, 2 nouvelles</span></button>
+        <a class="app-bar__account" href="connexion.html">
+          <span class="avatar avatar--gold" aria-hidden="true" data-component="avatar">RH</span>
+          <span class="app-bar__account-text">Rami Hanna<small>Mathématiques</small></span>
+          <span class="visually-hidden">Compte de Rami Hanna : se déconnecter</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu" class="page">
+    <div class="page__header">
+      <div class="page__header-text">
+        <nav class="breadcrumb" aria-label="Fil d’Ariane" data-component="breadcrumb"><ol role="list"><li><a href="#">Mes classes</a></li><li><a href="#">Seconde B</a></li><li><span aria-current="page">Appel</span></li></ol></nav>
+        <h1 class="t-h1">Appel de la Seconde B</h1>
+        <p class="t-muted">Mardi 20 octobre 2026, 8 h 00 à 8 h 55, mathématiques, salle 204</p>
+      </div>
+    </div>
+
+    <form data-attendance data-component="attendance-sheet" aria-labelledby="roll-title">
+      <div class="toolbar">
+        <h2 id="roll-title" class="visually-hidden">Liste des élèves</h2>
+        <p class="toolbar__status roll__counts" aria-live="polite">
+          <span><b data-count="present">0</b> présents</span>
+          <span><b data-count="absent">0</b> absents</span>
+          <span><b data-count="retard">0</b> en retard</span>
+        </p>
+        <button class="btn btn--secondary btn--sm" type="button" data-all-present data-component="button">Marquer tout le monde présent</button>
+        <button class="btn btn--primary btn--sm" type="submit" data-component="button">Enregistrer l’appel</button>
+      </div>
+      <ol class="roll" role="list">
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">NA</span><span id="n-a1">Nour Abdel-Malek</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Nour Abdel-Malek</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a1" value="present" checked><span>Présent</span></label><label><input type="radio" name="a1" value="absent"><span>Absent</span></label><label><input type="radio" name="a1" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a1">Remarque pour Nour Abdel-Malek</label><input class="field__control field__control--sm" id="r-a1" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">HA</span><span id="n-a2">Habiba Amin</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Habiba Amin</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a2" value="present" checked><span>Présent</span></label><label><input type="radio" name="a2" value="absent"><span>Absent</span></label><label><input type="radio" name="a2" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a2">Remarque pour Habiba Amin</label><input class="field__control field__control--sm" id="r-a2" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">YA</span><span id="n-a3">Yasmine Aziz</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Yasmine Aziz</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a3" value="present" checked><span>Présent</span></label><label><input type="radio" name="a3" value="absent"><span>Absent</span></label><label><input type="radio" name="a3" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a3">Remarque pour Yasmine Aziz</label><input class="field__control field__control--sm" id="r-a3" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">MB</span><span id="n-a4">Mina Botros</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Mina Botros</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a4" value="present" checked><span>Présent</span></label><label><input type="radio" name="a4" value="absent"><span>Absent</span></label><label><input type="radio" name="a4" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a4">Remarque pour Mina Botros</label><input class="field__control field__control--sm" id="r-a4" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">MB</span><span id="n-a5">Marc Boutros</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Marc Boutros</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a5" value="present" checked><span>Présent</span></label><label><input type="radio" name="a5" value="absent"><span>Absent</span></label><label><input type="radio" name="a5" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a5">Remarque pour Marc Boutros</label><input class="field__control field__control--sm" id="r-a5" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">OE</span><span id="n-a6">Omar El-Sayed</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Omar El-Sayed</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a6" value="present" checked><span>Présent</span></label><label><input type="radio" name="a6" value="absent"><span>Absent</span></label><label><input type="radio" name="a6" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a6">Remarque pour Omar El-Sayed</label><input class="field__control field__control--sm" id="r-a6" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">ZF</span><span id="n-a7">Ziad Fahmy</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Ziad Fahmy</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a7" value="present" checked><span>Présent</span></label><label><input type="radio" name="a7" value="absent"><span>Absent</span></label><label><input type="radio" name="a7" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a7">Remarque pour Ziad Fahmy</label><input class="field__control field__control--sm" id="r-a7" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">JF</span><span id="n-a8">Jana Farid</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Jana Farid</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a8" value="present"><span>Présent</span></label><label><input type="radio" name="a8" value="absent"><span>Absent</span></label><label><input type="radio" name="a8" value="retard" checked><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a8">Remarque pour Jana Farid</label><input class="field__control field__control--sm" id="r-a8" placeholder="Remarque" value="Arrivée à 8 h 12"></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">NF</span><span id="n-a9">Nadia Fawzy</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Nadia Fawzy</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a9" value="present" checked><span>Présent</span></label><label><input type="radio" name="a9" value="absent"><span>Absent</span></label><label><input type="radio" name="a9" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a9">Remarque pour Nadia Fawzy</label><input class="field__control field__control--sm" id="r-a9" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">MG</span><span id="n-a10">Mariam Gerges</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Mariam Gerges</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a10" value="present" checked><span>Présent</span></label><label><input type="radio" name="a10" value="absent"><span>Absent</span></label><label><input type="radio" name="a10" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a10">Remarque pour Mariam Gerges</label><input class="field__control field__control--sm" id="r-a10" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">FG</span><span id="n-a11">Fady Ghaly</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Fady Ghaly</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a11" value="present" checked><span>Présent</span></label><label><input type="radio" name="a11" value="absent"><span>Absent</span></label><label><input type="radio" name="a11" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a11">Remarque pour Fady Ghaly</label><input class="field__control field__control--sm" id="r-a11" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">LH</span><span id="n-a12">Lina Haddad</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Lina Haddad</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a12" value="present" checked><span>Présent</span></label><label><input type="radio" name="a12" value="absent"><span>Absent</span></label><label><input type="radio" name="a12" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a12">Remarque pour Lina Haddad</label><input class="field__control field__control--sm" id="r-a12" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">YH</span><span id="n-a13">Youssef Hanna</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Youssef Hanna</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a13" value="present" checked><span>Présent</span></label><label><input type="radio" name="a13" value="absent"><span>Absent</span></label><label><input type="radio" name="a13" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a13">Remarque pour Youssef Hanna</label><input class="field__control field__control--sm" id="r-a13" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">SI</span><span id="n-a14">Salma Ibrahim</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Salma Ibrahim</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a14" value="present" checked><span>Présent</span></label><label><input type="radio" name="a14" value="absent"><span>Absent</span></label><label><input type="radio" name="a14" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a14">Remarque pour Salma Ibrahim</label><input class="field__control field__control--sm" id="r-a14" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">SK</span><span id="n-a15">Sherif Kamel</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Sherif Kamel</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a15" value="present" checked><span>Présent</span></label><label><input type="radio" name="a15" value="absent"><span>Absent</span></label><label><input type="radio" name="a15" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a15">Remarque pour Sherif Kamel</label><input class="field__control field__control--sm" id="r-a15" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AK</span><span id="n-a16">Ahmed Khalil</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Ahmed Khalil</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a16" value="present"><span>Présent</span></label><label><input type="radio" name="a16" value="absent" checked><span>Absent</span></label><label><input type="radio" name="a16" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a16">Remarque pour Ahmed Khalil</label><input class="field__control field__control--sm" id="r-a16" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">KM</span><span id="n-a17">Karim Mansour</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Karim Mansour</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a17" value="present" checked><span>Présent</span></label><label><input type="radio" name="a17" value="absent"><span>Absent</span></label><label><input type="radio" name="a17" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a17">Remarque pour Karim Mansour</label><input class="field__control field__control--sm" id="r-a17" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">HM</span><span id="n-a18">Hana Mikhail</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Hana Mikhail</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a18" value="present" checked><span>Présent</span></label><label><input type="radio" name="a18" value="absent"><span>Absent</span></label><label><input type="radio" name="a18" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a18">Remarque pour Hana Mikhail</label><input class="field__control field__control--sm" id="r-a18" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">LN</span><span id="n-a19">Laila Nassif</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Laila Nassif</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a19" value="present" checked><span>Présent</span></label><label><input type="radio" name="a19" value="absent"><span>Absent</span></label><label><input type="radio" name="a19" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a19">Remarque pour Laila Nassif</label><input class="field__control field__control--sm" id="r-a19" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">SR</span><span id="n-a20">Sami Rafla</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Sami Rafla</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a20" value="present" checked><span>Présent</span></label><label><input type="radio" name="a20" value="absent"><span>Absent</span></label><label><input type="radio" name="a20" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a20">Remarque pour Sami Rafla</label><input class="field__control field__control--sm" id="r-a20" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AR</span><span id="n-a21">Amira Rizk</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Amira Rizk</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a21" value="present" checked><span>Présent</span></label><label><input type="radio" name="a21" value="absent"><span>Absent</span></label><label><input type="radio" name="a21" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a21">Remarque pour Amira Rizk</label><input class="field__control field__control--sm" id="r-a21" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">CS</span><span id="n-a22">Carla Saad</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Carla Saad</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a22" value="present" checked><span>Présent</span></label><label><input type="radio" name="a22" value="absent"><span>Absent</span></label><label><input type="radio" name="a22" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a22">Remarque pour Carla Saad</label><input class="field__control field__control--sm" id="r-a22" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">RS</span><span id="n-a23">Rana Saleh</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Rana Saleh</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a23" value="present"><span>Présent</span></label><label><input type="radio" name="a23" value="absent" checked><span>Absent</span></label><label><input type="radio" name="a23" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a23">Remarque pour Rana Saleh</label><input class="field__control field__control--sm" id="r-a23" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AT</span><span id="n-a24">Adam Tawfik</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Adam Tawfik</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a24" value="present" checked><span>Présent</span></label><label><input type="radio" name="a24" value="absent"><span>Absent</span></label><label><input type="radio" name="a24" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a24">Remarque pour Adam Tawfik</label><input class="field__control field__control--sm" id="r-a24" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">PW</span><span id="n-a25">Peter Wissa</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Peter Wissa</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a25" value="present" checked><span>Présent</span></label><label><input type="radio" name="a25" value="absent"><span>Absent</span></label><label><input type="radio" name="a25" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a25">Remarque pour Peter Wissa</label><input class="field__control field__control--sm" id="r-a25" placeholder="Remarque" value=""></div>
+        </li>
+        <li class="roll__item">
+          <span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">TY</span><span id="n-a26">Tamer Youssef</span></span>
+          <fieldset class="roll__status"><legend class="visually-hidden">Présence de Tamer Youssef</legend><div class="segmented" data-component="segmented"><label><input type="radio" name="a26" value="present" checked><span>Présent</span></label><label><input type="radio" name="a26" value="absent"><span>Absent</span></label><label><input type="radio" name="a26" value="retard"><span>En retard</span></label></div></fieldset>
+          <div class="roll__note"><label class="visually-hidden" for="r-a26">Remarque pour Tamer Youssef</label><input class="field__control field__control--sm" id="r-a26" placeholder="Remarque" value=""></div>
+        </li>
+      </ol>
+      <div class="roll__footer">
+        <p class="t-body-s t-muted">Les absences sont visibles par les élèves dès l’enregistrement. Le secrétariat du cycle est prévenu des absences non justifiées.</p>
+        <button class="btn btn--primary" type="submit" data-component="button">Enregistrer l’appel</button>
+      </div>
+    </form>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigation mobile" data-component="bottom-nav">
+    <ul role="list">
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-users"/></svg>Classes</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-calendar"/></svg>Agenda</a></li>
+      <li><a href="enseignant-saisie-notes.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-edit"/></svg>Notes</a></li>
+      <li><a href="enseignant-appel.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-check"/></svg>Appel</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-more"/></svg>Plus</a></li>
+    </ul>
+  </nav>
+</body>
+</html>

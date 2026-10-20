@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Connexion | Collège de la Salle, Daher</title>
+  <meta name="description" content="Connexion à l’espace élève, enseignant ou administration du Collège de la Salle, Daher.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#contenu">Aller au formulaire de connexion</a>
+  <div class="auth" data-component="auth-layout">
+    <aside class="auth__visual on-inverse" aria-label="Le collège">
+      <img src="img/batiment-brique.jpg" width="625" height="425" alt="">
+      <a class="wordmark" href="home.html" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire, depuis 1898</span></span>
+      </a>
+      <blockquote class="stack stack--sm">
+        <p class="t-quote">« Signum Fidei »</p>
+        <p class="t-body-s">Signe de la foi : la devise des Frères des Écoles chrétiennes, fondateurs du collège.</p>
+      </blockquote>
+    </aside>
+
+    <main id="contenu" class="auth__form">
+      <div class="auth__panel">
+        <div class="stack stack--sm">
+          <h1 class="t-h1">Connexion à votre espace</h1>
+          <p class="t-muted">Élèves, enseignants et administration du collège.</p>
+        </div>
+
+        <div class="alert alert--danger" role="alert" id="login-error" data-component="alert">
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#i-alert"/></svg>
+          <span>Identifiant ou mot de passe incorrect. Vérifiez la saisie ou contactez le secrétariat de votre cycle.</span>
+        </div>
+
+        <form class="stack" action="eleve-tableau-de-bord.html" aria-describedby="login-error">
+          <div class="field" data-component="field">
+            <label class="field__label" for="l-id">Identifiant</label>
+            <input class="field__control" id="l-id" name="username" autocomplete="username" value="nadia.fawzy@lasalle-daher.eg" aria-describedby="l-id-help">
+            <p class="field__helper" id="l-id-help">L’adresse e-mail fournie par le collège.</p>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="l-pass">Mot de passe</label>
+            <div class="field__row">
+              <input class="field__control" id="l-pass" name="password" type="password" autocomplete="current-password" value="motdepasse">
+              <button class="btn btn--tertiary" type="button" aria-controls="l-pass" aria-pressed="false" data-toggle-password data-component="button">Afficher</button>
+            </div>
+          </div>
+          <label class="check" data-component="checkbox"><input type="checkbox" name="remember"> <span>Rester connecté sur cet appareil</span></label>
+          <button class="btn btn--primary btn--block" type="submit" data-component="button">Se connecter</button>
+        </form>
+
+        <div class="stack stack--sm t-body-s">
+          <p>Mot de passe oublié ? Contactez le secrétariat de votre cycle, qui le réinitialisera.</p>
+          <p class="t-muted">Les comptes sont créés par le collège : il n’y a pas d’inscription en ligne.</p>
+          <p><a href="home.html">Retour au site du collège</a></p>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

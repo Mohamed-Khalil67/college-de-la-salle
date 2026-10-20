@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Utilisateurs | Collège de la Salle, Daher</title>
+  <meta name="description" content="Administration : comptes des élèves, des enseignants et du personnel.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="has-bottom-nav">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="app-bar on-inverse" data-component="app-bar">
+    <div class="app-bar__inner">
+      <a class="wordmark" href="admin-utilisateurs.html" aria-label="Collège de la Salle, Administration : accueil" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Administration</span></span>
+      </a>
+      <p class="app-bar__title" aria-hidden="true">Utilisateurs</p>
+      <nav class="app-bar__nav" aria-label="Administration">
+        <ul role="list">
+          <li><a class="nav-link" href="#" data-component="nav-link">Années et trimestres</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Classes</a></li>
+          <li><a class="nav-link" href="admin-utilisateurs.html" aria-current="page" data-component="nav-link">Utilisateurs</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Affectations</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Bulletins</a></li>
+        </ul>
+      </nav>
+      <div class="app-bar__end">
+        <button class="app-bar__icon-btn" type="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-bell"/></svg><span class="app-bar__dot"></span><span class="visually-hidden">Notifications, 2 nouvelles</span></button>
+        <a class="app-bar__account" href="connexion.html">
+          <span class="avatar avatar--gold" aria-hidden="true" data-component="avatar">MS</span>
+          <span class="app-bar__account-text">Mona Sabry<small>Secrétariat de direction</small></span>
+          <span class="visually-hidden">Compte de Mona Sabry : se déconnecter</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu" class="page">
+    <div class="page__header">
+      <div class="page__header-text">
+        <h1 class="t-h1">Utilisateurs</h1>
+        <p class="t-muted">2 412 comptes pour l’année 2026-2027</p>
+      </div>
+      <div class="page__actions">
+        <button class="btn btn--secondary" type="button" data-dialog-open="import" data-component="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-upload"/></svg>Importer un CSV</button>
+        <a class="btn btn--primary" href="#" data-component="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-plus"/></svg>Ajouter un utilisateur</a>
+      </div>
+    </div>
+
+    <div class="tabs" data-component="tabs">
+      <div class="tabs__list" role="tablist" aria-label="Type de compte">
+        <button class="tabs__tab" role="tab" id="tab-el" aria-selected="true" aria-controls="panel-el" tabindex="0">Élèves <span class="t-muted">2 318</span></button>
+        <button class="tabs__tab" role="tab" id="tab-en" aria-selected="false" aria-controls="panel-en" tabindex="-1">Enseignants <span class="t-muted">86</span></button>
+        <button class="tabs__tab" role="tab" id="tab-ad" aria-selected="false" aria-controls="panel-ad" tabindex="-1">Administration <span class="t-muted">8</span></button>
+      </div>
+
+      <section class="tabs__panel" id="panel-el" role="tabpanel" aria-labelledby="tab-el">
+        <form class="filters" role="search" aria-label="Filtrer les élèves" data-component="filters">
+          <div class="field" data-component="field">
+            <label class="field__label" for="q">Rechercher</label>
+            <div class="search" data-component="search-field"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-search"/></svg><input class="field__control" id="q" type="search" placeholder="Nom ou adresse e-mail"></div>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="f-track">Filière</label>
+            <select class="field__control" id="f-track"><option>Toutes</option><option>Bac nationale</option><option>Bac français</option></select>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="f-class">Classe</label>
+            <select class="field__control" id="f-class"><option>Toutes</option><option>1re secondaire</option><option>2e secondaire</option><option>3e secondaire</option><option>Seconde</option><option>Première</option><option>Terminale</option></select>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="f-status">Statut</label>
+            <select class="field__control" id="f-status"><option>Tous</option><option>Actif</option><option>Invitation envoyée</option><option>Désactivé</option></select>
+          </div>
+        </form>
+
+        <div class="table-wrap" role="region" aria-labelledby="u-caption" tabindex="0" data-component="data-table">
+          <table class="table table--sticky-first">
+            <caption id="u-caption" class="visually-hidden">Élèves, triés par nom</caption>
+            <thead>
+              <tr><th scope="col" aria-sort="ascending">Nom</th><th scope="col">Classe</th><th scope="col">Filière</th><th scope="col">Statut</th><th scope="col">Dernière connexion</th><th scope="col" class="num"><span class="visually-hidden">Actions</span></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">NF</span><span><span class="d-block">Nadia Fawzy</span><span class="cell-sub">nadia.fawzy@lasalle-daher.eg</span></span></span></th>
+                <td>Seconde B</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">Aujourd’hui, 9 h 14</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Nadia Fawzy</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AK</span><span><span class="d-block">Ahmed Khalil</span><span class="cell-sub">ahmed.khalil@lasalle-daher.eg</span></span></span></th>
+                <td>Seconde B</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">Hier</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Ahmed Khalil</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">AR</span><span><span class="d-block">Amira Rizk</span><span class="cell-sub">amira.rizk@lasalle-daher.eg</span></span></span></th>
+                <td>Première A</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">18 octobre</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Amira Rizk</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">BS</span><span><span class="d-block">Bassem Shenouda</span><span class="cell-sub">bassem.shenouda@lasalle-daher.eg</span></span></span></th>
+                <td>3e secondaire</td><td>Bac nationale</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">Aujourd’hui, 7 h 52</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Bassem Shenouda</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">DH</span><span><span class="d-block">Dina Habib</span><span class="cell-sub">dina.habib@lasalle-daher.eg</span></span></span></th>
+                <td>2e secondaire</td><td>Bac nationale</td>
+                <td><span class="badge badge--info" data-component="badge">Invitation envoyée</span></td>
+                <td class="t-muted">Jamais</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Dina Habib</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">FG</span><span><span class="d-block">Fady Ghaly</span><span class="cell-sub">fady.ghaly@lasalle-daher.eg</span></span></span></th>
+                <td>Seconde B</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">16 octobre</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Fady Ghaly</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">GM</span><span><span class="d-block">George Makram</span><span class="cell-sub">george.makram@lasalle-daher.eg</span></span></span></th>
+                <td>1re secondaire</td><td>Bac nationale</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">Hier</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de George Makram</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">HM</span><span><span class="d-block">Hana Mikhail</span><span class="cell-sub">hana.mikhail@lasalle-daher.eg</span></span></span></th>
+                <td>Seconde B</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">Aujourd’hui, 8 h 03</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Hana Mikhail</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">IS</span><span><span class="d-block">Ibrahim Saleh</span><span class="cell-sub">ibrahim.saleh@lasalle-daher.eg</span></span></span></th>
+                <td>Terminale</td><td>Bac français</td>
+                <td><span class="badge" data-component="badge">Désactivé</span></td>
+                <td class="t-muted">2 juin</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Ibrahim Saleh</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">JF</span><span><span class="d-block">Jana Farid</span><span class="cell-sub">jana.farid@lasalle-daher.eg</span></span></span></th>
+                <td>Seconde B</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">Hier</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Jana Farid</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">KA</span><span><span class="d-block">Kirollos Adel</span><span class="cell-sub">kirollos.adel@lasalle-daher.eg</span></span></span></th>
+                <td>3e secondaire</td><td>Bac nationale</td>
+                <td><span class="badge badge--info" data-component="badge">Invitation envoyée</span></td>
+                <td class="t-muted">Jamais</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Kirollos Adel</span></a></td>
+              </tr>
+              <tr>
+                <th scope="row"><span class="person"><span class="avatar" aria-hidden="true" data-component="avatar">LN</span><span><span class="d-block">Laila Nassif</span><span class="cell-sub">laila.nassif@lasalle-daher.eg</span></span></span></th>
+                <td>Seconde B</td><td>Bac français</td>
+                <td><span class="badge badge--success" data-component="badge">Actif</span></td>
+                <td class="t-muted">19 octobre</td>
+                <td class="num"><a class="btn btn--tertiary btn--sm" href="#" data-component="button">Modifier<span class="visually-hidden"> le compte de Laila Nassif</span></a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <nav class="pagination" aria-label="Pagination des élèves" data-component="pagination">
+          <p>1 à 12 sur 2 318 élèves</p>
+          <ul role="list">
+            <li><a href="#" aria-current="page">1</a></li>
+            <li><a href="#">2</a></li>
+            <li><a href="#">3</a></li>
+            <li><span class="t-muted" aria-hidden="true">…</span></li>
+            <li><a href="#">194</a></li>
+            <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-chevron-right"/></svg><span class="visually-hidden">Page suivante</span></a></li>
+          </ul>
+        </nav>
+      </section>
+      <section class="tabs__panel" id="panel-en" role="tabpanel" aria-labelledby="tab-en" hidden>
+        <div class="empty-state" data-component="empty-state">
+          <div class="empty-state__icon"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-search"/></svg></div>
+          <h2 class="t-h3">Aucun enseignant ne correspond</h2>
+          <p>Aucun résultat pour « Abdelnour ». Vérifiez l’orthographe ou effacez les filtres.</p>
+          <button class="btn btn--secondary" type="button" data-component="button">Effacer les filtres</button>
+        </div>
+      </section>
+      <section class="tabs__panel" id="panel-ad" role="tabpanel" aria-labelledby="tab-ad" hidden>
+        <p class="t-muted">8 comptes du personnel administratif.</p>
+      </section>
+    </div>
+
+    <dialog class="modal" id="import" aria-labelledby="import-title" data-component="modal">
+      <div class="modal__header">
+        <h2 id="import-title" class="t-h2">Importer des élèves</h2>
+        <button class="modal__close" type="button" data-dialog-close><svg class="icon" aria-hidden="true"><use href="icons.svg#i-close"/></svg><span class="visually-hidden">Fermer</span></button>
+      </div>
+      <form class="stack" method="dialog">
+        <p>Un fichier CSV avec une ligne par élève et les colonnes <code>nom</code>, <code>prenom</code>, <code>email</code>, <code>filiere</code>, <code>classe</code>. Chaque élève reçoit une invitation par e-mail.</p>
+        <div class="field" data-component="field">
+          <label class="field__label" for="csv">Fichier CSV</label>
+          <input class="field__control" id="csv" type="file" accept=".csv,text/csv" aria-describedby="csv-help">
+          <p class="field__helper" id="csv-help">5 000 lignes au plus. Les comptes déjà existants sont mis à jour, pas dupliqués.</p>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" type="button" data-dialog-close data-component="button">Annuler</button>
+          <button class="btn btn--primary" type="submit" data-component="button">Vérifier le fichier</button>
+        </div>
+      </form>
+    </dialog>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigation mobile" data-component="bottom-nav">
+    <ul role="list">
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-calendar"/></svg>Années</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-book"/></svg>Classes</a></li>
+      <li><a href="admin-utilisateurs.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-users"/></svg>Comptes</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-edit"/></svg>Affect.</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg>Bulletins</a></li>
+    </ul>
+  </nav>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accueil | Collège de la Salle, Daher</title>
+  <meta name="description" content="Collège lasallien au cœur du Caire depuis 1898 : Bac nationale et Bac français, du jardin d’enfants à la Terminale.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="site-header" data-component="site-header">
+    <div class="site-header__utility on-inverse">
+      <div class="container">
+        <a class="site-header__hide-sm" href="tel:+20225904740">Standard +20 2 2590 47 40</a>
+        <a class="site-header__hide-sm" href="mailto:delasalle@lasalle-eg.net">delasalle@lasalle-eg.net</a>
+        <a class="site-header__lang" href="#" lang="ar" hreflang="ar">العربية</a>
+      </div>
+    </div>
+    <div class="site-header__main">
+      <div class="container">
+        <a class="wordmark" href="home.html" data-component="wordmark">
+          <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest"/></svg>
+          <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire, depuis 1898</span></span>
+        </a>
+        <button class="btn btn--secondary btn--icon site-header__toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-disclosure data-component="button">
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#i-menu"/></svg><span class="visually-hidden">Menu</span>
+        </button>
+        <nav id="site-nav" class="site-header__nav" aria-label="Navigation principale">
+          <ul role="list">
+            <li><a class="nav-link" data-component="nav-link" href="home.html" aria-current="page">Accueil</a></li>
+            <li><a class="nav-link" href="#histoire" data-component="nav-link">Histoire</a></li>
+            <li><a class="nav-link" href="#filieres" data-component="nav-link">Bac nationale</a></li>
+            <li><a class="nav-link" href="bac-francais.html" data-component="nav-link">Bac français</a></li>
+            <li><a class="nav-link" href="#actualites" data-component="nav-link">Actualités</a></li>
+            <li><a class="nav-link" href="contact.html" data-component="nav-link">Contact</a></li>
+          </ul>
+          <a class="btn btn--primary site-header__cta-sm" href="connexion.html" data-component="button">Connexion</a>
+        </nav>
+        <a class="btn btn--secondary site-header__cta" data-component="button" href="connexion.html">Connexion</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu">
+    <section class="hero on-inverse" data-component="hero" aria-labelledby="hero-title">
+      <img class="hero__media" src="img/campus-aerien.jpg" width="1144" height="756" alt="Vue aérienne du Collège de la Salle à Daher, ses bâtiments et la chapelle, au milieu de la ville">
+      <div class="container">
+        <div class="hero__content">
+          <hr class="gold-rule">
+          <h1 id="hero-title" class="t-display-xl">Un collège lasallien au cœur du Caire, depuis 1898</h1>
+          <p class="t-body-l">Du jardin d’enfants à la Terminale, 2 400 élèves préparent la Thanaweya Amma ou le baccalauréat français, dans un même projet éducatif.</p>
+          <div class="hero__actions">
+            <a class="btn btn--on-dark" href="contact.html" data-component="button">Préparer une inscription</a>
+            <a class="t-label" href="#histoire">Découvrir notre histoire</a>
+          </div>
+        </div>
+      </div>
+      <p class="hero__credit">Le campus de Daher vu du ciel. Photo : Frères des Écoles chrétiennes, Proche-Orient.</p>
+    </section>
+
+    <section id="histoire" class="section section--subtle" aria-labelledby="histoire-title">
+      <div class="container">
+        <div class="section__head">
+          <div class="section__intro">
+            <h2 id="histoire-title" class="t-h1">Plus d’un siècle à Daher</h2>
+            <p class="t-body-l">Fondé par les Frères des Écoles chrétiennes, l’institut créé par saint Jean-Baptiste de La Salle, le collège appartient au réseau lasallien d’Égypte et à ses 900 établissements dans le monde.</p>
+          </div>
+        </div>
+        <ol class="timeline" role="list" data-component="timeline">
+          <li class="timeline__item">
+            <svg class="timeline__star" aria-hidden="true"><use href="icons.svg#star-marker"/></svg>
+            <p class="timeline__year">1898</p>
+            <h3 class="t-h3">Fondation à Daher</h3>
+            <p class="t-body-s t-muted">Les Frères ouvrent le Collège de la Salle dans le quartier de Daher, au Caire.</p>
+          </li>
+          <li class="timeline__item">
+            <svg class="timeline__star" aria-hidden="true"><use href="icons.svg#star-marker"/></svg>
+            <p class="timeline__year">1905</p>
+            <h3 class="t-h3">Le bâtiment en briques</h3>
+            <p class="t-body-s t-muted">Inauguration du bâtiment néoclassique en briques rouges, qui reste le visage du collège.</p>
+            <figure>
+              <img src="img/batiment-brique.jpg" width="625" height="425" alt="Le bâtiment historique en briques rouges du collège, devant la cour" loading="lazy">
+              <figcaption class="t-caption t-muted">Photo : Frères des Écoles chrétiennes, Proche-Orient.</figcaption>
+            </figure>
+          </li>
+          <li class="timeline__item">
+            <svg class="timeline__star" aria-hidden="true"><use href="icons.svg#star-marker"/></svg>
+            <p class="timeline__year">1955</p>
+            <h3 class="t-h3">Les nouveaux bâtiments</h3>
+            <p class="t-body-s t-muted">Inaugurés le 26 novembre en présence du ministre égyptien de l’Éducation et de l’ambassadeur de France.</p>
+            <figure>
+              <img src="img/inauguration-1955.jpg" width="1153" height="809" alt="Photographie en noir et blanc : coupure du ruban lors de l’inauguration des nouveaux bâtiments" loading="lazy">
+              <figcaption class="t-caption t-muted">Photo : Frères des Écoles chrétiennes, Proche-Orient.</figcaption>
+            </figure>
+          </li>
+          <li class="timeline__item">
+            <svg class="timeline__star" aria-hidden="true"><use href="icons.svg#star-marker"/></svg>
+            <p class="timeline__year">2013</p>
+            <h3 class="t-h3">Homologation AEFE</h3>
+            <p class="t-body-s t-muted">Le 10 janvier, l’AEFE homologue la section française pour la Seconde, la Première et la Terminale.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="filieres" class="section" aria-labelledby="filieres-title">
+      <div class="container">
+        <div class="section__head">
+          <div class="section__intro">
+            <h2 id="filieres-title" class="t-h1">Deux baccalauréats, un même projet éducatif</h2>
+            <p class="t-body-l t-muted">Les deux filières partagent les mêmes valeurs lasalliennes, la même cour et la même exigence.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <article class="card track-card" data-component="track-card" aria-labelledby="t-nat">
+            <img class="card__media" src="img/salle-de-classe.jpg" width="508" height="300" alt="Une salle de classe d’autrefois, élèves assis à leurs pupitres" loading="lazy">
+            <div class="card__body">
+              <h3 id="t-nat" class="t-h1">Bac nationale</h3>
+              <p class="t-accent">Programme du ministère égyptien, Thanaweya Amma</p>
+              <ul class="bullets" role="list">
+                <li>Établissement bilingue, du jardin d’enfants au secondaire</li>
+                <li>Français première langue étrangère, sciences enseignées en français</li>
+                <li>Anglais deuxième langue étrangère</li>
+              </ul>
+              <p><a class="btn btn--secondary" href="bac-francais.html" data-component="button">Découvrir le Bac nationale</a></p>
+            </div>
+          </article>
+          <article class="card track-card" aria-labelledby="t-bac" data-component="card">
+            <img class="card__media" src="img/batiment-brique.jpg" width="625" height="425" alt="Le bâtiment historique en briques rouges du collège" loading="lazy">
+            <div class="card__body">
+              <h3 id="t-bac" class="t-h1">Bac français</h3>
+              <p class="t-accent">Programmes français, section homologuée par l’AEFE</p>
+              <ul class="bullets" role="list">
+                <li>Ouverte en septembre 2009, de la Moyenne Section à la Terminale</li>
+                <li>Homologuée le 10 janvier 2013 pour le lycée</li>
+                <li>Enseignants certifiés de l’Éducation nationale</li>
+              </ul>
+              <p><a class="btn btn--secondary" href="bac-francais.html" data-component="button">Découvrir le Bac français</a></p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="actualites" class="section section--subtle" aria-labelledby="actu-title">
+      <div class="container">
+        <div class="section__head">
+          <h2 id="actu-title" class="t-h1">Actualités</h2>
+          <a class="t-label" href="#actualites">Toutes les actualités</a>
+        </div>
+        <div class="grid-3">
+          <article class="card card--news" data-component="card">
+            <img class="card__media" src="img/chapelle-coupole.jpg" width="358" height="425" alt="La coupole de la chapelle De La Salle" loading="lazy">
+            <div class="card__body">
+              <p class="t-caption t-muted"><time datetime="2026-10-02">2 octobre 2026</time></p>
+              <h3 class="t-h3 card__title"><a href="#actualites">Messe de rentrée dans la chapelle De La Salle</a></h3>
+              <p class="t-body-s t-muted">Élèves, Frères et enseignants se sont réunis pour ouvrir l’année scolaire 2026-2027.</p>
+            </div>
+          </article>
+          <article class="card card--news" data-component="card">
+            <img class="card__media" src="img/campus-1954.jpg" width="595" height="454" alt="La façade du collège en 1954" loading="lazy">
+            <div class="card__body">
+              <p class="t-caption t-muted"><time datetime="2026-10-14">14 octobre 2026</time></p>
+              <h3 class="t-h3 card__title"><a href="#actualites">Journée portes ouvertes du Bac français</a></h3>
+              <p class="t-body-s t-muted">Les familles visitent les classes de Seconde à Terminale et rencontrent l’équipe pédagogique.</p>
+            </div>
+          </article>
+          <article class="card card--news" data-component="card">
+            <img class="card__media" src="img/freres-1926.jpg" width="1166" height="431" alt="Photographie de groupe en noir et blanc des Frères d’Égypte en 1926" loading="lazy">
+            <div class="card__body">
+              <p class="t-caption t-muted"><time datetime="2026-10-20">20 octobre 2026</time></p>
+              <h3 class="t-h3 card__title"><a href="#actualites">Archives : les Frères d’Égypte réunis à Daher en 1926</a></h3>
+              <p class="t-body-s t-muted">Une photographie de groupe retrouvée dans les archives lasalliennes du Proche-Orient.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--inverse on-inverse" aria-labelledby="contact-title">
+      <div class="container grid-2 split">
+        <div class="stack">
+          <h2 id="contact-title" class="t-h1">Inscriptions et contact</h2>
+          <p class="t-body-l">Les ouvertures d’inscription et la liste des pièces à fournir sont publiées par le secrétariat. Écrivez-nous ou appelez directement le cycle concerné.</p>
+          <ul class="contact-lines" role="list">
+            <li><svg class="icon" aria-hidden="true"><use href="icons.svg#i-map-pin"/></svg>6 El Beshnini St., El-Zaher, Le Caire</li>
+            <li><svg class="icon" aria-hidden="true"><use href="icons.svg#i-clock"/></svg>Secrétariat : du dimanche au jeudi, de 8 h à 14 h</li>
+            <li><svg class="icon" aria-hidden="true"><use href="icons.svg#i-mail"/></svg><a href="mailto:delasalle@lasalle-eg.net">delasalle@lasalle-eg.net</a></li>
+          </ul>
+          <dl class="phones">
+            <dt>Standard</dt><dd><a href="tel:+20225904740">+20 2 2590 47 40</a></dd>
+            <dt>Bac français</dt><dd><a href="tel:+20225929598">+20 2 2592 95 98</a></dd>
+            <dt>Cycle secondaire</dt><dd><a href="tel:+20225922403">+20 2 2592 24 03</a></dd>
+          </dl>
+        </div>
+        <form class="form-card" action="contact.html" aria-labelledby="form-title">
+          <h3 id="form-title" class="t-h2">Écrire au secrétariat</h3>
+          <div class="field" data-component="field">
+            <label class="field__label" for="h-name">Nom du parent ou de l’élève</label>
+            <input class="field__control" id="h-name" name="name" autocomplete="name" required>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="h-email">Adresse e-mail</label>
+            <input class="field__control" id="h-email" name="email" type="email" autocomplete="email" required aria-describedby="h-email-help">
+            <p class="field__helper" id="h-email-help">Nous répondons sous deux jours ouvrés.</p>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="h-track">Filière souhaitée</label>
+            <select class="field__control" id="h-track" name="track">
+              <option>Bac nationale, jardin d’enfants</option>
+              <option>Bac nationale, primaire</option>
+              <option>Bac nationale, préparatoire ou secondaire</option>
+              <option selected>Bac français, Seconde</option>
+              <option>Bac français, autre classe</option>
+            </select>
+          </div>
+          <div class="field" data-component="field">
+            <label class="field__label" for="h-msg">Message</label>
+            <textarea class="field__control" id="h-msg" name="message" rows="4"></textarea>
+          </div>
+          <p><button class="btn btn--primary" type="submit" data-component="button">Envoyer le message</button></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer on-inverse" data-component="site-footer">
+    <div class="container">
+      <div class="site-footer__grid">
+        <div class="site-footer__about">
+          <a class="wordmark" href="home.html" data-component="wordmark">
+            <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+            <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire, depuis 1898</span></span>
+          </a>
+          <p>Un collège lasallien au cœur du Caire depuis 1898. Bac nationale et Bac français, du jardin d’enfants à la Terminale.</p>
+        </div>
+        <nav aria-labelledby="f-college"><h2 id="f-college">Le collège</h2><ul role="list"><li><a href="#histoire">Histoire</a></li><li><a href="#filieres">Bac nationale</a></li><li><a href="bac-francais.html">Bac français</a></li><li><a href="#actualites">Actualités</a></li></ul></nav>
+        <nav aria-labelledby="f-espaces"><h2 id="f-espaces">Espaces</h2><ul role="list"><li><a href="connexion.html">Espace élève</a></li><li><a href="connexion.html">Espace enseignant</a></li><li><a href="connexion.html">Administration</a></li></ul></nav>
+        <div><h2>Nous trouver</h2><ul role="list"><li>6 El Beshnini St., El-Zaher, Le Caire</li><li><a href="tel:+20225904740">+20 2 2590 47 40</a></li><li><a href="mailto:delasalle@lasalle-eg.net">delasalle@lasalle-eg.net</a></li></ul></div>
+      </div>
+      <div class="site-footer__legal">
+        <p>© 2026 Collège de la Salle, Daher. Frères des Écoles chrétiennes.</p>
+        <p>Photographies : archives lasalliennes, avec l’accord du collège.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bulletin du trimestre 1 | Collège de la Salle, Daher</title>
+  <meta name="description" content="Espace élève : bulletin trimestriel, à consulter et à télécharger en PDF.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <script src="app.js" defer></script>
+</head>
+<body class="has-bottom-nav">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  <header class="app-bar on-inverse" data-component="app-bar">
+    <div class="app-bar__inner">
+      <a class="wordmark" href="eleve-tableau-de-bord.html" aria-label="Collège de la Salle, Espace élève : accueil" data-component="wordmark">
+        <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest-on-dark"/></svg>
+        <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Espace élève</span></span>
+      </a>
+      <p class="app-bar__title" aria-hidden="true">Bulletin</p>
+      <nav class="app-bar__nav" aria-label="Espace élève">
+        <ul role="list">
+          <li><a class="nav-link" href="eleve-tableau-de-bord.html" data-component="nav-link">Tableau de bord</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Emploi du temps</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Devoirs</a></li>
+          <li><a class="nav-link" href="eleve-notes.html" data-component="nav-link">Notes</a></li>
+          <li><a class="nav-link" href="#" data-component="nav-link">Absences</a></li>
+          <li><a class="nav-link" href="eleve-bulletin.html" aria-current="page" data-component="nav-link">Bulletins</a></li>
+        </ul>
+      </nav>
+      <div class="app-bar__end">
+        <button class="app-bar__icon-btn" type="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-bell"/></svg><span class="app-bar__dot"></span><span class="visually-hidden">Notifications, 2 nouvelles</span></button>
+        <a class="app-bar__account" href="connexion.html">
+          <span class="avatar avatar--gold" aria-hidden="true" data-component="avatar">NF</span>
+          <span class="app-bar__account-text">Nadia Fawzy<small>Seconde B, Bac français</small></span>
+          <span class="visually-hidden">Compte de Nadia Fawzy : se déconnecter</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenu" class="page">
+    <div class="page__header">
+      <div class="page__header-text">
+        <h1 class="t-h1">Bulletins</h1>
+        <p class="t-muted">Publiés par l’administration à la fin de chaque trimestre.</p>
+      </div>
+      <div class="page__actions">
+        <div class="field field--inline" data-component="field">
+          <label class="field__label" for="term">Trimestre</label>
+          <select class="field__control" id="term">
+            <option selected>Trimestre 1, publié le 17 décembre 2026</option>
+            <option disabled>Trimestre 2, pas encore publié</option>
+            <option disabled>Trimestre 3, pas encore publié</option>
+          </select>
+        </div>
+        <button class="btn btn--secondary" type="button" data-print data-component="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-printer"/></svg>Imprimer</button>
+        <a class="btn btn--primary" href="#" data-component="button"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-download"/></svg>Télécharger le PDF</a>
+      </div>
+    </div>
+
+    <article class="bulletin" aria-labelledby="b-title" data-component="report-card">
+      <header class="bulletin__head">
+        <div class="wordmark" data-component="wordmark">
+          <svg class="wordmark__crest" aria-hidden="true"><use href="icons.svg#crest"/></svg>
+          <span class="wordmark__text"><span class="wordmark__name">Collège de la Salle</span><span class="wordmark__place">Daher, Le Caire. Section française</span></span>
+        </div>
+        <div class="stack stack--sm">
+          <h2 id="b-title" class="t-h2">Bulletin du trimestre 1</h2>
+          <p class="t-muted t-body-s">Année scolaire 2026-2027</p>
+        </div>
+      </header>
+
+      <dl class="bulletin__id">
+        <dt>Élève</dt><dd>Nadia Fawzy</dd>
+        <dt>Née le</dt><dd>3 mars 2011</dd>
+        <dt>Classe</dt><dd>Seconde B, 26 élèves</dd>
+        <dt>Professeure principale</dt><dd>Mme Claire Lefèvre</dd>
+      </dl>
+
+      <div class="table-wrap table-wrap--flat" role="region" aria-labelledby="b-caption" tabindex="0" data-component="data-table">
+        <table class="table">
+          <caption id="b-caption" class="visually-hidden">Résultats par matière</caption>
+          <thead>
+            <tr><th scope="col">Matière</th><th scope="col" class="num">Élève</th><th scope="col" class="num">Classe</th><th scope="col" class="num">Min.</th><th scope="col" class="num">Max.</th><th scope="col">Appréciation</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Français<span class="cell-sub">Mme Lefèvre</span></th><td class="num"><b>14,0</b></td><td class="num">11,8</td><td class="num">6,5</td><td class="num">16,5</td><td>Analyses fines et bien rédigées. Doit oser davantage à l’oral.</td></tr>
+            <tr><th scope="row">Mathématiques<span class="cell-sub">M. Hanna</span></th><td class="num"><b>14,2</b></td><td class="num">12,4</td><td class="num">5,0</td><td class="num">18,5</td><td>Très bon dernier contrôle. Continuer à soigner la rédaction.</td></tr>
+            <tr><th scope="row">Physique-Chimie<span class="cell-sub">M. Girgis</span></th><td class="num"><b>14,3</b></td><td class="num">12,1</td><td class="num">7,0</td><td class="num">17,5</td><td>Excellent travail en TP, plus de rigueur en contrôle.</td></tr>
+            <tr><th scope="row">SVT<span class="cell-sub">Mme Wahba</span></th><td class="num"><b>15,7</b></td><td class="num">14,2</td><td class="num">9,0</td><td class="num">18,0</td><td>Élève sérieuse et curieuse. Très bon trimestre.</td></tr>
+            <tr><th scope="row">Histoire-Géographie<span class="cell-sub">M. Daoud</span></th><td class="num"><b>12,3</b></td><td class="num">12,0</td><td class="num">6,0</td><td class="num">16,0</td><td>Les connaissances doivent être apprises plus régulièrement.</td></tr>
+            <tr><th scope="row">Sciences économiques et sociales<span class="cell-sub">Mme Nassar</span></th><td class="num"><b>14,0</b></td><td class="num">12,6</td><td class="num">8,0</td><td class="num">17,0</td><td>Bonne participation, travail régulier.</td></tr>
+            <tr><th scope="row">Anglais<span class="cell-sub">Mme Adly</span></th><td class="num"><b>16,3</b></td><td class="num">13,9</td><td class="num">8,5</td><td class="num">19,0</td><td>Very good work. Keep reading in English.</td></tr>
+            <tr><th scope="row">Espagnol<span class="cell-sub">Mme Ruiz</span></th><td class="num"><b>12,5</b></td><td class="num">13,2</td><td class="num">7,5</td><td class="num">18,0</td><td>Des progrès à l’oral, à poursuivre.</td></tr>
+            <tr><th scope="row">Langue arabe<span class="cell-sub">M. Mounir</span></th><td class="num"><b>13,3</b></td><td class="num">13,0</td><td class="num">8,0</td><td class="num">17,5</td><td><span lang="ar" dir="rtl">عمل جيد، يجب الاهتمام بالقواعد.</span></td></tr>
+            <tr><th scope="row">Éducation physique et sportive<span class="cell-sub">M. Selim</span></th><td class="num"><b>16,0</b></td><td class="num">15,1</td><td class="num">11,0</td><td class="num">19,0</td><td>Engagée et volontaire.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bulletin__summary">
+        <div class="bulletin__box stat"><span class="stat__value tabular">14,3</span><span class="stat__label">Moyenne générale de l’élève</span></div>
+        <div class="bulletin__box stat"><span class="stat__value stat__value--muted tabular">13,0</span><span class="stat__label">Moyenne générale de la classe</span></div>
+        <div class="bulletin__box stack stack--sm"><p class="t-label">Vie scolaire</p><p class="t-body-s">1 demi-journée d’absence, justifiée. 1 retard.</p></div>
+      </div>
+
+      <section class="bulletin__council" aria-labelledby="council">
+        <h3 id="council" class="t-h3">Avis du conseil de classe</h3>
+        <p><span class="badge badge--heritage" data-component="badge">Compliments</span></p>
+        <p>Un trimestre sérieux et réussi. Nadia participe avec pertinence ; elle doit maintenant gagner en régularité en histoire-géographie.</p>
+      </section>
+
+      <footer class="bulletin__signature">
+        <p>Conseil de classe du 14 décembre 2026</p>
+        <p>Pour le directeur du collège, le coordinateur de la section française</p>
+      </footer>
+    </article>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Navigation mobile" data-component="bottom-nav">
+    <ul role="list">
+      <li><a href="eleve-tableau-de-bord.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-home"/></svg>Accueil</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-calendar"/></svg>Agenda</a></li>
+      <li><a href="#"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-book"/></svg>Devoirs</a></li>
+      <li><a href="eleve-notes.html"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-file-text"/></svg>Notes</a></li>
+      <li><a href="eleve-bulletin.html" aria-current="page"><svg class="icon" aria-hidden="true"><use href="icons.svg#i-more"/></svg>Plus</a></li>
+    </ul>
+  </nav>
+</body>
+</html>
