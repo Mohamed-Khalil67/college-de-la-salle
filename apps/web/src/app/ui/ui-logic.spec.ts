@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidMark, parseMark } from './marks';
+import { isValidMark, markText, parseMark } from './marks';
 import { pageWindow } from './page-window';
 import { tabTarget } from './tab-keys';
 
@@ -52,5 +52,19 @@ describe('tabTarget', () => {
     expect(tabTarget('Home', 2, 3)).toBe(0);
     expect(tabTarget('End', 0, 3)).toBe(2);
     expect(tabTarget('Enter', 1, 3)).toBeNull();
+  });
+});
+
+describe('markText', () => {
+  const format = (n: number) => String(n).replace('.', ',');
+  it('keeps a half-typed mark while the teacher types', () => {
+    expect(markText(parseMark('12,'), '12,', format)).toBe('12,');
+    expect(markText(12.5, '12,5', format)).toBe('12,5');
+    expect(markText(12, '12,0', format)).toBe('12,0');
+  });
+  it('shows a value set from outside', () => {
+    expect(markText(14, '12,5', format)).toBe('14');
+    expect(markText(null, '12', format)).toBe('');
+    expect(markText(9.5, undefined, format)).toBe('9,5');
   });
 });

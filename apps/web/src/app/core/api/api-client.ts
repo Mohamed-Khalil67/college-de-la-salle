@@ -126,7 +126,8 @@ export class ApiClient {
     events: (query: EventRangeQuery) => this.#get<EventDto[]>('/events', { ...query }),
     occurrences: (query: EventRangeQuery) => this.#get<OccurrenceDto[]>('/events/occurrences', { ...query }),
     event: (id: string) => this.#get<EventDto>(`/events/${id}`),
-    icsUrl: (id: string) => `/api/events/${id}/ics`,
+    /** The .ics file needs the access token, so it is fetched as a blob rather than linked. */
+    ics: (id: string) => firstValueFrom(this.#http.get(`/api/events/${id}/ics`, { responseType: 'blob' })),
     create: (body: EventInput) => this.#post<EventDto>('/events', body),
     update: (id: string, body: Partial<EventInput>) => this.#patch<EventDto>(`/events/${id}`, body),
     remove: (id: string) => this.#delete(`/events/${id}`),

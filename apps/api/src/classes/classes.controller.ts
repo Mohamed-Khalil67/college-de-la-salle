@@ -28,7 +28,6 @@ import {
   EnrollStudentDto,
   SectionDto,
   ClassStudentDto,
-  StudentSummaryDto,
   UpdateClassDto,
 } from './dto/class.dto.js';
 

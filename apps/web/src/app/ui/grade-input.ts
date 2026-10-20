@@ -1,6 +1,6 @@
 import { Component, computed, input, linkedSignal, model } from '@angular/core';
 import { FORMAT_MARK } from '@cdls/shared';
-import { isValidMark, parseMark } from './marks';
+import { isValidMark, markText, parseMark } from './marks';
 
 /**
  * One cell of the grade grid. Accepts a decimal comma, validates 0 to `outOf` and sets aria-invalid;
@@ -27,10 +27,13 @@ export class GradeInput {
   readonly label = input.required<string>();
   readonly describedBy = input<string | null>(null);
 
-  /** What the teacher typed; follows the value when it changes from outside. */
-  protected readonly text = linkedSignal(() => {
-    const value = this.value();
-    return value === null || Number.isNaN(value) ? '' : FORMAT_MARK.format(value);
+  /**
+   * What the teacher typed. It follows the value only when the value changes from outside: while typing
+   * "12," (not a number yet) or "12,0", the typed text is kept instead of being reformatted.
+   */
+  protected readonly text = linkedSignal<number | null, string>({
+    source: this.value,
+    computation: (value, previous) => markText(value, previous?.value, FORMAT_MARK.format),
   });
   readonly invalid = computed(() => !isValidMark(parseMark(this.text()), this.outOf()));
 

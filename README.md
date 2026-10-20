@@ -49,6 +49,7 @@ health: `/api/health` (process) and `/api/health/db` (database).
 | `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
+| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe) against the running `npm run dev`; needs the seeded demo accounts and `LOGIN_THROTTLE_LIMIT=100` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default) |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
 | `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |

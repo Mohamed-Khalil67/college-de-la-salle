@@ -59,6 +59,12 @@ export class Env {
   @IsInt()
   @Min(1)
   THROTTLE_LIMIT = 120;
+
+  /** Sign-in attempts per minute and client. Keep the default in production; raise it locally for e2e runs. */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  LOGIN_THROTTLE_LIMIT = 5;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {

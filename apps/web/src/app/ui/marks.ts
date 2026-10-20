@@ -11,3 +11,12 @@ export function parseMark(text: string): number | null {
 export function isValidMark(mark: number | null, outOf = 20): boolean {
   return mark === null || (Number.isFinite(mark) && mark >= 0 && mark <= outOf);
 }
+
+/**
+ * The text a grade cell shows for `value`. Keeps `typed` (what is in the cell now) when it already stands
+ * for that value, including half-typed marks like "12," that are not a number yet.
+ */
+export function markText(value: number | null, typed: string | undefined, format: (n: number) => string): string {
+  if (typed !== undefined && Object.is(parseMark(typed), value)) return typed;
+  return value === null || Number.isNaN(value) ? '' : format(value);
+}

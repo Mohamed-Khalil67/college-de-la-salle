@@ -83,7 +83,7 @@ export class ClassesService {
     await this.get(classId);
     await this.access.assertTeachesClass(user, classId);
     const enrollments = await this.#enrollments(classId);
-    return enrollments.map((e) => ({ ...toStudentSummary(e.student), enrollmentId: e.id }));
+    return enrollments.map((e) => Object.assign(toStudentSummary(e.student), { enrollmentId: e.id }));
   }
 
   /** Students currently enrolled in a class, by name. */

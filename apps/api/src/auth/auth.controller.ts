@@ -18,6 +18,11 @@ import { LoginDto, SessionDto, SessionUserDto } from './dto/auth.dto.js';
 
 export const REFRESH_COOKIE = 'cdls_refresh';
 
+/** Read per request from the validated environment (defaults to 5). */
+function loginLimit(): number {
+  return Number(process.env['LOGIN_THROTTLE_LIMIT'] ?? 5) || 5;
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -30,9 +35,9 @@ export class AuthController {
     this.secureCookie = config.get('NODE_ENV', { infer: true }) === 'production';
   }
 
-  /** Signs in; sets the refresh token as an httpOnly cookie. Limited to 5 attempts a minute. */
+  /** Signs in; sets the refresh token as an httpOnly cookie. Limited to LOGIN_THROTTLE_LIMIT (5) attempts a minute. */
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: loginLimit, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
   @ApiOkResponse({ type: SessionDto })
