@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
@@ -16,6 +21,11 @@ const include = {
 } satisfies Prisma.ClassSubjectInclude;
 
 type Row = Prisma.ClassSubjectGetPayload<{ include: typeof include }>;
+
+const WEIGHTS_LOCKED =
+  'Une période de cette classe est clôturée ou a des bulletins : les coefficients ne peuvent plus changer.';
+const OWN_SUBJECT =
+  'Seul un administrateur peut modifier le coefficient d’une matière que vous enseignez dans cette classe.';
 
 const HAS_TEACHERS = 'Cette matière a encore des enseignants dans la classe : retirez-les d’abord.';
 
@@ -74,10 +84,18 @@ export class ClassSubjectsService {
     return conflictOnUnique(work, `La classe a déjà « ${subject.name} ».`);
   }
 
-  /** Changes the coefficient or the hours. Published report cards keep their snapshot. */
+  /**
+   * Changes the coefficient or the hours. The coefficient is frozen once a period of the class's section is
+   * closed or has report cards (409), and only an admin may change one for a subject they teach themself.
+   */
   async update(id: string, dto: UpdateClassSubjectDto, user: AuthUser): Promise<ClassSubjectDto> {
     const current = await this.find(id);
     return this.prisma.$transaction(async (tx) => {
+      if (dto.coefficient !== undefined && dto.coefficient !== Number(current.coefficient)) {
+        if (user.role !== 'admin' && current.assignments.some((a) => a.teacherId === user.teacherId))
+          throw new ForbiddenException(OWN_SUBJECT);
+        await this.assertWeightsEditable(tx, current.classId);
+      }
       const row = await tx.classSubject.update({
         where: { id },
         data: { coefficient: dto.coefficient, hoursPerWeek: dto.hoursPerWeek },
@@ -155,6 +173,22 @@ export class ClassSubjectsService {
       (s) => !s.subject.archivedAt && s.subject.sections.includes(target.section.code),
     );
     await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.classSubject.findMany({
+        where: { classId },
+        include: { assignments: true },
+      });
+      const changing = existing.filter((e) => {
+        const from = copied.find((s) => s.subjectId === e.subjectId);
+        return from && !from.coefficient.equals(e.coefficient);
+      });
+      if (changing.length) {
+        if (
+          user.role !== 'admin' &&
+          changing.some((e) => e.assignments.some((a) => a.teacherId === user.teacherId))
+        )
+          throw new ForbiddenException(OWN_SUBJECT);
+        await this.assertWeightsEditable(tx, classId);
+      }
       for (const s of copied) {
         const values = { coefficient: s.coefficient, hoursPerWeek: s.hoursPerWeek };
         await tx.classSubject.upsert({
@@ -174,6 +208,22 @@ export class ClassSubjectsService {
       ]);
     });
     return this.rows(classId);
+  }
+
+  /**
+   * 409 when a period of the class's section and year is closed or has report cards for the class. Takes a
+   * share lock on those periods, so closing one (exclusive lock) cannot slip in before the write commits.
+   */
+  private async assertWeightsEditable(tx: Prisma.TransactionClient, classId: string): Promise<void> {
+    const schoolClass = await tx.schoolClass.findUniqueOrThrow({ where: { id: classId } });
+    const periods = await tx.$queryRaw<{ id: string; closed_at: Date | null }[]>`
+      SELECT id, closed_at FROM periods
+      WHERE school_year_id = ${schoolClass.schoolYearId}::uuid
+        AND (section_id IS NULL OR section_id = ${schoolClass.sectionId}::uuid)
+      FOR SHARE`;
+    if (periods.some((p) => p.closed_at)) throw new ConflictException(WEIGHTS_LOCKED);
+    if (await tx.reportCard.count({ where: { classId } }))
+      throw new ConflictException(WEIGHTS_LOCKED);
   }
 
   private async rows(classId: string): Promise<ClassSubjectDto[]> {
