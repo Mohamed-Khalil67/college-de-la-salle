@@ -87,17 +87,27 @@ export class EventsService {
     const current = await this.editable(id, user);
     await this.periods.assertOpen(this.prisma, current.periodId);
     const patch = definedOnly(dto);
-    // A new date or class re-derives the period, unless the caller names one.
-    if (patch.periodId === undefined && (patch.date !== undefined || patch.classId !== undefined))
+    // A new date or class re-derives the period, unless the caller names one or the stored period (a
+    // semester picked by hand, say) still covers the new date of the same class.
+    if (patch.periodId === undefined && (patch.date !== undefined || patch.classId !== undefined)) {
       patch.periodId = null;
+      if (current.periodId && (patch.classId ?? current.classId) === current.classId) {
+        const stored = await this.periods.find(current.periodId);
+        const date = patch.date ?? toDay(current.date);
+        if (toDay(stored.startsOn) <= date && date <= toDay(stored.endsOn))
+          patch.periodId = current.periodId;
+      }
+    }
     const merged = withDefaults(merge(fromRow(current), patch));
     const hasGrades = (await this.prisma.grade.count({ where: { eventId: id } })) > 0;
     if (
       hasGrades &&
-      (merged.activityTypeId !== current.activityTypeId || merged.classId !== current.classId)
+      (merged.activityTypeId !== current.activityTypeId ||
+        merged.classId !== current.classId ||
+        merged.subjectId !== current.subjectId)
     ) {
       throw new ConflictException(
-        'Des notes existent : le type et la classe ne peuvent plus changer.',
+        'Des notes existent : le type, la classe et la matière ne peuvent plus changer.',
       );
     }
     const fields = await this.check(merged, user, current);
@@ -188,11 +198,16 @@ export class EventsService {
 
   /** Business rules beyond the DTO's shape checks. `current` is the stored event when updating. */
   private async check(
-    f: EventFields,
+    input: EventFields,
     user: AuthUser,
     current: EventRow | null,
   ): Promise<EventFields> {
-    const type = await this.types.usable(f.activityTypeId, user, current?.activityTypeId);
+    const type = await this.types.usable(input.activityTypeId, user, current?.activityTypeId);
+    // A type that is not graded has no coefficient: moving an event to one resets it.
+    const f =
+      !type.gradable && current && current.activityTypeId !== input.activityTypeId
+        ? { ...input, coefficient: 1 }
+        : input;
     if (f.classId && f.sectionId)
       throw new BadRequestException('Choisissez une classe ou une section, pas les deux.');
     if (!f.startTime && f.endTime)
@@ -224,13 +239,34 @@ export class EventsService {
       if (!(await this.prisma.schoolClass.findUnique({ where: { id: f.classId } })))
         throw notFound('Classe');
       await this.access.assertTeachesClass(user, f.classId, f.subjectId);
+      // A graded event counts in a subject of the class: report cards only weigh the class's subjects.
+      if (
+        type.gradable &&
+        (!current || current.subjectId !== f.subjectId || current.classId !== f.classId)
+      ) {
+        if (!f.subjectId)
+          throw new BadRequestException('Un événement noté a besoin d’une matière.');
+        const taught = await this.prisma.classSubject.findUnique({
+          where: { classId_subjectId: { classId: f.classId, subjectId: f.subjectId } },
+        });
+        if (!taught)
+          throw new BadRequestException('Cette matière n’est pas enseignée dans cette classe.');
+      }
     }
     const attachments = safeAttachments(f.attachments ?? []);
     if (attachments.length !== (f.attachments ?? []).length)
       throw new BadRequestException('Liens https uniquement.');
     // Gradable events count for a period (report cards read it, never the dates).
+    // An old graded event no period covered keeps no period while its date, class and type stay as they are.
+    const legacyWithoutPeriod =
+      !!current &&
+      current.periodId === null &&
+      f.periodId === null &&
+      f.date === toDay(current.date) &&
+      f.classId === current.classId &&
+      f.activityTypeId === current.activityTypeId;
     const periodId =
-      type.gradable && f.classId
+      type.gradable && f.classId && !legacyWithoutPeriod
         ? (await this.periods.resolveFor(this.prisma, f.classId, f.date, f.periodId)).id
         : null;
     return { ...f, attachments, periodId };

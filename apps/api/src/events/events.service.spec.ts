@@ -91,10 +91,11 @@ describe('EventsService', () => {
     section: { findUnique: vi.fn() },
     schoolClass: { findUnique: vi.fn() },
     room: { findUnique: vi.fn() },
+    classSubject: { findUnique: vi.fn() },
   };
   const access = { assertTeachesClass: vi.fn(), audienceFor: vi.fn(), placement: vi.fn() };
   const types = { usable: vi.fn() };
-  const periods = { resolveFor: vi.fn(), assertOpen: vi.fn() };
+  const periods = { resolveFor: vi.fn(), assertOpen: vi.fn(), find: vi.fn() };
   const calendarDays = { closures: vi.fn() };
   let events: EventsService;
 
@@ -103,6 +104,12 @@ describe('EventsService', () => {
     prisma.subject.findUnique.mockResolvedValue({ id: 'mathematiques' });
     prisma.schoolClass.findUnique.mockResolvedValue({ id: 'c1' });
     prisma.grade.count.mockResolvedValue(0);
+    prisma.classSubject.findUnique.mockResolvedValue({ id: 'cs1' });
+    periods.find.mockResolvedValue({
+      id: 'p1',
+      startsOn: new Date('2026-09-06T00:00:00Z'),
+      endsOn: new Date('2026-12-17T00:00:00Z'),
+    });
     types.usable.mockImplementation((id: string) =>
       Promise.resolve(id === 'ty-exam' ? EXAM : type()),
     );
@@ -186,6 +193,22 @@ describe('EventsService', () => {
       });
     });
 
+    it('counts a graded event in a subject the class has, since report cards only weigh those', async () => {
+      prisma.classSubject.findUnique.mockResolvedValue(null);
+      await expect(events.create(dto, TEACHER)).rejects.toThrow(/pas enseignée dans cette classe/);
+      await expect(events.create({ ...dto, subjectId: undefined }, TEACHER)).rejects.toThrow(
+        /besoin d’une matière/,
+      );
+      expect(prisma.classSubject.findUnique).toHaveBeenCalledWith({
+        where: { classId_subjectId: { classId: 'c1', subjectId: 'mathematiques' } },
+      });
+      expect(prisma.event.create).not.toHaveBeenCalled();
+      // Ungraded events need no subject of the class.
+      await expect(
+        events.create({ ...dto, activityTypeId: 'ty-cours', coefficient: undefined }, TEACHER),
+      ).resolves.toBeDefined();
+    });
+
     it('checks that the teacher teaches the class and the subject', async () => {
       await events.create(dto, TEACHER);
       expect(access.assertTeachesClass).toHaveBeenCalledWith(TEACHER, 'c1', 'mathematiques');
@@ -211,6 +234,29 @@ describe('EventsService', () => {
       expect(periods.resolveFor).toHaveBeenCalledWith(prisma, 'c1', '2026-10-13', 'p1');
     });
 
+    it('keeps an explicit period (a semester picked by hand) while the new date is still inside it', async () => {
+      await events.update('e1', { date: '2026-11-20' }, TEACHER);
+      expect(periods.resolveFor).toHaveBeenCalledWith(prisma, 'c1', '2026-11-20', 'p1');
+    });
+
+    it('lets an old graded event without a period change its title, but derives one for a new date', async () => {
+      prisma.event.findUnique.mockResolvedValue(row({ periodId: null }));
+      await events.update('e1', { title: 'Corrigé' }, TEACHER);
+      expect(periods.resolveFor).not.toHaveBeenCalled();
+      expect(prisma.event.update.mock.calls[0]![0].data.periodId).toBeNull();
+      await events.update('e1', { date: '2026-10-20' }, TEACHER);
+      expect(periods.resolveFor).toHaveBeenCalledWith(prisma, 'c1', '2026-10-20', null);
+    });
+
+    it('resets the coefficient when the type becomes ungraded', async () => {
+      await events.update('e1', { activityTypeId: 'ty-cours' }, TEACHER);
+      expect(prisma.event.update.mock.calls[0]![0].data).toMatchObject({
+        activityTypeId: 'ty-cours',
+        coefficient: 1,
+        periodId: null,
+      });
+    });
+
     it('derives the period again from a new date', async () => {
       periods.resolveFor.mockResolvedValue({ id: 'p2' });
       await events.update('e1', { date: '2027-02-10' }, TEACHER);
@@ -231,7 +277,10 @@ describe('EventsService', () => {
       );
       await expect(
         events.update('e1', { activityTypeId: 'ty-cours', coefficient: 1 }, TEACHER),
-      ).rejects.toThrow(/type et la classe/);
+      ).rejects.toThrow(/le type, la classe et la matière/);
+      await expect(events.update('e1', { subjectId: 'arabe' }, TEACHER)).rejects.toThrow(
+        /la matière/,
+      );
       expect(prisma.event.update).not.toHaveBeenCalled();
       // Retitling is fine: the stored period is asked for again and comes back the same.
       periods.resolveFor.mockResolvedValue({ id: 'p1' });

@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import type { Prisma } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { notFound } from '../common/errors.js';
+import { conflictOnUnique, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   ClassSubjectDto,
@@ -50,7 +50,7 @@ export class ClassSubjectsService {
       })
     )
       throw new ConflictException(`La classe a déjà « ${subject.name} ».`);
-    return this.prisma.$transaction(async (tx) => {
+    const work = this.prisma.$transaction(async (tx) => {
       const row = await tx.classSubject.create({
         data: {
           classId,
@@ -71,6 +71,7 @@ export class ClassSubjectsService {
       ]);
       return toClassSubjectDto(row);
     });
+    return conflictOnUnique(work, `La classe a déjà « ${subject.name} ».`);
   }
 
   /** Changes the coefficient or the hours. Published report cards keep their snapshot. */
@@ -110,6 +111,18 @@ export class ClassSubjectsService {
       if (grades)
         throw new ConflictException(
           'Des notes existent pour cette matière dans la classe : elle ne peut plus être retirée.',
+        );
+      if (
+        await tx.event.count({
+          where: {
+            classId: current.classId,
+            subjectId: current.subjectId,
+            activityType: { gradable: true },
+          },
+        })
+      )
+        throw new ConflictException(
+          'Des événements notés existent pour cette matière dans la classe : supprimez-les d’abord.',
         );
       await tx.classSubject.delete({ where: { id } });
       await audit(tx, [

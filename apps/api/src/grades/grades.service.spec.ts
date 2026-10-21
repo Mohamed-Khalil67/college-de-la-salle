@@ -98,7 +98,7 @@ describe('GradesService', () => {
       { id: 's2', userId: 'u2', firstName: 'B', lastName: 'B', studentNumber: null },
     ]),
   };
-  const periods = { assertOpen: vi.fn() };
+  const periods = { assertOpen: vi.fn(), lockOpen: vi.fn() };
   let grades: GradesService;
 
   beforeEach(async () => {
@@ -106,6 +106,7 @@ describe('GradesService', () => {
     prisma.event.findUnique.mockResolvedValue(event());
     access.assertTeachesClass.mockResolvedValue(undefined);
     periods.assertOpen.mockResolvedValue(undefined);
+    periods.lockOpen.mockResolvedValue(undefined);
     tx.grade.findMany.mockResolvedValue([]);
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -152,6 +153,19 @@ describe('GradesService', () => {
     );
     expect(periods.assertOpen).toHaveBeenCalledWith(prisma, 'p1');
     expect(tx.grade.create).not.toHaveBeenCalled();
+  });
+
+  it('re-checks the period under a lock inside the write, so a concurrent close wins', async () => {
+    periods.lockOpen.mockRejectedValue(new ConflictException('clôturée'));
+    await expect(
+      grades.save('e1', { entries: [{ studentId: 's1', score: 10 }] }, TEACHER),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(periods.lockOpen).toHaveBeenCalledWith(tx, 'p1');
+    expect(tx.grade.create).not.toHaveBeenCalled();
+    await expect(grades.publish('e1', { published: true }, TEACHER)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(tx.grade.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates, corrects and removes grades, with one audit row each', async () => {

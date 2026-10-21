@@ -48,7 +48,8 @@ describe('PeriodsService', () => {
     },
     reportCard: { count: vi.fn() },
     grade: { count: vi.fn() },
-    event: { updateMany: vi.fn() },
+    event: { count: vi.fn() },
+    $queryRaw: vi.fn(),
     auditLog: { createMany: vi.fn() },
   };
   const prisma = {
@@ -185,7 +186,7 @@ describe('PeriodsService', () => {
       await periods.update('p1', { endsOn: '2026-12-10' }, ADMIN);
       expect(tx.period.count.mock.calls[0]![0].where).toMatchObject({ NOT: { id: 'p1' } });
       // Grades follow Event.periodId: nothing here touches events or grades.
-      expect(tx.event.updateMany).not.toHaveBeenCalled();
+      expect(tx.event.count).not.toHaveBeenCalled();
       expect(tx.grade.count).not.toHaveBeenCalled();
     });
 
@@ -219,16 +220,36 @@ describe('PeriodsService', () => {
       expect(tx.period.delete).not.toHaveBeenCalled();
     });
 
-    it('detaches ungraded events when it deletes an empty period', async () => {
+    it('refuses to delete a period that events still point at, and deletes an empty one', async () => {
       tx.period.findUnique.mockResolvedValue(period());
       tx.reportCard.count.mockResolvedValue(0);
       tx.grade.count.mockResolvedValue(0);
+      tx.event.count.mockResolvedValue(2);
+      await expect(periods.remove('p1', ADMIN)).rejects.toThrow(/événements notés sont rattachés/);
+      expect(tx.period.delete).not.toHaveBeenCalled();
+      tx.event.count.mockResolvedValue(0);
       await periods.remove('p1', ADMIN);
-      expect(tx.event.updateMany).toHaveBeenCalledWith({
-        where: { periodId: 'p1' },
-        data: { periodId: null },
-      });
       expect(tx.period.delete).toHaveBeenCalledWith({ where: { id: 'p1' } });
+    });
+  });
+
+  describe('lockOpen', () => {
+    it('takes a share lock and refuses a period closed meanwhile', async () => {
+      await expect(periods.lockOpen(tx as never, null)).resolves.toBeUndefined();
+      expect(tx.$queryRaw).not.toHaveBeenCalled();
+      tx.$queryRaw.mockResolvedValue([{ closed_at: null }]);
+      await expect(periods.lockOpen(tx as never, 'p1')).resolves.toBeUndefined();
+      tx.$queryRaw.mockResolvedValue([{ closed_at: new Date() }]);
+      await expect(periods.lockOpen(tx as never, 'p1')).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('is the exclusive lock that close() takes before it writes', async () => {
+      prisma.period.findUnique.mockResolvedValue(period());
+      tx.period.update.mockResolvedValue(period({ closedAt: new Date() }));
+      await periods.close('p1', true, ADMIN);
+      expect(tx.$queryRaw.mock.invocationCallOrder[0]!).toBeLessThan(
+        tx.period.update.mock.invocationCallOrder[0]!,
+      );
     });
   });
 

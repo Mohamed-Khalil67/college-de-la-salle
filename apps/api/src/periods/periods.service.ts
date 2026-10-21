@@ -114,6 +114,8 @@ export class PeriodsService {
         'Des bulletins publiés existent : la période ne peut plus être rouverte.',
       );
     return this.prisma.$transaction(async (tx) => {
+      // Waits for the grade writes holding a share lock on the period (see lockOpen), then locks them out.
+      await tx.$queryRaw`SELECT id FROM periods WHERE id = ${id}::uuid FOR UPDATE`;
       const row = await tx.period.update({
         where: { id },
         data: { closedAt: closed ? new Date() : null },
@@ -142,8 +144,10 @@ export class PeriodsService {
           'Des notes sont rattachées à cette période : elle ne peut pas être supprimée.',
         );
       if (period.closedAt) throw new ConflictException(CLOSED);
-      // Events without grades simply lose their period.
-      await tx.event.updateMany({ where: { periodId: id }, data: { periodId: null } });
+      if (await tx.event.count({ where: { periodId: id } }))
+        throw new ConflictException(
+          'Des événements notés sont rattachés à cette période : elle ne peut pas être supprimée.',
+        );
       await tx.period.delete({ where: { id } });
       await audit(tx, [
         {
@@ -212,6 +216,18 @@ export class PeriodsService {
       select: { closedAt: true },
     });
     if (period?.closedAt)
+      throw new ConflictException('La période est clôturée : les notes ne peuvent plus changer.');
+  }
+
+  /**
+   * Inside a write transaction: takes a share lock on the period and refuses a closed one, so closing
+   * (which takes the exclusive lock) cannot slip between this check and the write.
+   */
+  async lockOpen(tx: Prisma.TransactionClient, periodId: string | null): Promise<void> {
+    if (!periodId) return;
+    const rows = await tx.$queryRaw<{ closed_at: Date | null }[]>`
+      SELECT closed_at FROM periods WHERE id = ${periodId}::uuid FOR SHARE`;
+    if (rows[0]?.closed_at)
       throw new ConflictException('La période est clôturée : les notes ne peuvent plus changer.');
   }
 

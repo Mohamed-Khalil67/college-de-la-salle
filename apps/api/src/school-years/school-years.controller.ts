@@ -63,8 +63,11 @@ export class SchoolYearsController {
   @Post(':id/current')
   @HttpCode(200)
   @ApiOkResponse({ type: SchoolYearDto })
-  makeCurrent(@Param('id', ParseUUIDPipe) id: string): Promise<SchoolYearDto> {
-    return this.years.makeCurrent(id);
+  makeCurrent(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<SchoolYearDto> {
+    return this.years.makeCurrent(id, user);
   }
 
   /** Admin: deletes a school year that is not the current one and has no classes; 409 otherwise. */

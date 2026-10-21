@@ -2,6 +2,26 @@
 -- their period, and report cards point to a period. Periods of the same year, section and kind never
 -- overlap (EXCLUDE with btree_gist).
 
+-- Pre-flight: the constraints below cannot hold for terms that overlap or end before they start (the old
+-- code never checked). Stop with the list, so they can be corrected first (nothing has been changed yet).
+DO $$
+DECLARE
+  bad text;
+BEGIN
+  SELECT string_agg(DISTINCT format('%s / %s', a.label, b.label), ', ')
+    INTO bad
+    FROM terms a
+    JOIN terms b ON a.school_year_id = b.school_year_id AND a.id < b.id
+                AND a.starts_on <= b.ends_on AND b.starts_on <= a.ends_on;
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Trimestres qui se chevauchent : %. Corrigez leurs dates avant de migrer.', bad;
+  END IF;
+  SELECT string_agg(label, ', ') INTO bad FROM terms WHERE ends_on < starts_on;
+  IF bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Trimestres qui finissent avant de commencer : %. Corrigez leurs dates avant de migrer.', bad;
+  END IF;
+END $$;
+
 -- btree_gist is a trusted extension: the database owner can create it.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 

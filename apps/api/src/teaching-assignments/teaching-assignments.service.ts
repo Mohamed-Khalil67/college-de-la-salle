@@ -1,7 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client.js';
+import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { notFound } from '../common/errors.js';
+import { conflictOnUnique, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   CreateTeachingAssignmentDto,
@@ -39,7 +40,7 @@ export class TeachingAssignmentsService {
     return rows.map(toDto);
   }
 
-  async create(dto: CreateTeachingAssignmentDto): Promise<TeachingAssignmentDto> {
+  async create(dto: CreateTeachingAssignmentDto, user: AuthUser): Promise<TeachingAssignmentDto> {
     const key = { teacherId: dto.teacherId, classSubjectId: dto.classSubjectId };
     if (
       await this.prisma.teachingAssignment.findUnique({
@@ -54,13 +55,38 @@ export class TeachingAssignmentsService {
     ]);
     if (!teacher) throw notFound('Enseignant');
     if (!classSubject) throw notFound('Matière de la classe');
-    return toDto(await this.prisma.teachingAssignment.create({ data: key, include }));
+    // An assignment grants grade, attendance and event rights: it is a permission change, so it is audited.
+    const work = this.prisma.$transaction(async (tx) => {
+      const row = await tx.teachingAssignment.create({ data: key, include });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'teaching_assignment.create',
+          entity: 'teaching_assignment',
+          entityId: row.id,
+          after: key,
+        },
+      ]);
+      return toDto(row);
+    });
+    return conflictOnUnique(work, 'Cette affectation existe déjà.');
   }
 
-  async remove(id: string): Promise<void> {
-    if (!(await this.prisma.teachingAssignment.findUnique({ where: { id } })))
-      throw notFound('Affectation');
-    await this.prisma.teachingAssignment.delete({ where: { id } });
+  async remove(id: string, user: AuthUser): Promise<void> {
+    const current = await this.prisma.teachingAssignment.findUnique({ where: { id } });
+    if (!current) throw notFound('Affectation');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.teachingAssignment.delete({ where: { id } });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'teaching_assignment.delete',
+          entity: 'teaching_assignment',
+          entityId: id,
+          before: { teacherId: current.teacherId, classSubjectId: current.classSubjectId },
+        },
+      ]);
+    });
   }
 }
 

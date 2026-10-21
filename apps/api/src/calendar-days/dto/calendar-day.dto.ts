@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -92,5 +92,5 @@ export class CreateCalendarDayDto implements CreateCalendarDayRequest {
 }
 
 export class UpdateCalendarDayDto
-  extends PartialType(CreateCalendarDayDto)
+  extends PartialType(OmitType(CreateCalendarDayDto, ['schoolYearId'] as const))
   implements UpdateCalendarDayRequest {}

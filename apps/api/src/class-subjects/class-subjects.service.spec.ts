@@ -46,6 +46,7 @@ describe('ClassSubjectsService', () => {
       upsert: vi.fn(),
     },
     grade: { count: vi.fn() },
+    event: { count: vi.fn() },
     auditLog: { createMany: vi.fn() },
   };
   const prisma = {
@@ -138,8 +139,21 @@ describe('ClassSubjectsService', () => {
       expect(tx.classSubject.delete).not.toHaveBeenCalled();
     });
 
+    it('refuses while graded events of that subject exist in the class', async () => {
+      tx.grade.count.mockResolvedValue(0);
+      tx.event.count.mockResolvedValue(2);
+      await expect(service.remove('cs1', ADMIN)).rejects.toThrow(/événements notés/);
+      expect(tx.event.count.mock.calls[0]![0].where).toMatchObject({
+        classId: 'c1',
+        subjectId: 'maths',
+        activityType: { gradable: true },
+      });
+      expect(tx.classSubject.delete).not.toHaveBeenCalled();
+    });
+
     it('locks the row, then deletes it, audited', async () => {
       tx.grade.count.mockResolvedValue(0);
+      tx.event.count.mockResolvedValue(0);
       await service.remove('cs1', ADMIN);
       expect(tx.$queryRaw).toHaveBeenCalled();
       expect(tx.classSubject.delete).toHaveBeenCalledWith({ where: { id: 'cs1' } });

@@ -3,7 +3,7 @@ import type { RoomKind } from '@cdls/shared';
 import type { Room } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { conflictOnReference, notFound } from '../common/errors.js';
+import { conflictOnReference, conflictOnUnique, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateRoomDto, RoomDto, UpdateRoomDto } from './dto/room.dto.js';
 
@@ -23,7 +23,7 @@ export class RoomsService {
 
   async create(dto: CreateRoomDto, user: AuthUser): Promise<RoomDto> {
     await this.assertNameFree(dto.name);
-    return this.prisma.$transaction(async (tx) => {
+    const work = this.prisma.$transaction(async (tx) => {
       const row = await tx.room.create({
         data: {
           name: dto.name,
@@ -43,6 +43,7 @@ export class RoomsService {
       ]);
       return toRoomDto(row);
     });
+    return conflictOnUnique(work, `La salle « ${dto.name} » existe déjà.`);
   }
 
   async update(id: string, dto: UpdateRoomDto, user: AuthUser): Promise<RoomDto> {

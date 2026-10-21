@@ -64,6 +64,7 @@ export class GradesService {
     const graderId = user.teacherId ?? event.authorId;
 
     await this.prisma.$transaction(async (tx) => {
+      await this.periods.lockOpen(tx, event.periodId);
       const existing = await tx.grade.findMany({ where: { eventId } });
       const byStudent = new Map(existing.map((g) => [g.studentId, g]));
       const outOf = dto.outOf ?? (existing[0] ? Number(existing[0].outOf) : 20);
@@ -138,6 +139,7 @@ export class GradesService {
     const event = await this.gradableEvent(eventId, user);
     await this.periods.assertOpen(this.prisma, event.periodId);
     await this.prisma.$transaction(async (tx) => {
+      await this.periods.lockOpen(tx, event.periodId);
       const { count } = await tx.grade.updateMany({
         where: { eventId },
         data: { published: dto.published },

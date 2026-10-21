@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, linkedSignal, output, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal, output, resource, signal, untracked } from '@angular/core';
 import { form, FormField, maxLength, required, submit, validate } from '@angular/forms/signals';
 import { daysBetween, EVENT_LIMITS, type EventDto, type TeachingAssignmentDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
@@ -21,7 +21,7 @@ function shownError(state: { touched(): boolean; errors(): readonly { message?: 
       }
       <cdls-field label="Type">
         <select cdlsControl [formField]="eventForm.activityTypeId">
-          @for (k of types(); track k.id) {
+          @for (k of choices(); track k.id) {
             <option [value]="k.id">{{ k.label }}</option>
           }
         </select>
@@ -87,16 +87,16 @@ export class EventForm {
 
   readonly #api = inject(ApiClient);
   /** The school's activity types plus the teacher's own. */
-  readonly #types = resource({ loader: () => this.#api.school.activityTypes() });
+  readonly #types = resource({ loader: () => this.#api.school.activityTypes(true) });
   protected readonly types = computed(() => (this.#types.hasValue() ? this.#types.value() : []));
+  /** What the select offers: active types, plus the archived one the edited event still has. */
+  protected readonly choices = computed(() => this.types().filter((t) => !t.archived || t.id === this.event()?.activityTypeId));
   protected readonly sorted = computed(() => sortAssignments(this.assignments()));
 
   protected readonly model = linkedSignal<EventFormModel>(() => {
     const e = this.event();
     const list = this.sorted();
-    return e
-      ? modelFromEvent(e, list)
-      : emptyEventModel(this.day(), list.length === 1 ? list[0]!.id : '', defaultActivityType(this.types())?.id ?? '');
+    return e ? modelFromEvent(e, list) : emptyEventModel(this.day(), list.length === 1 ? list[0]!.id : '');
   });
   protected readonly eventForm = form(this.model, (p) => {
     required(p.title, { message: 'Donnez un titre, par exemple « Contrôle n° 3 : fonctions affines ».' });
@@ -138,6 +138,16 @@ export class EventForm {
     place: shownError(this.eventForm.place()),
     description: shownError(this.eventForm.description()),
   }));
+
+  constructor() {
+    // A new event starts with the plain weekly type, once the types have arrived (without resetting what was typed).
+    effect(() => {
+      const fallback = defaultActivityType(this.choices())?.id;
+      untracked(() => {
+        if (fallback && !this.event() && !this.model().activityTypeId) this.model.update((m) => ({ ...m, activityTypeId: fallback }));
+      });
+    });
+  }
 
   protected readonly busy = signal(false);
   protected readonly failure = signal<string | null>(null);

@@ -115,7 +115,8 @@ export class ApiClient {
     enroll: (classId: string, studentId: string) => this.#post<EnrollmentDto>(`/classes/${classId}/enrollments`, { studentId }),
     unenroll: (enrollmentId: string) => this.#delete(`/enrollments/${enrollmentId}`),
     subjects: () => this.#get<SubjectDto[]>('/subjects'),
-    activityTypes: () => this.#get<ActivityTypeDto[]>('/activity-types'),
+    /** School-wide types plus the teacher's own; `includeArchived` also lists the archived ones (an old event may still have one). */
+    activityTypes: (includeArchived = false) => this.#get<ActivityTypeDto[]>('/activity-types', includeArchived ? { includeArchived } : {}),
     classSubjects: (classId: string) => this.#get<ClassSubjectDto[]>(`/classes/${classId}/subjects`),
     addClassSubject: (classId: string, body: CreateClassSubjectRequest) => this.#post<ClassSubjectDto>(`/classes/${classId}/subjects`, body),
     updateClassSubject: (id: string, body: UpdateClassSubjectRequest) => this.#patch<ClassSubjectDto>(`/class-subjects/${id}`, body),

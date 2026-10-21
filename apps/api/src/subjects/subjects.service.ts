@@ -3,7 +3,7 @@ import { SECTION_IDS, type SectionId } from '@cdls/shared';
 import type { Subject } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { notFound } from '../common/errors.js';
+import { conflictOnUnique, notFound } from '../common/errors.js';
 import { uniqueSlug } from '../common/slug.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -40,7 +40,7 @@ export class SubjectsService {
       dto.name,
       async (slug) => !!(await this.prisma.subject.findUnique({ where: { id: slug } })),
     );
-    return this.prisma.$transaction(async (tx) => {
+    const work = this.prisma.$transaction(async (tx) => {
       const row = await tx.subject.create({
         data: { id, name: dto.name, group: dto.group, sections: sortSections(dto.sections) },
       });
@@ -55,6 +55,7 @@ export class SubjectsService {
       ]);
       return toSubjectDto(row);
     });
+    return conflictOnUnique(work, `La matière « ${dto.name} » existe déjà.`);
   }
 
   /**

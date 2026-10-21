@@ -3,7 +3,7 @@ import type { ActivityColour, ActivityIcon, ActivityTypeSummary } from '@cdls/sh
 import type { ActivityType, Prisma } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { conflictOnReference, forbidden, notFound } from '../common/errors.js';
+import { conflictOnReference, conflictOnUnique, forbidden, notFound } from '../common/errors.js';
 import { uniqueSlug } from '../common/slug.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -52,7 +52,7 @@ export class ActivityTypesService {
       dto.label,
       async (slug) => !!(await this.prisma.activityType.findUnique({ where: { code: slug } })),
     );
-    return this.prisma.$transaction(async (tx) => {
+    const work = this.prisma.$transaction(async (tx) => {
       const row = await tx.activityType.create({
         data: {
           code,
@@ -77,6 +77,7 @@ export class ActivityTypesService {
       ]);
       return toActivityTypeDto(row);
     });
+    return conflictOnUnique(work, 'Un type de ce nom vient d’être créé : réessayez.');
   }
 
   /**
@@ -210,7 +211,8 @@ export class ActivityTypesService {
       include,
     });
     if (!row) throw notFound('Type d’activité');
-    if (user.role !== 'admin' && row.ownerTeacherId !== user.teacherId) throw forbidden();
+    if (user.role !== 'admin' && (!user.teacherId || row.ownerTeacherId !== user.teacherId))
+      throw forbidden();
     return row;
   }
 }

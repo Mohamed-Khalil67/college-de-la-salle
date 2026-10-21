@@ -108,20 +108,28 @@ export class SchoolYearsService {
   }
 
   /** Makes this the current year (exactly one is current). */
-  async makeCurrent(id: string): Promise<SchoolYearDto> {
+  async makeCurrent(id: string, user: AuthUser): Promise<SchoolYearDto> {
     await this.find(id);
-    const [, year] = await this.prisma.$transaction([
-      this.prisma.schoolYear.updateMany({
+    return this.prisma.$transaction(async (tx) => {
+      await tx.schoolYear.updateMany({
         where: { isCurrent: true, NOT: { id } },
         data: { isCurrent: false },
-      }),
-      this.prisma.schoolYear.update({
+      });
+      const year = await tx.schoolYear.update({
         where: { id },
         data: { isCurrent: true },
         include: withPeriods,
-      }),
-    ]);
-    return toSchoolYearDto(year);
+      });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'school_year.make_current',
+          entity: 'school_year',
+          entityId: id,
+        },
+      ]);
+      return toSchoolYearDto(year);
+    });
   }
 
   /** Deletes a school year created by mistake: not the current one, and without classes. Its periods go with it. */
