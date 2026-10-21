@@ -380,6 +380,7 @@ export type OccupancySource = 'slot' | 'exception' | 'event';
  * One row of the occupancy index: a room, a teacher and a class held during a time range. The database
  * refuses two rows that hold the same room, the same teacher or the same class at the same time, except
  * two rows of one class that carry the same non-null division key (groups of one division run in parallel).
+ * Two rows of the SAME group never overlap: a group is not in two places at once.
  */
 export interface OccupancyEntry {
   readonly source: OccupancySource;
@@ -389,6 +390,8 @@ export interface OccupancyEntry {
   readonly teacherId: string | null;
   readonly classId: string | null;
   readonly divisionKey: string | null;
+  /** The group the session is for; null for the whole class. */
+  readonly groupId?: string | null;
   /** `YYYY-MM-DD HH:MM`, wall-clock time. */
   readonly startsAt: string;
   readonly endsAt: string;
@@ -403,6 +406,7 @@ export function occupancyEntries(
   occurrences: readonly TimetableOccurrence[],
   classId: string,
   divisionKey: string | null,
+  groupId: string | null = null,
 ): OccupancyEntry[] {
   return occurrences.filter(occupiesResources).map((o) => ({
     source: o.exception ? 'exception' : 'slot',
@@ -411,6 +415,7 @@ export function occupancyEntries(
     teacherId: o.current.teacherId,
     classId,
     divisionKey,
+    groupId,
     startsAt: stamp(o.current.date, o.current.startTime),
     endsAt: stamp(o.current.date, o.current.endTime),
     exceptionId: o.exception?.id ?? null,
@@ -425,7 +430,8 @@ export function entriesClash(a: OccupancyEntry, b: OccupancyEntry): ('room' | 't
   if (a.teacherId && a.teacherId === b.teacherId) kinds.push('teacher');
   if (a.classId && a.classId === b.classId) {
     const sameDivision = a.divisionKey !== null && a.divisionKey === b.divisionKey;
-    if (!sameDivision) kinds.push('class');
+    const sameGroup = !!a.groupId && a.groupId === b.groupId;
+    if (!sameDivision || sameGroup) kinds.push('class');
   }
   return kinds;
 }

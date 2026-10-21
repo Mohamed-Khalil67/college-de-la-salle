@@ -691,10 +691,39 @@ export interface EventDto {
   readonly description: string;
   readonly attachments: readonly Attachment[];
   readonly coefficient: number;
+  /** Who the work concerns (assessments and homework of a class); the whole class for everything else. */
+  readonly target: AssessmentTargetDto;
   readonly authorId: string;
   readonly authorName: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+/**
+ * « Assigner à » of an assessment or a homework: the whole class (no group, no student), or groups and
+ * individual students. Stored as the target, not as a list of students: see `targetedStudentIds`.
+ */
+export interface AssessmentTargetInput {
+  /** Groups of the event's class. */
+  readonly groupIds: readonly string[];
+  /** Students currently enrolled in the event's class. */
+  readonly studentIds: readonly string[];
+}
+
+export interface AssessmentTargetGroupDto {
+  readonly id: string;
+  readonly division: string;
+  readonly label: string;
+}
+
+export interface AssessmentTargetDto {
+  /** True: the whole class is concerned (the default). */
+  readonly whole: boolean;
+  readonly groups: readonly AssessmentTargetGroupDto[];
+  /** Students named one by one. Empty for students (they never learn who else was named). */
+  readonly studentIds: readonly string[];
+  /** Students concerned today (the class, the groups' members and the students named). Null when not computed. */
+  readonly concerned: number | null;
 }
 
 export interface EventInput {
@@ -719,6 +748,11 @@ export interface EventInput {
   readonly description?: string;
   readonly attachments?: readonly Attachment[];
   readonly coefficient?: number;
+  /**
+   * Assessments and homework of a class: who they concern. Omitted on create: the whole class; omitted
+   * on update: unchanged. Students already graded cannot be taken out (409).
+   */
+  readonly target?: AssessmentTargetInput;
 }
 
 /** GET /events?from&to (max 186 days), plus optional classId / sectionId filters for staff. */
@@ -765,9 +799,15 @@ export interface TimetableSlotInput {
   readonly weekParity: WeekParity | null;
   /**
    * Division of the groups that run in parallel (« TP », « LV2 »): two slots of one class may overlap only
-   * when both carry the same division. Null: the whole class. Groups come with phase 3.
+   * when both carry the same division. Null: the whole class. With a `groupId` the division is the
+   * group's (a different one is refused), so phase 2 clients that only send a division keep working.
    */
   readonly division: string | null;
+  /**
+   * The group the session is for (a group of the same class). Omitted or null: the whole class, or the
+   * free-text division above. Only that group's students see the session.
+   */
+  readonly groupId?: string | null;
 }
 
 export interface TimetableSlotDto extends TimetableSlotInput {
@@ -779,8 +819,10 @@ export interface TimetableSlotDto extends TimetableSlotInput {
   readonly teacherName: string;
   readonly roomName: string | null;
   readonly activityType: ActivityTypeSummary;
-  /** Reserved for phase 3 (groups): always null today. */
+  /** The group the session is for, or null (the whole class). */
   readonly groupId: string | null;
+  /** « TP A »; null without a group. */
+  readonly groupLabel: string | null;
 }
 
 /** Soft rules: they warn, and the save needs a reason for each. */
@@ -985,6 +1027,8 @@ export interface TimetableOccurrenceDto {
   readonly subjectName: string;
   readonly activityType: ActivityTypeSummary;
   readonly division: string | null;
+  readonly groupId: string | null;
+  readonly groupLabel: string | null;
   /** The signed-in user may cancel, move or change the room of this session. */
   readonly canChange: boolean;
 }
@@ -1018,6 +1062,83 @@ export interface FreeRoomDto extends RoomDto {
 }
 
 /* ------------------------------------------------------------------------------------------------
+ * Groups: /api/groups
+ * A group is a part of a class (TP A, LV2 Allemand). Groups of the same `division` run at the same
+ * time; a student belongs to at most ONE group per division of a class (409 otherwise). Memberships are
+ * soft: leaving sets `leftOn` and keeps the history. A student who leaves the class, or changes section,
+ * leaves their groups at the same time.
+ * Admins and coordinators manage any group, a teacher those of the classes they teach, a student reads
+ * only their own memberships (`GET /groups/mine`).
+ * ---------------------------------------------------------------------------------------------- */
+
+export const GROUP_LIMITS = { division: 40, label: 60, members: 100 } as const;
+
+export interface GroupDto {
+  readonly id: string;
+  readonly classId: string;
+  readonly classLabel: string;
+  /** « TP », « LV2 »: a student is in one group per division. */
+  readonly division: string;
+  /** « TP A », « Allemand ». */
+  readonly label: string;
+  /** Current members. */
+  readonly memberCount: number;
+  readonly createdAt: string;
+}
+
+export interface GroupMemberDto extends StudentSummaryDto {
+  /** The day the student joined the group. */
+  readonly joinedOn: string;
+}
+
+/** GET /groups/:id: the group with its current members, by name. */
+export interface GroupDetailDto extends GroupDto {
+  readonly members: readonly GroupMemberDto[];
+}
+
+/** GET /groups?classId= (required): the groups of a class, by division then label. */
+export interface GroupListQuery {
+  readonly classId: string;
+}
+
+/** An entry of GET /groups: the group and who is in it now (student ids), so screens can count a target. */
+export interface GroupWithMembersDto extends GroupDto {
+  readonly memberIds: readonly string[];
+}
+
+export interface CreateGroupRequest {
+  readonly classId: string;
+  readonly division: string;
+  readonly label: string;
+}
+
+/** The class of a group never changes. A new division needs the group to have no timetable session. */
+export interface UpdateGroupRequest {
+  readonly division?: string;
+  readonly label?: string;
+}
+
+/** POST /groups/:id/members */
+export interface AddGroupMembersRequest {
+  /** Students currently enrolled in the group's class. */
+  readonly studentIds: readonly string[];
+  /**
+   * A student already in another group of this division is refused (409) unless `move` is true: then they
+   * leave that group (today) and join this one.
+   */
+  readonly move?: boolean;
+}
+
+/** GET /groups/mine: the signed-in student's current groups. */
+export interface MyGroupDto {
+  readonly id: string;
+  readonly classId: string;
+  readonly division: string;
+  readonly label: string;
+  readonly joinedOn: string;
+}
+
+/* ------------------------------------------------------------------------------------------------
  * Homework
  * ---------------------------------------------------------------------------------------------- */
 
@@ -1047,12 +1168,17 @@ export interface GradeDto {
   readonly updatedAt: string;
 }
 
-/** GET /events/:id/grades: the whole class with each student's grade, for the entry grid. */
+/** GET /events/:id/grades: the students the work concerns (the whole class by default) with each one's grade. */
 export interface GradeSheetDto {
   readonly event: EventDto;
   readonly rows: readonly {
     readonly student: StudentSummaryDto;
     readonly grade: GradeDto | null;
+    /**
+     * False for a student who has a grade but is no longer concerned (left the group): the grade is
+     * kept and shown, but only removing it is allowed.
+     */
+    readonly targeted: boolean;
   }[];
 }
 
@@ -1119,7 +1245,7 @@ export interface AttendanceRecordDto {
   readonly note: string;
 }
 
-/** GET /events/:id/attendance?date= */
+/** GET /events/:id/attendance?date= : the students the event concerns (see `event.target`). */
 export interface AttendanceSheetDto {
   readonly event: EventDto;
   readonly date: string;

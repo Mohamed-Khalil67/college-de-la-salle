@@ -364,6 +364,10 @@ describe('occupancy index', () => {
     expect(entriesClash(tpA, { ...tpB, divisionKey: 'LV2' })).toEqual(['class']);
     expect(entriesClash(tpA, { ...tpB, divisionKey: null })).toEqual(['class']);
     expect(entriesClash({ ...tpA, divisionKey: null }, tpB)).toEqual(['class']);
+    // The same group is never in two places at once, even inside one division.
+    const groupA = { ...tpA, groupId: 'gA' };
+    expect(entriesClash(groupA, { ...tpB, groupId: 'gB' })).toEqual([]);
+    expect(entriesClash(groupA, { ...tpB, groupId: 'gA' })).toEqual(['class']);
   });
 });
 

@@ -71,6 +71,15 @@ enum SectionChangeStatus {
   @@map("section_change_status")
 }
 
+/// AssessmentTargetScope in packages/shared.
+enum TargetScope {
+  class
+  group
+  student
+
+  @@map("target_scope")
+}
+
 enum AttendanceStatus {
   present
   absent
@@ -138,6 +147,9 @@ model Student {
   homeworkCompletions   HomeworkCompletion[]
   attendance            Attendance[]
   reportCards           ReportCard[]
+  groupMemberships      GroupMember[]
+  /// Work addressed to this student by name.
+  assessmentTargets     AssessmentTarget[]
 
   @@index([sectionId])
   @@map("students")
@@ -306,6 +318,7 @@ model SchoolClass {
   calendarDays       CalendarDayClass[]
   /// Section changes that moved a student into this class.
   sectionChangesInto SectionChangeRequest[]
+  groups             Group[]
 
   @@unique([schoolYearId, sectionId, code])
   @@index([sectionId])
@@ -470,10 +483,11 @@ enum OccupancySource {
 model TimetableSlot {
   id             String      @id @default(uuid(7)) @db.Uuid
   classSubjectId String      @map("class_subject_id") @db.Uuid
-  /// Placeholder for phase 3 (groups): no foreign key yet, always null.
+  /// The group the session is for (a group of the slot's class); null: the whole class.
   groupId        String?     @map("group_id") @db.Uuid
   /// Division of the groups that run in parallel (« TP », « LV2 »). Null: the whole class. Two slots of one
-  /// class may overlap only when both carry the same division.
+  /// class may overlap only when both carry the same division. With a group it is the group's division
+  /// (derived by the API, never typed).
   division       String?     @db.VarChar(40)
   teacherId      String      @map("teacher_id") @db.Uuid
   roomId         String?     @map("room_id") @db.Uuid
@@ -494,9 +508,11 @@ model TimetableSlot {
   teacher      Teacher         @relation(fields: [teacherId], references: [id], onDelete: Restrict)
   room         Room?           @relation(fields: [roomId], references: [id], onDelete: Restrict)
   activityType ActivityType    @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
+  group        Group?          @relation(fields: [groupId], references: [id], onDelete: Restrict)
   exceptions   SlotException[]
   occupancy    Occupancy[]
 
+  @@index([groupId])
   @@index([classSubjectId, validFrom])
   @@index([teacherId, validFrom])
   @@index([roomId, validFrom])
@@ -551,6 +567,8 @@ model Occupancy {
   classId     String?                @map("class_id") @db.Uuid
   /// Non-null: groups of the same division may share the class.
   divisionKey String?                @map("division_key") @db.VarChar(40)
+  /// The group the session is for. Two rows of one group never overlap (occupancy_group_no_overlap).
+  groupId     String?                @map("group_id") @db.Uuid
   /// Wall-clock time of the school, no time zone.
   during      Unsupported("tsrange")
 
@@ -565,6 +583,7 @@ model Occupancy {
   @@index([roomId])
   @@index([teacherId])
   @@index([classId])
+  @@index([groupId])
   @@map("occupancy")
 }
 
@@ -613,6 +632,8 @@ model Event {
   homeworkCompletions HomeworkCompletion[]
   attendance          Attendance[]
   occupancy           Occupancy[]
+  /// Who the work concerns; no row means the whole class (the default).
+  targets             AssessmentTarget[]
 
   @@index([classId, date])
   @@index([sectionId, date])
@@ -748,6 +769,72 @@ model SectionChangeRequest {
   @@index([decidedById])
   @@index([newClassId])
   @@map("section_change_requests")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Groups and targets (phase 3)
+// ---------------------------------------------------------------------------------------------------
+
+/// A part of a class: « TP A », « LV2 Allemand ». Groups of one `division` of a class run at the same time.
+/// The class and the division of a group never change while it has timetable sessions (the API refuses).
+model Group {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  classId   String   @map("class_id") @db.Uuid
+  /// « TP », « LV2 ». A student is in at most one group per division of a class.
+  division  String   @db.VarChar(40)
+  label     String   @db.VarChar(60)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  schoolClass SchoolClass        @relation(fields: [classId], references: [id], onDelete: Cascade)
+  members     GroupMember[]
+  slots       TimetableSlot[]
+  targets     AssessmentTarget[]
+
+  @@unique([classId, division, label])
+  @@map("groups")
+}
+
+/// A student in a group. Leaving sets `leftOn` (history is kept, like enrolments). `classId` and `division`
+/// repeat the group's so the partial unique index can hold: ONE open membership per student, class and division.
+model GroupMember {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  groupId   String    @map("group_id") @db.Uuid
+  studentId String    @map("student_id") @db.Uuid
+  classId   String    @map("class_id") @db.Uuid
+  division  String    @db.VarChar(40)
+  joinedOn  DateTime  @default(now()) @map("joined_on") @db.Date
+  leftOn    DateTime? @map("left_on") @db.Date
+
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, classId, division], where: raw("left_on IS NULL"), map: "group_members_open_student_division_key")
+  @@index([groupId, leftOn])
+  @@index([studentId, leftOn])
+  @@index([classId])
+  @@map("group_members")
+}
+
+/// Who an assessment or a homework concerns. The TARGET is stored (not the student list), so a student who
+/// joins a group later is included. A `class` row (at most one) or one or more `group` / `student` rows; no
+/// row at all means the whole class. CHECK constraint `assessment_targets_scope_check` in the migration SQL.
+model AssessmentTarget {
+  id        String      @id @default(uuid(7)) @db.Uuid
+  eventId   String      @map("event_id") @db.Uuid
+  scope     TargetScope
+  groupId   String?     @map("group_id") @db.Uuid
+  studentId String?     @map("student_id") @db.Uuid
+
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  group   Group?   @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, groupId])
+  @@unique([eventId, studentId])
+  @@unique([eventId], where: raw("scope = 'class'"), map: "assessment_targets_one_class_key")
+  @@index([groupId])
+  @@index([studentId])
+  @@map("assessment_targets")
 }
 
 // ---------------------------------------------------------------------------------------------------
