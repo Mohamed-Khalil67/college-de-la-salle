@@ -90,7 +90,7 @@ export class UsersController {
     @Query() query: ImportUsersQueryDto,
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<ImportPreviewDto> {
-    return this.users.previewImport(file?.buffer, query.role);
+    return this.users.previewImport(file?.buffer, query.role, query.createAnyway);
   }
 
   /** Roster CSV import, all or nothing: generated e-mails, temporary passwords returned once. */
@@ -109,7 +109,7 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File | undefined,
     @CurrentUser() actor: AuthUser,
   ): Promise<ImportUsersDto> {
-    return this.users.importCsv(file?.buffer, query.role, actor);
+    return this.users.importCsv(file?.buffer, query.role, actor, query.createAnyway);
   }
 
   /**

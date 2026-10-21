@@ -2,10 +2,13 @@ import type {
   ApiError,
   ClassSubjectDto,
   CreatedUserResponse,
+  ImportPreviewResponse,
   ImportUsersResponse,
   SessionResponse,
   SectionChangeRequestDto,
 } from '@cdls/shared';
+import type { AuthUser } from '../src/common/auth-user.js';
+import { UsersService } from '../src/users/users.service.js';
 import {
   ADMIN,
   bearer,
@@ -398,6 +401,102 @@ describe('Review fixes (e2e)', () => {
           .expect(200)
       ).body as SessionResponse;
       await t.http().get('/api/auth/me').set(bearer(fresh.accessToken)).expect(200);
+    });
+  });
+  describe('M3 and M4: re-imports, homonyms, CSV errors', () => {
+    const upload = (role: 'teacher' | 'student', lines: string[], query = '', preview = false) =>
+      t
+        .http()
+        .post(`/api/users/import${preview ? '/preview' : ''}?role=${role}${query}`)
+        .set(bearer(admin))
+        .attach('file', Buffer.from(lines.join('\n')), { filename: 'f.csv', contentType: 'text/csv' });
+    const unique = () => Date.now().toString(36);
+
+    it('skips a teacher already present, and creates a genuine homonym only on request', async () => {
+      const last = `Reimport${unique()}`;
+      const file = ['lastName,firstName', `${last},Yasmine`];
+      const first = await upload('teacher', file).expect(201);
+      expect((first.body as ImportUsersResponse).created).toHaveLength(1);
+
+      const preview = (await upload('teacher', file, '', true).expect(200)).body as ImportPreviewResponse;
+      expect(preview.rows[0]).toMatchObject({
+        alreadyImported: true,
+        matchedBy: 'name',
+        createAnyway: false,
+        emailNumber: 0,
+      });
+      expect(((await upload('teacher', file).expect(201)).body as ImportUsersResponse).created).toEqual([]);
+      expect(await t.prisma.user.count({ where: { lastName: last } })).toBe(1);
+
+      // Accents, case and spacing do not make a new person.
+      await upload('teacher', ['lastName,firstName', `${last.toUpperCase()},YASMINE`])
+        .expect(201)
+        .expect((r) => expect((r.body as ImportUsersResponse).created).toEqual([]));
+
+      // The explicit choice for line 2 creates the homonym, numbered.
+      const forced = (await upload('teacher', file, '&createAnyway=2').expect(201)).body as ImportUsersResponse;
+      expect(forced.created.map((c) => c.email)).toEqual([`yasmine.${last.toLowerCase()}2@${DOMAIN}`]);
+      expect(await t.prisma.user.count({ where: { lastName: last } })).toBe(2);
+      await upload('teacher', file, '&createAnyway=x').expect(400);
+    });
+
+    it('treats students without a number as present only in the same section and class', async () => {
+      const last = `Eleve${unique()}`;
+      const head = 'lastName,firstName,section,class';
+      const here = [head, `${last},Karim,bac,fix-current`];
+      expect(((await upload('student', here).expect(201)).body as ImportUsersResponse).created).toHaveLength(1);
+      expect(((await upload('student', here).expect(201)).body as ImportUsersResponse).created).toEqual([]);
+      const elsewhere = [head, `${last},Karim,bac,seconde`];
+      const other = (await upload('student', elsewhere, '', true).expect(200)).body as ImportPreviewResponse;
+      expect(other.rows[0]).toMatchObject({ alreadyImported: false, matchedBy: null, emailNumber: 2 });
+    });
+
+    it('answers a generic French message for a malformed CSV and counts real lines', async () => {
+      const bad = await upload('teacher', ['lastName,firstName', '"unclosed,Alice']).expect(400);
+      expect(message(bad.body)).toMatch(/illisible/);
+      expect(message(bad.body)).not.toMatch(/quote|record|csv_/i);
+
+      // A quoted cell over lines 2-3 and a blank line: the bad row is on line 5.
+      const res = await upload('teacher', [
+        'lastName,firstName',
+        '"Multi',
+        `line",Alice${unique()}`,
+        '',
+        ',Bob',
+      ]).expect(400);
+      expect((res.body as { errors: { line: number }[] }).errors.map((e) => e.line)).toEqual([5]);
+    });
+
+    it('reads only the addresses of the names concerned, not every account', async () => {
+      const spy = vi.spyOn(t.prisma.user, 'findMany');
+      try {
+        await upload('teacher', ['lastName,firstName', `Lecture${unique()},Zied`], '', true).expect(200);
+        const wheres = spy.mock.calls.map((c) => JSON.stringify(c[0]?.where ?? {}));
+        expect(wheres.length).toBeGreaterThan(0);
+        for (const w of wheres) expect(w).toMatch(/startsWith|insensitive/);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('gives distinct addresses to a parallel import and POST /users for the same name', async () => {
+      const last = `Parallele${unique()}`;
+      const users = t.app.get(UsersService);
+      const adminUser = await t.prisma.user.findFirstOrThrow({ where: { email: ADMIN } });
+      const actor = { id: adminUser.id, role: 'admin' } as AuthUser;
+      const [created, imported] = await Promise.all([
+        t.http().post('/api/users').set(bearer(admin)).send({ role: 'teacher', firstName: 'Nabil', lastName: last }),
+        // Through the service: the import route's own limit (10 a minute) is spent by the tests above.
+        users.importCsv(Buffer.from(`lastName,firstName
+${last},Nabil`), 'teacher', actor),
+      ]);
+      expect(created.status).toBe(201);
+      const emails = [
+        (created.body as CreatedUserResponse).user.email,
+        ...imported.created.map((c) => c.email),
+      ];
+      expect(new Set(emails).size).toBe(emails.length);
+      expect(await t.prisma.user.count({ where: { lastName: last } })).toBe(emails.length);
     });
   });
 });

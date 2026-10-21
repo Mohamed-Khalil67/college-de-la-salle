@@ -9,6 +9,7 @@ import {
   describeSchoolEmails,
   type ImportRole,
   type Paginated,
+  schoolEmailPrefix,
   type SectionId,
 } from '@cdls/shared';
 import { hash } from 'argon2';
@@ -39,10 +40,13 @@ import {
   checkRoster,
   headerProblems,
   columnName,
+  identityKey,
   MAX_IMPORT_ROWS,
 } from './roster-import.js';
 
 const HASH_CONCURRENCY = 4;
+const MALFORMED_CSV =
+  'Le fichier CSV est illisible : vérifiez les guillemets et les colonnes, puis enregistrez-le de nouveau au format CSV (UTF-8).';
 const ARCHIVED = 'Compte archivé : restaurez-le avant de le modifier.';
 
 const include = {
@@ -298,8 +302,12 @@ export class UsersService {
   }
 
   /** Checks a roster CSV and lists the accounts it would create, with their generated e-mails. */
-  async previewImport(csv: Buffer | undefined, role: ImportRole): Promise<ImportPreviewDto> {
-    const checked = await this.checkImport(csv, role);
+  async previewImport(
+    csv: Buffer | undefined,
+    role: ImportRole,
+    createAnyway: readonly number[] = [],
+  ): Promise<ImportPreviewDto> {
+    const checked = await this.checkImport(csv, role, createAnyway);
     return {
       role,
       rows: checked.rows.map(({ classId: _classId, ...row }) => row),
@@ -312,16 +320,18 @@ export class UsersService {
     csv: Buffer | undefined,
     role: ImportRole,
     actor: AuthUser,
+    createAnyway: readonly number[] = [],
   ): Promise<ImportUsersDto> {
-    const { rows, errors } = await this.checkImport(csv, role);
+    const { rows, errors } = await this.checkImport(csv, role, createAnyway);
     if (errors.length)
       throw new BadRequestException({
         statusCode: 400,
         message: 'Import refusé : corrigez les lignes en erreur.',
         errors,
       });
-    // Students already in the school (same student number) are kept as they are: a re-import never
-    // creates a second account or renumbers anyone.
+    // People already in the school (same student number, or same name, section and class) are kept as
+    // they are: a re-import never creates a second account or renumbers anyone, unless a line was
+    // explicitly marked « créer quand même ».
     const fresh = rows.filter((row) => !row.alreadyImported);
     if (!fresh.length) return { created: [] };
     const sectionIds = await this.sectionIds();
@@ -340,7 +350,7 @@ export class UsersService {
           // One import (or creation) at a time numbers the homonyms: take the lock, read the addresses
           // again, number from there. The unique index on the e-mail stays the last line of defence.
           await lockEmails(tx);
-          const taken = await this.takenEmails(tx);
+          const taken = await this.takenEmails(tx, fresh);
           const assigned = describeSchoolEmails(fresh, this.domain, taken);
           const created: string[] = [];
           for (const [i, row] of fresh.entries()) {
@@ -485,7 +495,7 @@ export class UsersService {
     firstName: string,
     lastName: string,
   ): Promise<string> {
-    const [generated] = describeSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails(db));
+    const [generated] = describeSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails(db, [{ firstName, lastName }]));
     const email = generated?.email;
     if (!email)
       throw new BadRequestException(
@@ -494,9 +504,23 @@ export class UsersService {
     return email;
   }
 
-  private async takenEmails(db: Db = this.prisma): Promise<Set<string>> {
+  /**
+   * The addresses that could collide with these people's: only `prenom.nom%@domain` is read, not every
+   * account of the school.
+   */
+  private async takenEmails(
+    db: Db,
+    people: readonly { firstName: string; lastName: string }[],
+  ): Promise<Set<string>> {
+    const prefixes = [
+      ...new Set(people.map((p) => schoolEmailPrefix(p.firstName, p.lastName)).filter((p): p is string => !!p)),
+    ];
+    if (!prefixes.length) return new Set();
     const rows = await db.user.findMany({
-      where: { email: { endsWith: `@${this.domain}` } },
+      where: {
+        email: { endsWith: `@${this.domain}` },
+        OR: prefixes.map((prefix) => ({ email: { startsWith: prefix } })),
+      },
       select: { email: true },
     });
     return new Set(rows.map((r) => r.email));
@@ -507,12 +531,16 @@ export class UsersService {
     return new Map(sections.map((s) => [s.code as SectionId, s.id]));
   }
 
-  private async checkImport(csv: Buffer | undefined, role: ImportRole): Promise<CheckedRoster> {
+  private async checkImport(
+    csv: Buffer | undefined,
+    role: ImportRole,
+    createAnyway: readonly number[],
+  ): Promise<CheckedRoster> {
     if (!csv?.length) throw new BadRequestException('Fichier CSV manquant (champ « file »).');
     let headings: string[] = [];
-    let records: Record<string, string>[];
+    let parsed: { record: Record<string, string>; info: { lines: number }; raw: string }[];
     try {
-      records = parse(csv, {
+      parsed = parse(csv, {
         columns: (header: string[]) => {
           headings = header.map((c) => c.trim());
           return headings.map((c) => columnName(c) ?? c);
@@ -521,12 +549,19 @@ export class UsersService {
         trim: true,
         skip_empty_lines: true,
         delimiter: [',', ';'],
+        info: true,
+        raw: true,
       });
-    } catch (error) {
-      throw new BadRequestException(
-        `CSV illisible : ${error instanceof Error ? error.message : String(error)}`,
-      );
+    } catch {
+      // The parser's own message is English and technical: say what to check instead.
+      throw new BadRequestException(MALFORMED_CSV);
     }
+    const records = parsed.map((p) => p.record);
+    // The line each record starts on: `info.lines` is where it ends, and a quoted cell may span several.
+    const lineNumbers = parsed.map((p) => {
+      const body = p.raw.replace(/^[\r\n]+/, '').replace(/\r?\n?$/, '');
+      return p.info.lines - (body.match(/\n/g)?.length ?? 0);
+    });
     const header = headerProblems(headings, role);
     if (header.length)
       return { rows: [], errors: header.map((message) => ({ line: 1, message })) };
@@ -534,13 +569,13 @@ export class UsersService {
     if (records.length > MAX_IMPORT_ROWS)
       throw new BadRequestException(`Au plus ${MAX_IMPORT_ROWS} lignes par import.`);
 
-    const classes =
-      role === 'student'
-        ? await this.prisma.schoolClass.findMany({
-            where: { schoolYearId: (await this.access.currentYear()).id },
-            include: { section: true },
-          })
-        : [];
+    const year = role === 'student' ? await this.access.currentYear() : null;
+    const classes = year
+      ? await this.prisma.schoolClass.findMany({
+          where: { schoolYearId: year.id },
+          include: { section: true },
+        })
+      : [];
     const numbers = records.map((r) => (r['studentNumber'] ?? '').trim()).filter(Boolean);
     const existingByNumber = new Map<string, string>(
       numbers.length
@@ -552,15 +587,79 @@ export class UsersService {
           ).flatMap((s) => (s.studentNumber ? [[s.studentNumber, s.user.email] as const] : []))
         : [],
     );
-    return checkRoster(records, {
-      role,
-      domain: this.domain,
-      classes: new Map(
-        classes.map((c) => [`${c.section.code}/${c.code.toLowerCase()}`, { id: c.id, label: c.label }]),
-      ),
-      takenEmails: await this.takenEmails(),
-      existingByNumber,
+    const people = records
+      .map((r) => ({ firstName: (r['firstName'] ?? '').trim(), lastName: (r['lastName'] ?? '').trim() }))
+      .filter((p) => p.firstName && p.lastName);
+    return checkRoster(
+      records,
+      {
+        role,
+        domain: this.domain,
+        classes: new Map(
+          classes.map((c) => [`${c.section.code}/${c.code.toLowerCase()}`, { id: c.id, label: c.label }]),
+        ),
+        takenEmails: await this.takenEmails(this.prisma, people),
+        existingByNumber,
+        existingByIdentity: await this.existingByIdentity(role, people, year?.id ?? null),
+        createAnyway: new Set(createAnyway),
+      },
+      lineNumbers,
+    );
+  }
+
+  /**
+   * Accounts that look like one of these people: same exact normalised name and, for students, the same
+   * section and class this year. Candidates come from the `prenom.nom%` addresses and the exact names, then
+   * are compared on the normalised name.
+   */
+  private async existingByIdentity(
+    role: ImportRole,
+    people: readonly { firstName: string; lastName: string }[],
+    yearId: string | null,
+  ): Promise<Map<string, string>> {
+    const prefixes = [
+      ...new Set(people.map((p) => schoolEmailPrefix(p.firstName, p.lastName)).filter((p): p is string => !!p)),
+    ];
+    if (!people.length) return new Map();
+    const rows = await this.prisma.user.findMany({
+      where: {
+        role,
+        OR: [
+          ...prefixes.map((prefix) => ({ email: { startsWith: prefix } })),
+          ...people.map((p) => ({
+            firstName: { equals: p.firstName, mode: 'insensitive' as const },
+            lastName: { equals: p.lastName, mode: 'insensitive' as const },
+          })),
+        ],
+      },
+      select: {
+        email: true,
+        firstName: true,
+        lastName: true,
+        student: {
+          select: {
+            section: { select: { code: true } },
+            enrollments: {
+              where: { leftOn: null, ...(yearId ? { schoolYearId: yearId } : {}) },
+              select: { classId: true },
+              take: 1,
+            },
+          },
+        },
+      },
     });
+    const found = new Map<string, string>();
+    for (const row of rows) {
+      const key = identityKey(
+        role,
+        row.firstName,
+        row.lastName,
+        row.student?.section?.code ?? null,
+        row.student?.enrollments[0]?.classId ?? null,
+      );
+      if (key && !found.has(key)) found.set(key, row.email);
+    }
+    return found;
   }
 }
 

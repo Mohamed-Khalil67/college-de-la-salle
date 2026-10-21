@@ -11,6 +11,21 @@ import {
   type SectionId,
 } from '@cdls/shared';
 
+/**
+ * What identifies "the same person again" when there is no student number: role, exact normalised name
+ * (accents, case, spaces and apostrophes ignored) and, for students, section and class.
+ */
+export function identityKey(
+  role: ImportRole,
+  firstName: string,
+  lastName: string,
+  sectionCode: string | null,
+  classId: string | null,
+): string | null {
+  const local = schoolEmailLocalPart(firstName, lastName);
+  return local ? [role, local, sectionCode ?? '', classId ?? ''].join('|') : null;
+}
+
 /** Every account costs one password hash: 500 rows keep an import well inside a proxy timeout. */
 export const MAX_IMPORT_ROWS = 500;
 const STUDENT_NUMBER = /^[\w-]{1,32}$/;
@@ -63,6 +78,18 @@ export function headerProblems(headings: readonly string[], role: ImportRole): s
   return problems;
 }
 
+/** Does a line without a student number match an existing account, and is it forced as a homonym? */
+function identityMatch(
+  context: RosterContext,
+  line: number,
+  key: string | null,
+): { alreadyImported: boolean; matchedBy: 'name' | null; createAnyway: boolean } {
+  if (!key || !context.existingByIdentity.has(key))
+    return { alreadyImported: false, matchedBy: null, createAnyway: false };
+  const force = context.createAnyway.has(line);
+  return { alreadyImported: !force, matchedBy: 'name', createAnyway: force };
+}
+
 export interface RosterClass {
   readonly id: string;
   readonly label: string;
@@ -80,6 +107,10 @@ export interface RosterContext {
    * these numbers is the same student again: the account is kept as it is, never renumbered.
    */
   readonly existingByNumber: ReadonlyMap<string, string>;
+  /** E-mail of an existing account by `identityKey` (same name, and section and class for students). */
+  readonly existingByIdentity: ReadonlyMap<string, string>;
+  /** Lines the request asks to create even though the identity matches (genuine homonyms). */
+  readonly createAnyway: ReadonlySet<number>;
 }
 
 export interface CheckedRow extends ImportPreviewRow {
@@ -100,13 +131,15 @@ export interface CheckedRoster {
 export function checkRoster(
   records: readonly Readonly<Record<string, string>>[],
   context: RosterContext,
+  /** Real line number of each record in the file (a quoted cell may span lines); defaults to index + 2. */
+  lineNumbers: readonly number[] = [],
 ): CheckedRoster {
   const errors: ImportUsersError[] = [];
   const valid: Omit<CheckedRow, 'email' | 'emailNumber' | 'emailNote'>[] = [];
   const numbers = new Set<string>();
 
   records.forEach((record, i) => {
-    const line = i + 2;
+    const line = lineNumbers[i] ?? i + 2;
     const fail = (message: string) => errors.push({ line, message });
     const get = (name: string) => (record[name] ?? '').trim();
     const lastName = get('lastName');
@@ -129,7 +162,7 @@ export function checkRoster(
         classId: null,
         studentNumber: null,
         birthDate: null,
-        alreadyImported: false,
+        ...identityMatch(context, line, identityKey('teacher', firstName, lastName, null, null)),
       });
       return;
     }
@@ -159,7 +192,17 @@ export function checkRoster(
       classId: schoolClass.id,
       studentNumber,
       birthDate,
-      alreadyImported: !!studentNumber && context.existingByNumber.has(studentNumber),
+      ...(studentNumber
+        ? {
+            alreadyImported: context.existingByNumber.has(studentNumber),
+            matchedBy: context.existingByNumber.has(studentNumber) ? ('studentNumber' as const) : null,
+            createAnyway: false,
+          }
+        : identityMatch(
+            context,
+            line,
+            identityKey('student', firstName, lastName, section, schoolClass.id),
+          )),
     });
   });
 
@@ -170,8 +213,15 @@ export function checkRoster(
   const byLine = new Map(fresh.map((row, i) => [row.line, generated[i]!] as const));
   // Every valid row has a usable name (checked above), so every address is set.
   const rows = valid.map((row): CheckedRow => {
-    if (row.alreadyImported)
-      return { ...row, email: context.existingByNumber.get(row.studentNumber!)!, emailNumber: 0, emailNote: null };
+    if (row.alreadyImported) {
+      const existing =
+        row.matchedBy === 'studentNumber'
+          ? context.existingByNumber.get(row.studentNumber!)!
+          : context.existingByIdentity.get(
+              identityKey(context.role, row.firstName, row.lastName, row.sectionCode, row.classId)!,
+            )!;
+      return { ...row, email: existing, emailNumber: 0, emailNote: null };
+    }
     const { email, number } = byLine.get(row.line)!;
     return { ...row, email, emailNumber: number, emailNote: emailNumberReason(number) };
   });

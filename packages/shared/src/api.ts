@@ -185,6 +185,12 @@ export const IMPORT_ROLES: readonly ImportRole[] = ['student', 'teacher'];
  */
 export interface ImportUsersQuery {
   readonly role: ImportRole;
+  /**
+   * Lines (as numbered in the file) whose person already has an account with the same name, section and
+   * class, but who is a genuine homonym: create them anyway (`createAnyway=3,7`). Without it, those lines
+   * are skipped as « déjà présent ». Does not apply to a line whose student number is already in the school.
+   */
+  readonly createAnyway?: readonly number[];
 }
 
 export const ROSTER_HEADERS: Readonly<Record<ImportRole, readonly string[]>> = {
@@ -203,8 +209,15 @@ export interface ImportPreviewRow {
   readonly emailNumber: number;
   /** « car 1 homonyme » when the address carries a number, else null. */
   readonly emailNote: string | null;
-  /** The student number is already in the school: that account is kept as it is (no new account or e-mail). */
+  /**
+   * The person already has an account (same student number, or same name and section and class): it is kept
+   * as it is, and no new account or e-mail is made for the line.
+   */
   readonly alreadyImported: boolean;
+  /** Why `alreadyImported` (or the choice to create anyway) applies: null for a new person. */
+  readonly matchedBy: 'studentNumber' | 'name' | null;
+  /** The line matched an account by name but the request asks to create it anyway (a genuine homonym). */
+  readonly createAnyway: boolean;
   readonly sectionCode: SectionId | null;
   readonly classLabel: string | null;
   readonly studentNumber: string | null;
