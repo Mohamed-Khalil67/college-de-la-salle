@@ -77,6 +77,8 @@ export class DecisionModal {
   readonly decision = input<Decision>('approve');
   readonly classes = input<readonly ClassDto[]>([]);
   readonly decided = output<SectionChangeRequestDto>();
+  /** The request was decided or changed elsewhere (409): the list should be fetched again. */
+  readonly stale = output<void>();
 
   readonly #api = inject(ApiClient);
 
@@ -137,6 +139,7 @@ export class DecisionModal {
         this.open.set(false);
       } catch (error) {
         this.failure.set(apiMessage(error));
+        if ((error as { status?: number }).status === 409) this.stale.emit();
       } finally {
         this.busy.set(false);
       }

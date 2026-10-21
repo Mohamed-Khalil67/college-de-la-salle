@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -142,16 +148,15 @@ export class AuthService {
     if (await verify(user.passwordHash, newPassword))
       throw new BadRequestException('Choisissez un mot de passe différent de l’actuel.');
 
+    const newHash = await hash(newPassword);
     const updated = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.user.update({
-        where: { id: userId },
-        data: {
-          passwordHash: await hash(newPassword),
-          mustChangePassword: false,
-          passwordChangedAt: new Date(),
-        },
-        include: userInclude,
+      // Only if the password is still the one that was checked: a reset or another change in between wins.
+      const swapped = await tx.user.updateMany({
+        where: { id: userId, passwordHash: user.passwordHash, status: 'active' },
+        data: { passwordHash: newHash, mustChangePassword: false, passwordChangedAt: new Date() },
       });
+      if (swapped.count === 0) throw new ConflictException('Votre mot de passe vient d’être modifié : reconnectez-vous.');
+      const row = await tx.user.findUniqueOrThrow({ where: { id: userId }, include: userInclude });
       await tx.refreshToken.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },

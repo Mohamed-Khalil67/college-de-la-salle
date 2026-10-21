@@ -23,7 +23,8 @@ interface EditUserModel {
           <p class="t-muted">{{ user()?.email }}</p>
           <cdls-alert tone="info">
             Ce compte est archivé{{ user()?.graduatedOn ? ' (diplômé le ' + graduated() + ')' : '' }} : il ne peut plus se connecter
-            et reste en lecture seule. Ses notes, absences et bulletins sont conservés.
+            et reste en lecture seule. Ses notes, absences et bulletins sont conservés. Après une restauration, inscrivez
+            l’élève dans une classe depuis la page Classes.
           </cdls-alert>
           @if (saveFailure()) {
             <cdls-alert tone="danger">{{ saveFailure() }}</cdls-alert>

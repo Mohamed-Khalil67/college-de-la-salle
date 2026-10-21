@@ -3,6 +3,7 @@ import {
   PASSWORD_ALPHABET,
   classOptionLabel,
   createdAccountsCsv,
+  csvCell,
   formatAverage,
   formatDay,
   formatLastLogin,
@@ -89,6 +90,17 @@ describe('createdAccountsCsv', () => {
       { email: 'a@b.eg', role: 'student', firstName: 'Mariam', lastName: 'Saad', temporaryPassword: 'x,"y' },
     ]);
     expect(csv).toBe('nom,prenom,email,role,motDePasseTemporaire\nSaad,Mariam,a@b.eg,Élève,"x,""y"\n');
+  });
+});
+
+describe('csvCell', () => {
+  it('neutralises spreadsheet formulas and quotes special characters', () => {
+    expect(csvCell('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"');
+    expect(csvCell('-abc')).toBe("'-abc");
+    expect(csvCell('+1')).toBe("'+1");
+    expect(csvCell('@sum')).toBe("'@sum");
+    expect(csvCell('plain')).toBe('plain');
+    expect(csvCell('a,b')).toBe('"a,b"');
   });
 });
 

@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -16,7 +16,7 @@ const ROW_ID = '0190d5b4-1c2a-7000-8000-000000000001';
 
 describe('AuthService', () => {
   const prisma = {
-    user: { findUnique: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
     refreshToken: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
   };
@@ -132,9 +132,11 @@ describe('AuthService', () => {
   describe('changePassword', () => {
     beforeEach(() => {
       prisma.$transaction.mockImplementation((work: (tx: typeof prisma) => unknown) => work(prisma));
-      prisma.user.update.mockImplementation(async ({ data }: { data: object }) => ({
+      prisma.user.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.findUniqueOrThrow.mockImplementation(async () => ({
         ...(await user()),
-        ...data,
+        passwordChangedAt: new Date(),
+        mustChangePassword: false,
       }));
       prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
     });
@@ -144,7 +146,7 @@ describe('AuthService', () => {
       await expect(auth.changePassword('u1', 'wrong', 'a-new-long-password')).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
     });
 
     it('applies the rules: 10 characters, not the e-mail, not the current password', async () => {
@@ -154,13 +156,25 @@ describe('AuthService', () => {
           BadRequestException,
         );
       }
-      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the password changed in between (a reset or another change won)', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
+      prisma.user.updateMany.mockResolvedValue({ count: 0 });
+      await expect(
+        auth.changePassword('u1', 'correct horse', 'Cedre-du-Liban-2026'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     });
 
     it('stores the new password, clears the flag, revokes every session and issues a new one', async () => {
       prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
       const issued = await auth.changePassword('u1', 'correct horse', 'Cedre-du-Liban-2026');
-      const data = prisma.user.update.mock.calls[0]![0].data;
+      const { where, data } = prisma.user.updateMany.mock.calls[0]![0];
+      // Only while the password is still the one that was checked.
+      expect(where).toMatchObject({ id: 'u1', status: 'active' });
+      expect(where.passwordHash).toMatch(/^\$argon2/);
       expect(data).toMatchObject({ mustChangePassword: false, passwordChangedAt: expect.any(Date) });
       expect(data.passwordHash).toMatch(/^\$argon2/);
       expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
@@ -170,7 +184,7 @@ describe('AuthService', () => {
       expect(issued.session.user.mustChangePassword).toBe(false);
       // The new token carries the new password version.
       expect(jwt.signAsync).toHaveBeenLastCalledWith(
-        expect.objectContaining({ pv: (data.passwordChangedAt as Date).getTime() }),
+        expect.objectContaining({ pv: expect.any(Number) }),
         expect.anything(),
       );
       expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);

@@ -120,6 +120,7 @@ function isStatus(value: string): value is SectionChangeStatus {
       [decision]="decision()"
       [classes]="classList()"
       (decided)="onDecided($event)"
+      (stale)="reload()"
     />
     <app-request-create-modal [(open)]="createOpen" (created)="onCreated()" />
   `,
@@ -149,9 +150,13 @@ export class ValidationsPage {
     loader: ({ params }) => this.#api.sectionChanges.list({ ...params, pageSize: PAGE_SIZE }),
   });
   /** The last page received, kept on screen while the next one loads. */
-  protected readonly shown = linkedSignal<Paginated<SectionChangeRequestDto> | undefined, Paginated<SectionChangeRequestDto> | undefined>({
-    source: () => (this.requests.hasValue() ? this.requests.value() : undefined),
-    computation: (next, previous) => next ?? previous?.value,
+  protected readonly shown = linkedSignal<
+    { status: SectionChangeStatus; list: Paginated<SectionChangeRequestDto> | undefined },
+    Paginated<SectionChangeRequestDto> | undefined
+  >({
+    source: () => ({ status: this.statusFilter(), list: this.requests.hasValue() ? this.requests.value() : undefined }),
+    // Keep the previous page on screen while the next one loads, but never another tab's rows.
+    computation: (next, previous) => next.list ?? (previous?.source.status === next.status ? previous.value : undefined),
   });
   protected readonly pendingCount = resource({
     loader: async () => (await this.#api.sectionChanges.list({ status: 'pending', pageSize: 1 })).total,
@@ -213,7 +218,7 @@ export class ValidationsPage {
     this.reload();
   }
 
-  private reload(): void {
+  protected reload(): void {
     this.requests.reload();
     this.pendingCount.reload();
   }

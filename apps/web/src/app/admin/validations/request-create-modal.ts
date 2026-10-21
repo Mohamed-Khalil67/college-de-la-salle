@@ -25,7 +25,7 @@ interface RequestModel {
         <cdls-field label="Élève" [error]="studentError()">
           <select cdlsControl [formField]="requestForm.studentId">
             <option value="">Choisir un élève</option>
-            @for (s of candidates(); track s.id) {
+            @for (s of options(); track s.id) {
               <option [value]="s.studentId">{{ label(s) }}</option>
             }
           </select>
@@ -71,6 +71,13 @@ export class RequestCreateModal {
   protected readonly candidates = computed<readonly UserDto[]>(() =>
     this.found.hasValue() ? this.found.value().items.filter((u) => !!u.studentId && !!u.sectionCode) : [],
   );
+  /** Every student seen in the results of this dialog: the chosen one stays valid when the search changes. */
+  readonly #seen = signal<ReadonlyMap<string, UserDto>>(new Map());
+  protected readonly options = computed<readonly UserDto[]>(() => {
+    const chosen = this.#seen().get(this.model().studentId);
+    const list = this.candidates();
+    return chosen && !list.some((u) => u.studentId === chosen.studentId) ? [chosen, ...list] : list;
+  });
   protected readonly resultsText = computed(() => {
     if (this.#term().length < 2) return '';
     if (this.found.isLoading()) return 'Recherche en cours…';
@@ -78,7 +85,7 @@ export class RequestCreateModal {
     return n ? `${n} élève${n > 1 ? 's' : ''} trouvé${n > 1 ? 's' : ''}.` : 'Aucun élève trouvé.';
   });
   protected readonly target = computed(() => {
-    const chosen = this.candidates().find((u) => u.studentId === this.model().studentId);
+    const chosen = this.#seen().get(this.model().studentId);
     return chosen?.sectionCode ? sectionLabel(otherSection(chosen.sectionCode)) : '';
   });
 
@@ -87,8 +94,14 @@ export class RequestCreateModal {
 
   constructor() {
     effect(() => {
+      const list = this.candidates();
+      if (!list.length) return;
+      untracked(() => this.#seen.update((seen) => new Map([...seen, ...list.map((u) => [u.studentId!, u] as const)])));
+    });
+    effect(() => {
       if (!this.open()) return;
       untracked(() => {
+        this.#seen.set(new Map());
         this.failure.set(null);
         this.requestForm().reset({ search: '', studentId: '', reason: '' });
       });
@@ -102,8 +115,11 @@ export class RequestCreateModal {
   protected onSubmit(event: Event): void {
     event.preventDefault();
     void submit(this.requestForm, async () => {
-      const chosen = this.candidates().find((u) => u.studentId === this.model().studentId);
-      if (!chosen?.sectionCode) return;
+      const chosen = this.#seen().get(this.model().studentId);
+      if (!chosen?.sectionCode) {
+        this.failure.set('Choisissez l’élève dans la liste des résultats.');
+        return;
+      }
       this.busy.set(true);
       this.failure.set(null);
       try {

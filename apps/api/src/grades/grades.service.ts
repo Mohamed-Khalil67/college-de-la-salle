@@ -165,11 +165,13 @@ export class GradesService {
 
     const eventWhere: Prisma.EventWhereInput = {};
     let schoolYearId: string | null = null;
+    let window: { from: Date; to: Date } | null = null;
     if (query.termId) {
       const term = await this.prisma.term.findUnique({ where: { id: query.termId } });
       if (!term) throw notFound('Trimestre');
       eventWhere.date = { gte: term.startsOn, lte: term.endsOn };
       schoolYearId = term.schoolYearId;
+      window = { from: term.startsOn, to: term.endsOn };
     } else if (query.from || query.to) {
       eventWhere.date = {
         ...(query.from ? { gte: fromDay(query.from) } : {}),
@@ -197,7 +199,7 @@ export class GradesService {
       const key = g.event.subjectId ?? '';
       bySubject.set(key, [...(bySubject.get(key) ?? []), g]);
     }
-    const coefficients = await this.subjectCoefficients(studentId, schoolYearId);
+    const coefficients = await this.subjectCoefficients(studentId, schoolYearId, window);
     return {
       studentId,
       subjects: [...bySubject]
@@ -234,13 +236,24 @@ export class GradesService {
   private async subjectCoefficients(
     studentId: string,
     schoolYearId: string | null,
+    window: { from: Date; to: Date } | null,
   ): Promise<Map<string, number>> {
     const classId = schoolYearId
       ? (
-          // The open enrolment of that year, else the last one (a section change closes the first).
+          // The class the student was in during the term (a section change closes the first enrolment
+          // and opens another), the latest one when they moved within the term.
           await this.prisma.enrollment.findFirst({
-            where: { studentId, schoolYearId },
-            orderBy: [{ leftOn: { sort: 'desc', nulls: 'first' } }, { enrolledOn: 'desc' }],
+            where: {
+              studentId,
+              schoolYearId,
+              ...(window
+                ? {
+                    enrolledOn: { lte: window.to },
+                    OR: [{ leftOn: null }, { leftOn: { gte: window.from } }],
+                  }
+                : {}),
+            },
+            orderBy: { enrolledOn: 'desc' },
             select: { classId: true },
           })
         )?.classId

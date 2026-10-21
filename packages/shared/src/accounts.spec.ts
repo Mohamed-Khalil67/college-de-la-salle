@@ -23,6 +23,7 @@ describe('emailNamePart', () => {
   it('drops other characters and trims hyphens', () => {
     expect(emailNamePart('  Jean -- Paul. ')).toBe('jean-paul');
     expect(emailNamePart('Œdipe Straße')).toBe('oedipe-strasse');
+    expect(emailNamePart('Łukasz Østergård')).toBe('lukasz-ostergard');
     expect(emailNamePart('محمد')).toBe('');
   });
 });
@@ -69,6 +70,15 @@ describe('assignSchoolEmails', () => {
         'ali.zaki2@demo.cdls.test',
       ]),
     ).toEqual(['ali.zaki3@demo.cdls.test']);
+  });
+
+  it('keeps the local part within the 64 characters the sign-in form accepts, collision number included', () => {
+    const person = { firstName: 'Mohamed-Abdelrahman-Ibrahim', lastName: 'El-Sayed-Hassan-Mahmoud-Abdelhamid' };
+    const [first, second] = assignSchoolEmails([person, person], domain);
+    expect(first!.split('@')[0]!.length).toBeLessThanOrEqual(58);
+    expect(first!.split('@')[0]!.endsWith('-')).toBe(false);
+    expect(second!.split('@')[0]!.length).toBeLessThanOrEqual(64);
+    expect(second).not.toBe(first);
   });
 
   it('gives null for names without usable letters', () => {

@@ -20,7 +20,7 @@ interface CreateUserModel {
   selector: 'app-user-create-modal',
   imports: [FormField, Modal, Alert, Button, Field, FieldControl, CopyButton],
   template: `
-    <cdls-modal title="Ajouter un utilisateur" [(open)]="open">
+    <cdls-modal title="Ajouter un utilisateur" [(open)]="open" [dismissible]="!result() && !busy()">
       @if (result(); as created) {
         <div class="stack" #resultBlock tabindex="-1">
           <cdls-alert tone="warning">

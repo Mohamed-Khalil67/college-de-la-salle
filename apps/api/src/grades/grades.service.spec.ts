@@ -209,7 +209,7 @@ describe('GradesService', () => {
       await grades.forStudent('s1', { termId: 'tm1' }, STUDENT);
       expect(prisma.enrollment.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { studentId: 's1', schoolYearId: 'y0' },
+          where: expect.objectContaining({ studentId: 's1', schoolYearId: 'y0' }),
         }),
       );
       expect(prisma.teachingAssignment.findMany).toHaveBeenCalledWith(

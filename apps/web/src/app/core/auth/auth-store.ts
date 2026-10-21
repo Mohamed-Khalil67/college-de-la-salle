@@ -95,6 +95,18 @@ export class AuthStore {
     this.#clear();
   }
 
+  /**
+   * Fetches the current profile (section, class…) from /auth/me, which the API reads from the database
+   * on every call. Unlike refresh() it keeps the tokens and the session: a network error changes nothing.
+   */
+  async reloadUser(): Promise<void> {
+    try {
+      this.#user.set(await firstValueFrom(this.#http.get<SessionUser>('/api/auth/me')));
+    } catch {
+      // Keep what we have: the next call will show an error if the session really ended.
+    }
+  }
+
   /** Exchanges the refresh cookie for a new access token. Concurrent callers share one request. */
   refresh(): Promise<boolean> {
     this.#refreshing ??= firstValueFrom(

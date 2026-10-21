@@ -10,7 +10,8 @@ import {
   type SectionId,
 } from '@cdls/shared';
 
-export const MAX_IMPORT_ROWS = 2000;
+/** Every account costs one password hash: 500 rows keep an import well inside a proxy timeout. */
+export const MAX_IMPORT_ROWS = 500;
 const STUDENT_NUMBER = /^[\w-]{1,32}$/;
 
 /** Accepted column names, French spreadsheet headings included, mapped to the contract's names. */

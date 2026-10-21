@@ -21,7 +21,7 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
   selector: 'app-users-import-modal',
   imports: [Modal, Alert, Button, Icon, Segmented],
   template: `
-    <cdls-modal title="Importer une liste" [(open)]="open">
+    <cdls-modal title="Importer une liste" [(open)]="open" [dismissible]="step() !== 'done' && !busy()">
       <div class="stack" #body tabindex="-1">
         @switch (step()) {
           @case ('done') {
@@ -158,7 +158,7 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                   [attr.aria-invalid]="fileError() ? 'true' : null"
                   (change)="onFile($event)"
                 />
-                <p class="field__helper" id="import-file-help">1 Mo et 2 000 lignes au plus.</p>
+                <p class="field__helper" id="import-file-help">1 Mo et 500 lignes au plus : découpez une liste plus longue en plusieurs fichiers.</p>
                 @if (fileError()) {
                   <p class="field__error"><cdls-icon name="alert" /><span>{{ fileError() }}</span></p>
                 }
@@ -271,6 +271,7 @@ export class UsersImportModal {
   }
 
   protected backToChoose(): void {
+    this.resetFile();
     this.preview.set(null);
     this.step.set('choose');
     this.failure.set(null);

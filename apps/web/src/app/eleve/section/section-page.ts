@@ -174,9 +174,9 @@ export class SectionPage {
   protected readonly notice = signal<string | null>(null);
 
   constructor() {
-    // The section and class of the session come from the last sign-in or refresh: an approved request
-    // changes them, so fetch them again when the page opens.
-    void this.auth.refresh();
+    // The section and class of the session come from sign-in: an approved request changes them, so
+    // read the profile again when the page opens.
+    void this.auth.reloadUser();
   }
 
   protected labelOf(code: SectionId): string {

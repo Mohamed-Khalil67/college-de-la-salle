@@ -150,8 +150,13 @@ export function importTemplate(role: ImportRole): string {
   return [importHeader(role), example, ''].join('\n');
 }
 
-function csvCell(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+/**
+ * One CSV cell. A value starting with = + - @ (or a tab or carriage return) would be read as a formula
+ * by a spreadsheet, so it gets a leading apostrophe; values with a comma, quote or line break are quoted.
+ */
+export function csvCell(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 /** The accounts created by an import, with their temporary passwords, as a CSV to hand out. */

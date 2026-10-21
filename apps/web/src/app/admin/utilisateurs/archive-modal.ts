@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { form, FormField, required, submit, validate } from '@angular/forms/signals';
 import { isCalendarDay, todayIso, type ArchiveOutcome } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
@@ -48,7 +48,7 @@ const OUTCOMES: readonly SegmentOption[] = [
             </div>
           </form>
         } @else {
-          <div class="stack">
+          <div class="stack" #confirmBlock tabindex="-1">
             <cdls-alert tone="warning">
               <p><strong>Confirmez l’archivage.</strong></p>
               <ul>
@@ -78,6 +78,9 @@ const OUTCOMES: readonly SegmentOption[] = [
     </cdls-modal>
   `,
   styles: `
+    [tabindex='-1']:focus {
+      outline: none;
+    }
     ul {
       padding-left: var(--space-6);
       margin-block: var(--space-2);
@@ -91,6 +94,8 @@ export class ArchiveModal {
   readonly archived = output<number>();
 
   readonly #api = inject(ApiClient);
+  readonly #injector = inject(Injector);
+  private readonly confirmBlock = viewChild<ElementRef<HTMLElement>>('confirmBlock');
 
   protected readonly plural = plural;
   protected readonly outcomes = OUTCOMES;
@@ -129,6 +134,8 @@ export class ArchiveModal {
     event.preventDefault();
     void submit(this.archiveForm, async () => {
       this.confirming.set(true);
+      // The form is replaced by the confirmation: keep the focus inside the dialog, on the new content.
+      afterNextRender(() => this.confirmBlock()?.nativeElement.focus(), { injector: this.#injector });
     });
   }
 

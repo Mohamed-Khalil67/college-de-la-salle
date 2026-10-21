@@ -174,7 +174,11 @@ export class ClassesService {
 
     const today = fromDay(todayIso());
     const enrollment = await this.prisma.$transaction(async (tx) => {
-      if (!student.sectionId)
+      // Read again inside the transaction: a section change may have been approved meanwhile.
+      const current = await tx.student.findUniqueOrThrow({ where: { id: studentId } });
+      if (current.sectionId && current.sectionId !== schoolClass.sectionId)
+        throw new ConflictException('La section de l’élève a changé : actualisez la page.');
+      if (!current.sectionId)
         await tx.student.update({ where: { id: studentId }, data: { sectionId: schoolClass.sectionId } });
       const open = await tx.enrollment.findFirst({
         where: { studentId, schoolYearId: schoolClass.schoolYearId, leftOn: null },
@@ -192,8 +196,14 @@ export class ClassesService {
 
   /** Removes a student from a class (the enrollment row is deleted). */
   async unenroll(enrollmentId: string): Promise<void> {
-    const enrollment = await this.prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { student: { include: { user: { select: { status: true } } } } },
+    });
     if (!enrollment) throw notFound('Inscription');
+    // An archived account is read-only, and its enrolments are history.
+    if (enrollment.student.user.status === 'archived')
+      throw new ConflictException('Ce compte est archivé : son inscription est conservée.');
     await this.prisma.enrollment.delete({ where: { id: enrollmentId } });
   }
 }

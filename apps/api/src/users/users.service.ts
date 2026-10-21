@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import {
   assignSchoolEmails,
   type ImportRole,
@@ -437,9 +437,12 @@ export class UsersService {
   }
 }
 
-/** 16 URL-safe characters (96 bits). */
-function generatePassword(): string {
-  return randomBytes(12).toString('base64url');
+/** No look-alike characters (0/O, 1/l/I) and no symbol: safe to read aloud, and never read as a spreadsheet formula. */
+const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+
+/** 16 letters and digits drawn uniformly (about 93 bits). */
+export function generatePassword(): string {
+  return Array.from({ length: 16 }, () => PASSWORD_ALPHABET[randomInt(PASSWORD_ALPHABET.length)]).join('');
 }
 
 export function toUserDto(u: UserRow): UserDto {

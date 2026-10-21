@@ -21,6 +21,10 @@ export function emailNamePart(name: string): string {
     .replace(/æ/g, 'ae')
     .replace(/œ/g, 'oe')
     .replace(/ß/g, 'ss')
+    .replace(/ł/g, 'l')
+    .replace(/ø/g, 'o')
+    .replace(/đ/g, 'd')
+    .replace(/ı/g, 'i')
     .replace(SEPARATORS, '-')
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-{2,}/g, '-')
@@ -32,6 +36,16 @@ export function schoolEmailLocalPart(firstName: string, lastName: string): strin
   const first = emailNamePart(firstName);
   const last = emailNamePart(lastName);
   return first && last ? `${first}.${last}` : null;
+}
+
+/**
+ * Longest local part we generate: the sign-in form accepts at most 64 characters before the @, and a
+ * collision number (`2`…`99999`) is added after it.
+ */
+export const EMAIL_LOCAL_MAX = 58;
+
+function cappedLocal(local: string): string {
+  return local.length <= EMAIL_LOCAL_MAX ? local : local.slice(0, EMAIL_LOCAL_MAX).replace(/[-.]+$/, '');
 }
 
 /**
@@ -47,8 +61,9 @@ export function assignSchoolEmails(
   const used = new Set([...taken].map((email) => email.toLowerCase()));
   const host = domain.trim().toLowerCase();
   return people.map(({ firstName, lastName }) => {
-    const local = schoolEmailLocalPart(firstName, lastName);
-    if (!local) return null;
+    const full = schoolEmailLocalPart(firstName, lastName);
+    if (!full) return null;
+    const local = cappedLocal(full);
     let email = `${local}@${host}`;
     for (let n = 2; used.has(email); n++) email = `${local}${n}@${host}`;
     used.add(email);
