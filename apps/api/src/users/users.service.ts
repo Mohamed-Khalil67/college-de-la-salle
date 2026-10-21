@@ -23,6 +23,7 @@ import { fromDay, toDay, toIso } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { pageArgs, paginated } from '../common/pagination.js';
 import type { Env } from '../config/env.validation.js';
+import { archiveStudentRows } from './archive-students.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   ArchiveStudentsDto,
@@ -434,47 +435,15 @@ export class UsersService {
     const targets = students.filter((s) => s.user.status !== 'archived');
     if (!targets.length) return { archived: 0 };
 
-    const on = fromDay(dto.on);
-    const now = new Date();
-    const studentIds = targets.map((s) => s.id);
-    const userIds = targets.map((s) => s.userId);
-    const note =
-      dto.outcome === 'graduated'
-        ? 'Demande close : l’élève a obtenu son diplôme.'
-        : 'Demande close : l’élève a quitté le collège.';
-    await this.prisma.$transaction(async (tx) => {
-      await tx.user.updateMany({
-        where: { id: { in: userIds } },
-        data: { status: 'archived', passwordChangedAt: now },
-      });
-      await tx.student.updateMany({
-        where: { id: { in: studentIds } },
-        data: { graduatedOn: dto.outcome === 'graduated' ? on : null },
-      });
-      await tx.enrollment.updateMany({
-        where: { studentId: { in: studentIds }, leftOn: null },
-        data: { leftOn: on },
-      });
-      await tx.sectionChangeRequest.updateMany({
-        where: { studentId: { in: studentIds }, status: 'pending' },
-        data: { status: 'rejected', decidedById: actor.id, decidedAt: now, decisionNote: note },
-      });
-      await tx.refreshToken.updateMany({
-        where: { userId: { in: userIds }, revokedAt: null },
-        data: { revokedAt: now },
-      });
-      await audit(
+    await this.prisma.$transaction((tx) =>
+      archiveStudentRows(
         tx,
-        targets.map((s) => ({
-          actorId: actor.id,
-          action: `student.${dto.outcome}`,
-          entity: 'student',
-          entityId: s.id,
-          before: { status: s.user.status },
-          after: { status: 'archived', outcome: dto.outcome, on: dto.on },
-        })),
-      );
-    });
+        targets.map((s) => ({ id: s.id, userId: s.userId, status: s.user.status })),
+        dto.outcome,
+        dto.on,
+        actor.id,
+      ),
+    );
     return { archived: targets.length };
   }
 

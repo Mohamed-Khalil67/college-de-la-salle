@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextYearLabel, shiftRange, shiftYear } from './rollover.js';
+import { nextYearLabel, shiftRange, shiftYear, yearsBetween } from './rollover.js';
 
 describe('shiftYear', () => {
   it('moves a day one year on', () => {
@@ -43,6 +43,7 @@ describe('shiftRange', () => {
       startsOn: '2027-12-20',
       endsOn: '2028-01-02',
       clamped: false,
+      outside: false,
     });
   });
 
@@ -51,6 +52,7 @@ describe('shiftRange', () => {
       startsOn: '2027-09-06',
       endsOn: '2028-06-15',
       clamped: true,
+      outside: false,
     });
     expect(shiftRange({ startsOn: '2026-09-01', endsOn: '2026-09-02' }, year).startsOn).toBe(
       '2027-09-05',
@@ -60,6 +62,21 @@ describe('shiftRange', () => {
   it('shifts a leap-day range', () => {
     expect(
       shiftRange({ startsOn: '2027-02-28', endsOn: '2028-02-29' }, { startsOn: '2028-09-01', endsOn: '2029-06-30' }),
-    ).toEqual({ startsOn: '2028-09-01', endsOn: '2029-02-28', clamped: true });
+    ).toEqual({ startsOn: '2028-09-01', endsOn: '2029-02-28', clamped: true, outside: false });
+  });
+});
+
+describe('yearsBetween and a range outside the year', () => {
+  it('counts whole years, one at least', () => {
+    expect(yearsBetween('2026-09-06', '2027-09-05')).toBe(1);
+    expect(yearsBetween('2026-09-06', '2028-09-05')).toBe(2);
+    expect(yearsBetween('2026-09-06', '2026-10-01')).toBe(1);
+  });
+
+  it('says when nothing of the range is left in the year', () => {
+    const year = { startsOn: '2027-09-05', endsOn: '2028-06-15' };
+    expect(shiftRange({ startsOn: '2026-01-01', endsOn: '2026-01-10' }, year).outside).toBe(true);
+    expect(shiftRange({ startsOn: '2026-01-01', endsOn: '2026-01-10' }, year, 2).outside).toBe(false);
+    expect(shiftRange({ startsOn: '2026-12-20', endsOn: '2027-01-02' }, year, 1).outside).toBe(false);
   });
 });

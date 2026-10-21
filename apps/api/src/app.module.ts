@@ -21,6 +21,7 @@ import { GradesModule } from './grades/grades.module.js';
 import { HomeworkModule } from './homework/homework.module.js';
 import { PeriodsModule } from './periods/periods.module.js';
 import { PostsModule } from './posts/posts.module.js';
+import { RolloverModule } from './rollover/rollover.module.js';
 import { ReportCardsModule } from './report-cards/report-cards.module.js';
 import { RoomsModule } from './rooms/rooms.module.js';
 import { SchoolYearsModule } from './school-years/school-years.module.js';
@@ -81,6 +82,7 @@ import { UsersModule } from './users/users.module.js';
     ContactModule,
     SectionChangesModule,
     TimetableModule,
+    RolloverModule,
   ],
   providers: [
     // Order matters: rate limit, then authentication, then roles.

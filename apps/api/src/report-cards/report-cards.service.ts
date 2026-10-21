@@ -42,7 +42,6 @@ export class ReportCardsService {
     user: AuthUser,
   ): Promise<ReportCardBatchResultDto> {
     const period = await this.closedPeriod(periodId);
-    const window = { from: toDay(period.startsOn), to: toDay(period.endsOn) };
     const inScope = new Set((await this.classesOf(period, classId)).map((c) => c.id));
 
     // Who was enrolled during the period, and in which classes: a student who changed class or section
@@ -72,7 +71,15 @@ export class ReportCardsService {
     const primary = new Map(
       [...byStudent].map(([studentId, stints]) => [studentId, primaryClassId(stints)!]),
     );
-    const cardStudents = [...byStudent.keys()].filter((id) => inScope.has(primary.get(id)!));
+    // Only students still enrolled (an unenrolled or archived student gets no new card); earlier classes of the
+    // period still count for the ones who moved.
+    const cardStudents = [...byStudent]
+      .filter(
+        ([id, stints]) =>
+          inScope.has(primary.get(id)!) &&
+          stints.some((st) => st.classId === primary.get(id) && st.leftOn === null),
+      )
+      .map(([id]) => id);
 
     // The grades: the events of the period in the class of the card (by the events' stored period, never their
     // dates), and the earlier class's events of the same stretch of the year (another section keeps its own

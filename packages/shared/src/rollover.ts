@@ -33,16 +33,30 @@ export function nextYearLabel(label: string): string | null {
   return `${Number(match[1]) + 1}-${Number(match[2]) + 1}`;
 }
 
-/** A date range moved by one year and held inside the new school year (the plan warns when it was cut). */
+/**
+ * A date range moved by `years` (one by default) and held inside the new school year; the plan warns when it
+ * was cut. `outside` is true when nothing of the range is left inside the year (it cannot be created).
+ */
 export function shiftRange(
   range: { readonly startsOn: string; readonly endsOn: string },
   year: { readonly startsOn: string; readonly endsOn: string },
-): { readonly startsOn: string; readonly endsOn: string; readonly clamped: boolean } {
-  const startsOn = shiftYear(range.startsOn);
-  const endsOn = shiftYear(range.endsOn);
+  years = 1,
+): {
+  readonly startsOn: string;
+  readonly endsOn: string;
+  readonly clamped: boolean;
+  readonly outside: boolean;
+} {
+  const startsOn = shiftYear(range.startsOn, years);
+  const endsOn = shiftYear(range.endsOn, years);
   const from = startsOn < year.startsOn ? year.startsOn : startsOn;
   const to = endsOn > year.endsOn ? year.endsOn : endsOn;
-  return { startsOn: from, endsOn: to, clamped: from !== startsOn || to !== endsOn };
+  return { startsOn: from, endsOn: to, clamped: from !== startsOn || to !== endsOn, outside: from > to };
+}
+
+/** Whole years between two school years' first days (at least one): how far the plan moves every date. */
+export function yearsBetween(sourceStartsOn: string, newStartsOn: string): number {
+  return Math.max(1, Number(newStartsOn.slice(0, 4)) - Number(sourceStartsOn.slice(0, 4)));
 }
 
 /** Holiday and « pas de cours » dates move with the lunar and civil calendars: the plan flags them for a check. */
