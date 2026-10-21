@@ -1,9 +1,9 @@
-import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { Component, computed, inject, input, linkedSignal, output, resource, signal } from '@angular/core';
 import { form, FormField, maxLength, required, submit, validate } from '@angular/forms/signals';
-import { daysBetween, EVENT_KINDS, EVENT_LIMITS, type EventDto, kindInfo, type TeachingAssignmentDto } from '@cdls/shared';
+import { daysBetween, EVENT_LIMITS, type EventDto, type TeachingAssignmentDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, Field, FieldControl } from '../../ui';
-import { assignmentLabel, emptyEventModel, type EventFormModel, modelFromEvent, sortAssignments, timeProblem, toEventInput } from '../shared/teacher';
+import { assignmentLabel, defaultActivityType, emptyEventModel, type EventFormModel, modelFromEvent, sortAssignments, timeProblem, toEventInput } from '../shared/teacher';
 
 /** First error of a field once it was touched (or a submit was tried). */
 function shownError(state: { touched(): boolean; errors(): readonly { message?: string }[] }): string | null {
@@ -20,8 +20,8 @@ function shownError(state: { touched(): boolean; errors(): readonly { message?: 
         <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
       }
       <cdls-field label="Type">
-        <select cdlsControl [formField]="eventForm.kind">
-          @for (k of kinds; track k.id) {
+        <select cdlsControl [formField]="eventForm.activityTypeId">
+          @for (k of types(); track k.id) {
             <option [value]="k.id">{{ k.label }}</option>
           }
         </select>
@@ -86,13 +86,17 @@ export class EventForm {
   readonly cancelled = output<void>();
 
   readonly #api = inject(ApiClient);
-  protected readonly kinds = EVENT_KINDS;
+  /** The school's activity types plus the teacher's own. */
+  readonly #types = resource({ loader: () => this.#api.school.activityTypes() });
+  protected readonly types = computed(() => (this.#types.hasValue() ? this.#types.value() : []));
   protected readonly sorted = computed(() => sortAssignments(this.assignments()));
 
   protected readonly model = linkedSignal<EventFormModel>(() => {
     const e = this.event();
     const list = this.sorted();
-    return e ? modelFromEvent(e, list) : emptyEventModel(this.day(), list.length === 1 ? list[0]!.id : '');
+    return e
+      ? modelFromEvent(e, list)
+      : emptyEventModel(this.day(), list.length === 1 ? list[0]!.id : '', defaultActivityType(this.types())?.id ?? '');
   });
   protected readonly eventForm = form(this.model, (p) => {
     required(p.title, { message: 'Donnez un titre, par exemple « Contrôle n° 3 : fonctions affines ».' });
@@ -104,7 +108,7 @@ export class EventForm {
       return message ? { kind: 'time', message } : undefined;
     });
     validate(p.repeatUntil, ({ value, valueOf }) => {
-      if (!valueOf(p.weekly) || !kindInfo(valueOf(p.kind)).repeatable) return undefined;
+      if (!valueOf(p.weekly) || !this.#flags(valueOf(p.activityTypeId)).repeatable) return undefined;
       const until = value();
       if (!until) return { kind: 'required', message: 'Indiquez jusqu’à quand l’événement se répète.' };
       if (until < valueOf(p.date)) return { kind: 'order', message: 'La répétition doit finir après le premier jour.' };
@@ -112,7 +116,7 @@ export class EventForm {
       return undefined;
     });
     validate(p.coefficient, ({ value, valueOf }) => {
-      if (!kindInfo(valueOf(p.kind)).gradable) return undefined;
+      if (!this.#flags(valueOf(p.activityTypeId)).gradable) return undefined;
       const c = value();
       return Number.isFinite(c) && c > 0 && c <= 20 ? undefined : { kind: 'range', message: 'Saisissez un coefficient entre 0,5 et 20.' };
     });
@@ -122,8 +126,8 @@ export class EventForm {
     });
   });
 
-  protected readonly repeatable = computed(() => kindInfo(this.model().kind).repeatable);
-  protected readonly gradable = computed(() => kindInfo(this.model().kind).gradable);
+  protected readonly repeatable = computed(() => this.#flags(this.model().activityTypeId).repeatable);
+  protected readonly gradable = computed(() => this.#flags(this.model().activityTypeId).gradable);
   protected readonly err = computed(() => ({
     title: shownError(this.eventForm.title()),
     assignment: shownError(this.eventForm.assignmentId()),
@@ -138,6 +142,10 @@ export class EventForm {
   protected readonly busy = signal(false);
   protected readonly failure = signal<string | null>(null);
 
+  #flags(id: string): { repeatable: boolean; gradable: boolean } {
+    return this.types().find((t) => t.id === id) ?? { repeatable: false, gradable: false };
+  }
+
   protected label(a: TeachingAssignmentDto): string {
     return assignmentLabel(a);
   }
@@ -149,7 +157,7 @@ export class EventForm {
       this.busy.set(true);
       this.failure.set(null);
       try {
-        const body = toEventInput(this.model(), this.assignments());
+        const body = toEventInput(this.model(), this.assignments(), this.types());
         const current = this.event();
         this.saved.emit(current ? await this.#api.calendar.update(current.id, body) : await this.#api.calendar.create(body));
       } catch (error) {

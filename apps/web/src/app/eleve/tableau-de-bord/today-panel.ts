@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { OccurrenceDto } from '@cdls/shared';
 import { ApiClient } from '../../core/api/api-client';
 import { Badge } from '../../ui';
-import { clock, kindLabel, subjectName } from '../shared/format';
+import { clock, kindLabel, subjectName, whereOf } from '../shared/format';
 import { LoadState } from '../shared/load-state';
 
 /** Today's classes and exams (homework deadlines are in their own panel). */
@@ -54,7 +54,7 @@ export class TodayPanel {
     loader: ({ params }) => this.#api.calendar.occurrences(params),
   });
   protected readonly items = computed(() =>
-    this.occurrences.hasValue() ? this.occurrences.value().filter((o) => o.event.kind !== 'devoir') : [],
+    this.occurrences.hasValue() ? this.occurrences.value().filter((o) => !o.event.type.homework) : [],
   );
 
   protected start(item: OccurrenceDto): string {
@@ -67,7 +67,6 @@ export class TodayPanel {
   protected meta(item: OccurrenceDto): string {
     const e = item.event;
     const subject = subjectName(e.subjectId);
-    const kind = e.kind === 'cours' ? '' : kindLabel(e.kind);
-    return [kind, subject && subject !== e.title ? subject : '', e.place, e.authorName].filter(Boolean).join(', ');
+    return [kindLabel(e.type), subject && subject !== e.title ? subject : '', whereOf(e), e.authorName].filter(Boolean).join(', ');
   }
 }

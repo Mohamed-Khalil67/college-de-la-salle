@@ -75,16 +75,16 @@ export class ReportCardsPage {
     loader: ({ params }) => this.#api.attendance.ofStudent(params),
   });
 
-  readonly #terms = computed(() => (this.#years.hasValue() ? this.#years.value().flatMap((y) => y.terms.map((t) => ({ ...t, year: y.label }))) : []));
+  readonly #terms = computed(() => (this.#years.hasValue() ? this.#years.value().flatMap((y) => y.periods.map((t) => ({ ...t, year: y.label }))) : []));
   readonly #list = computed(() => {
     const cards = this.cards.hasValue() ? this.cards.value() : [];
-    const start = (termId: string) => this.#terms().find((t) => t.id === termId)?.startsOn ?? '';
-    return [...cards].sort((a, b) => start(b.termId).localeCompare(start(a.termId)));
+    const start = (periodId: string) => this.#terms().find((t) => t.id === periodId)?.startsOn ?? '';
+    return [...cards].sort((a, b) => start(b.periodId).localeCompare(start(a.periodId)));
   });
   /** The latest report card first. */
   protected readonly cardId = linkedSignal(() => this.#list()[0]?.id ?? '');
   protected readonly selected = computed(() => this.#list().find((c) => c.id === this.cardId()) ?? null);
-  readonly #term = computed(() => this.#terms().find((t) => t.id === this.selected()?.termId) ?? null);
+  readonly #term = computed(() => this.#terms().find((t) => t.id === this.selected()?.periodId) ?? null);
 
   protected readonly termLabel = computed(() => this.#term()?.label ?? 'trimestre');
   protected readonly yearLabel = computed(() => this.#term()?.year ?? '');
@@ -95,7 +95,7 @@ export class ReportCardsPage {
   });
   protected readonly options = computed(() =>
     this.#list().map((c) => {
-      const term = this.#terms().find((t) => t.id === c.termId);
+      const term = this.#terms().find((t) => t.id === c.periodId);
       const published = c.publishedAt ? `, publié le ${longDate(c.publishedAt.slice(0, 10))}` : '';
       return { id: c.id, label: `${term?.label ?? 'Trimestre'}${published}` };
     }),

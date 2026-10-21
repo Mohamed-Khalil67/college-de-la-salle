@@ -54,7 +54,7 @@ export function weekLabel(day: string): string {
 export function toCalendarEvent(e: EventDto): CalendarEvent {
   return {
     id: e.id,
-    kind: e.kind,
+    type: e.type,
     title: e.title,
     subject: e.subjectId ?? '',
     target: 'all',

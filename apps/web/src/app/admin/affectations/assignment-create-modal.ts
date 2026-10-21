@@ -122,11 +122,17 @@ export class AssignmentCreateModal {
       this.busy.set(true);
       this.failure.set(null);
       try {
+        // A teacher teaches a subject of the class: make sure the class has it, with the typed coefficient.
+        const coefficient = Math.round((value.coefficient ?? 1) * 100) / 100;
+        const existing = (await this.#api.school.classSubjects(value.classId)).find((s) => s.subjectId === value.subjectId);
+        const classSubject = existing
+          ? existing.coefficient === coefficient
+            ? existing
+            : await this.#api.school.updateClassSubject(existing.id, { coefficient })
+          : await this.#api.school.addClassSubject(value.classId, { subjectId: value.subjectId, coefficient });
         const created = await this.#api.school.createAssignment({
           teacherId: value.teacherId,
-          classId: value.classId,
-          subjectId: value.subjectId,
-          coefficient: Math.round((value.coefficient ?? 1) * 100) / 100,
+          classSubjectId: classSubject.id,
         });
         this.created.emit(created);
         this.open.set(false);

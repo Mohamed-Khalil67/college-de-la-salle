@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { form, FormField, max, maxLength, min, required, submit, validate } from '@angular/forms/signals';
-import type { SchoolYearDto, TermDto } from '@cdls/shared';
+import type { SchoolYearDto, PeriodDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../ui';
 import { formatRange, shownError } from '../shared/admin-format';
@@ -48,7 +48,7 @@ interface TermModel {
 export class TermCreateModal {
   readonly open = model(false);
   readonly year = input<SchoolYearDto | null>(null);
-  readonly created = output<TermDto>();
+  readonly created = output<PeriodDto>();
 
   readonly #api = inject(ApiClient);
 
@@ -82,7 +82,7 @@ export class TermCreateModal {
       const year = this.year();
       if (!this.open()) return;
       untracked(() => {
-        const next = Math.min(4, (year?.terms.length ?? 0) + 1);
+        const next = Math.min(4, (year?.periods.length ?? 0) + 1);
         this.failure.set(null);
         this.termForm().reset({ number: next, label: next === 1 ? '1er trimestre' : `${next}e trimestre`, startsOn: '', endsOn: '' });
       });

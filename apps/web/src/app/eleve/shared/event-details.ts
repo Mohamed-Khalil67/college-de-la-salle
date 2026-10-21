@@ -1,8 +1,8 @@
 import { Component, DOCUMENT, computed, inject, input, model } from '@angular/core';
-import { kindInfo, type OccurrenceDto, safeAttachments } from '@cdls/shared';
+import { type OccurrenceDto, safeAttachments } from '@cdls/shared';
 import { Badge, Button, Icon, Modal } from '../../ui';
 import { saveFile } from './download';
-import { dayTitle, isAssessment, kindLabel, longDate, mark, subjectName, timeSpan } from './format';
+import { dayTitle, isAssessment, kindLabel, longDate, mark, subjectName, timeSpan, whereOf } from './format';
 import { eventIcs, fileName } from './week';
 
 /**
@@ -30,9 +30,9 @@ import { eventIcs, fileName } from './week';
               <dt>Matière</dt>
               <dd>{{ subject() }}</dd>
             }
-            @if (o.event.place) {
+            @if (where()) {
               <dt>Lieu</dt>
-              <dd>{{ o.event.place }}</dd>
+              <dd>{{ where() }}</dd>
             }
             @if (gradable()) {
               <dt>Coefficient</dt>
@@ -82,9 +82,16 @@ export class EventDetails {
 
   readonly #document = inject(DOCUMENT);
 
-  protected readonly kind = computed(() => kindLabel(this.occurrence()?.event.kind ?? 'cours'));
-  protected readonly exam = computed(() => isAssessment(this.occurrence()?.event.kind ?? 'cours'));
-  protected readonly gradable = computed(() => kindInfo(this.occurrence()?.event.kind ?? 'cours').gradable);
+  protected readonly kind = computed(() => kindLabel(this.occurrence()?.event.type ?? { label: '' }));
+  protected readonly exam = computed(() => {
+    const type = this.occurrence()?.event.type;
+    return !!type && isAssessment(type);
+  });
+  protected readonly gradable = computed(() => this.occurrence()?.event.type.gradable ?? false);
+  protected readonly where = computed(() => {
+    const e = this.occurrence()?.event;
+    return e ? whereOf(e) : '';
+  });
   protected readonly coefficient = computed(() => mark(this.occurrence()?.event.coefficient ?? 1));
   protected readonly day = computed(() => dayTitle(this.occurrence()?.day ?? '2000-01-01'));
   protected readonly until = computed(() => longDate(this.occurrence()?.event.repeatUntil ?? '2000-01-01'));

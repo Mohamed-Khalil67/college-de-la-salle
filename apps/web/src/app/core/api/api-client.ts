@@ -2,19 +2,22 @@ import { HttpClient, type HttpErrorResponse, HttpParams } from '@angular/common/
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
+  ActivityTypeDto,
   ApiError,
   AttendanceSheetDto,
   ClassStudentDto,
   ClassDto,
+  ClassSubjectDto,
   ContactMessageDto,
   ContactMessageListQuery,
   ContactMessageRequest,
   CreateClassRequest,
+  CreateClassSubjectRequest,
   CreatedUserResponse,
   CreatePostRequest,
   CreateSchoolYearRequest,
   CreateTeachingAssignmentRequest,
-  CreateTermRequest,
+  CreatePeriodRequest,
   CreateUserRequest,
   EnrollmentDto,
   EventDto,
@@ -38,7 +41,8 @@ import type {
   StudentGradesDto,
   SubjectDto,
   TeachingAssignmentDto,
-  TermDto,
+  PeriodDto,
+  UpdateClassSubjectRequest,
   UpdateUserRequest,
   UserDto,
   UserListQuery,
@@ -96,11 +100,11 @@ export class ApiClient {
     setCurrentYear: (id: string) => this.#post<SchoolYearDto>(`/school-years/${id}/current`),
     /** A year that is not the current one and has no classes (409 otherwise). */
     deleteYear: (id: string) => this.#delete(`/school-years/${id}`),
-    createTerm: (yearId: string, body: CreateTermRequest) => this.#post<TermDto>(`/school-years/${yearId}/terms`, body),
+    createTerm: (yearId: string, body: CreatePeriodRequest) => this.#post<PeriodDto>(`/school-years/${yearId}/periods`, body),
     /** A term without grades or report cards (409 otherwise). */
-    deleteTerm: (termId: string) => this.#delete(`/terms/${termId}`),
-    closeTerm: (termId: string) => this.#post<TermDto>(`/terms/${termId}/close`),
-    reopenTerm: (termId: string) => this.#post<TermDto>(`/terms/${termId}/close?closed=false`),
+    deleteTerm: (periodId: string) => this.#delete(`/periods/${periodId}`),
+    closeTerm: (periodId: string) => this.#post<PeriodDto>(`/periods/${periodId}/close`),
+    reopenTerm: (periodId: string) => this.#post<PeriodDto>(`/periods/${periodId}/close?closed=false`),
     classes: (query: { schoolYearId?: string } = {}) => this.#get<ClassDto[]>('/classes', query),
     class: (id: string) => this.#get<ClassDto>(`/classes/${id}`),
     createClass: (body: CreateClassRequest) => this.#post<ClassDto>('/classes', body),
@@ -111,6 +115,10 @@ export class ApiClient {
     enroll: (classId: string, studentId: string) => this.#post<EnrollmentDto>(`/classes/${classId}/enrollments`, { studentId }),
     unenroll: (enrollmentId: string) => this.#delete(`/enrollments/${enrollmentId}`),
     subjects: () => this.#get<SubjectDto[]>('/subjects'),
+    activityTypes: () => this.#get<ActivityTypeDto[]>('/activity-types'),
+    classSubjects: (classId: string) => this.#get<ClassSubjectDto[]>(`/classes/${classId}/subjects`),
+    addClassSubject: (classId: string, body: CreateClassSubjectRequest) => this.#post<ClassSubjectDto>(`/classes/${classId}/subjects`, body),
+    updateClassSubject: (id: string, body: UpdateClassSubjectRequest) => this.#patch<ClassSubjectDto>(`/class-subjects/${id}`, body),
     assignments: (query: { teacherId?: string; classId?: string } = {}) => this.#get<TeachingAssignmentDto[]>('/teaching-assignments', query),
     createAssignment: (body: CreateTeachingAssignmentRequest) => this.#post<TeachingAssignmentDto>('/teaching-assignments', body),
     deleteAssignment: (id: string) => this.#delete(`/teaching-assignments/${id}`),
@@ -154,7 +162,7 @@ export class ApiClient {
     sheet: (eventId: string) => this.#get<GradeSheetDto>(`/events/${eventId}/grades`),
     save: (eventId: string, body: SaveGradesRequest) => this.#put<GradeSheetDto>(`/events/${eventId}/grades`, body),
     publish: (eventId: string, published: boolean) => this.#post<GradeSheetDto>(`/events/${eventId}/grades/publish`, { published }),
-    ofStudent: (studentId: string, query: { termId?: string; from?: string; to?: string } = {}) =>
+    ofStudent: (studentId: string, query: { periodId?: string; from?: string; to?: string } = {}) =>
       this.#get<StudentGradesDto>(`/students/${studentId}/grades`, query),
   };
 
@@ -175,9 +183,9 @@ export class ApiClient {
 
   /* Report cards */
   readonly reportCards = {
-    generate: (termId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/terms/${termId}/report-cards/generate`, body),
-    publish: (termId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/terms/${termId}/report-cards/publish`, body),
-    ofTerm: (termId: string, query: { classId?: string } = {}) => this.#get<ReportCardDto[]>(`/terms/${termId}/report-cards`, query),
+    generate: (periodId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/periods/${periodId}/report-cards/generate`, body),
+    publish: (periodId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/periods/${periodId}/report-cards/publish`, body),
+    ofTerm: (periodId: string, query: { classId?: string } = {}) => this.#get<ReportCardDto[]>(`/periods/${periodId}/report-cards`, query),
     ofStudent: (studentId: string) => this.#get<ReportCardDto[]>(`/students/${studentId}/report-cards`),
     update: (id: string, appreciation: string) => this.#patch<ReportCardDto>(`/report-cards/${id}`, { appreciation }),
     /** The PDF needs the access token, so it is fetched as a blob rather than linked. */

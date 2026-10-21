@@ -27,7 +27,7 @@ import { GradesTable } from './grades-table';
 
     <app-load-state [ref]="years" label="Chargement des trimestres…" />
     @if (tabs().length) {
-      <cdls-tabs [tabs]="tabs()" label="Trimestres" [(value)]="termId">
+      <cdls-tabs [tabs]="tabs()" label="Trimestres" [(value)]="periodId">
         <app-load-state [ref]="grades" label="Chargement des notes…" />
         @if (grades.hasValue()) {
           @if (hasGrades()) {
@@ -47,19 +47,19 @@ export class GradesPage {
 
   protected readonly years = resource({ loader: () => this.#api.school.years() });
   protected readonly year = computed(() => (this.years.hasValue() ? currentYear(this.years.value()) : null));
-  readonly #terms = computed(() => [...(this.year()?.terms ?? [])].sort((a, b) => a.number - b.number));
+  readonly #terms = computed(() => [...(this.year()?.periods ?? [])].sort((a, b) => a.number - b.number));
   protected readonly tabs = computed<TabItem[]>(() => this.#terms().map((t) => ({ id: t.id, label: t.label })));
   /** The current term first; the student can switch. */
-  protected readonly termId = linkedSignal(() => termOf(this.#terms(), this.today)?.id ?? '');
-  protected readonly term = computed(() => this.#terms().find((t) => t.id === this.termId()) ?? null);
+  protected readonly periodId = linkedSignal(() => termOf(this.#terms(), this.today)?.id ?? '');
+  protected readonly term = computed(() => this.#terms().find((t) => t.id === this.periodId()) ?? null);
 
   protected readonly grades = resource({
     params: () => {
       const studentId = this.#auth.user()?.studentId;
-      const termId = this.termId();
-      return studentId && termId ? { studentId, termId } : undefined;
+      const periodId = this.periodId();
+      return studentId && periodId ? { studentId, periodId } : undefined;
     },
-    loader: ({ params }) => this.#api.grades.ofStudent(params.studentId, { termId: params.termId }),
+    loader: ({ params }) => this.#api.grades.ofStudent(params.studentId, { periodId: params.periodId }),
   });
 
   protected readonly hasGrades = computed(

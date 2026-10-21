@@ -1,5 +1,5 @@
 import { Component, inject, resource, signal } from '@angular/core';
-import type { SchoolYearDto, TermDto } from '@cdls/shared';
+import type { SchoolYearDto, PeriodDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
@@ -49,7 +49,7 @@ import { YearCreateModal } from './year-create-modal';
                       Définir comme année en cours<span class="visually-hidden"> : {{ year.label }}</span>
                     </button>
                   }
-                  @if (year.terms.length < 4) {
+                  @if (year.periods.length < 4) {
                     <button cdlsButton variant="secondary" size="sm" type="button" (click)="startTerm(year)">
                       <cdls-icon name="plus" />Ajouter un trimestre<span class="visually-hidden"> à {{ year.label }}</span>
                     </button>
@@ -62,7 +62,7 @@ import { YearCreateModal } from './year-create-modal';
                 </div>
               </div>
 
-              @if (year.terms.length) {
+              @if (year.periods.length) {
                 <div class="table-wrap" role="region" [attr.aria-labelledby]="'terms-' + year.id" tabindex="0">
                   <table class="table table--stack">
                     <caption class="visually-hidden" [id]="'terms-' + year.id">Trimestres de l’année {{ year.label }}</caption>
@@ -75,7 +75,7 @@ import { YearCreateModal } from './year-create-modal';
                       </tr>
                     </thead>
                     <tbody>
-                      @for (term of year.terms; track term.id) {
+                      @for (term of year.periods; track term.id) {
                         <tr>
                           <th scope="row">{{ term.label }}</th>
                           <td data-label="Période :">{{ range(term.startsOn, term.endsOn) }}</td>
@@ -222,7 +222,7 @@ export class YearsPage {
   protected readonly deleteYearOpen = signal(false);
   protected readonly deleteTermOpen = signal(false);
   protected readonly pendingYear = signal<SchoolYearDto | null>(null);
-  protected readonly pendingTerm = signal<TermDto | null>(null);
+  protected readonly pendingTerm = signal<PeriodDto | null>(null);
   protected readonly busy = signal(false);
   protected readonly actionError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -245,7 +245,7 @@ export class YearsPage {
     this.years.reload();
   }
 
-  protected onTermCreated(term: TermDto): void {
+  protected onTermCreated(term: PeriodDto): void {
     this.notice.set(`${term.label} ajouté.`);
     this.years.reload();
   }
@@ -261,7 +261,7 @@ export class YearsPage {
     this.currentOpen.set(true);
   }
 
-  protected startClose(term: TermDto, year: SchoolYearDto): void {
+  protected startClose(term: PeriodDto, year: SchoolYearDto): void {
     this.pendingTerm.set(term);
     this.pendingYear.set(year);
     this.actionError.set(null);
@@ -274,7 +274,7 @@ export class YearsPage {
     this.deleteYearOpen.set(true);
   }
 
-  protected startDeleteTerm(term: TermDto, year: SchoolYearDto): void {
+  protected startDeleteTerm(term: PeriodDto, year: SchoolYearDto): void {
     this.pendingTerm.set(term);
     this.pendingYear.set(year);
     this.actionError.set(null);

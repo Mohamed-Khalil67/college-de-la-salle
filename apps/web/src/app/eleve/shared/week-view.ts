@@ -1,7 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import type { OccurrenceDto } from '@cdls/shared';
 import { Badge } from '../../ui';
-import { dayTitle, isAssessment, kindLabel, subjectName, timeSpan } from './format';
+import { dayTitle, isAssessment, kindLabel, subjectName, timeSpan, whereOf } from './format';
 import { weekColumns } from './week';
 
 /**
@@ -111,11 +111,11 @@ export class WeekView {
     return timeSpan(item.event.startTime, item.event.endTime);
   }
   protected exam(item: OccurrenceDto): boolean {
-    return isAssessment(item.event.kind);
+    return isAssessment(item.event.type);
   }
   protected meta(item: OccurrenceDto): string {
     const e = item.event;
     const subject = subjectName(e.subjectId);
-    return [kindLabel(e.kind), subject && subject !== e.title ? subject : '', e.place].filter(Boolean).join(', ');
+    return [kindLabel(e.type), subject && subject !== e.title ? subject : '', whereOf(e)].filter(Boolean).join(', ');
   }
 }
