@@ -83,6 +83,22 @@ test('a teacher takes the roll and saves it', async ({ page }) => {
   await expectNoAxeViolations(page);
 });
 
+test('a teacher picks the type of a new event from the school’s activity types', async ({ page }) => {
+  await signInTo(page, ACCOUNTS.teacher, '/enseignant/agenda');
+  await page.getByRole('button', { name: 'Nouvel événement' }).click();
+  const type = page.getByLabel('Type', { exact: true });
+  // The types come from the API (system types of the school), not from a list in the code.
+  await expect(type.locator('option')).toHaveText(['Cours', 'TD', 'TP', 'Examen', 'Contrôle', 'Devoir à rendre', 'Révision', 'Activité', 'Réunion']);
+  // A type that is not gradable hides the coefficient; a gradable one shows it.
+  await expect(page.getByLabel('Coefficient')).toBeHidden();
+  await type.selectOption({ label: 'Examen' });
+  await expect(page.getByLabel('Coefficient')).toBeVisible();
+  await expect(page.getByLabel('Chaque semaine')).toBeHidden();
+  await type.selectOption({ label: 'TD' });
+  await expect(page.getByLabel('Chaque semaine', { exact: false })).toBeVisible();
+  await expectNoAxeViolations(page);
+});
+
 test('a visitor writes to the secretariat; an admin reads the message and marks it handled', async ({ page }, info) => {
   const email = `parent.${info.project.name}.${Date.now()}@example.com`;
   await page.goto('/contact');
