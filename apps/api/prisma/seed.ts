@@ -26,6 +26,7 @@ import {
 } from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role, type Prisma } from '../src/generated/prisma/client.js';
+import { hoursPerWeek, seedTimetable, type TimetableClassSubject } from './seed-timetable.js';
 
 // The e2e tests seed their own database with a known password and a temporary credentials file.
 const CREDENTIALS_FILE =
@@ -141,6 +142,9 @@ const ROOMS = [
   { name: 'Salle 8', capacity: 30, kind: 'classroom' },
   { name: 'Salle 12', capacity: 30, kind: 'classroom' },
   { name: 'Salle 14', capacity: 28, kind: 'classroom' },
+  { name: 'Salle 16', capacity: 30, kind: 'classroom' },
+  { name: 'Salle 18', capacity: 30, kind: 'classroom' },
+  { name: 'Salle 20', capacity: 28, kind: 'classroom' },
   { name: 'Laboratoire de sciences', capacity: 24, kind: 'lab' },
   { name: 'Salle informatique', capacity: 24, kind: 'lab' },
   { name: 'Gymnase', capacity: 80, kind: 'gym' },
@@ -161,6 +165,9 @@ const TERMS = [
 async function wipe(): Promise<void> {
   // Children before parents.
   await prisma.auditLog.deleteMany();
+  await prisma.occupancy.deleteMany();
+  await prisma.slotException.deleteMany();
+  await prisma.timetableSlot.deleteMany();
   await prisma.sectionChangeRequest.deleteMany();
   await prisma.reportCard.deleteMany();
   await prisma.attendance.deleteMany();
@@ -239,6 +246,10 @@ async function main(): Promise<void> {
   };
 
   await prisma.room.createMany({ data: [...ROOMS] });
+  const roomIds = new Map((await prisma.room.findMany()).map((r) => [r.name, r.id]));
+  const homeroomNames = ['Salle 8', 'Salle 12', 'Salle 14', 'Salle 16', 'Salle 18', 'Salle 20'];
+  const homerooms = new Map<string, string>();
+  const timetableEntries: TimetableClassSubject[] = [];
   await prisma.calendarDay.createMany({
     data: CALENDAR_DAYS.map((d) => ({
       schoolYearId: year.id,
@@ -305,14 +316,24 @@ async function main(): Promise<void> {
         data: { schoolYearId: year.id, sectionId, code: option.value, label: option.label },
       });
 
+      homerooms.set(schoolClass.id, roomIds.get(homeroomNames[homerooms.size]!)!);
       for (const m of matieresFor(code)) {
-        await prisma.classSubject.create({
+        const teacherId = teacherFor(m.id, code).id;
+        const classSubject = await prisma.classSubject.create({
           data: {
             classId: schoolClass.id,
             subjectId: m.id,
             coefficient: COEFFICIENTS[m.id] ?? 1,
-            assignments: { create: { teacherId: teacherFor(m.id, code).id } },
+            hoursPerWeek: hoursPerWeek(m.id, code) || null,
+            assignments: { create: { teacherId } },
           },
+        });
+        timetableEntries.push({
+          classId: schoolClass.id,
+          section: code,
+          subjectId: m.id,
+          classSubjectId: classSubject.id,
+          teacherId,
         });
       }
 
@@ -442,6 +463,17 @@ async function main(): Promise<void> {
   );
   const createdEvents = await prisma.event.createManyAndReturn({ data: events });
 
+  // The weekly timetable (no conflicts: the scheduler and the database both refuse them).
+  const timetable = await seedTimetable(prisma, {
+    entries: timetableEntries,
+    rooms: roomIds,
+    homerooms,
+    activityTypes: typeIds,
+    validFrom: YEAR.startsOn,
+    validTo: YEAR.endsOn,
+    substituteTeacherId: teacherFor('informatique').id,
+  });
+
   // Grades, homework, attendance ----------------------------------------------------------------------
   const grades: Prisma.GradeCreateManyInput[] = [];
   const completions: Prisma.HomeworkCompletionCreateManyInput[] = [];
@@ -551,7 +583,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Seeded ${YEAR.label}: ${classRosters.length} classes, ${TEACHERS.length} teachers, ${studentNumber} students, ` +
-      `${createdEvents.length} events, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
+      `${createdEvents.length} events, ${timetable.slots} timetable slots, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
   );
 }
 

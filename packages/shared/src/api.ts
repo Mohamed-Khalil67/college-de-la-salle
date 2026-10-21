@@ -813,6 +813,8 @@ export interface TimetableConflictDto {
   readonly endTime: string;
   /** French sentence naming the conflicting item (« Salle 12 est déjà prise le … par Mathématiques, Première »). */
   readonly message: string;
+  /** How many sessions clash with this same item (1 when only `date` does). */
+  readonly count: number;
   /** What it clashes with: a weekly slot, an exception, or a one-off event. */
   readonly withSource: 'slot' | 'exception' | 'event';
   readonly withId: string | null;

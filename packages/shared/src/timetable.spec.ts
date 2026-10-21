@@ -1,6 +1,8 @@
 import { weekday } from './calendar.js';
 import {
   applyException,
+  exceptionProblems,
+  needsLab,
   entriesClash,
   expandTimetable,
   hoursBetween,
@@ -379,5 +381,30 @@ describe('validation helpers', () => {
 
   it('labels a slot', () => {
     expect(slotLabel({ weekday: 0, startTime: '08:30', endTime: '10:00' })).toBe('Dimanche 08:30 – 10:00');
+  });
+});
+
+describe('exceptions and lab rule', () => {
+  it('checks what each kind of exception carries', () => {
+    expect(exceptionProblems({ kind: 'cancelled' })).toEqual([]);
+    expect(exceptionProblems({ kind: 'cancelled', newRoomId: 'r' })).toHaveLength(1);
+    expect(exceptionProblems({ kind: 'moved' })).toEqual(['Indiquez le nouveau jour ou la nouvelle heure.']);
+    expect(exceptionProblems({ kind: 'moved', newDate: '2026-09-15' })).toEqual([]);
+    expect(exceptionProblems({ kind: 'moved', newStart: '09:00' })).toEqual([
+      'Indiquez l’heure de début et l’heure de fin.',
+    ]);
+    expect(exceptionProblems({ kind: 'moved', newStart: '10:00', newEnd: '09:00' })).toEqual([
+      'La fin doit suivre le début.',
+    ]);
+    expect(exceptionProblems({ kind: 'substitute' })).toHaveLength(1);
+    expect(exceptionProblems({ kind: 'substitute', newTeacherId: 't' })).toEqual([]);
+    expect(exceptionProblems({ kind: 'room_change' })).toHaveLength(1);
+    expect(exceptionProblems({ kind: 'room_change', newRoomId: 'r', newDate: '2026-09-15' })).toHaveLength(1);
+  });
+
+  it('only the system TP belongs in a laboratory', () => {
+    expect(needsLab({ isSystem: true, code: 'tp' })).toBe(true);
+    expect(needsLab({ isSystem: true, code: 'cours' })).toBe(false);
+    expect(needsLab({ isSystem: false, code: 'tp' })).toBe(false);
   });
 });

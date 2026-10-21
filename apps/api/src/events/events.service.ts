@@ -7,6 +7,7 @@ import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
+import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -34,6 +35,7 @@ export class EventsService {
     private readonly types: ActivityTypesService,
     private readonly periods: PeriodsService,
     private readonly calendarDays: CalendarDaysService,
+    private readonly occupancy: OccupancyService,
   ) {}
 
   /** Events that take place in [from, to] and that the user may see. */
@@ -72,10 +74,17 @@ export class EventsService {
   async create(dto: CreateEventDto, user: AuthUser): Promise<EventDto> {
     if (!user.teacherId) throw forbidden();
     const fields = await this.check(withDefaults(dto), user, null);
-    const row = await this.prisma.event.create({
-      data: { ...toData(fields), authorId: user.teacherId },
-      include: eventInclude,
-    });
+    const row = await this.occupancy.guard(
+      this.prisma.$transaction(async (tx) => {
+        const created = await tx.event.create({
+          data: { ...toData(fields), authorId: user.teacherId! },
+          include: eventInclude,
+        });
+        // One-off events hold their room and class like a timetable session: a clash is a 409.
+        await this.occupancy.indexEvent(tx, booking(created));
+        return created;
+      }),
+    );
     return toEventDto(row);
   }
 
@@ -116,11 +125,17 @@ export class EventsService {
         'Des notes existent : l’événement ne peut plus changer de période. Gardez la période ou supprimez les notes.',
       );
     }
-    const row = await this.prisma.event.update({
-      where: { id },
-      data: toData(fields),
-      include: eventInclude,
-    });
+    const row = await this.occupancy.guard(
+      this.prisma.$transaction(async (tx) => {
+        const updated = await tx.event.update({
+          where: { id },
+          data: toData(fields),
+          include: eventInclude,
+        });
+        await this.occupancy.indexEvent(tx, booking(updated));
+        return updated;
+      }),
+    );
     return toEventDto(row);
   }
 
@@ -271,6 +286,20 @@ export class EventsService {
         : null;
     return { ...f, attachments, periodId };
   }
+}
+
+/** What the occupancy index needs of an event. */
+function booking(row: EventRow) {
+  return {
+    id: row.id,
+    date: toDay(row.date),
+    startTime: row.startTime,
+    endTime: row.endTime,
+    repeatUntil: row.repeatUntil ? toDay(row.repeatUntil) : null,
+    roomId: row.roomId,
+    classId: row.classId,
+    homework: row.activityType.homework,
+  };
 }
 
 function withDefaults(dto: CreateEventDto): EventFields {

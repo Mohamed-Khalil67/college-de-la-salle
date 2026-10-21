@@ -462,3 +462,47 @@ export function slotProblems(
 export function slotLabel(slot: Pick<SlotRule, 'weekday' | 'startTime' | 'endTime'>): string {
   return `${WEEKDAY_LABELS[slot.weekday]} ${slot.startTime} – ${slot.endTime}`;
 }
+
+/**
+ * Does this activity type belong in a laboratory? The TP of the platform does: the one rule about a named
+ * type (everything else relies on flags), kept here so the API and the screens agree. Teachers' own types
+ * never count.
+ */
+export function needsLab(type: { readonly isSystem: boolean; readonly code: string }): boolean {
+  return type.isSystem && type.code === 'tp';
+}
+
+/** Problems with an exception's fields for its kind (French messages), empty when it is fine. */
+export function exceptionProblems(e: {
+  readonly kind: SlotExceptionKind;
+  readonly newDate?: string | null;
+  readonly newStart?: string | null;
+  readonly newEnd?: string | null;
+  readonly newRoomId?: string | null;
+  readonly newTeacherId?: string | null;
+}): string[] {
+  const out: string[] = [];
+  const time = !!e.newStart || !!e.newEnd;
+  switch (e.kind) {
+    case 'cancelled':
+      if (e.newDate || time || e.newRoomId || e.newTeacherId)
+        out.push('Une annulation ne change rien d’autre.');
+      break;
+    case 'moved':
+      if (e.newTeacherId) out.push('Un déplacement ne change pas l’enseignant : choisissez un remplacement.');
+      if (!e.newDate && !time) out.push('Indiquez le nouveau jour ou la nouvelle heure.');
+      if (!!e.newStart !== !!e.newEnd) out.push('Indiquez l’heure de début et l’heure de fin.');
+      else if (e.newStart && e.newEnd && e.newEnd <= e.newStart)
+        out.push('La fin doit suivre le début.');
+      break;
+    case 'substitute':
+      if (!e.newTeacherId) out.push('Choisissez l’enseignant qui remplace.');
+      if (e.newDate || time || e.newRoomId) out.push('Un remplacement ne change que l’enseignant.');
+      break;
+    case 'room_change':
+      if (!e.newRoomId) out.push('Choisissez la nouvelle salle.');
+      if (e.newDate || time || e.newTeacherId) out.push('Un changement de salle ne change que la salle.');
+      break;
+  }
+  return out;
+}

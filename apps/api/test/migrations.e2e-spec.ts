@@ -284,7 +284,7 @@ describe('Phase 1 migrations on existing data (e2e)', () => {
       { number: 2, kind: 'trimester', section_id: null },
     ]);
     const constraints = (
-      await db.query(`SELECT conname FROM pg_constraint WHERE contype = 'x' ORDER BY conname`)
+      await db.query(`SELECT conname FROM pg_constraint WHERE contype = 'x' AND conname LIKE 'periods_%' ORDER BY conname`)
     ).rows.map((r) => r['conname']);
     expect(constraints).toEqual(['periods_no_overlap', 'periods_number_unique']);
 

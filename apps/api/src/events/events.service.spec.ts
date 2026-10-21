@@ -4,6 +4,7 @@ import { AccessService } from '../access/access.service.js';
 import { ActivityTypesService } from '../activity-types/activity-types.service.js';
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
+import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EventsService } from './events.service.js';
@@ -95,11 +96,13 @@ describe('EventsService', () => {
     schoolClass: { findUnique: vi.fn() },
     room: { findUnique: vi.fn() },
     classSubject: { findUnique: vi.fn() },
+    $transaction: vi.fn(),
   };
   const access = { assertTeachesClass: vi.fn(), audienceFor: vi.fn(), placement: vi.fn() };
   const types = { usable: vi.fn() };
   const periods = { resolveFor: vi.fn(), assertOpen: vi.fn(), find: vi.fn() };
   const calendarDays = { closures: vi.fn() };
+  const occupancy = { indexEvent: vi.fn(), guard: vi.fn() };
   let events: EventsService;
 
   beforeEach(async () => {
@@ -121,6 +124,9 @@ describe('EventsService', () => {
     calendarDays.closures.mockResolvedValue([]);
     prisma.event.create.mockResolvedValue(row());
     prisma.event.update.mockResolvedValue(row());
+    prisma.$transaction.mockImplementation((work: (tx: unknown) => unknown) => work(prisma));
+    occupancy.indexEvent.mockResolvedValue(undefined);
+    occupancy.guard.mockImplementation((work: unknown) => work);
     const moduleRef = await Test.createTestingModule({
       providers: [
         EventsService,
@@ -129,6 +135,7 @@ describe('EventsService', () => {
         { provide: ActivityTypesService, useValue: types },
         { provide: PeriodsService, useValue: periods },
         { provide: CalendarDaysService, useValue: calendarDays },
+        { provide: OccupancyService, useValue: occupancy },
       ],
     }).compile();
     events = moduleRef.get(EventsService);

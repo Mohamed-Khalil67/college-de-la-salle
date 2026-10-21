@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../common/auth-user.js';
+import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CalendarDaysService } from './calendar-days.service.js';
 
@@ -65,7 +66,11 @@ describe('CalendarDaysService', () => {
     prisma.$transaction.mockImplementation((fn: (t: typeof tx) => Promise<unknown>) => fn(tx));
     prisma.schoolYear.findUnique.mockResolvedValue(YEAR);
     const moduleRef = await Test.createTestingModule({
-      providers: [CalendarDaysService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        CalendarDaysService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: OccupancyService, useValue: { reindexRange: vi.fn() } },
+      ],
     }).compile();
     days = moduleRef.get(CalendarDaysService);
   });
