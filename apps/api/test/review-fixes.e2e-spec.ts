@@ -499,4 +499,29 @@ ${last},Nabil`), 'teacher', actor),
       expect(await t.prisma.user.count({ where: { lastName: last } })).toBe(emails.length);
     });
   });
+  describe('LOW: one-day periods', () => {
+    it('accepts a period whose end is its start, like the database, and refuses an end before it', async () => {
+      const { year, n } = await isolatedYear();
+      const body = { number: 2, label: 'Examen', startsOn: `${n + 1}-01-10`, endsOn: `${n + 1}-01-10` };
+      const res = await t
+        .http()
+        .post(`/api/school-years/${year.id}/periods`)
+        .set(bearer(admin))
+        .send({ ...body, kind: 'semester' })
+        .expect(201);
+      const id = (res.body as { id: string }).id;
+      await t
+        .http()
+        .patch(`/api/periods/${id}`)
+        .set(bearer(admin))
+        .send({ startsOn: `${n + 1}-01-11` })
+        .expect(400);
+      await t
+        .http()
+        .patch(`/api/periods/${id}`)
+        .set(bearer(admin))
+        .send({ startsOn: `${n + 1}-01-09`, endsOn: `${n + 1}-01-09` })
+        .expect(200);
+    });
+  });
 });
