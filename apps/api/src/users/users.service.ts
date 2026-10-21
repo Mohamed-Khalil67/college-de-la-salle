@@ -519,7 +519,9 @@ export class UsersService {
     const rows = await db.user.findMany({
       where: {
         email: { endsWith: `@${this.domain}` },
-        OR: prefixes.map((prefix) => ({ email: { startsWith: prefix } })),
+        OR: prefixes.map((prefix) => ({
+          email: { startsWith: prefix, mode: 'insensitive' as const },
+        })),
       },
       select: { email: true },
     });

@@ -43,7 +43,12 @@ describe('Catalogue (e2e)', () => {
     coordinator = await t.token(COORDINATOR);
     maths = await t.token(MATHS_TEACHER);
     french = await t.token(FRENCH_TEACHER);
-    yearId = (await t.prisma.schoolYear.findFirstOrThrow({ where: { isCurrent: true } })).id;
+    // A year of its own: other specs close the current year's periods, which freezes coefficients.
+    yearId = (
+      await t.prisma.schoolYear.create({
+        data: { label: '2150-2151', startsOn: new Date('2150-09-01'), endsOn: new Date('2151-06-30') },
+      })
+    ).id;
     bacId = (await t.prisma.section.findFirstOrThrow({ where: { code: 'bac' } })).id;
     nationaleId = (await t.prisma.section.findFirstOrThrow({ where: { code: 'nationale' } })).id;
     for (const [key, sectionId] of [

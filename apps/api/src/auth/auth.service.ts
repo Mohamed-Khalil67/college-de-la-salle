@@ -30,6 +30,18 @@ function passwordVersion(user: { passwordChangedAt: Date | null }): number {
   return user.passwordChangedAt?.getTime() ?? 0;
 }
 
+/** The account still waits for its first password and the temporary one has run out. */
+function temporaryPasswordExpired(user: {
+  mustChangePassword: boolean;
+  temporaryPasswordExpiresAt: Date | null;
+}): boolean {
+  return (
+    user.mustChangePassword &&
+    !!user.temporaryPasswordExpiresAt &&
+    user.temporaryPasswordExpiresAt <= new Date()
+  );
+}
+
 /** A session plus the refresh cookie value the controller must set. */
 export interface IssuedSession {
   readonly session: SessionResponse;
@@ -89,12 +101,7 @@ export class AuthService {
     // Disabled and archived accounts get the same answer as a wrong password.
     if (!user || !ok || user.status !== 'active') throw new UnauthorizedException(INVALID_LOGIN);
     // Said only to someone who knows the temporary password, so it reveals nothing about other accounts.
-    if (
-      user.mustChangePassword &&
-      user.temporaryPasswordExpiresAt &&
-      user.temporaryPasswordExpiresAt <= new Date()
-    )
-      throw new UnauthorizedException(EXPIRED_TEMPORARY_PASSWORD);
+    if (temporaryPasswordExpired(user)) throw new UnauthorizedException(EXPIRED_TEMPORARY_PASSWORD);
 
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return this.issue(toAuthUser(user), passwordVersion(user), randomUUID(), userAgent);
@@ -117,6 +124,11 @@ export class AuthService {
     }
     if (row.expiresAt <= new Date() || row.user.status !== 'active')
       throw new UnauthorizedException(INVALID_SESSION);
+    // A session opened with a temporary password does not outlive that password.
+    if (temporaryPasswordExpired(row.user)) {
+      await this.revokeFamily(row.familyId);
+      throw new UnauthorizedException(EXPIRED_TEMPORARY_PASSWORD);
+    }
 
     const revoked = await this.prisma.refreshToken.updateMany({
       where: { id: row.id, revokedAt: null },

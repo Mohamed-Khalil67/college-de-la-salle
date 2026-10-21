@@ -36,7 +36,7 @@ export class CalendarDaysService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * The year's days, or those overlapping [from, to] (at most a year and a bit), by start day. A year or a
+   * The year's days, or those overlapping [from, to] (at most a year and a bit without a year), by start day. A year or a
    * range is required. A student only gets what concerns them: days for the whole school, their section
    * or their class, and of the classes a day names, only their own.
    */
@@ -45,7 +45,8 @@ export class CalendarDaysService {
       throw new BadRequestException('Indiquez une année scolaire, ou une période (from et to).');
     if (query.from && query.to) {
       if (query.to < query.from) throw new BadRequestException('« to » doit suivre « from ».');
-      if (daysBetween(query.from, query.to) > MAX_RANGE_DAYS)
+      // With a school year the result is bounded already; the cap only guards a bare range.
+      if (!query.schoolYearId && daysBetween(query.from, query.to) > MAX_RANGE_DAYS)
         throw new BadRequestException(`Période limitée à ${MAX_RANGE_DAYS} jours.`);
     }
     const student = user.role === 'student';

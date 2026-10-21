@@ -46,6 +46,11 @@ import { UsersModule } from './users/users.module.js';
             name: 'ip',
             ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
             limit: config.get('THROTTLE_LIMIT', { infer: true }),
+            // Only the sign-in routes need it (they override its limit); elsewhere `default` already counts by address.
+            skipIf: (context) => {
+              const path = String(context.switchToHttp().getRequest<{ path?: string }>().path ?? '');
+              return !(path.endsWith('/auth/login') || path.endsWith('/auth/password'));
+            },
           },
         ],
         // One counter per IPv4 address or IPv6 /64 (a client could rotate through its /64).

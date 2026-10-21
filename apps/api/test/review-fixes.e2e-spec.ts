@@ -841,4 +841,31 @@ ${last},Nabil`), 'teacher', actor),
       ).toBe(2);
     });
   });
+  describe('M2 follow-up: an open session does not outlive its temporary password', () => {
+    it('refuses to refresh once the temporary password has expired', async () => {
+      const created = (
+        await t
+          .http()
+          .post('/api/users')
+          .set(bearer(admin))
+          .send({ role: 'teacher', firstName: 'Session', lastName: `Ouverte${Date.now().toString(36)}` })
+          .expect(201)
+      ).body as CreatedUserResponse;
+      const login = await t
+        .http()
+        .post('/api/auth/login')
+        .send({ email: created.user.email, password: created.temporaryPassword })
+        .expect(200);
+      const cookie = ((login.headers['set-cookie'] as unknown as string[]) ?? [])
+        .find((c) => c.startsWith('cdls_refresh='))!
+        .split(';')[0]!;
+      await t.prisma.user.update({
+        where: { id: created.user.id },
+        data: { temporaryPasswordExpiresAt: new Date(Date.now() - 1000) },
+      });
+      const res = await t.http().post('/api/auth/refresh').set('Cookie', cookie).expect(401);
+      expect(message(res.body)).toMatch(/expiré.*secrétariat/);
+      await t.http().post('/api/auth/refresh').set('Cookie', cookie).expect(401);
+    });
+  });
 });
