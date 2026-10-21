@@ -7,6 +7,7 @@ generator client {
   output              = "../src/generated/prisma"
   moduleFormat        = "esm"
   importFileExtension = "js"
+  previewFeatures     = ["partialIndexes"]
 }
 
 datasource db {
@@ -40,6 +41,23 @@ enum EventKind {
   @@map("event_kind")
 }
 
+/// active: can sign in. disabled: blocked by an admin. archived: graduated or left, read-only, no sign-in.
+enum UserStatus {
+  active
+  disabled
+  archived
+
+  @@map("user_status")
+}
+
+enum SectionChangeStatus {
+  pending
+  approved
+  rejected
+
+  @@map("section_change_status")
+}
+
 enum AttendanceStatus {
   present
   absent
@@ -55,27 +73,34 @@ enum AttendanceStatus {
 
 /// An account. Created by an admin (no open sign-up). A teacher or student also has a profile row.
 model User {
-  id           String    @id @default(uuid(7)) @db.Uuid
+  id                 String     @id @default(uuid(7)) @db.Uuid
   /// Stored lower-cased.
-  email        String    @unique @db.VarChar(254)
-  passwordHash String    @map("password_hash")
-  role         Role
-  firstName    String    @map("first_name") @db.VarChar(80)
-  lastName     String    @map("last_name") @db.VarChar(80)
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(3)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  email              String     @unique @db.VarChar(254)
+  passwordHash       String     @map("password_hash")
+  role               Role
+  firstName          String     @map("first_name") @db.VarChar(80)
+  lastName           String     @map("last_name") @db.VarChar(80)
+  status             UserStatus @default(active)
+  /// Set on every account the administration creates or resets: the user must choose a password first.
+  mustChangePassword Boolean    @default(true) @map("must_change_password")
+  /// Access tokens issued before this instant are refused (password change or reset).
+  passwordChangedAt  DateTime?  @map("password_changed_at") @db.Timestamptz(3)
+  lastLoginAt        DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  student                Student?
-  teacher                Teacher?
-  posts                  Post[]
-  auditLogs              AuditLog[]
-  refreshTokens          RefreshToken[]
+  student                 Student?
+  teacher                 Teacher?
+  posts                   Post[]
+  auditLogs               AuditLog[]
+  refreshTokens           RefreshToken[]
   /// Contact messages this admin marked handled.
-  contactMessagesHandled ContactMessage[]
+  contactMessagesHandled  ContactMessage[]
+  sectionChangesRequested SectionChangeRequest[] @relation("SectionChangeRequestedBy")
+  sectionChangesDecided   SectionChangeRequest[] @relation("SectionChangeDecidedBy")
 
   @@index([role])
+  @@index([status])
   @@map("users")
 }
 
@@ -85,14 +110,21 @@ model Student {
   /// School registration number (matricule).
   studentNumber String?   @unique @map("student_number") @db.VarChar(32)
   birthDate     DateTime? @map("birth_date") @db.Date
+  /// Bac nationale or Bac français. Set at creation from the class; changed only by an approved SectionChangeRequest.
+  sectionId     String?   @map("section_id") @db.Uuid
+  /// The day the student graduated (the account is then archived).
+  graduatedOn   DateTime? @map("graduated_on") @db.Date
 
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  enrollments         Enrollment[]
-  grades              Grade[]
-  homeworkCompletions HomeworkCompletion[]
-  attendance          Attendance[]
-  reportCards         ReportCard[]
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section               Section?               @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  sectionChangeRequests SectionChangeRequest[]
+  enrollments           Enrollment[]
+  grades                Grade[]
+  homeworkCompletions   HomeworkCompletion[]
+  attendance            Attendance[]
+  reportCards           ReportCard[]
 
+  @@index([sectionId])
   @@map("students")
 }
 
@@ -176,9 +208,12 @@ model Section {
   code  String @unique @db.VarChar(20)
   label String @db.VarChar(80)
 
-  classes SchoolClass[]
-  events  Event[]
-  posts   Post[]
+  classes            SchoolClass[]
+  events             Event[]
+  posts              Post[]
+  students           Student[]
+  sectionChangesFrom SectionChangeRequest[] @relation("SectionChangeFrom")
+  sectionChangesTo   SectionChangeRequest[] @relation("SectionChangeTo")
 
   @@map("sections")
 }
@@ -192,20 +227,23 @@ model SchoolClass {
   code         String @db.VarChar(40)
   label        String @db.VarChar(80)
 
-  schoolYear  SchoolYear           @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
-  section     Section              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
-  enrollments Enrollment[]
-  assignments TeachingAssignment[]
-  events      Event[]
-  posts       Post[]
-  reportCards ReportCard[]
+  schoolYear         SchoolYear             @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+  section            Section                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  enrollments        Enrollment[]
+  assignments        TeachingAssignment[]
+  events             Event[]
+  posts              Post[]
+  reportCards        ReportCard[]
+  /// Section changes that moved a student into this class.
+  sectionChangesInto SectionChangeRequest[]
 
   @@unique([schoolYearId, sectionId, code])
   @@index([sectionId])
   @@map("school_classes")
 }
 
-/// A student in a class. One class per student per school year.
+/// A student in a class. At most one open enrolment (leftOn null) per student and school year; a closed one
+/// (moved by a section change, graduated, left) stays as history.
 model Enrollment {
   id           String    @id @default(uuid(7)) @db.Uuid
   studentId    String    @map("student_id") @db.Uuid
@@ -219,7 +257,8 @@ model Enrollment {
   schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Restrict)
   schoolYear  SchoolYear  @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
 
-  @@unique([studentId, schoolYearId])
+  @@unique([studentId, schoolYearId], where: raw("left_on IS NULL"), map: "enrollments_open_student_year_key")
+  @@index([studentId, schoolYearId])
   @@index([classId])
   @@index([schoolYearId])
   @@map("enrollments")
@@ -392,6 +431,42 @@ model ReportCard {
   @@index([termId, classId])
   @@index([classId])
   @@map("report_cards")
+}
+
+/// A request to move a student to the other section. Only one pending request per student (partial unique
+/// index). Approval moves the student in one transaction (StudentSectionService).
+model SectionChangeRequest {
+  id            String              @id @default(uuid(7)) @db.Uuid
+  studentId     String              @map("student_id") @db.Uuid
+  fromSectionId String              @map("from_section_id") @db.Uuid
+  toSectionId   String              @map("to_section_id") @db.Uuid
+  reason        String              @db.VarChar(1000)
+  status        SectionChangeStatus @default(pending)
+  /// The student, or the member of staff who entered it for them.
+  requestedById String              @map("requested_by_id") @db.Uuid
+  decidedById   String?             @map("decided_by_id") @db.Uuid
+  decidedAt     DateTime?           @map("decided_at") @db.Timestamptz(3)
+  decisionNote  String              @default("") @map("decision_note") @db.VarChar(1000)
+  /// Approved: the class of the new section the student was enrolled in.
+  newClassId    String?             @map("new_class_id") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  fromSection Section      @relation("SectionChangeFrom", fields: [fromSectionId], references: [id], onDelete: Restrict)
+  toSection   Section      @relation("SectionChangeTo", fields: [toSectionId], references: [id], onDelete: Restrict)
+  requestedBy User         @relation("SectionChangeRequestedBy", fields: [requestedById], references: [id], onDelete: Restrict)
+  decidedBy   User?        @relation("SectionChangeDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  newClass    SchoolClass? @relation(fields: [newClassId], references: [id], onDelete: SetNull)
+
+  @@unique([studentId], where: raw("status = 'pending'"), map: "section_change_requests_one_pending_key")
+  @@index([studentId, createdAt])
+  @@index([status, createdAt])
+  @@index([fromSectionId])
+  @@index([toSectionId])
+  @@index([requestedById])
+  @@index([decidedById])
+  @@index([newClassId])
+  @@map("section_change_requests")
 }
 
 // ---------------------------------------------------------------------------------------------------

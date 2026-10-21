@@ -28,6 +28,10 @@ describe('App (e2e)', () => {
     for (const path of [
       '/api/auth/login',
       '/api/users/import',
+      '/api/users/import/preview',
+      '/api/users/archive',
+      '/api/auth/password',
+      '/api/section-changes/{id}/approve',
       '/api/classes/{id}/students',
       '/api/events/occurrences',
       '/api/events/{id}/grades',

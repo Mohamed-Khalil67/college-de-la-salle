@@ -237,8 +237,10 @@ export class GradesService {
   ): Promise<Map<string, number>> {
     const classId = schoolYearId
       ? (
-          await this.prisma.enrollment.findUnique({
-            where: { studentId_schoolYearId: { studentId, schoolYearId } },
+          // The open enrolment of that year, else the last one (a section change closes the first).
+          await this.prisma.enrollment.findFirst({
+            where: { studentId, schoolYearId },
+            orderBy: [{ leftOn: { sort: 'desc', nulls: 'first' } }, { enrolledOn: 'desc' }],
             select: { classId: true },
           })
         )?.classId

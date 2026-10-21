@@ -9,6 +9,7 @@ import {
   generatePassword,
   groupBySection,
   importErrors,
+  importTemplate,
   isYearLabel,
   plural,
   shownError,
@@ -17,9 +18,12 @@ import {
 
 describe('userStatus', () => {
   it('says when an account is disabled, never used or active', () => {
-    expect(userStatus({ isActive: false, lastLoginAt: '2026-10-01T08:00:00Z' })).toEqual({ label: 'Désactivé', tone: 'neutral' });
-    expect(userStatus({ isActive: true, lastLoginAt: null }).label).toBe('Jamais connecté');
-    expect(userStatus({ isActive: true, lastLoginAt: '2026-10-01T08:00:00Z' }).tone).toBe('success');
+    const login = '2026-10-01T08:00:00Z';
+    expect(userStatus({ status: 'disabled', mustChangePassword: false, lastLoginAt: login })).toEqual({ label: 'Désactivé', tone: 'neutral' });
+    expect(userStatus({ status: 'archived', mustChangePassword: true, lastLoginAt: null })).toEqual({ label: 'Archivé', tone: 'neutral' });
+    expect(userStatus({ status: 'active', mustChangePassword: true, lastLoginAt: login }).label).toBe('Premier accès à faire');
+    expect(userStatus({ status: 'active', mustChangePassword: false, lastLoginAt: null }).label).toBe('Jamais connecté');
+    expect(userStatus({ status: 'active', mustChangePassword: false, lastLoginAt: login }).tone).toBe('success');
   });
 });
 
@@ -81,8 +85,17 @@ describe('importErrors', () => {
 
 describe('createdAccountsCsv', () => {
   it('escapes cells and labels roles in French', () => {
-    const csv = createdAccountsCsv([{ email: 'a@b.eg', role: 'student', temporaryPassword: 'x,"y' }]);
-    expect(csv).toBe('email,role,motDePasseTemporaire\na@b.eg,Élève,"x,""y"\n');
+    const csv = createdAccountsCsv([
+      { email: 'a@b.eg', role: 'student', firstName: 'Mariam', lastName: 'Saad', temporaryPassword: 'x,"y' },
+    ]);
+    expect(csv).toBe('nom,prenom,email,role,motDePasseTemporaire\nSaad,Mariam,a@b.eg,Élève,"x,""y"\n');
+  });
+});
+
+describe('importTemplate', () => {
+  it('has the roster header of each role and no e-mail column', () => {
+    expect(importTemplate('student').split('\n')[0]).toBe('lastName,firstName,section,class,studentNumber,birthDate');
+    expect(importTemplate('teacher').split('\n')[0]).toBe('lastName,firstName');
   });
 });
 

@@ -15,6 +15,9 @@ const TEACHER: AuthUser = {
   studentId: null,
   teacherId: 't1',
   classId: null,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 
 const event = (overrides = {}) => ({
@@ -70,7 +73,7 @@ describe('GradesService', () => {
     grade: { findMany: vi.fn().mockResolvedValue([]) },
     student: { findUnique: vi.fn() },
     term: { findUnique: vi.fn() },
-    enrollment: { findUnique: vi.fn() },
+    enrollment: { findFirst: vi.fn() },
     teachingAssignment: { findMany: vi.fn() },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
@@ -202,11 +205,11 @@ describe('GradesService', () => {
         startsOn: new Date('2025-09-01T00:00:00Z'),
         endsOn: new Date('2025-12-20T00:00:00Z'),
       });
-      prisma.enrollment.findUnique.mockResolvedValue({ classId: 'c-old' });
+      prisma.enrollment.findFirst.mockResolvedValue({ classId: 'c-old' });
       await grades.forStudent('s1', { termId: 'tm1' }, STUDENT);
-      expect(prisma.enrollment.findUnique).toHaveBeenCalledWith(
+      expect(prisma.enrollment.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { studentId_schoolYearId: { studentId: 's1', schoolYearId: 'y0' } },
+          where: { studentId: 's1', schoolYearId: 'y0' },
         }),
       );
       expect(prisma.teachingAssignment.findMany).toHaveBeenCalledWith(

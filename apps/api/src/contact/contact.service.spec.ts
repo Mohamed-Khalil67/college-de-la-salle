@@ -13,6 +13,9 @@ const ADMIN: AuthUser = {
   studentId: null,
   teacherId: null,
   classId: null,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 
 const row = (overrides = {}) => ({

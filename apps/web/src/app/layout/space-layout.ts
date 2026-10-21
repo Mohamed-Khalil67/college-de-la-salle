@@ -4,6 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, Ro
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
 import { Avatar, Icon, type IconName, Wordmark } from '../ui';
+import { ChangePasswordModal } from './change-password-modal';
 
 export interface SpaceNavItem {
   readonly label: string;
@@ -20,7 +21,7 @@ export interface SpaceNavItem {
  */
 @Component({
   selector: 'app-space-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, ChangePasswordModal],
   template: `
     <div class="has-bottom-nav">
       <a class="skip-link" href="#contenu">Aller au contenu</a>
@@ -62,6 +63,12 @@ export interface SpaceNavItem {
             @if (accountOpen()) {
               <div id="account-menu" class="account-menu">
                 <p class="account-menu__who">{{ auth.user()?.email }}</p>
+                @if (auth.role() === 'student') {
+                  <a class="account-menu__item" routerLink="/eleve/section"><cdls-icon name="book" /> Ma section</a>
+                }
+                <button type="button" class="account-menu__item" (click)="openPassword()">
+                  <cdls-icon name="edit" /> Changer mon mot de passe
+                </button>
                 <button type="button" class="account-menu__item" (click)="logout()">
                   <cdls-icon name="log-out" /> Se déconnecter
                 </button>
@@ -74,6 +81,8 @@ export interface SpaceNavItem {
       <main id="contenu" class="page" tabindex="-1">
         <router-outlet />
       </main>
+
+      <app-change-password-modal [(open)]="passwordOpen" />
 
       <nav class="bottom-nav" aria-label="Navigation mobile">
         <ul role="list">
@@ -132,6 +141,9 @@ export interface SpaceNavItem {
       font: inherit;
       cursor: pointer;
     }
+    a.account-menu__item {
+      text-decoration: none;
+    }
     .account-menu__item:hover {
       background: var(--color-subtle);
     }
@@ -149,6 +161,7 @@ export class SpaceLayout {
   private readonly accountButton = viewChild.required<ElementRef<HTMLButtonElement>>('accountButton');
 
   protected readonly accountOpen = signal(false);
+  protected readonly passwordOpen = signal(false);
   protected readonly base = computed(() => '/' + (this.#route.snapshot.pathFromRoot.flatMap((r) => r.url.map((s) => s.path)).join('/') || ''));
   protected readonly mobileNav = computed(() => this.nav().filter((item) => item.icon).slice(0, 5));
   protected readonly roleLabel = computed(() => {
@@ -184,6 +197,11 @@ export class SpaceLayout {
 
   protected link(item: SpaceNavItem): string {
     return item.path ? `${this.base()}/${item.path}` : this.base();
+  }
+
+  protected openPassword(): void {
+    this.accountOpen.set(false);
+    this.passwordOpen.set(true);
   }
 
   protected async logout(): Promise<void> {

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCookieAuth,
   ApiOkResponse,
@@ -11,10 +12,10 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { API_PREFIX } from '../app.prefix.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { CurrentUser, Public } from '../common/decorators.js';
+import { AllowDuringPasswordChange, CurrentUser, Public } from '../common/decorators.js';
 import type { Env } from '../config/env.validation.js';
 import { AuthService, type IssuedSession, toSessionUser } from './auth.service.js';
-import { LoginDto, SessionDto, SessionUserDto } from './dto/auth.dto.js';
+import { ChangePasswordDto, LoginDto, SessionDto, SessionUserDto } from './dto/auth.dto.js';
 
 export const REFRESH_COOKIE = 'cdls_refresh';
 
@@ -79,6 +80,35 @@ export class AuthController {
     this.clear(res);
   }
 
+  /**
+   * Chooses a new password (current one required; at least 10 characters, not the e-mail). Signs out
+   * every other session and returns a fresh one with a new refresh cookie. Limited like the login.
+   */
+  @AllowDuringPasswordChange()
+  @Throttle({ default: { limit: loginLimit, ttl: 60_000 } })
+  @Post('password')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: SessionDto })
+  @ApiBadRequestResponse({ description: 'Wrong current password, or the new one breaks a rule.' })
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: ChangePasswordDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionDto> {
+    return this.send(
+      res,
+      await this.auth.changePassword(
+        user.id,
+        body.currentPassword,
+        body.newPassword,
+        req.get('user-agent'),
+      ),
+    );
+  }
+
+  @AllowDuringPasswordChange()
   @Get('me')
   @ApiBearerAuth()
   @ApiOkResponse({ type: SessionUserDto })

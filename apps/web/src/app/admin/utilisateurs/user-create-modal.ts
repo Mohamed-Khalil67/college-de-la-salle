@@ -26,14 +26,15 @@ interface CreateUserModel {
           <cdls-alert tone="warning">
             <div class="stack stack--sm">
               <p><strong>Compte créé pour {{ createdName() }}</strong> ({{ created.user.email }}).</p>
-              @if (created.temporaryPassword) {
-                <p>
-                  Mot de passe temporaire :
-                  <code class="temp-password">{{ created.temporaryPassword }}</code>
-                </p>
-                <p>Il ne sera plus affiché. Copiez-le maintenant et remettez-le à la personne en main propre.</p>
-                <app-copy-button [value]="created.temporaryPassword" [what]="'le mot de passe de ' + createdName()" />
-              }
+              <p>
+                Mot de passe temporaire :
+                <code class="temp-password">{{ created.temporaryPassword }}</code>
+              </p>
+              <p>
+                Il ne sera plus affiché. Copiez-le maintenant et remettez-le à la personne en main propre : elle choisira
+                son propre mot de passe à la première connexion.
+              </p>
+              <app-copy-button [value]="created.temporaryPassword" [what]="'le mot de passe de ' + createdName()" />
             </div>
           </cdls-alert>
           <div class="modal__footer">
@@ -56,7 +57,11 @@ interface CreateUserModel {
           <cdls-field label="Nom" [error]="lastNameError()">
             <input cdlsControl autocomplete="off" [formField]="userForm.lastName" />
           </cdls-field>
-          <cdls-field label="Adresse e-mail" helper="Elle sert d’identifiant de connexion." [error]="emailError()">
+          <cdls-field
+            label="Adresse e-mail (facultative)"
+            helper="Laissez vide pour créer l’adresse du collège : prenom.nom suivi du domaine, avec un numéro si elle existe déjà."
+            [error]="emailError()"
+          >
             <input cdlsControl type="email" autocomplete="off" [formField]="userForm.email" />
           </cdls-field>
           @if (isStudent()) {
@@ -80,7 +85,7 @@ interface CreateUserModel {
               <input cdlsControl autocomplete="off" [formField]="userForm.studentNumber" />
             </cdls-field>
           }
-          <p class="t-body-s t-muted">Un mot de passe temporaire est créé et affiché une seule fois, juste après l’enregistrement.</p>
+          <p class="t-body-s t-muted">Un mot de passe temporaire est créé et affiché une seule fois, juste après l’enregistrement. La personne devra le remplacer à sa première connexion.</p>
           @if (failure()) {
             <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
           }
@@ -125,8 +130,7 @@ export class UserCreateModal {
     maxLength(p.firstName, 80, { message: 'Le prénom compte 80 caractères au plus.' });
     required(p.lastName, { message: 'Saisissez le nom de famille.' });
     maxLength(p.lastName, 80, { message: 'Le nom compte 80 caractères au plus.' });
-    required(p.email, { message: 'Saisissez l’adresse e-mail.' });
-    email(p.email, { message: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg.' });
+    email(p.email, { message: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg, ou laissez le champ vide.' });
     hidden(p.classId, (ctx) => !student(ctx));
     hidden(p.studentNumber, (ctx) => !student(ctx));
     required(p.classId, { message: 'Choisissez la classe de l’élève.', when: student });
@@ -181,7 +185,7 @@ export class UserCreateModal {
           role: value.role,
           firstName: value.firstName.trim(),
           lastName: value.lastName.trim(),
-          email: value.email.trim(),
+          ...(value.email.trim() ? { email: value.email.trim() } : {}),
           ...(isStudent && value.classId ? { classId: value.classId } : {}),
           ...(isStudent && value.studentNumber.trim() ? { studentNumber: value.studentNumber.trim() } : {}),
         });

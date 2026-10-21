@@ -22,3 +22,11 @@ export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionConte
   if (!user) throw new UnauthorizedException();
   return user;
 });
+
+export const ALLOW_DURING_PASSWORD_CHANGE = 'allowDuringPasswordChange';
+
+/**
+ * Keeps a route open to a user who must still choose their password (first sign-in, reset by the
+ * administration). Every other authenticated route answers 403 PASSWORD_CHANGE_REQUIRED until then.
+ */
+export const AllowDuringPasswordChange = () => SetMetadata(ALLOW_DURING_PASSWORD_CHANGE, true);

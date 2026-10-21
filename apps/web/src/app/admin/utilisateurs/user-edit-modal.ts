@@ -4,7 +4,7 @@ import type { UserDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../ui';
 import { CopyButton } from '../shared/copy-button';
-import { fullName, generatePassword, shownError } from '../shared/admin-format';
+import { formatDay, fullName, generatePassword, shownError } from '../shared/admin-format';
 
 interface EditUserModel {
   firstName: string;
@@ -18,6 +18,22 @@ interface EditUserModel {
   imports: [FormField, Modal, Alert, Button, Field, FieldControl, CopyButton],
   template: `
     <cdls-modal [title]="'Modifier le compte de ' + name()" [(open)]="open">
+      @if (isArchived()) {
+        <div class="stack">
+          <p class="t-muted">{{ user()?.email }}</p>
+          <cdls-alert tone="info">
+            Ce compte est archivé{{ user()?.graduatedOn ? ' (diplômé le ' + graduated() + ')' : '' }} : il ne peut plus se connecter
+            et reste en lecture seule. Ses notes, absences et bulletins sont conservés.
+          </cdls-alert>
+          @if (saveFailure()) {
+            <cdls-alert tone="danger">{{ saveFailure() }}</cdls-alert>
+          }
+          <div class="modal__footer">
+            <button cdlsButton variant="secondary" type="button" (click)="open.set(false)">Fermer</button>
+            <button cdlsButton type="button" [disabled]="busy()" (click)="restore()">Restaurer le compte</button>
+          </div>
+        </div>
+      } @else {
       <form class="stack" novalidate (submit)="onSubmit($event)">
         <p class="t-muted">{{ user()?.email }}</p>
         <cdls-field label="Prénom" [error]="firstNameError()">
@@ -68,7 +84,9 @@ interface EditUserModel {
             </button>
           </div>
         } @else {
-          <p class="t-body-s t-muted">Pour un mot de passe oublié : un nouveau mot de passe temporaire est généré.</p>
+          <p class="t-body-s t-muted">
+            Pour un mot de passe oublié : un nouveau mot de passe temporaire est généré, et la personne devra le remplacer à sa prochaine connexion.
+          </p>
           <div>
             <button cdlsButton variant="secondary" size="sm" type="button" (click)="askReset(true)">Réinitialiser le mot de passe</button>
           </div>
@@ -77,6 +95,7 @@ interface EditUserModel {
           <cdls-alert tone="danger">{{ resetFailure() }}</cdls-alert>
         }
       </section>
+      }
     </cdls-modal>
   `,
   styles: `
@@ -112,6 +131,11 @@ export class UserEditModal {
     const user = this.user();
     return user ? fullName(user) : '';
   });
+  protected readonly isArchived = computed(() => this.user()?.status === 'archived');
+  protected readonly graduated = computed(() => {
+    const day = this.user()?.graduatedOn;
+    return day ? formatDay(day) : '';
+  });
   protected readonly isSelf = computed(() => !!this.user() && this.user()?.id === this.selfId());
 
   protected readonly model = signal<EditUserModel>({ firstName: '', lastName: '', isActive: true });
@@ -136,7 +160,7 @@ export class UserEditModal {
       const user = this.user();
       if (!this.open() || !user) return;
       untracked(() => {
-        this.editForm().reset({ firstName: user.firstName, lastName: user.lastName, isActive: user.isActive });
+        this.editForm().reset({ firstName: user.firstName, lastName: user.lastName, isActive: user.status !== 'disabled' });
         this.saveFailure.set(null);
         this.resetFailure.set(null);
         this.confirmReset.set(false);
@@ -157,7 +181,7 @@ export class UserEditModal {
         const updated = await this.#api.users.update(user.id, {
           firstName: value.firstName.trim(),
           lastName: value.lastName.trim(),
-          ...(this.isSelf() ? {} : { isActive: value.isActive }),
+          ...(this.isSelf() ? {} : { status: value.isActive ? ('active' as const) : ('disabled' as const) }),
         });
         this.saved.emit(updated);
         this.open.set(false);
@@ -167,6 +191,22 @@ export class UserEditModal {
         this.busy.set(false);
       }
     });
+  }
+
+  protected async restore(): Promise<void> {
+    const user = this.user();
+    if (!user) return;
+    this.busy.set(true);
+    this.saveFailure.set(null);
+    try {
+      const restored = await this.#api.users.update(user.id, { status: 'active' });
+      this.saved.emit(restored);
+      this.open.set(false);
+    } catch (error) {
+      this.saveFailure.set(apiMessage(error));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected askReset(ask: boolean): void {

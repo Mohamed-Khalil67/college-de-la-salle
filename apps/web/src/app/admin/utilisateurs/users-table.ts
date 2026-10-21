@@ -55,9 +55,14 @@ interface UserRow {
                   <button cdlsButton variant="tertiary" size="sm" type="button" (click)="edit.emit(row.user)">
                     Modifier<span class="visually-hidden"> le compte de {{ row.name }}</span>
                   </button>
-                  @if (row.user.isActive && !row.isSelf) {
+                  @if (row.user.status === 'active' && !row.isSelf) {
                     <button cdlsButton variant="tertiary" size="sm" type="button" (click)="deactivate.emit(row.user)">
                       Désactiver<span class="visually-hidden"> le compte de {{ row.name }}</span>
+                    </button>
+                  }
+                  @if (row.user.role === 'student' && row.user.status !== 'archived') {
+                    <button cdlsButton variant="tertiary" size="sm" type="button" (click)="archive.emit(row.user)">
+                      Diplômé ou parti<span class="visually-hidden"> : {{ row.name }}</span>
                     </button>
                   }
                 </span>
@@ -86,6 +91,8 @@ export class UsersTable {
   readonly selfId = input<string | null>(null);
   readonly edit = output<UserDto>();
   readonly deactivate = output<UserDto>();
+  /** A student who graduated or left the school. */
+  readonly archive = output<UserDto>();
 
   protected readonly captionId = `users-caption-${++nextId}`;
   protected readonly isStudents = computed(() => this.role() === 'student');

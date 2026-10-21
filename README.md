@@ -9,7 +9,7 @@ signed-in spaces run the school year:
 | **Public site** | Everyone | Home, history and heritage, the two tracks with their subjects, contact |
 | **Espace élève** `/eleve` | Students | Dashboard, timetable, homework (tick as done), grades with averages, absences, report cards (PDF) |
 | **Espace enseignant** `/enseignant` | Teachers | Their classes, the shared calendar, grade entry with a publish step, attendance, announcements |
-| **Administration** `/admin` | School staff | Accounts (one by one or CSV import), classes and enrolments, teaching assignments, school years and terms, report cards, messages from the contact form |
+| **Administration** `/admin` | School staff | Accounts (one by one or roster CSV with generated school e-mails), section-change validations, graduation, classes and enrolments, teaching assignments, school years and terms, report cards, messages from the contact form |
 
 Accounts are created by the college; there is no open sign-up. Built with **Angular 22** (standalone, zoneless,
 signals, Signal Forms, prerendering with hydration), **Tailwind CSS v4**, **NestJS 12**, **Prisma 7** and
@@ -57,13 +57,18 @@ health: `/api/health` (process) and `/api/health/db` (database).
 ## The API
 
 `apps/api` serves `/api` (docs at http://localhost:3000/api/docs). Accounts are created by the admin (one
-by one or by CSV import); there is no open sign-up. Sign-in returns a 15-minute access token (send it as
+by one, or from a roster CSV); there is no open sign-up. Every login e-mail is `prenom.nom@<SCHOOL_EMAIL_DOMAIN>`
+(accents removed, spaces and apostrophes turned into hyphens, `2`, `3`… on a collision). A new or reset account has a
+temporary password and `mustChangePassword`: until the person chooses a password (`POST /auth/password`, at least 10
+characters, not the e-mail) every other route answers 403 `PASSWORD_CHANGE_REQUIRED`, and the web app shows the
+« Premier accès » page. Accounts are `active`, `disabled` or `archived` (graduated or left: no sign-in, read-only).
+Sign-in returns a 15-minute access token (send it as
 `Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
 
 | Area | Endpoints |
 | --- | --- |
-| Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` |
-| Admin | `/users` (CRUD, `POST /users/import` CSV), `/school-years`, `/terms/:id/close`, `/classes`, `/enrollments`, `/subjects`, `/teaching-assignments`; `DELETE` an empty class, an unused school year (not the current one) or a term without grades (409 otherwise) |
+| Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/password`, `GET /auth/me` |
+| Admin | `/users` (CRUD, `POST /users/import/preview` then `POST /users/import?role=student|teacher` roster CSV, `POST /users/archive`), `/section-changes` (students ask, `GET /section-changes/mine`; admins list, `/:id/approve`, `/:id/reject`), `/school-years`, `/terms/:id/close`, `/classes`, `/enrollments`, `/subjects`, `/teaching-assignments`; `DELETE` an empty class, an unused school year (not the current one) or a term without grades (409 otherwise) |
 | Calendar | `/events` (range, `/occurrences` with weekly repeats, `/:id/ics`), `/homework` (done ticks), `/posts` |
 | Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |

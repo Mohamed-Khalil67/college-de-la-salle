@@ -1,35 +1,49 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
 import {
-  CLASSES,
-  type ImportUsersError,
+  assignSchoolEmails,
+  type ImportRole,
   type Paginated,
-  type Role,
-  ROLES,
   type SectionId,
 } from '@cdls/shared';
 import { hash } from 'argon2';
 import { parse } from 'csv-parse/sync';
-import { isEmail } from 'class-validator';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { AuthService } from '../auth/auth.service.js';
+import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { toIso } from '../common/dates.js';
+import { fromDay, toDay, toIso } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { pageArgs, paginated } from '../common/pagination.js';
+import type { Env } from '../config/env.validation.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
+  ArchiveStudentsDto,
+  ArchiveStudentsResultDto,
   CreatedUserDto,
   CreateUserDto,
+  ImportPreviewDto,
   ImportUsersDto,
   UpdateUserDto,
   UserDto,
   UserListQueryDto,
 } from './dto/user.dto.js';
+import {
+  type CheckedRoster,
+  checkRoster,
+  headerProblems,
+  columnName,
+  MAX_IMPORT_ROWS,
+} from './roster-import.js';
 
-const MAX_IMPORT_ROWS = 2000;
 const HASH_CONCURRENCY = 4;
+const ARCHIVED = 'Compte archivé : restaurez-le avant de le modifier.';
 
 const include = {
   teacher: { select: { id: true } },
@@ -37,6 +51,8 @@ const include = {
     select: {
       id: true,
       studentNumber: true,
+      graduatedOn: true,
+      section: { select: { code: true } },
       enrollments: {
         where: { schoolYear: { isCurrent: true }, leftOn: null },
         select: { classId: true },
@@ -48,28 +64,31 @@ const include = {
 
 type UserRow = Prisma.UserGetPayload<{ include: typeof include }>;
 
-interface ImportRow {
-  line: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: Role;
-  studentNumber: string | null;
-  classId: string | null;
+/** Prisma's unique-constraint violation. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'P2002'
+  );
 }
 
 @Injectable()
 export class UsersService {
+  private readonly domain: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly auth: AuthService,
-  ) {}
+    config: ConfigService<Env, true>,
+  ) {
+    this.domain = config.get('SCHOOL_EMAIL_DOMAIN', { infer: true });
+  }
 
   async list(query: UserListQueryDto): Promise<Paginated<UserDto>> {
     const search = query.search?.trim();
     const where: Prisma.UserWhereInput = {
       ...(query.role ? { role: query.role } : {}),
+      ...(query.status ? { status: query.status } : {}),
       ...(search
         ? {
             OR: [
@@ -93,150 +112,131 @@ export class UsersService {
   }
 
   async get(id: string): Promise<UserDto> {
-    const user = await this.prisma.user.findUnique({ where: { id }, include });
-    if (!user) throw notFound('Utilisateur');
-    return toUserDto(user);
+    return toUserDto(await this.row(id));
   }
 
+  /**
+   * Creates one account with a temporary password (shown once). Without an e-mail, the school address
+   * `prenom.nom@<domain>` is generated. A student's class sets their section.
+   */
   async create(dto: CreateUserDto): Promise<CreatedUserDto> {
-    if (await this.prisma.user.findUnique({ where: { email: dto.email } })) {
+    if (dto.role !== 'student' && (dto.classId || dto.studentNumber || dto.birthDate)) {
+      throw new BadRequestException(
+        'Classe, matricule et date de naissance concernent uniquement les élèves.',
+      );
+    }
+    const schoolClass = dto.classId
+      ? await this.prisma.schoolClass.findUnique({ where: { id: dto.classId } })
+      : null;
+    if (dto.classId && !schoolClass) throw notFound('Classe');
+    if (dto.studentNumber && (await this.prisma.student.findUnique({ where: { studentNumber: dto.studentNumber } })))
+      throw new ConflictException('Ce matricule est déjà utilisé.');
+
+    const email = dto.email ?? (await this.generatedEmail(dto.firstName, dto.lastName));
+    if (dto.email && (await this.prisma.user.findUnique({ where: { email: dto.email } }))) {
       throw new ConflictException('Un compte existe déjà avec cette adresse e-mail.');
     }
-    if (dto.role !== 'student' && (dto.classId || dto.studentNumber)) {
-      throw new BadRequestException('Classe et matricule concernent uniquement les élèves.');
+    const temporaryPassword = generatePassword();
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          email,
+          passwordHash: await hash(temporaryPassword),
+          role: dto.role,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          mustChangePassword: true,
+          ...(dto.role === 'teacher' ? { teacher: { create: {} } } : {}),
+          ...(dto.role === 'student'
+            ? {
+                student: {
+                  create: {
+                    studentNumber: dto.studentNumber ?? null,
+                    birthDate: dto.birthDate ? fromDay(dto.birthDate) : null,
+                    sectionId: schoolClass?.sectionId ?? null,
+                    ...(schoolClass
+                      ? {
+                          enrollments: {
+                            create: {
+                              classId: schoolClass.id,
+                              schoolYearId: schoolClass.schoolYearId,
+                            },
+                          },
+                        }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
+        },
+        include,
+      });
+      return { user: toUserDto(user), temporaryPassword };
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException('Ce compte existe déjà (e-mail ou matricule). Réessayez.');
+      throw error;
     }
-    const schoolYearId = dto.classId ? await this.classYear(dto.classId) : null;
-    const temporaryPassword = dto.password ? null : generatePassword();
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash: await hash(dto.password ?? temporaryPassword!),
-        role: dto.role,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        ...profile(dto.role, dto.studentNumber ?? null, dto.classId ?? null, schoolYearId),
-      },
-      include,
-    });
-    return { user: toUserDto(user), temporaryPassword };
   }
 
   async update(id: string, dto: UpdateUserDto, actor: AuthUser): Promise<UserDto> {
-    await this.get(id);
-    if (id === actor.id && dto.isActive === false)
+    const current = await this.row(id);
+    if (id === actor.id && dto.status === 'disabled')
       throw new BadRequestException('Vous ne pouvez pas désactiver votre propre compte.');
+    const restoring = current.status === 'archived' && dto.status === 'active';
+    if (current.status === 'archived' && !restoring) throw new ConflictException(ARCHIVED);
+
+    const reset = dto.password !== undefined;
     const user = await this.prisma.user.update({
       where: { id },
       data: {
         firstName: dto.firstName,
         lastName: dto.lastName,
-        isActive: dto.isActive,
-        ...(dto.password ? { passwordHash: await hash(dto.password) } : {}),
+        status: dto.status,
+        ...(restoring && current.student
+          ? { student: { update: { graduatedOn: null } } }
+          : {}),
+        // A reset password is temporary: the user chooses their own at next sign-in.
+        ...(reset
+          ? {
+              passwordHash: await hash(dto.password!),
+              mustChangePassword: true,
+              passwordChangedAt: new Date(),
+            }
+          : {}),
       },
       include,
     });
-    if (dto.password || dto.isActive === false) await this.auth.revokeAll(id);
+    if (reset || dto.status === 'disabled') await this.auth.revokeAll(id);
     return toUserDto(user);
   }
 
-  /** Accounts are never hard-deleted (grades and logs point at them): deactivate and sign out. */
+  /** Accounts are never hard-deleted (grades and logs point at them): disable and sign out. */
   async deactivate(id: string, actor: AuthUser): Promise<UserDto> {
-    return this.update(id, { isActive: false }, actor);
+    return this.update(id, { status: 'disabled' }, actor);
   }
 
-  /** CSV import, all or nothing. See ImportUsersResponse in packages/shared for the format. */
-  async importCsv(csv: Buffer | undefined): Promise<ImportUsersDto> {
-    if (!csv?.length) throw new BadRequestException('Fichier CSV manquant (champ « file »).');
-    let records: Record<string, string>[];
-    try {
-      records = parse(csv, {
-        columns: (h: string[]) => h.map((c) => c.trim()),
-        bom: true,
-        trim: true,
-        skip_empty_lines: true,
-      });
-    } catch (error) {
-      throw new BadRequestException(
-        `CSV illisible : ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-    if (!records.length) throw new BadRequestException('Le fichier ne contient aucune ligne.');
-    if (records.length > MAX_IMPORT_ROWS)
-      throw new BadRequestException(`Au plus ${MAX_IMPORT_ROWS} lignes par import.`);
+  /** Checks a roster CSV and lists the accounts it would create, with their generated e-mails. */
+  async previewImport(csv: Buffer | undefined, role: ImportRole): Promise<ImportPreviewDto> {
+    const checked = await this.checkImport(csv, role);
+    return {
+      role,
+      rows: checked.rows.map(({ classId: _classId, ...row }) => row),
+      errors: checked.errors,
+    };
+  }
 
-    const year = await this.access.currentYear();
-    const classes = await this.prisma.schoolClass.findMany({
-      where: { schoolYearId: year.id },
-      include: { section: true },
-    });
-    const classByCode = new Map(classes.map((c) => [`${c.section.code}/${c.code}`, c.id]));
-    const emails = records.map((r) => (r['email'] ?? '').toLowerCase());
-    const existing = new Set(
-      (
-        await this.prisma.user.findMany({
-          where: { email: { in: emails } },
-          select: { email: true },
-        })
-      ).map((u) => u.email),
-    );
-    const numbers = records.map((r) => r['studentNumber'] ?? '').filter(Boolean);
-    const existingNumbers = new Set(
-      (
-        await this.prisma.student.findMany({
-          where: { studentNumber: { in: numbers } },
-          select: { studentNumber: true },
-        })
-      ).map((s) => s.studentNumber),
-    );
-
-    const errors: ImportUsersError[] = [];
-    const rows: ImportRow[] = [];
-    const seen = new Set<string>();
-    records.forEach((r, i) => {
-      const line = i + 2; // header is line 1
-      const fail = (message: string) => errors.push({ line, message });
-      const email = (r['email'] ?? '').toLowerCase();
-      const role = r['role'] as Role;
-      const firstName = r['firstName'] ?? '';
-      const lastName = r['lastName'] ?? '';
-      const studentNumber = r['studentNumber'] || null;
-      if (!isEmail(email)) return fail('e-mail invalide');
-      if (existing.has(email) || seen.has(email)) return fail(`${email} existe déjà`);
-      seen.add(email);
-      if (!ROLES.includes(role))
-        return fail(`rôle inconnu « ${r['role'] ?? ''} » (admin, teacher, student)`);
-      if (!firstName || !lastName || firstName.length > 80 || lastName.length > 80)
-        return fail('prénom et nom requis (80 caractères max.)');
-      if (
-        studentNumber &&
-        (!/^[\w-]{1,32}$/.test(studentNumber) || existingNumbers.has(studentNumber))
-      ) {
-        return fail(`matricule invalide ou déjà utilisé : ${studentNumber}`);
-      }
-      let classId: string | null = null;
-      if (role === 'student') {
-        const section = r['section'] as SectionId;
-        const code = r['class'] ?? '';
-        if (!(section in CLASSES)) return fail('section requise pour un élève (nationale ou bac)');
-        classId = classByCode.get(`${section}/${code}`) ?? null;
-        if (!classId) return fail(`classe inconnue « ${code} » en ${section} pour ${year.label}`);
-      }
-      rows.push({
-        line,
-        email,
-        firstName,
-        lastName,
-        role,
-        studentNumber: role === 'student' ? studentNumber : null,
-        classId,
-      });
-    });
+  /** Roster CSV import, all or nothing: every account gets a generated e-mail and a temporary password. */
+  async importCsv(csv: Buffer | undefined, role: ImportRole): Promise<ImportUsersDto> {
+    const { rows, errors } = await this.checkImport(csv, role);
     if (errors.length)
       throw new BadRequestException({
         statusCode: 400,
         message: 'Import refusé : corrigez les lignes en erreur.',
         errors,
       });
+    const sectionIds = await this.sectionIds();
+    const schoolYearId = role === 'student' ? (await this.access.currentYear()).id : null;
 
     const passwords = rows.map(() => generatePassword());
     const hashes: string[] = [];
@@ -245,52 +245,196 @@ export class UsersService {
         ...(await Promise.all(passwords.slice(i, i + HASH_CONCURRENCY).map((p) => hash(p)))),
       );
     }
-    await this.prisma.$transaction(
-      rows.map((row, i) =>
-        this.prisma.user.create({
-          data: {
-            email: row.email,
-            passwordHash: hashes[i]!,
-            role: row.role,
-            firstName: row.firstName,
-            lastName: row.lastName,
-            ...profile(row.role, row.studentNumber, row.classId, row.classId ? year.id : null),
-          },
-        }),
-      ),
-    );
+    try {
+      await this.prisma.$transaction(
+        rows.map((row, i) =>
+          this.prisma.user.create({
+            data: {
+              email: row.email,
+              passwordHash: hashes[i]!,
+              role,
+              firstName: row.firstName,
+              lastName: row.lastName,
+              mustChangePassword: true,
+              ...(role === 'teacher'
+                ? { teacher: { create: {} } }
+                : {
+                    student: {
+                      create: {
+                        studentNumber: row.studentNumber,
+                        birthDate: row.birthDate ? fromDay(row.birthDate) : null,
+                        sectionId: sectionIds.get(row.sectionCode!)!,
+                        enrollments: {
+                          create: { classId: row.classId!, schoolYearId: schoolYearId! },
+                        },
+                      },
+                    },
+                  }),
+            },
+          }),
+        ),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException(
+          'Un compte a été créé entre-temps avec la même adresse ou le même matricule : relancez l’import.',
+        );
+      throw error;
+    }
     return {
       created: rows.map((row, i) => ({
         email: row.email,
-        role: row.role,
+        role,
+        firstName: row.firstName,
+        lastName: row.lastName,
         temporaryPassword: passwords[i]!,
       })),
     };
   }
 
-  private async classYear(classId: string): Promise<string> {
-    const schoolClass = await this.prisma.schoolClass.findUnique({ where: { id: classId } });
-    if (!schoolClass) throw notFound('Classe');
-    return schoolClass.schoolYearId;
-  }
-}
+  /**
+   * Students who graduated or left: archives their accounts, closes their open enrolments on `on`,
+   * rejects their pending section-change requests and signs them out, in one transaction with audit rows.
+   */
+  async archiveStudents(dto: ArchiveStudentsDto, actor: AuthUser): Promise<ArchiveStudentsResultDto> {
+    if (!!dto.classId === !!dto.studentIds?.length)
+      throw new BadRequestException('Indiquez soit des élèves, soit une classe.');
+    const students = dto.classId
+      ? await this.prisma.student.findMany({
+          where: { enrollments: { some: { classId: dto.classId, leftOn: null } } },
+          select: { id: true, userId: true, user: { select: { status: true } } },
+        })
+      : await this.prisma.student.findMany({
+          where: { id: { in: [...new Set(dto.studentIds)] } },
+          select: { id: true, userId: true, user: { select: { status: true } } },
+        });
+    if (dto.studentIds && students.length !== new Set(dto.studentIds).size) throw notFound('Élève');
+    const targets = students.filter((s) => s.user.status !== 'archived');
+    if (!targets.length) return { archived: 0 };
 
-function profile(
-  role: Role,
-  studentNumber: string | null,
-  classId: string | null,
-  schoolYearId: string | null,
-) {
-  if (role === 'teacher') return { teacher: { create: {} } };
-  if (role !== 'student') return {};
-  return {
-    student: {
-      create: {
-        studentNumber,
-        ...(classId && schoolYearId ? { enrollments: { create: { classId, schoolYearId } } } : {}),
-      },
-    },
-  };
+    const on = fromDay(dto.on);
+    const now = new Date();
+    const studentIds = targets.map((s) => s.id);
+    const userIds = targets.map((s) => s.userId);
+    const note =
+      dto.outcome === 'graduated'
+        ? 'Demande close : l’élève a obtenu son diplôme.'
+        : 'Demande close : l’élève a quitté le collège.';
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.updateMany({ where: { id: { in: userIds } }, data: { status: 'archived' } });
+      await tx.student.updateMany({
+        where: { id: { in: studentIds } },
+        data: { graduatedOn: dto.outcome === 'graduated' ? on : null },
+      });
+      await tx.enrollment.updateMany({
+        where: { studentId: { in: studentIds }, leftOn: null },
+        data: { leftOn: on },
+      });
+      await tx.sectionChangeRequest.updateMany({
+        where: { studentId: { in: studentIds }, status: 'pending' },
+        data: { status: 'rejected', decidedById: actor.id, decidedAt: now, decisionNote: note },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: { in: userIds }, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      await audit(
+        tx,
+        targets.map((s) => ({
+          actorId: actor.id,
+          action: `student.${dto.outcome}`,
+          entity: 'student',
+          entityId: s.id,
+          before: { status: s.user.status },
+          after: { status: 'archived', outcome: dto.outcome, on: dto.on },
+        })),
+      );
+    });
+    return { archived: targets.length };
+  }
+
+  private async row(id: string): Promise<UserRow> {
+    const user = await this.prisma.user.findUnique({ where: { id }, include });
+    if (!user) throw notFound('Utilisateur');
+    return user;
+  }
+
+  /** The school e-mail for a name, numbered after the addresses already in use. */
+  private async generatedEmail(firstName: string, lastName: string): Promise<string> {
+    const [email] = assignSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails());
+    if (!email)
+      throw new BadRequestException(
+        'Impossible de créer l’adresse e-mail : écrivez le nom et le prénom en lettres latines, ou saisissez l’adresse.',
+      );
+    return email;
+  }
+
+  private async takenEmails(): Promise<Set<string>> {
+    const rows = await this.prisma.user.findMany({
+      where: { email: { endsWith: `@${this.domain}` } },
+      select: { email: true },
+    });
+    return new Set(rows.map((r) => r.email));
+  }
+
+  private async sectionIds(): Promise<Map<SectionId, string>> {
+    const sections = await this.prisma.section.findMany();
+    return new Map(sections.map((s) => [s.code as SectionId, s.id]));
+  }
+
+  private async checkImport(csv: Buffer | undefined, role: ImportRole): Promise<CheckedRoster> {
+    if (!csv?.length) throw new BadRequestException('Fichier CSV manquant (champ « file »).');
+    let headings: string[] = [];
+    let records: Record<string, string>[];
+    try {
+      records = parse(csv, {
+        columns: (header: string[]) => {
+          headings = header.map((c) => c.trim());
+          return headings.map((c) => columnName(c) ?? c);
+        },
+        bom: true,
+        trim: true,
+        skip_empty_lines: true,
+        delimiter: [',', ';'],
+      });
+    } catch (error) {
+      throw new BadRequestException(
+        `CSV illisible : ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    const header = headerProblems(headings, role);
+    if (header.length)
+      return { rows: [], errors: header.map((message) => ({ line: 1, message })) };
+    if (!records.length) throw new BadRequestException('Le fichier ne contient aucune ligne.');
+    if (records.length > MAX_IMPORT_ROWS)
+      throw new BadRequestException(`Au plus ${MAX_IMPORT_ROWS} lignes par import.`);
+
+    const classes =
+      role === 'student'
+        ? await this.prisma.schoolClass.findMany({
+            where: { schoolYearId: (await this.access.currentYear()).id },
+            include: { section: true },
+          })
+        : [];
+    const numbers = records.map((r) => (r['studentNumber'] ?? '').trim()).filter(Boolean);
+    const takenNumbers = numbers.length
+      ? (
+          await this.prisma.student.findMany({
+            where: { studentNumber: { in: numbers } },
+            select: { studentNumber: true },
+          })
+        ).flatMap((s) => (s.studentNumber ? [s.studentNumber] : []))
+      : [];
+    return checkRoster(records, {
+      role,
+      domain: this.domain,
+      classes: new Map(
+        classes.map((c) => [`${c.section.code}/${c.code.toLowerCase()}`, { id: c.id, label: c.label }]),
+      ),
+      takenEmails: await this.takenEmails(),
+      takenNumbers: new Set(takenNumbers),
+    });
+  }
 }
 
 /** 16 URL-safe characters (96 bits). */
@@ -305,12 +449,15 @@ export function toUserDto(u: UserRow): UserDto {
     role: u.role,
     firstName: u.firstName,
     lastName: u.lastName,
-    isActive: u.isActive,
+    status: u.status,
+    mustChangePassword: u.mustChangePassword,
     lastLoginAt: toIso(u.lastLoginAt),
     createdAt: u.createdAt.toISOString(),
     studentId: u.student?.id ?? null,
     teacherId: u.teacher?.id ?? null,
     studentNumber: u.student?.studentNumber ?? null,
     classId: u.student?.enrollments[0]?.classId ?? null,
+    sectionCode: (u.student?.section?.code as SectionId | undefined) ?? null,
+    graduatedOn: u.student?.graduatedOn ? toDay(u.student.graduatedOn) : null,
   };
 }

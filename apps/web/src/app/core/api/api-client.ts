@@ -3,6 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   ApiError,
+  ApproveSectionChangeRequest,
+  ArchiveStudentsRequest,
+  ArchiveStudentsResponse,
   AttendanceSheetDto,
   ClassStudentDto,
   ClassDto,
@@ -12,6 +15,7 @@ import type {
   CreateClassRequest,
   CreatedUserResponse,
   CreatePostRequest,
+  CreateSectionChangeRequest,
   CreateSchoolYearRequest,
   CreateTeachingAssignmentRequest,
   CreateTermRequest,
@@ -23,6 +27,8 @@ import type {
   GradeSheetDto,
   HomeworkCompletionDto,
   HomeworkDto,
+  ImportPreviewResponse,
+  ImportRole,
   ImportUsersResponse,
   OccurrenceDto,
   Paginated,
@@ -30,9 +36,12 @@ import type {
   ReportCardBatchRequest,
   ReportCardBatchResponse,
   ReportCardDto,
+  RejectSectionChangeRequest,
   SaveAttendanceRequest,
   SaveGradesRequest,
   SchoolYearDto,
+  SectionChangeListQuery,
+  SectionChangeRequestDto,
   SectionDto,
   StudentAttendanceDto,
   StudentGradesDto,
@@ -43,6 +52,12 @@ import type {
   UserDto,
   UserListQuery,
 } from '@cdls/shared';
+
+function csvForm(file: File): FormData {
+  const form = new FormData();
+  form.append('file', file);
+  return form;
+}
 
 type Query = Readonly<Record<string, string | number | boolean | null | undefined>>;
 
@@ -123,11 +138,22 @@ export class ApiClient {
     create: (body: CreateUserRequest) => this.#post<CreatedUserResponse>('/users', body),
     update: (id: string, body: UpdateUserRequest) => this.#patch<UserDto>(`/users/${id}`, body),
     remove: (id: string) => this.#delete(`/users/${id}`),
-    import: (file: File) => {
-      const form = new FormData();
-      form.append('file', file);
-      return this.#post<ImportUsersResponse>('/users/import', form);
-    },
+    /** Checks a roster CSV: the accounts it would create (generated e-mails) and the line errors. */
+    previewImport: (file: File, role: ImportRole) =>
+      this.#post<ImportPreviewResponse>(`/users/import/preview?role=${role}`, csvForm(file)),
+    /** All or nothing (400 with `errors`); returns the temporary passwords, once. */
+    import: (file: File, role: ImportRole) => this.#post<ImportUsersResponse>(`/users/import?role=${role}`, csvForm(file)),
+    /** Students who graduated or left: archived accounts, closed enrolments. */
+    archive: (body: ArchiveStudentsRequest) => this.#post<ArchiveStudentsResponse>('/users/archive', body),
+  };
+
+  /* Section changes: the student asks, the administration decides */
+  readonly sectionChanges = {
+    list: (query: SectionChangeListQuery = {}) => this.#get<Paginated<SectionChangeRequestDto>>('/section-changes', { ...query }),
+    mine: () => this.#get<SectionChangeRequestDto[]>('/section-changes/mine'),
+    create: (body: CreateSectionChangeRequest) => this.#post<SectionChangeRequestDto>('/section-changes', body),
+    approve: (id: string, body: ApproveSectionChangeRequest) => this.#post<SectionChangeRequestDto>(`/section-changes/${id}/approve`, body),
+    reject: (id: string, body: RejectSectionChangeRequest) => this.#post<SectionChangeRequestDto>(`/section-changes/${id}/reject`, body),
   };
 
   /* Calendar, homework, announcements */

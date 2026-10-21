@@ -1,4 +1,4 @@
-import { type ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { type ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../common/auth-user.js';
@@ -14,6 +14,9 @@ const USER: AuthUser = {
   studentId: 's1',
   teacherId: null,
   classId: 'c1',
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 
 function context(authorization?: string) {
@@ -68,5 +71,20 @@ describe('JwtAuthGuard', () => {
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(auth.userFromAccessToken).toHaveBeenCalledWith('good');
     expect(request.user).toBe(USER);
+  });
+
+  it('lets a user who must change their password reach only the marked routes', async () => {
+    auth.userFromAccessToken.mockResolvedValue({ ...USER, mustChangePassword: true });
+    const spy = vi.spyOn(reflector, 'getAllAndOverride');
+    // Not public, not marked @AllowDuringPasswordChange().
+    spy.mockReturnValue(false);
+    const refused = guard.canActivate(context('Bearer good').ctx);
+    await expect(refused).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(guard.canActivate(context('Bearer good').ctx)).rejects.toMatchObject({
+      response: { error: 'PASSWORD_CHANGE_REQUIRED' },
+    });
+    // Marked: /auth/me and POST /auth/password.
+    spy.mockImplementation((key: unknown) => key === 'allowDuringPasswordChange');
+    await expect(guard.canActivate(context('Bearer good').ctx)).resolves.toBe(true);
   });
 });
