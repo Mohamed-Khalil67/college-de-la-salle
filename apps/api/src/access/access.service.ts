@@ -4,6 +4,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { forbidden } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { concernsStudentNow } from '../targets/target-filters.js';
 import { canEditStructure } from './grants.js';
 
 export interface StudentPlacement {
@@ -55,6 +56,23 @@ export class AccessService {
     const wholeSchool = { classId: null, sectionId: null };
     if (!p) return wholeSchool;
     return { OR: [wholeSchool, { classId: null, sectionId: p.sectionId }, { classId: p.classId }] };
+  }
+
+  /**
+   * Events addressed to a student: the whole school, their section, or their class; and, for the
+   * assessments and homework of their class, only those that concern them (the whole class by default,
+   * or a group they are in, or them by name). Events and posts share `audienceFor`; only events have targets.
+   */
+  eventAudienceFor(p: StudentPlacement | null, studentId: string): Prisma.EventWhereInput {
+    const wholeSchool = { classId: null, sectionId: null };
+    if (!p) return wholeSchool;
+    return {
+      OR: [
+        wholeSchool,
+        { classId: null, sectionId: p.sectionId },
+        { AND: [{ classId: p.classId }, concernsStudentNow(studentId)] },
+      ],
+    };
   }
 
   /** The admin or a coordinator; everyone else is refused (structure writes reached from other routes). */

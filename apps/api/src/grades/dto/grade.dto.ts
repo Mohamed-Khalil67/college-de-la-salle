@@ -44,6 +44,8 @@ class GradeSheetRowDto {
   student: StudentSummaryDto;
   @ApiProperty({ type: GradeDto, nullable: true })
   grade: GradeDto | null;
+  /** False: graded, but no longer concerned (left the group); only removing the grade is allowed. */
+  targeted: boolean;
 }
 
 export class GradeSheetDto implements GradeSheetContract {

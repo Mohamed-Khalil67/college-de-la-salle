@@ -26,6 +26,7 @@ import {
 } from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role, type Prisma } from '../src/generated/prisma/client.js';
+import { seedGroups } from './seed-groups.js';
 import { hoursPerWeek, seedTimetable, type TimetableClassSubject } from './seed-timetable.js';
 
 // The e2e tests seed their own database with a known password and a temporary credentials file.
@@ -165,6 +166,8 @@ const TERMS = [
 async function wipe(): Promise<void> {
   // Children before parents.
   await prisma.auditLog.deleteMany();
+  await prisma.assessmentTarget.deleteMany();
+  await prisma.groupMember.deleteMany();
   await prisma.occupancy.deleteMany();
   await prisma.slotException.deleteMany();
   await prisma.timetableSlot.deleteMany();
@@ -174,6 +177,7 @@ async function wipe(): Promise<void> {
   await prisma.homeworkCompletion.deleteMany();
   await prisma.grade.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.group.deleteMany();
   await prisma.post.deleteMany();
   await prisma.teachingAssignment.deleteMany();
   await prisma.classSubject.deleteMany();
@@ -462,6 +466,13 @@ async function main(): Promise<void> {
     },
   );
   const createdEvents = await prisma.event.createManyAndReturn({ data: events });
+  // Every assessment and homework of a class is addressed to the whole class unless a group is named.
+  const targeted = new Set([typeId('examen'), typeId('controle'), typeId('devoir')]);
+  await prisma.assessmentTarget.createMany({
+    data: createdEvents
+      .filter((e) => e.classId && targeted.has(e.activityTypeId))
+      .map((e) => ({ eventId: e.id, scope: 'class' as const })),
+  });
 
   // The weekly timetable (no conflicts: the scheduler and the database both refuse them).
   const timetable = await seedTimetable(prisma, {
@@ -472,6 +483,13 @@ async function main(): Promise<void> {
     validFrom: YEAR.startsOn,
     validTo: YEAR.endsOn,
     substituteTeacherId: teacherFor('informatique').id,
+  });
+
+  // Groups ---------------------------------------------------------------------------------------------
+  const groupsDemo = await seedGroups(prisma, {
+    rosters: classRosters,
+    typeId,
+    teacherId: teacherFor('physique-chimie').id,
   });
 
   // Grades, homework, attendance ----------------------------------------------------------------------
@@ -583,7 +601,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Seeded ${YEAR.label}: ${classRosters.length} classes, ${TEACHERS.length} teachers, ${studentNumber} students, ` +
-      `${createdEvents.length} events, ${timetable.slots} timetable slots, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
+      `${createdEvents.length} events, ${timetable.slots} timetable slots, ${groupsDemo.groups} groups, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
   );
 }
 

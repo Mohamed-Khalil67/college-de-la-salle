@@ -23,6 +23,8 @@ export interface WarningFacts {
   readonly examWeeks: readonly Closure[];
   /** Open enrolments per class. */
   readonly classSize: ReadonlyMap<string, number>;
+  /** Current members per group (a session of a group counts these, not the class). */
+  readonly groupSize?: ReadonlyMap<string, number>;
   readonly rooms: ReadonlyMap<string, RoomFacts>;
   /** Assessments (exams, tests) per `classId|day`. */
   readonly assessments: ReadonlyMap<string, number>;
@@ -66,18 +68,22 @@ export function sessionWarnings(
   }
 
   for (const [key, list] of groupBy(
-    sorted.filter((o) => o.slot.division === null && o.current.roomId),
-    (o) => `${o.current.roomId}|${o.slot.classId}`,
+    // The whole class, or a group (a division typed by hand without a group has no known size).
+    sorted.filter((o) => (o.slot.division === null || o.slot.groupId) && o.current.roomId),
+    (o) => `${o.current.roomId}|${o.slot.classId}|${o.slot.groupId ?? ''}`,
   )) {
     const first = list[0]!;
     const room = facts.rooms.get(first.current.roomId!);
-    const size = facts.classSize.get(first.slot.classId);
+    const group = first.slot.row.group;
+    const size = group
+      ? facts.groupSize?.get(group.id)
+      : facts.classSize.get(first.slot.classId);
     if (!room || room.capacity === null || size === undefined || room.capacity >= size) continue;
     out.push({
       code: 'room_capacity',
       slotId: first.slot.id,
       date: first.current.date,
-      message: `${room.name} compte ${room.capacity} places pour ${size} élèves (${sessionName(first.slot)})${more(list.length)}.`,
+      message: `${room.name} compte ${room.capacity} places pour ${size} élèves${group ? ` du groupe « ${group.label} »` : ''} (${sessionName(first.slot)})${more(list.length)}.`,
     });
     void key;
   }

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, ForbiddenException } from '@nes
 import { Test } from '@nestjs/testing';
 import { AccessService } from '../access/access.service.js';
 import { ClassesService } from '../classes/classes.service.js';
+import { TargetsService } from '../targets/targets.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -58,6 +59,7 @@ const event = (overrides = {}) => ({
   author: { user: { firstName: 'T', lastName: 'T' } },
   schoolClass: null,
   section: null,
+  targets: [],
   ...overrides,
 });
 
@@ -84,14 +86,16 @@ describe('GradesService', () => {
       updateMany: vi.fn(),
     },
     auditLog: { createMany: vi.fn() },
+    $queryRaw: vi.fn(),
   };
   const prisma = {
     event: { findUnique: vi.fn() },
     grade: { findMany: vi.fn().mockResolvedValue([]) },
-    student: { findUnique: vi.fn() },
     period: { findUnique: vi.fn() },
     enrollment: { findFirst: vi.fn() },
     classSubject: { findMany: vi.fn() },
+    groupMember: { findMany: vi.fn().mockResolvedValue([]) },
+    student: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
   const access = { assertTeachesClass: vi.fn(), assertCanReadStudent: vi.fn(), placement: vi.fn() };
@@ -102,6 +106,12 @@ describe('GradesService', () => {
     ]),
   };
   const periods = { assertOpen: vi.fn(), lockOpen: vi.fn() };
+  const rosterOf = () => classes.roster() as Promise<{ id: string }[]>;
+  const targets = {
+    concerned: vi.fn(),
+    concernedIds: vi.fn(),
+    annotate: vi.fn((list: unknown[]) => Promise.resolve(list)),
+  };
   let grades: GradesService;
 
   beforeEach(async () => {
@@ -111,6 +121,9 @@ describe('GradesService', () => {
     periods.assertOpen.mockResolvedValue(undefined);
     periods.lockOpen.mockResolvedValue(undefined);
     tx.grade.findMany.mockResolvedValue([]);
+    targets.concerned.mockImplementation(async () => ({ students: await rosterOf(), entries: [] }));
+    targets.concernedIds.mockImplementation(async () => (await rosterOf()).map((s) => s.id));
+    targets.annotate.mockImplementation((list: unknown[]) => Promise.resolve(list));
     const moduleRef = await Test.createTestingModule({
       providers: [
         GradesService,
@@ -118,6 +131,7 @@ describe('GradesService', () => {
         { provide: AccessService, useValue: access },
         { provide: ClassesService, useValue: classes },
         { provide: PeriodsService, useValue: periods },
+        { provide: TargetsService, useValue: targets },
       ],
     }).compile();
     grades = moduleRef.get(GradesService);

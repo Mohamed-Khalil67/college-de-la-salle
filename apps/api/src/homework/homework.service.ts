@@ -8,6 +8,7 @@ import { forbidden, notFound } from '../common/errors.js';
 import { EventsService } from '../events/events.service.js';
 import { eventInclude, toEventDto } from '../events/event.mapper.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TargetsService } from '../targets/targets.service.js';
 import type { HomeworkCompletionDto, HomeworkDto } from './dto/homework.dto.js';
 
 /** « Devoirs à rendre »: students tick them off; teachers see who did. */
@@ -17,12 +18,17 @@ export class HomeworkService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly events: EventsService,
+    private readonly targets: TargetsService,
   ) {}
 
   /** A student's homework due from `from` (default: a week ago), soonest first, with their done flag. */
   async mine(user: AuthUser, from?: string): Promise<HomeworkDto[]> {
     if (!user.studentId) throw forbidden();
-    const audience = this.access.audienceFor(await this.access.placement(user.studentId));
+    // Only the homework that concerns this student: their class by default, their groups, or them by name.
+    const audience = this.access.eventAudienceFor(
+      await this.access.placement(user.studentId),
+      user.studentId,
+    );
     const rows = await this.prisma.event.findMany({
       where: {
         activityType: { homework: true },
@@ -33,10 +39,11 @@ export class HomeworkService {
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
       take: 200,
     });
-    return rows.map((row) => {
+    const dtos = await this.targets.annotate(rows.map(toEventDto), user);
+    return rows.map((row, i) => {
       const done = row.homeworkCompletions[0];
       return {
-        event: toEventDto(row),
+        event: dtos[i]!,
         done: !!done,
         doneAt: done ? done.doneAt.toISOString() : null,
       };
@@ -48,6 +55,8 @@ export class HomeworkService {
     const event = await this.events.visible(eventId, user);
     if (!event.activityType.homework)
       throw new BadRequestException('Seuls les devoirs se cochent.');
+    const [dto] = await this.targets.annotate([toEventDto(event)], user);
+    if (!dto) throw notFound('Événement');
     const key = { eventId_studentId: { eventId, studentId: user.studentId } };
     if (done) {
       const row = await this.prisma.homeworkCompletion.upsert({
@@ -55,12 +64,12 @@ export class HomeworkService {
         create: { eventId, studentId: user.studentId },
         update: {},
       });
-      return { event: toEventDto(event), done: true, doneAt: row.doneAt.toISOString() };
+      return { event: dto, done: true, doneAt: row.doneAt.toISOString() };
     }
     await this.prisma.homeworkCompletion.deleteMany({
       where: { eventId, studentId: user.studentId },
     });
-    return { event: toEventDto(event), done: false, doneAt: null };
+    return { event: dto, done: false, doneAt: null };
   }
 
   /** Who ticked this homework: the class's teachers and admins. */
@@ -69,8 +78,10 @@ export class HomeworkService {
     if (!event) throw notFound('Événement');
     if (event.classId) await this.access.assertTeachesClass(user, event.classId);
     else if (user.role !== 'admin' && event.authorId !== user.teacherId) throw forbidden();
+    // Only students the homework concerns today: a tick of someone who left the group no longer counts.
+    const concerned = new Set(await this.targets.concernedIds(this.prisma, event));
     const rows = await this.prisma.homeworkCompletion.findMany({
-      where: { eventId },
+      where: { eventId, ...(event.classId ? { studentId: { in: [...concerned] } } : {}) },
       include: { student: { include: { user: true } } },
       orderBy: { doneAt: 'asc' },
     });

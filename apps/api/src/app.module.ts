@@ -18,6 +18,7 @@ import { ClassesModule } from './classes/classes.module.js';
 import { ContactModule } from './contact/contact.module.js';
 import { EventsModule } from './events/events.module.js';
 import { GradesModule } from './grades/grades.module.js';
+import { GroupsModule } from './groups/groups.module.js';
 import { HomeworkModule } from './homework/homework.module.js';
 import { PeriodsModule } from './periods/periods.module.js';
 import { PostsModule } from './posts/posts.module.js';
@@ -75,6 +76,7 @@ import { UsersModule } from './users/users.module.js';
     EventsModule,
     HomeworkModule,
     GradesModule,
+    GroupsModule,
     AttendanceModule,
     PostsModule,
     ReportCardsModule,

@@ -8,6 +8,7 @@ import {
 import type { Prisma } from '../generated/prisma/client.js';
 import { toDay } from '../common/dates.js';
 import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
+import { toTargetDto } from '../targets/target.mapper.js';
 import type { EventDto } from './dto/event.dto.js';
 
 /** What every event query includes, so it can be mapped to the API shape and to the shared model. */
@@ -17,6 +18,8 @@ export const eventInclude = {
   author: { include: { user: { select: { firstName: true, lastName: true } } } },
   schoolClass: { include: { section: true } },
   section: true,
+  /** Who the work concerns (see TargetsService); no row means the whole class. */
+  targets: { include: { group: true } },
 } satisfies Prisma.EventInclude;
 
 export type EventRow = Prisma.EventGetPayload<{ include: typeof eventInclude }>;
@@ -41,6 +44,7 @@ export function toEventDto(e: EventRow): EventDto {
     description: e.description,
     attachments: (e.attachments ?? []) as unknown as Attachment[],
     coefficient: Number(e.coefficient),
+    target: toTargetDto(e.targets),
     authorId: e.authorId,
     authorName: `${e.author.user.firstName} ${e.author.user.lastName}`,
     createdAt: e.createdAt.toISOString(),

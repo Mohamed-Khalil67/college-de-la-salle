@@ -42,6 +42,16 @@ export class WarningsService {
       where: { classId: { in: classIds }, leftOn: null },
       _count: { _all: true },
     });
+    const groupIds = [
+      ...new Set(standing.flatMap((o) => (o.slot.groupId ? [o.slot.groupId] : []))),
+    ];
+    const groupSizes = groupIds.length
+      ? await db.groupMember.groupBy({
+          by: ['groupId'],
+          where: { groupId: { in: groupIds }, leftOn: null },
+          _count: { _all: true },
+        })
+      : [];
     const rooms = roomIds.length ? await db.room.findMany({ where: { id: { in: roomIds } } }) : [];
     const assessments = await db.event.groupBy({
       by: ['classId', 'date'],
@@ -55,6 +65,7 @@ export class WarningsService {
     const facts = {
       examWeeks,
       classSize: new Map(sizes.map((s) => [s.classId, s._count._all])),
+      groupSize: new Map(groupIds.map((id) => [id, groupSizes.find((g) => g.groupId === id)?._count._all ?? 0])),
       rooms: new Map<string, RoomFacts>(
         rooms.map((r) => [r.id, { name: r.name, capacity: r.capacity, kind: r.kind as RoomKind }]),
       ),

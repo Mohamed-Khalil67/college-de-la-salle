@@ -16,6 +16,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
+  type AssessmentTargetDto as AssessmentTargetContract,
+  type AssessmentTargetGroupDto as AssessmentTargetGroupContract,
+  type AssessmentTargetInput,
   type Attachment,
   EVENT_LIMITS,
   type EventDto as EventContract,
@@ -42,6 +45,35 @@ export class AttachmentDto implements Attachment {
   url: string;
 }
 
+export class AssessmentTargetGroupDto implements AssessmentTargetGroupContract {
+  id: string;
+  division: string;
+  label: string;
+}
+
+export class AssessmentTargetDto implements AssessmentTargetContract {
+  whole: boolean;
+  @ApiProperty({ type: [AssessmentTargetGroupDto] })
+  groups: readonly AssessmentTargetGroupDto[];
+  studentIds: readonly string[];
+  @ApiProperty({ type: Number, nullable: true })
+  concerned: number | null;
+}
+
+export class AssessmentTargetInputDto implements AssessmentTargetInput {
+  /** Groups of the event's class (GET /groups?classId=). */
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID(undefined, { each: true })
+  groupIds: string[];
+
+  /** Students enrolled in the event's class. */
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID(undefined, { each: true })
+  studentIds: string[];
+}
+
 export class EventDto implements EventContract {
   id: string;
   activityTypeId: string;
@@ -65,6 +97,7 @@ export class EventDto implements EventContract {
   @ApiProperty({ type: [AttachmentDto] })
   attachments: AttachmentDto[];
   coefficient: number;
+  target: AssessmentTargetDto;
   authorId: string;
   authorName: string;
   createdAt: string;
@@ -166,6 +199,16 @@ export class CreateEventDto implements EventInput {
   @Min(0)
   @Max(20)
   coefficient?: number;
+
+  /**
+   * « Assigner à » (assessments and homework of a class): omitted, the whole class on create and
+   * unchanged on update; both lists empty, the whole class.
+   */
+  @ApiPropertyOptional({ type: AssessmentTargetInputDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AssessmentTargetInputDto)
+  target?: AssessmentTargetInputDto;
 }
 
 export class UpdateEventDto extends PartialType(CreateEventDto) {}

@@ -43,6 +43,7 @@ const CONSTRAINTS = [
   'occupancy_teacher_no_overlap',
   'occupancy_class_whole_no_overlap',
   'occupancy_class_division_no_overlap',
+  'occupancy_group_no_overlap',
 ] as const;
 
 interface Clash {
@@ -94,6 +95,7 @@ export class OccupancyService {
         expandSlots([slot], from, to, closures),
         slot.classId,
         slot.division,
+        slot.groupId,
       ).map((e) => ({ ...e, slotId: slot.id, eventId: null }));
     });
   }
@@ -116,17 +118,18 @@ export class OccupancyService {
         teacher_id: r.teacherId,
         class_id: r.classId,
         division_key: r.divisionKey,
+        group_id: r.groupId ?? null,
         starts_at: r.startsAt,
         ends_at: r.endsAt,
       })),
     );
     await db.$executeRaw`
-      INSERT INTO occupancy (id, source, slot_id, exception_id, event_id, day, room_id, teacher_id, class_id, division_key, during)
+      INSERT INTO occupancy (id, source, slot_id, exception_id, event_id, day, room_id, teacher_id, class_id, division_key, group_id, during)
       SELECT gen_random_uuid(), r.source::occupancy_source, r.slot_id, r.exception_id, r.event_id, r.day,
-             r.room_id, r.teacher_id, r.class_id, r.division_key, tsrange(r.starts_at, r.ends_at)
+             r.room_id, r.teacher_id, r.class_id, r.division_key, r.group_id, tsrange(r.starts_at, r.ends_at)
       FROM jsonb_to_recordset(${json}::jsonb) AS r(
         source text, slot_id uuid, exception_id uuid, event_id uuid, day date, room_id uuid, teacher_id uuid,
-        class_id uuid, division_key text, starts_at timestamp, ends_at timestamp)`;
+        class_id uuid, division_key text, group_id uuid, starts_at timestamp, ends_at timestamp)`;
   }
 
   /**
@@ -142,6 +145,7 @@ export class OccupancyService {
         teacher_id: r.teacherId,
         class_id: r.classId,
         division_key: r.divisionKey,
+        group_id: r.groupId ?? null,
         starts_at: r.startsAt,
         ends_at: r.endsAt,
       })),
@@ -157,7 +161,7 @@ export class OccupancyService {
     >`
       WITH c AS (
         SELECT * FROM jsonb_to_recordset(${json}::jsonb) AS c(
-          i int, room_id uuid, teacher_id uuid, class_id uuid, division_key text, starts_at timestamp, ends_at timestamp)
+          i int, room_id uuid, teacher_id uuid, class_id uuid, division_key text, group_id uuid, starts_at timestamp, ends_at timestamp)
       )
       SELECT c.i, 'room'::text AS kind, o.slot_id, o.exception_id, o.event_id
         FROM c JOIN occupancy o ON o.room_id = c.room_id AND o.during && tsrange(c.starts_at, c.ends_at)
@@ -167,7 +171,11 @@ export class OccupancyService {
       UNION ALL
       SELECT c.i, 'class'::text, o.slot_id, o.exception_id, o.event_id
         FROM c JOIN occupancy o ON o.class_id = c.class_id AND o.during && tsrange(c.starts_at, c.ends_at)
-         AND (c.division_key IS NULL OR o.division_key IS DISTINCT FROM c.division_key)`;
+         AND (c.division_key IS NULL OR o.division_key IS DISTINCT FROM c.division_key)
+      UNION ALL
+      SELECT c.i, 'class'::text, o.slot_id, o.exception_id, o.event_id
+        FROM c JOIN occupancy o ON o.group_id = c.group_id AND o.during && tsrange(c.starts_at, c.ends_at)
+       WHERE c.group_id IS NOT NULL`;
     const clashes: Clash[] = found.map((f) => ({
       i: f.i,
       kind: f.kind,

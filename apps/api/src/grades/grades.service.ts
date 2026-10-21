@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { averageOnTwenty } from '@cdls/shared';
+import { averageOnTwenty, wasTargeted } from '@cdls/shared';
 import type { Grade, Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
@@ -9,9 +9,12 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { eventInclude, type EventRow, toEventDto } from '../events/event.mapper.js';
+import { toStudentSummary } from '../classes/classes.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { subjectWeights } from '../report-cards/compute.js';
+import { toEntries } from '../targets/target.mapper.js';
+import { TargetsService } from '../targets/targets.service.js';
 import type {
   GradeDto,
   GradeSheetDto,
@@ -32,27 +35,55 @@ export class GradesService {
     private readonly access: AccessService,
     private readonly classes: ClassesService,
     private readonly periods: PeriodsService,
+    private readonly targets: TargetsService,
   ) {}
 
-  /** The whole class with each student's grade, for the entry grid. */
+  /**
+   * The students the work concerns (the whole class by default) with each one's grade, for the entry
+   * grid. A student who was graded and is no longer concerned (left the group) stays in the list, marked
+   * `targeted: false`: their grade is kept, never dropped silently.
+   */
   async sheet(eventId: string, user: AuthUser): Promise<GradeSheetDto> {
     const event = await this.gradableEvent(eventId, user);
-    const [roster, grades] = await Promise.all([
-      this.classes.roster(event.classId!),
+    const [{ students }, grades] = await Promise.all([
+      this.targets.concerned(this.prisma, event),
       this.prisma.grade.findMany({ where: { eventId } }),
     ]);
+    const concerned = new Set(students.map((s) => s.id));
+    const former = grades.filter((g) => !concerned.has(g.studentId));
+    const formerStudents = former.length
+      ? (
+          await this.prisma.student.findMany({
+            where: { id: { in: former.map((g) => g.studentId) } },
+            include: { user: true },
+          })
+        ).map(toStudentSummary)
+      : [];
     const byStudent = new Map(grades.map((g) => [g.studentId, toGradeDto(g)]));
-    return {
-      event: toEventDto(event),
-      rows: roster.map((student) => ({ student, grade: byStudent.get(student.id) ?? null })),
-    };
+    const rows = [
+      ...students.map((student) => ({ student, targeted: true })),
+      ...formerStudents.map((student) => ({ student, targeted: false })),
+    ]
+      .sort(
+        (a, b) =>
+          a.student.lastName.localeCompare(b.student.lastName, 'fr') ||
+          a.student.firstName.localeCompare(b.student.firstName, 'fr'),
+      )
+      .map((r) => ({ ...r, grade: byStudent.get(r.student.id) ?? null }));
+    const [dto] = await this.targets.annotate([toEventDto(event)], user);
+    return { event: dto!, rows };
   }
 
   /** Creates, corrects or removes (score null) grades; one audit row per change. */
   async save(eventId: string, dto: SaveGradesDto, user: AuthUser): Promise<GradeSheetDto> {
     const event = await this.gradableEvent(eventId, user);
     await this.periods.assertOpen(this.prisma, event.periodId);
-    const roster = new Set((await this.classes.roster(event.classId!)).map((s) => s.id));
+    const rosterRows = await this.classes.roster(event.classId!);
+    const roster = new Set(rosterRows.map((s) => s.id));
+    const nameOf = (id: string) => {
+      const s = rosterRows.find((r) => r.id === id);
+      return s ? `${s.firstName} ${s.lastName}` : id;
+    };
     const seen = new Set<string>();
     for (const entry of dto.entries) {
       if (!roster.has(entry.studentId))
@@ -65,6 +96,16 @@ export class GradesService {
 
     await this.prisma.$transaction(async (tx) => {
       await this.periods.lockOpen(tx, event.periodId);
+      // The event row is locked: a change of « Assigner à » saved at the same moment waits for this save
+      // (or the other way round), so a grade never lands on a student the work no longer concerns.
+      await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId}::uuid FOR UPDATE`;
+      const concerned = new Set(await this.targets.concernedIds(tx, event));
+      for (const entry of dto.entries) {
+        if (entry.score !== null && entry.score !== undefined && !concerned.has(entry.studentId))
+          throw new BadRequestException(
+            `${nameOf(entry.studentId)} n’est pas concerné(e) par cette évaluation. Modifiez d’abord l’assignation (« Assigner à »).`,
+          );
+      }
       const existing = await tx.grade.findMany({ where: { eventId } });
       const byStudent = new Map(existing.map((g) => [g.studentId, g]));
       const outOf = dto.outOf ?? (existing[0] ? Number(existing[0].outOf) : 20);
@@ -192,15 +233,25 @@ export class GradesService {
         in: placement ? await this.access.subjectsTaught(user.teacherId!, placement.classId) : [],
       };
     }
-    const grades = await this.prisma.grade.findMany({
+    const allGrades = await this.prisma.grade.findMany({
       where: {
         studentId,
         ...(user.role === 'student' ? { published: true } : {}),
         event: eventWhere,
       },
-      include: { event: { include: { activityType: true } } },
+      include: { event: { include: { activityType: true, targets: true } } },
       orderBy: { event: { date: 'desc' } },
     });
+    // Only the work the student was targeted for counts (a student who moved to another group of the same
+    // division keeps the marks earned in the first one).
+    const groupsEver = new Set(
+      (
+        await this.prisma.groupMember.findMany({ where: { studentId }, select: { groupId: true } })
+      ).map((m) => m.groupId),
+    );
+    const grades = allGrades.filter((g) =>
+      wasTargeted(toEntries(g.event.targets), studentId, groupsEver),
+    );
 
     const bySubject = new Map<string, typeof grades>();
     for (const g of grades) {

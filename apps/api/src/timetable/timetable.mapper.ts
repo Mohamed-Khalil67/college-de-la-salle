@@ -46,6 +46,7 @@ export function toSlotDto(row: SlotRow): SlotContract {
     weekParity: row.weekParity,
     division: row.division,
     groupId: row.groupId,
+    groupLabel: row.group?.label ?? null,
   };
 }
 
@@ -114,6 +115,8 @@ export function toOccurrenceDto(
       homework: t.homework,
     },
     division: row.division,
+    groupId: row.groupId,
+    groupLabel: row.group?.label ?? null,
     canChange,
   };
 }

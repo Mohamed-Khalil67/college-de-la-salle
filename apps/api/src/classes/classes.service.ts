@@ -6,6 +6,7 @@ import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
+import { closeGroupMemberships } from '../groups/memberships.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   ClassDto,
@@ -191,6 +192,8 @@ export class ClassesService {
         where: { studentId, schoolYearId: schoolClass.schoolYearId, leftOn: null },
       });
       if (open?.classId === classId) return open;
+      // Leaving a class means leaving its groups, in the same transaction.
+      if (open) await closeGroupMemberships(tx, [studentId], today, open.classId);
       if (open && open.enrolledOn.getTime() >= today.getTime())
         return tx.enrollment.update({ where: { id: open.id }, data: { classId } });
       if (open) await tx.enrollment.update({ where: { id: open.id }, data: { leftOn: today } });
@@ -221,6 +224,7 @@ export class ClassesService {
         where: { id: enrollmentId, leftOn: null },
         data: { leftOn: today },
       });
+      if (closed.count) await closeGroupMemberships(tx, [enrollment.studentId], today, enrollment.classId);
       if (closed.count)
         await audit(tx, [
           {

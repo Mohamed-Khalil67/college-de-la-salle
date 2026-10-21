@@ -83,7 +83,19 @@ export class TimetableReadService {
     user: AuthUser,
   ): Promise<TimetableOccurrenceDto[]> {
     const scope = await this.scope(query, user);
-    const sessions = await this.sessions(this.prisma, scope, query.from, query.to);
+    let sessions = await this.sessions(this.prisma, scope, query.from, query.to);
+    if (user.role === 'student') {
+      // A student sees the whole-class sessions and those of the groups they are in, nothing else.
+      const mine = new Set(
+        (
+          await this.prisma.groupMember.findMany({
+            where: { studentId: user.studentId!, leftOn: null },
+            select: { groupId: true },
+          })
+        ).map((m) => m.groupId),
+      );
+      sessions = sessions.filter((o) => !o.slot.groupId || mine.has(o.slot.groupId));
+    }
     const names = await this.names(sessions);
     const today = schoolToday();
     const taught = new Set<string>(

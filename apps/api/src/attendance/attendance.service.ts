@@ -15,6 +15,7 @@ import {
 } from '../events/event.mapper.js';
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TargetsService } from '../targets/targets.service.js';
 import type {
   AttendanceRecordDto,
   AttendanceSheetDto,
@@ -31,26 +32,30 @@ export class AttendanceService {
     private readonly access: AccessService,
     private readonly classes: ClassesService,
     private readonly calendarDays: CalendarDaysService,
+    private readonly targets: TargetsService,
   ) {}
 
   async sheet(eventId: string, date: string, user: AuthUser): Promise<AttendanceSheetDto> {
     const event = await this.classEvent(eventId, date, user);
-    const [roster, records] = await Promise.all([
-      this.classes.roster(event.classId!),
+    // The students the event concerns: the whole class unless it is assigned to groups or students.
+    const [{ students }, records] = await Promise.all([
+      this.targets.concerned(this.prisma, event),
       this.prisma.attendance.findMany({ where: { eventId, date: fromDay(date) } }),
     ]);
     const byStudent = new Map(records.map((r) => [r.studentId, toRecordDto(r)]));
+    const [eventDto] = await this.targets.annotate([toEventDto(event)], user);
     return {
-      event: toEventDto(event),
+      event: eventDto!,
       date,
-      rows: roster.map((student) => ({ student, record: byStudent.get(student.id) ?? null })),
+      rows: students.map((student) => ({ student, record: byStudent.get(student.id) ?? null })),
     };
   }
 
   /** Saves the roll call of one day (upsert per student). */
   async save(eventId: string, dto: SaveAttendanceDto, user: AuthUser): Promise<AttendanceSheetDto> {
     const event = await this.classEvent(eventId, dto.date, user);
-    const roster = new Set((await this.classes.roster(event.classId!)).map((s) => s.id));
+    const rosterRows = await this.classes.roster(event.classId!);
+    const roster = new Set(rosterRows.map((s) => s.id));
     for (const r of dto.records) {
       if (!roster.has(r.studentId))
         throw new BadRequestException(`L'élève ${r.studentId} n'est pas dans cette classe.`);
@@ -59,9 +64,19 @@ export class AttendanceService {
     }
     const recordedById = user.teacherId ?? event.authorId;
     const date = fromDay(dto.date);
-    await this.prisma.$transaction(
-      dto.records.map((r) =>
-        this.prisma.attendance.upsert({
+    await this.prisma.$transaction(async (tx) => {
+      // Lock the event, then check who it concerns: a change of « Assigner à » at the same moment waits.
+      await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId}::uuid FOR UPDATE`;
+      const concerned = new Set(await this.targets.concernedIds(tx, event));
+      const outside = dto.records.find((r) => !concerned.has(r.studentId));
+      if (outside) {
+        const s = rosterRows.find((x) => x.id === outside.studentId);
+        throw new BadRequestException(
+          `${s ? `${s.firstName} ${s.lastName}` : 'Cet élève'} n’est pas concerné(e) par cette séance : elle n’est pas assignée à cet élève.`,
+        );
+      }
+      for (const r of dto.records) {
+        await tx.attendance.upsert({
           where: { eventId_studentId_date: { eventId, studentId: r.studentId, date } },
           create: {
             eventId,
@@ -78,9 +93,9 @@ export class AttendanceService {
             note: r.note ?? '',
             recordedById,
           },
-        }),
-      ),
-    );
+        });
+      }
+    });
     return this.sheet(eventId, dto.date, user);
   }
 

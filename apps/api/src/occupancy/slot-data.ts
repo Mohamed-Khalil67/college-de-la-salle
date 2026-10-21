@@ -21,6 +21,7 @@ export const slotInclude = {
   teacher: { include: { user: true } },
   room: true,
   activityType: true,
+  group: true,
   exceptions: true,
 } satisfies Prisma.TimetableSlotInclude;
 
@@ -31,6 +32,7 @@ export type ExceptionRow = SlotRow['exceptions'][number];
 export interface SlotData extends SlotRule {
   readonly classId: string;
   readonly division: string | null;
+  readonly groupId: string | null;
   /** First day of the school year: its week is week A. */
   readonly parityAnchor: string;
   readonly row: SlotRow;
@@ -51,6 +53,7 @@ export function toSlotData(row: SlotRow): SlotData {
     teacherId: row.teacherId,
     classId: c.id,
     division: row.division,
+    groupId: row.groupId,
     parityAnchor: toDay(c.schoolYear.startsOn),
     row,
   };

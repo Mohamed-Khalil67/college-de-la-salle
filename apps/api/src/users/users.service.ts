@@ -1,3 +1,4 @@
+import { closeGroupMemberships } from '../groups/memberships.js';
 import {
   BadRequestException,
   ConflictException,
@@ -455,6 +456,7 @@ export class UsersService {
         where: { studentId: { in: studentIds }, leftOn: null },
         data: { leftOn: on },
       });
+      await closeGroupMemberships(tx, studentIds, on);
       await tx.sectionChangeRequest.updateMany({
         where: { studentId: { in: studentIds }, status: 'pending' },
         data: { status: 'rejected', decidedById: actor.id, decidedAt: now, decisionNote: note },

@@ -1,3 +1,4 @@
+import { closeGroupMemberships } from '../groups/memberships.js';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { type Paginated, type SectionId, todayIso } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -200,7 +201,11 @@ export class SectionChangesService {
         const open = await tx.enrollment.findFirst({
           where: { studentId: student.id, schoolYearId: schoolClass.schoolYearId, leftOn: null },
         });
-        if (open) await tx.enrollment.update({ where: { id: open.id }, data: { leftOn: today } });
+        if (open) {
+          await tx.enrollment.update({ where: { id: open.id }, data: { leftOn: today } });
+          // The old class's groups end with the old enrolment.
+          await closeGroupMemberships(tx, [student.id], today, open.classId);
+        }
         await tx.enrollment.create({
           data: {
             studentId: student.id,

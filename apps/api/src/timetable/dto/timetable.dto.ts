@@ -114,6 +114,17 @@ export class TimetableSlotInputDto implements TimetableSlotInput {
   @MinLength(1)
   @MaxLength(TIMETABLE_LIMITS.division)
   division: string | null;
+
+  /**
+   * The group the session is for (a group of the slot's class, GET /groups?classId=). The division is
+   * then the group's: leave `division` null, or send the same one.
+   */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(emptyToNull)
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  groupId?: string | null;
 }
 
 export class AcknowledgedWarningDto implements AcknowledgedWarning {
@@ -369,6 +380,8 @@ export class TimetableSlotDto implements SlotContract {
   division: string | null;
   @ApiProperty({ type: String, nullable: true })
   groupId: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  groupLabel: string | null;
 }
 
 export class SlotExceptionDto implements SlotExceptionContract {
@@ -472,6 +485,10 @@ export class TimetableOccurrenceDto implements OccurrenceContract {
   activityType: ActivityTypeSummaryDto;
   @ApiProperty({ type: String, nullable: true })
   division: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  groupId: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  groupLabel: string | null;
   canChange: boolean;
 }
 

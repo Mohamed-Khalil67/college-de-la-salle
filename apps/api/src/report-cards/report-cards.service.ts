@@ -6,7 +6,9 @@ import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { toIso } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
+import { wasTargeted } from '@cdls/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { toEntries } from '../targets/target.mapper.js';
 import { computeReportCards, type SubjectWeight, subjectWeights } from './compute.js';
 import type {
   ReportCardBatchResultDto,
@@ -47,12 +49,25 @@ export class ReportCardsService {
           // The events' stored period, never their dates: editing a period's dates moves no grade.
           event: { classId: schoolClass.id, periodId },
         },
-        include: { event: { select: { subjectId: true, coefficient: true } } },
+        include: {
+          event: { select: { subjectId: true, coefficient: true, targets: true } },
+        },
       });
+      // Only graded work the student was targeted for counts (a group's test is not in the others' average).
+      const memberships = await this.prisma.groupMember.findMany({
+        where: { studentId: { in: roster.map((s) => s.id) }, classId: schoolClass.id },
+        select: { studentId: true, groupId: true },
+      });
+      const groupsOf = new Map<string, Set<string>>();
+      for (const m of memberships)
+        groupsOf.set(m.studentId, (groupsOf.get(m.studentId) ?? new Set()).add(m.groupId));
+      const targeted = grades.filter((g) =>
+        wasTargeted(toEntries(g.event.targets), g.studentId, groupsOf.get(g.studentId) ?? new Set()),
+      );
       const cards = computeReportCards(
         roster.map((s) => s.id),
         subjects,
-        grades.map((g) => ({
+        targeted.map((g) => ({
           studentId: g.studentId,
           subjectId: g.event.subjectId ?? '',
           score: Number(g.score),

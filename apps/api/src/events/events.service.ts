@@ -10,6 +10,7 @@ import { forbidden, notFound } from '../common/errors.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TargetsService } from '../targets/targets.service.js';
 import type {
   CreateEventDto,
   EventDto,
@@ -23,7 +24,7 @@ export const MAX_RANGE_DAYS = 186;
 const MAX_REPEAT_DAYS = 366;
 
 /** The fields of an event once defaults are applied, before writing it. */
-type EventFields = Required<Omit<CreateEventDto, 'attachments'>> & {
+type EventFields = Required<Omit<CreateEventDto, 'attachments' | 'target'>> & {
   attachments: CreateEventDto['attachments'];
 };
 
@@ -36,11 +37,12 @@ export class EventsService {
     private readonly periods: PeriodsService,
     private readonly calendarDays: CalendarDaysService,
     private readonly occupancy: OccupancyService,
+    private readonly targets: TargetsService,
   ) {}
 
   /** Events that take place in [from, to] and that the user may see. */
   async list(query: EventRangeQueryDto, user: AuthUser): Promise<EventDto[]> {
-    return (await this.rows(query, user)).map(toEventDto);
+    return this.targets.annotate((await this.rows(query, user)).map(toEventDto), user);
   }
 
   /**
@@ -49,7 +51,9 @@ export class EventsService {
    */
   async occurrences(query: EventRangeQueryDto, user: AuthUser): Promise<OccurrenceDto[]> {
     const rows = await this.rows(query, user);
-    const byId = new Map(rows.map((r) => [r.id, toEventDto(r)]));
+    const byId = new Map(
+      (await this.targets.annotate(rows.map(toEventDto), user)).map((d) => [d.id, d]),
+    );
     const closures = await this.calendarDays.closures(query.from, query.to);
     return occurrences(rows.map(toCalendarEvent), query.from, query.to, closures).map((o) => ({
       key: o.key,
@@ -59,7 +63,8 @@ export class EventsService {
   }
 
   async get(id: string, user: AuthUser): Promise<EventDto> {
-    return toEventDto(await this.visible(id, user));
+    const [dto] = await this.targets.annotate([toEventDto(await this.visible(id, user))], user);
+    return dto!;
   }
 
   /** The event as an iCalendar file (« Ajouter à mon agenda »); cancelled sessions become EXDATE lines. */
@@ -79,8 +84,14 @@ export class EventsService {
         // The type's flags are read after taking its shared lock and stay put until this event commits.
         await this.types.lockForEvent(tx, input.activityTypeId);
         const fields = await this.check(input, user, null);
-        const created = await tx.event.create({
+        const made = await tx.event.create({
           data: { ...toData(fields), authorId: user.teacherId! },
+          include: eventInclude,
+        });
+        // Who the work concerns (the whole class unless « Assigner à » says otherwise).
+        await this.targets.write(tx, made, dto.target);
+        const created = await tx.event.findUniqueOrThrow({
+          where: { id: made.id },
           include: eventInclude,
         });
         // One-off events hold their room and class like a timetable session: a clash is a 409.
@@ -88,7 +99,7 @@ export class EventsService {
         return created;
       }),
     );
-    return toEventDto(row);
+    return (await this.targets.annotate([toEventDto(row)], user))[0]!;
   }
 
   /**
@@ -131,16 +142,21 @@ export class EventsService {
             'Des notes existent : l’événement ne peut plus changer de période. Gardez la période ou supprimez les notes.',
           );
         }
-        const updated = await tx.event.update({
+        const saved = await tx.event.update({
           where: { id },
           data: toData(fields),
           include: eventInclude,
         });
+        // The event row is locked now: a grade saved at the same moment waits and then sees the new target.
+        await this.targets.write(tx, saved, dto.target, {
+          classChanged: fields.classId !== current.classId,
+        });
+        const updated = await tx.event.findUniqueOrThrow({ where: { id }, include: eventInclude });
         await this.occupancy.indexEvent(tx, booking(updated));
         return updated;
       }),
     );
-    return toEventDto(row);
+    return (await this.targets.annotate([toEventDto(row)], user))[0]!;
   }
 
   /** The author or an admin; refused while the event still has grades. */
@@ -156,7 +172,7 @@ export class EventsService {
   /** An event the user may see (students: only their audience), or 404. */
   async visible(id: string, user: AuthUser): Promise<EventRow> {
     const audience = user.studentId
-      ? this.access.audienceFor(await this.access.placement(user.studentId))
+      ? this.access.eventAudienceFor(await this.access.placement(user.studentId), user.studentId)
       : {};
     const row = await this.prisma.event.findFirst({
       where: { id, ...audience },
@@ -189,7 +205,11 @@ export class EventsService {
     query: EventRangeQueryDto,
     user: AuthUser,
   ): Promise<Prisma.EventWhereInput> {
-    if (user.studentId) return this.access.audienceFor(await this.access.placement(user.studentId));
+    if (user.studentId)
+      return this.access.eventAudienceFor(
+        await this.access.placement(user.studentId),
+        user.studentId,
+      );
     const wholeSchool = { classId: null, sectionId: null };
     if (query.classId) {
       const c = await this.prisma.schoolClass.findUnique({ where: { id: query.classId } });

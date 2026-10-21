@@ -64,6 +64,7 @@ describe('SectionChangesService', () => {
     schoolClass: { findUnique: vi.fn() },
     enrollment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
     auditLog: { createMany: vi.fn() },
+    $executeRaw: vi.fn().mockResolvedValue(0),
   };
   const prisma = {
     $transaction: vi.fn((work: (t: typeof tx) => unknown) => work(tx)),

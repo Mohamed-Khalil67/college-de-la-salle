@@ -5,6 +5,7 @@ import { ActivityTypesService } from '../activity-types/activity-types.service.j
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
+import { TargetsService } from '../targets/targets.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EventsService } from './events.service.js';
@@ -68,6 +69,7 @@ const row = (over: Record<string, unknown> = {}) => ({
   author: { user: { firstName: 'T', lastName: 'T' } },
   schoolClass: null,
   section: null,
+  targets: [],
   ...over,
 });
 
@@ -89,6 +91,7 @@ describe('EventsService', () => {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
     },
     grade: { count: vi.fn() },
     subject: { findUnique: vi.fn() },
@@ -104,6 +107,7 @@ describe('EventsService', () => {
   const periods = { resolveFor: vi.fn(), assertOpen: vi.fn(), find: vi.fn() };
   const calendarDays = { closures: vi.fn() };
   const occupancy = { indexEvent: vi.fn(), guard: vi.fn() };
+  const targets = { write: vi.fn(), annotate: vi.fn() };
   let events: EventsService;
 
   beforeEach(async () => {
@@ -126,6 +130,9 @@ describe('EventsService', () => {
     calendarDays.closures.mockResolvedValue([]);
     prisma.event.create.mockResolvedValue(row());
     prisma.event.update.mockResolvedValue(row());
+    prisma.event.findUniqueOrThrow.mockResolvedValue(row());
+    targets.write.mockResolvedValue(undefined);
+    targets.annotate.mockImplementation((list: unknown[]) => Promise.resolve(list));
     prisma.$transaction.mockImplementation((work: (tx: unknown) => unknown) => work(prisma));
     occupancy.indexEvent.mockResolvedValue(undefined);
     occupancy.guard.mockImplementation((work: unknown) => work);
@@ -138,6 +145,7 @@ describe('EventsService', () => {
         { provide: PeriodsService, useValue: periods },
         { provide: CalendarDaysService, useValue: calendarDays },
         { provide: OccupancyService, useValue: occupancy },
+        { provide: TargetsService, useValue: targets },
       ],
     }).compile();
     events = moduleRef.get(EventsService);

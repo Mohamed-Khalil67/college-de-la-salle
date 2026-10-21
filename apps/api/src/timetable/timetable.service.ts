@@ -294,9 +294,9 @@ export class TimetableService {
   private createMutation(input: TimetableSlotInput, user: AuthUser): Mutation {
     return async (tx) => {
       if (!canEditStructure(user)) throw forbidden();
-      await this.validate(tx, input, null);
+      const valid = await this.validate(tx, input, null);
       const id = randomUUID();
-      await tx.timetableSlot.create({ data: { id, ...slotData(input), createdById: user.id } });
+      await tx.timetableSlot.create({ data: { id, ...slotData(valid), createdById: user.id } });
       return {
         touched: [id],
         warn: [id],
@@ -305,7 +305,7 @@ export class TimetableService {
         slotId: id,
         endedSlotId: null,
         exceptionId: null,
-        audit: [this.entry(user, 'timetable_slot.create', 'timetable_slot', id, { ...input })],
+        audit: [this.entry(user, 'timetable_slot.create', 'timetable_slot', id, { ...valid })],
       };
     };
   }
@@ -387,9 +387,13 @@ export class TimetableService {
     scope: 'following' | 'all',
   ): Promise<Applied> {
     const before = rowInput(row);
+    // Changing the group derives the division from the new group (or the whole class without one).
+    const base =
+      changes.groupId !== undefined && changes.division === undefined
+        ? { ...before, division: null }
+        : before;
     if (!splitDay) {
-      const merged = { ...before, ...changes };
-      await this.validate(tx, merged, row);
+      const merged = await this.validate(tx, { ...base, ...changes }, row);
       await tx.timetableSlot.update({ where: { id: row.id }, data: slotData(merged) });
       await this.pruneExceptions(tx, row.id);
       return {
@@ -412,13 +416,11 @@ export class TimetableService {
         ],
       };
     }
-    const merged = {
-      ...before,
-      ...changes,
-      validFrom: splitDay,
-      validTo: changes.validTo ?? before.validTo,
-    };
-    await this.validate(tx, merged, row);
+    const merged = await this.validate(
+      tx,
+      { ...base, ...changes, validFrom: splitDay, validTo: changes.validTo ?? before.validTo },
+      row,
+    );
     const newId = randomUUID();
     await tx.timetableSlot.create({
       data: { id: newId, ...slotData(merged), createdById: user.id },
@@ -663,7 +665,7 @@ export class TimetableService {
     tx: Db,
     input: TimetableSlotInput,
     previous: SlotRow | null,
-  ): Promise<void> {
+  ): Promise<TimetableSlotInput> {
     const problems = slotProblems(input);
     if (problems.length) throw new BadRequestException(problems[0]);
     const classSubject = await tx.classSubject.findUnique({
@@ -694,6 +696,17 @@ export class TimetableService {
       );
     if (!type.repeatable || type.homework)
       throw new BadRequestException(`Un « ${type.label} » ne se répète pas chaque semaine.`);
+    if (!input.groupId) return { ...input, groupId: null };
+    // A session for a group: the group is one of this class, and its division is the slot's division.
+    const group = await tx.group.findUnique({ where: { id: input.groupId } });
+    if (!group) throw notFound('Groupe');
+    if (group.classId !== classSubject.classId)
+      throw new BadRequestException('Ce groupe n’est pas un groupe de la classe de cette séance.');
+    if (input.division && input.division !== group.division)
+      throw new BadRequestException(
+        `La division d’une séance de groupe est celle du groupe (« ${group.division} »).`,
+      );
+    return { ...input, division: group.division };
   }
 
   private slotFromCheck(dto: TimetableCheckDto): TimetableSlotInput {
@@ -733,6 +746,7 @@ function slotData(input: TimetableSlotInput) {
     validTo: fromDay(input.validTo),
     weekParity: input.weekParity,
     division: input.division,
+    groupId: input.groupId ?? null,
   };
 }
 
@@ -749,5 +763,6 @@ function rowInput(row: SlotRow): TimetableSlotInput {
     validTo: toDay(row.validTo),
     weekParity: row.weekParity,
     division: row.division,
+    groupId: row.groupId,
   };
 }
