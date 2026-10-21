@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, ElementRef, computed, effect, input, output, untracked, viewChildren } from '@angular/core';
 import type { ClassDto, Role, UserDto } from '@cdls/shared';
 import { Avatar, Badge, Button } from '../../ui';
 import { formatLastLogin, fullName, sectionLabel, userStatus } from '../shared/admin-format';
@@ -39,7 +39,7 @@ interface UserRow {
           </tr>
         </thead>
         <tbody>
-          @for (row of rows(); track row.user.id + ':' + revision()) {
+          @for (row of rows(); track row.user.id) {
             <tr>
               <th scope="row">
                 <span class="person">
@@ -52,13 +52,15 @@ interface UserRow {
                 <td data-label="Filière :">{{ row.track }}</td>
               }
               @if (isTeachers()) {
-                <td>
+                <td data-label="Rôle :">
                   <label class="check">
                     <input
+                      #coordinatorBox
                       type="checkbox"
                       [checked]="row.user.isCoordinator"
-                      [disabled]="row.user.status !== 'active' || busyId() === row.user.id"
-                      (change)="toggle($event, row.user)"
+                      [attr.data-saved]="row.user.isCoordinator"
+                      [attr.aria-disabled]="row.user.status !== 'active' || busyId() !== null ? 'true' : null"
+                      (click)="onBoxClick($event, row.user)"
                     />
                     <span>Coordinateur<span class="visually-hidden"> : {{ row.name }}</span></span>
                   </label>
@@ -116,12 +118,31 @@ export class UsersTable {
   /** The admin ticked or unticked « Coordinateur » for a teacher; `value` is the new state. */
   readonly coordinator = output<{ readonly user: UserDto; readonly value: boolean }>();
 
+  constructor() {
+    // A refused change: every box goes back to the saved state without drawing the rows again (focus stays).
+    effect(() => {
+      this.revision();
+      untracked(() => {
+        for (const ref of this.boxes()) ref.nativeElement.checked = ref.nativeElement.dataset['saved'] === 'true';
+      });
+    });
+  }
+
   protected readonly captionId = `users-caption-${++nextId}`;
+  private readonly boxes = viewChildren<ElementRef<HTMLInputElement>>('coordinatorBox');
   protected readonly isStudents = computed(() => this.role() === 'student');
   protected readonly isTeachers = computed(() => this.role() === 'teacher');
-  /** The box flips at once and is disabled while the API answers; a refusal draws the rows again. */
-  protected toggle(event: Event, user: UserDto): void {
-    this.coordinator.emit({ user, value: (event.target as HTMLInputElement).checked });
+  /**
+   * The box flips at once. While any change is being saved, or for an account that is not active, the click is
+   * ignored (`aria-disabled`, not `disabled`: focus stays on the box).
+   */
+  protected onBoxClick(event: Event, user: UserDto): void {
+    const box = event.target as HTMLInputElement;
+    if (box.getAttribute('aria-disabled') === 'true') {
+      event.preventDefault();
+      return;
+    }
+    this.coordinator.emit({ user, value: box.checked });
   }
 
   protected readonly rows = computed<UserRow[]>(() =>

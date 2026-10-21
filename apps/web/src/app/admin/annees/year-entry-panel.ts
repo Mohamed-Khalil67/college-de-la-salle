@@ -16,6 +16,7 @@ import { Alert, Button, Field, FieldControl } from '../../ui';
 import { shownError } from '../shared/admin-format';
 import { formatTypedDate, parseTypedDate, typedDateProblem } from '../shared/day-math';
 import {
+  dayInYearProblem,
   defaultPeriodLabel,
   nextPeriodNumber,
   overlapHint,
@@ -199,7 +200,10 @@ export class YearEntryPanel {
     );
     validate(p.startsOn, ({ value }) => {
       const message = typedDateProblem(value());
-      return message ? { kind: 'date', message } : null;
+      if (message) return { kind: 'date', message };
+      const start = parseTypedDate(value());
+      const outside = start ? dayInYearProblem(start, this.year()) : null;
+      return outside ? { kind: 'range', message: outside } : null;
     });
     validate(p.endsOn, ({ value, valueOf }) => {
       const period = isPeriodType(valueOf(p.type));

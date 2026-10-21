@@ -1,8 +1,10 @@
+import { DOCUMENT } from '@angular/common';
 import { Component, inject, resource, signal } from '@angular/core';
 import { ROOM_KIND_LABELS, type RoomDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
+import { focusPageHeading } from '../shared/focus';
 import { RoomFormModal } from './room-form-modal';
 
 /** Rooms of the school: create, edit (name, kind, seats, active) and delete the ones no event uses. */
@@ -86,6 +88,8 @@ import { RoomFormModal } from './room-form-modal';
       [busy]="busy()"
       [error]="actionError()"
       [(open)]="deleteOpen"
+      [restoreFocus]="!leaving()"
+      (closed)="afterConfirmClosed()"
       (confirmed)="remove()"
     >
       <p><strong>{{ deleting()?.name }}</strong> sera supprimée de la liste des salles.</p>
@@ -103,6 +107,8 @@ import { RoomFormModal } from './room-form-modal';
 })
 export class RoomsPage {
   readonly #api = inject(ApiClient);
+  readonly #document = inject(DOCUMENT);
+  protected readonly leaving = signal(false);
 
   protected readonly kindLabels = ROOM_KIND_LABELS;
   protected readonly rooms = resource({ loader: () => this.#api.school.rooms() });
@@ -117,6 +123,13 @@ export class RoomsPage {
 
   protected errorText(error: unknown): string {
     return apiMessage(error, 'Impossible de charger les salles. Réessayez dans un instant.');
+  }
+
+  /** After a confirmed action that removed the opener, focus goes to the page heading. */
+  protected afterConfirmClosed(): void {
+    if (!this.leaving()) return;
+    this.leaving.set(false);
+    focusPageHeading(this.#document);
   }
 
   protected startCreate(): void {
@@ -147,6 +160,7 @@ export class RoomsPage {
     this.actionError.set(null);
     try {
       await this.#api.school.deleteRoom(room.id);
+      this.leaving.set(true);
       this.deleteOpen.set(false);
       this.notice.set(`Salle « ${room.name} » supprimée.`);
       this.rooms.reload();

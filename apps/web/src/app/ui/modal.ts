@@ -32,6 +32,11 @@ export class Modal {
    * request is running: Escape and the close button are then off, and the dialog's own button ends it.
    */
   readonly dismissible = input(true);
+  /**
+   * Focus goes back to the element that opened the dialog. Turn it off when that element is about to
+   * disappear (a deleted row): the page then moves focus to a stable place from `closed`.
+   */
+  readonly restoreFocus = input(true);
   readonly closed = output<void>();
 
   protected readonly titleId = `cdls-modal-${++nextId}`;
@@ -57,7 +62,7 @@ export class Modal {
   protected onClose(): void {
     this.open.set(false);
     this.closed.emit();
-    this.#opener?.focus();
+    if (this.restoreFocus()) this.#opener?.focus();
     this.#opener = null;
   }
 }

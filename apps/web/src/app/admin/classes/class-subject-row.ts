@@ -121,10 +121,12 @@ export class ClassSubjectRow {
   protected readonly failure = signal<string | null>(null);
 
   protected readonly teachers = computed(() => this.row().teachers.map((t) => t.teacherName).join(', ') || 'Aucun enseignant');
+  /** The values last known to be saved (the row from the API, or the answer to the last save). */
+  readonly #base = signal<RowModel>({ coefficient: '', hours: '' });
   protected readonly dirty = computed(() => {
-    const row = this.row();
+    const base = this.#base();
     const value = this.model();
-    return value.coefficient.trim() !== formatDecimal(row.coefficient) || value.hours.trim() !== formatDecimal(row.hoursPerWeek);
+    return value.coefficient.trim() !== base.coefficient || value.hours.trim() !== base.hours;
   });
   protected readonly statusText = computed(() => {
     if (this.state() === 'saving') return 'Enregistrement…';
@@ -135,16 +137,29 @@ export class ClassSubjectRow {
   });
 
   constructor() {
+    // A new row from the API: fields the person has not touched since follow it, edited ones keep their text.
     effect(() => {
       const row = this.row();
-      untracked(() => this.rowForm().reset({ coefficient: formatDecimal(row.coefficient), hours: formatDecimal(row.hoursPerWeek) }));
+      untracked(() => {
+        const next: RowModel = { coefficient: formatDecimal(row.coefficient), hours: formatDecimal(row.hoursPerWeek) };
+        const base = this.#base();
+        const current = this.model();
+        this.#base.set(next);
+        this.rowForm().reset({
+          coefficient: current.coefficient.trim() === base.coefficient ? next.coefficient : current.coefficient,
+          hours: current.hours.trim() === base.hours ? next.hours : current.hours,
+        });
+      });
     });
+    // Editing again clears an old « Enregistré » or failure message.
     effect(() => {
-      if (this.dirty() && this.state() === 'saved') untracked(() => this.state.set('idle'));
+      this.model();
+      if (this.dirty() && (untracked(this.state) === 'saved' || untracked(this.state) === 'failed')) untracked(() => this.state.set('idle'));
     });
   }
 
   protected async save(): Promise<void> {
+    // A save is running: the edit made meanwhile is saved right after it (see below), never lost.
     if (this.state() === 'saving' || !this.dirty()) return;
     const value = this.model();
     this.rowForm.coefficient().markAsTouched();
@@ -157,11 +172,14 @@ export class ClassSubjectRow {
         coefficient: parseDecimal(value.coefficient) ?? 1,
         hoursPerWeek: value.hours.trim() ? parseDecimal(value.hours) : null,
       });
+      this.#base.set({ coefficient: formatDecimal(saved.coefficient), hours: formatDecimal(saved.hoursPerWeek) });
       this.state.set('saved');
       this.changed.emit(saved);
     } catch (error) {
       this.failure.set(apiMessage(error));
       this.state.set('failed');
+      return;
     }
+    if (this.dirty()) await this.save();
   }
 }

@@ -2,6 +2,7 @@ import type { CalendarDayDto, ClassDto, PeriodDto, SchoolYearDto, SectionDto } f
 import { describe, expect, it } from 'vitest';
 import {
   buildChecklist,
+  dayInYearProblem,
   defaultPeriodLabel,
   nextPeriodNumber,
   rangeProblem,
@@ -79,6 +80,10 @@ describe('entriesOfSection', () => {
 
   it('keeps school-wide and own entries', () => {
     expect(entriesOfSection(entries, 's1', sectionOfClass).map((e) => e.id)).toEqual(['all', 'nat']);
+  });
+
+  it('shows a day aimed at unknown classes in every section until they are known', () => {
+    expect(entriesOfSection(entries, 's1', new Map()).map((e) => e.id).sort()).toEqual(['all', 'c', 'nat']);
   });
 
   it('adds the days aimed at classes of the section', () => {
@@ -188,9 +193,9 @@ describe('buildChecklist', () => {
     expect(nextStep(steps)).toBeNull();
   });
 
-  it('flags a year that is not the current one', () => {
+  it('keeps the dates done for a year that is not the current one yet, and says so', () => {
     const steps = buildChecklist({ year: year([], false), sections, days: [], classes, subjectCounts: new Map() });
-    expect(steps[0].status).toBe('partial');
+    expect(steps[0].status).toBe('done');
     expect(steps[0].detail).toContain('pas encore l’année en cours');
   });
 });
@@ -224,5 +229,16 @@ describe('rangeProblem', () => {
     expect(rangeProblem('2026-08-31', '2026-10-01', y, false)).toContain('2026-2027');
     expect(rangeProblem('2026-10-01', '2027-07-01', y, true)).toContain('comprises dans l’année');
     expect(rangeProblem('2026-09-01', '2027-06-30', y, false)).toBeNull();
+  });
+});
+
+describe('dayInYearProblem', () => {
+  const y = { label: '2026-2027', startsOn: '2026-09-01', endsOn: '2027-06-30' };
+
+  it('checks a single date against the year', () => {
+    expect(dayInYearProblem('2026-09-01', y)).toBeNull();
+    expect(dayInYearProblem('2027-06-30', y)).toBeNull();
+    expect(dayInYearProblem('2030-01-01', y)).toContain('2026-2027');
+    expect(dayInYearProblem('2026-08-31', y)).toContain('comprises dans l’année');
   });
 });

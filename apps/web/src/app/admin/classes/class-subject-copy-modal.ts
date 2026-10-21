@@ -55,8 +55,9 @@ export class ClassSubjectCopyModal {
   readonly #api = inject(ApiClient);
 
   protected readonly classes = resource({
-    params: () => (this.open() ? true : undefined),
-    loader: () => this.#api.school.classes(),
+    // The classes of the class's own school year (a year being prepared is not the current one).
+    params: () => (this.open() ? { schoolYearId: this.schoolYearId() ?? undefined } : undefined),
+    loader: ({ params }) => this.#api.school.classes(params),
   });
   protected readonly others = computed(() =>
     (this.classes.hasValue() ? this.classes.value() : []).filter(

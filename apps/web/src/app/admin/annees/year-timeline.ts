@@ -68,7 +68,7 @@ const ROW_REM = 2.5;
                       [style.left.%]="bar.left"
                       [style.width.%]="bar.width"
                       [style.top.rem]="bar.row * rowRem"
-                      (click)="select.emit(bar.entry)"
+                      (click)="select.emit({ entry: bar.entry, trigger: $any($event.currentTarget) })"
                     >
                       @if (bar.entry.locked) {
                         <svg class="tl-bar__lock" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -210,7 +210,8 @@ export class YearTimeline {
   /** Class id → section id, to place the days aimed at some classes. */
   readonly sectionOfClass = input<ReadonlyMap<string, string>>(new Map());
   readonly selectedKey = input<string | null>(null);
-  readonly select = output<TimelineEntry>();
+  /** The bar that was pressed comes with the entry, so the page can return focus to it. */
+  readonly select = output<{ readonly entry: TimelineEntry; readonly trigger: HTMLElement }>();
 
   protected readonly rowRem = ROW_REM;
   protected readonly months = computed(() => monthTicks(this.year().startsOn, this.year().endsOn));
@@ -243,7 +244,7 @@ export class YearTimeline {
       left: geometry.left,
       width: Math.max(geometry.width, 0.6),
       row: placed.row,
-      aria: `${entry.kindLabel} : ${entry.label}, ${formatRange(entry.startsOn, entry.endsOn)}${scope}${lock}. Modifier.`,
+      aria: `${entry.kindLabel} : ${entry.label}, ${formatRange(entry.startsOn, entry.endsOn)}${scope}${lock}. ${entry.locked ? 'Voir le détail dans le panneau sous le calendrier.' : 'Modifier dans le panneau sous le calendrier.'}`,
     };
   }
 }

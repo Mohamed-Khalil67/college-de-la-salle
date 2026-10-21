@@ -1,8 +1,10 @@
+import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { SECTION_LABELS, type SubjectDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
+import { focusPageHeading } from '../shared/focus';
 import { SubjectFormModal } from './subject-form-modal';
 
 /** Subjects of the school: create, rename, set the sections they are taught in, archive and restore. */
@@ -100,6 +102,8 @@ import { SubjectFormModal } from './subject-form-modal';
       [busy]="busy()"
       [error]="actionError()"
       [(open)]="archiveOpen"
+      [restoreFocus]="!leaving()"
+      (closed)="afterConfirmClosed()"
       (confirmed)="archive()"
     >
       <p><strong>{{ archiving()?.name }}</strong> ne pourra plus être ajoutée à une classe.</p>
@@ -120,6 +124,8 @@ import { SubjectFormModal } from './subject-form-modal';
 })
 export class SubjectsPage {
   readonly #api = inject(ApiClient);
+  readonly #document = inject(DOCUMENT);
+  protected readonly leaving = signal(false);
 
   protected readonly subjects = resource({ loader: () => this.#api.school.subjects(true) });
   protected readonly showArchived = signal(false);
@@ -143,6 +149,13 @@ export class SubjectsPage {
 
   protected errorText(error: unknown): string {
     return apiMessage(error, 'Impossible de charger les matières. Réessayez dans un instant.');
+  }
+
+  /** After a confirmed action that removed the opener, focus goes to the page heading. */
+  protected afterConfirmClosed(): void {
+    if (!this.leaving()) return;
+    this.leaving.set(false);
+    focusPageHeading(this.#document);
   }
 
   protected startCreate(): void {
@@ -173,6 +186,7 @@ export class SubjectsPage {
     this.actionError.set(null);
     try {
       await this.#api.school.updateSubject(subject.id, { archived: true });
+      this.leaving.set(true);
       this.archiveOpen.set(false);
       this.notice.set(`« ${subject.name} » est archivée.`);
       this.subjects.reload();
@@ -187,6 +201,7 @@ export class SubjectsPage {
     this.pageError.set(null);
     try {
       await this.#api.school.updateSubject(subject.id, { archived: false });
+      focusPageHeading(this.#document);
       this.notice.set(`« ${subject.name} » est de nouveau active.`);
       this.subjects.reload();
     } catch (error) {

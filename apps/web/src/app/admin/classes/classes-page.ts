@@ -1,4 +1,4 @@
-import { Component, computed, inject, resource, signal } from '@angular/core';
+import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { ClassDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
@@ -138,17 +138,27 @@ export class ClassesPage {
   protected readonly isAdmin = computed(() => this.#auth.role() === 'admin');
 
   protected readonly years = resource({ loader: () => this.#api.school.years() });
-  protected readonly classes = resource({ loader: () => this.#api.school.classes() });
+  /** `?annee=<id>`: a year being prepared (the school year checklist links here); by default the current year. */
+  readonly annee = input<string | undefined>(undefined);
+  protected readonly classes = resource({
+    params: () => ({ schoolYearId: this.annee() }),
+    loader: ({ params }) => this.#api.school.classes(params),
+  });
   protected readonly sections = resource({ loader: () => this.#api.school.sections() });
 
-  protected readonly currentYear = computed(() => (this.years.hasValue() ? this.years.value().find((y) => y.isCurrent) : undefined));
+  /** The year shown: the one asked for in the address, else the current year. */
+  protected readonly currentYear = computed(() => {
+    if (!this.years.hasValue()) return undefined;
+    const list = this.years.value();
+    return list.find((y) => y.id === this.annee()) ?? list.find((y) => y.isCurrent);
+  });
   protected readonly groups = computed(() => (this.classes.hasValue() ? groupBySection(this.classes.value()) : []));
   protected readonly subtitle = computed(() => {
     const year = this.currentYear();
-    if (!year || !this.classes.hasValue()) return 'Classes de l’année en cours';
+    if (!year || !this.classes.hasValue()) return 'Classes de l’année';
     const list = this.classes.value();
     const students = list.reduce((sum, c) => sum + c.studentCount, 0);
-    return `Année ${year.label} : ${plural(list.length, 'classe', 'classes')}, ${plural(students, 'élève inscrit', 'élèves inscrits')}`;
+    return `Année ${year.label}${year.isCurrent ? '' : ' (en préparation)'} : ${plural(list.length, 'classe', 'classes')}, ${plural(students, 'élève inscrit', 'élèves inscrits')}`;
   });
 
   protected readonly formOpen = signal(false);

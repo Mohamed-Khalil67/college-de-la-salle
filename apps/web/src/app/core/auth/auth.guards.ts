@@ -47,7 +47,7 @@ export const COORDINATOR_HOME = '/admin/matieres';
 
 /**
  * The administration's structure screens (subjects, classes, rooms, activity types, school year): the admin,
- * and teachers the admin marked coordinateur. A teacher's flag is read again from /auth/me, so a promotion
+ * and teachers the admin marked coordinateur. A teacher's flag is read again from /auth/me (at most once a minute), so a promotion
  * or a revocation shows without signing in again (the API checks it on every request anyway).
  */
 export const structureGuard: CanMatchFn = async (_route, segments) => {
@@ -62,7 +62,7 @@ export const structureGuard: CanMatchFn = async (_route, segments) => {
   if (user.mustChangePassword) return router.parseUrl(FIRST_ACCESS);
   if (user.role === 'admin') return true;
   if (user.role === 'teacher') {
-    await store.reloadUser();
+    await store.reloadUserIfStale();
     user = store.user();
     if (user?.isCoordinator) return true;
   }

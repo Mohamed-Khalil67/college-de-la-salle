@@ -7,6 +7,7 @@ import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Badge, Button, EmptyState, Field, FieldControl, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { formatDay, formatRange } from '../shared/admin-format';
+import { focusPageHeading } from '../shared/focus';
 import { YearChecklist } from './year-checklist';
 import { YearCreateModal } from './year-create-modal';
 import { YearDatesModal } from './year-dates-modal';
@@ -110,8 +111,14 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
               [entries]="entries()"
               [sectionOfClass]="sectionOfClass()"
               [selectedKey]="draft()?.entry?.key ?? null"
-              (select)="openEdit($event)"
+              (select)="openEdit($event.entry, $event.trigger)"
             />
+
+            @if (classes.error()) {
+              <cdls-alert tone="warning">
+                Les classes n’ont pas pu être chargées : les jours réservés à certaines classes apparaissent dans toutes les filières.
+              </cdls-alert>
+            }
 
             @if (draft(); as d) {
               <app-year-entry-panel
@@ -216,6 +223,8 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
       [busy]="busy()"
       [error]="actionError()"
       [(open)]="confirmOpen"
+      [restoreFocus]="!leaving()"
+      (closed)="afterConfirmClosed()"
       (confirmed)="runPending()"
     >
       @switch (pending()?.kind) {
@@ -338,6 +347,7 @@ export class SchoolYearPage {
   protected readonly draft = signal<EntryDraft | null>(null);
   protected readonly confirmOpen = signal(false);
   protected readonly pending = signal<Pending | null>(null);
+  protected readonly leaving = signal(false);
   protected readonly busy = signal(false);
   protected readonly actionError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
@@ -416,7 +426,7 @@ export class SchoolYearPage {
         this.openAdd('holiday');
         break;
       case 'classes':
-        void this.#router.navigate(['/admin/classes']);
+        void this.#router.navigate(['/admin/classes'], { queryParams: { annee: this.year()?.id } });
         break;
       case 'subjects': {
         const target = classToCompleteNext(this.classes.hasValue() ? this.classes.value() : [], this.counts.hasValue() ? this.counts.value() : new Map());
@@ -426,20 +436,20 @@ export class SchoolYearPage {
     }
   }
 
-  protected openAdd(type: EntryType, event?: Event): void {
-    this.#remember(event);
+  protected openAdd(type: EntryType, source?: Event | HTMLElement): void {
+    this.#remember(source);
     this.notice.set(null);
     this.draft.set({ entry: null, type });
   }
 
-  protected openEdit(entry: TimelineEntry, event?: Event): void {
-    this.#remember(event);
+  protected openEdit(entry: TimelineEntry, source?: Event | HTMLElement): void {
+    this.#remember(source);
     this.notice.set(null);
     this.draft.set({ entry, type: entry.type });
   }
 
-  #remember(event?: Event): void {
-    const target = event?.target ?? this.#document.activeElement;
+  #remember(source?: Event | HTMLElement): void {
+    const target = source instanceof Event ? source.target : (source ?? this.#document.activeElement);
     if (target instanceof HTMLElement) this.#opener = target.closest('button') ?? target;
   }
 
@@ -465,6 +475,13 @@ export class SchoolYearPage {
   protected onYearSaved(year: SchoolYearDto): void {
     this.notice.set(`Les dates de l’année ${year.label} sont enregistrées.`);
     this.#refresh();
+  }
+
+  /** After a confirmed action that removed the opener, focus goes to the page heading. */
+  protected afterConfirmClosed(): void {
+    if (!this.leaving()) return;
+    this.leaving.set(false);
+    focusPageHeading(this.#document);
   }
 
   protected startPending(pending: Pending): void {
@@ -506,6 +523,7 @@ export class SchoolYearPage {
           break;
       }
       this.pageError.set(null);
+      this.leaving.set(true);
       this.confirmOpen.set(false);
       this.#refresh();
     } catch (error) {

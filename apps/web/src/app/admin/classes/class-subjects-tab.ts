@@ -1,8 +1,10 @@
+import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import type { ClassDto, ClassSubjectDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
+import { focusPageHeading } from '../shared/focus';
 import { ClassSubjectAddModal } from './class-subject-add-modal';
 import { ClassSubjectCopyModal, type CopyResult } from './class-subject-copy-modal';
 import { ClassSubjectRow } from './class-subject-row';
@@ -53,7 +55,7 @@ import { classSubjectTotals, copyMessage, copySummary, formatDecimal } from './c
               </tbody>
               <tfoot>
                 <tr>
-                  <th scope="row">Total : {{ totals().count }} matières</th>
+                  <th scope="row">Total : {{ totals().count }} {{ totals().count > 1 ? 'matières' : 'matière' }}</th>
                   <td class="cell-empty"></td>
                   <td class="num" data-label="Coefficients :">{{ formatDecimal(totals().coefficient) }}</td>
                   <td class="num" data-label="Heures :">{{ totals().hours === null ? '—' : formatDecimal(totals().hours) }}</td>
@@ -89,6 +91,8 @@ import { classSubjectTotals, copyMessage, copySummary, formatDecimal } from './c
       [busy]="busy()"
       [error]="actionError()"
       [(open)]="removeOpen"
+      [restoreFocus]="!leaving()"
+      (closed)="afterConfirmClosed()"
       (confirmed)="remove()"
     >
       <p><strong>{{ removing()?.subjectName }}</strong> ne fera plus partie de la classe {{ schoolClass().label }}.</p>
@@ -117,6 +121,8 @@ export class ClassSubjectsTab {
   readonly schoolClass = input.required<ClassDto>();
 
   readonly #api = inject(ApiClient);
+  readonly #document = inject(DOCUMENT);
+  protected readonly leaving = signal(false);
   protected readonly formatDecimal = formatDecimal;
 
   protected readonly rows = resource({ params: () => this.schoolClass().id, loader: ({ params }) => this.#api.school.classSubjects(params) });
@@ -149,6 +155,13 @@ export class ClassSubjectsTab {
     this.rows.set([...result.rows]);
   }
 
+  /** After a confirmed action that removed the opener, focus goes to the page heading. */
+  protected afterConfirmClosed(): void {
+    if (!this.leaving()) return;
+    this.leaving.set(false);
+    focusPageHeading(this.#document);
+  }
+
   protected startRemove(row: ClassSubjectDto): void {
     this.removing.set(row);
     this.actionError.set(null);
@@ -162,6 +175,7 @@ export class ClassSubjectsTab {
     this.actionError.set(null);
     try {
       await this.#api.school.removeClassSubject(row.id);
+      this.leaving.set(true);
       this.removeOpen.set(false);
       this.notice.set(`« ${row.subjectName} » est retirée de la classe.`);
       this.rows.reload();

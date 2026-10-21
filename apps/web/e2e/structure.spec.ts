@@ -209,6 +209,8 @@ test('create a room, edit it, and delete it', async ({ page }) => {
   await page.getByRole('button', { name: new RegExp(`Supprimer ${name}`) }).click();
   await confirm.getByRole('button', { name: 'Supprimer la salle' }).click();
   await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(0);
+  // The row that had focus is gone: focus is on the page heading, not lost.
+  await expect(page.getByRole('heading', { level: 1, name: 'Salles' })).toBeFocused();
 });
 
 test('create an activity type with a colour, an icon and options, and share a teacher type', async ({ page, request }) => {
@@ -356,7 +358,7 @@ test('add a holiday and see it on the calendar, then close and reopen a period',
   await panel.getByLabel('Début').fill('01/01/2030');
   await panel.getByLabel('Fin').fill('05/01/2030');
   await panel.getByRole('button', { name: 'Ajouter' }).click();
-  await expect(panel.getByText(/comprises dans l’année 2026-2027/)).toBeVisible();
+  await expect(panel.getByText(/comprises dans l’année 2026-2027/).first()).toBeVisible();
   await panel.getByRole('button', { name: 'Annuler' }).click();
   await expect(opener).toBeFocused();
 
@@ -364,6 +366,7 @@ test('add a holiday and see it on the calendar, then close and reopen a period',
   await page.getByRole('row', { name: new RegExp(label) }).getByRole('button', { name: new RegExp(`Supprimer ${label}`) }).click();
   await page.getByRole('dialog', { name: 'Supprimer du calendrier ?' }).getByRole('button', { name: 'Supprimer' }).click();
   await expect(page.getByRole('row', { name: new RegExp(label) })).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1, name: 'Année scolaire' })).toBeFocused();
 
   // Closing a period locks it (admin only); reopening frees it again.
   const term = page.getByRole('row', { name: /3e trimestre/ });
@@ -484,5 +487,58 @@ test('every admin screen is free of Axe violations at 390 and 1440 px, and the p
   await expect(page).toHaveURL(/\/admin\/menu$/);
   for (const name of ['Matières', 'Salles', 'Types d’activité', 'Année scolaire', 'Messages']) {
     await expect(page.getByRole('main').getByRole('link', { name })).toBeVisible();
+  }
+});
+
+test('a coordinator prepares a year that is not the current one yet', async ({ page, request }) => {
+  const admin = await tokenOf(request, ACCOUNTS.admin);
+  const label = '2031-2032';
+  const sections = (await (await request.get('/api/sections', { headers: admin })).json()) as { id: string; code: string }[];
+  const old = ((await (await request.get('/api/school-years', { headers: admin })).json()) as { id: string; label: string }[]).find(
+    (y) => y.label === label,
+  );
+  if (old) await request.delete(`/api/school-years/${old.id}`, { headers: admin });
+  const year = (await (
+    await request.post('/api/school-years', { headers: admin, data: { label, startsOn: '2031-09-01', endsOn: '2032-06-30' } })
+  ).json()) as { id: string };
+  const make = async (code: string) =>
+    (await (
+      await request.post('/api/classes', {
+        headers: admin,
+        data: { schoolYearId: year.id, sectionId: sections[0].id, code, label: `Classe ${code}` },
+      })
+    ).json()) as { id: string };
+  const first = await make('prepa-a');
+  const second = await make('prepa-b');
+  const subjects = (await (await request.get('/api/subjects', { headers: admin })).json()) as { id: string }[];
+  await request.post(`/api/classes/${first.id}/subjects`, { headers: admin, data: { subjectId: subjects[0].id, coefficient: 3 } });
+  try {
+    await signInAs(page, ACCOUNTS.coordinator);
+    await goInApp(page, '/admin/annees');
+    await page.getByLabel('Année affichée').selectOption({ label: label });
+    // The dates step is done without the admin making the year current, and the classes step opens that year.
+    await expect(page.getByRole('heading', { name: /Dates de l’année/ })).toContainText('Fait');
+    await page.getByRole('button', { name: 'Gérer les classes' }).click();
+    await expect(page).toHaveURL(/\/admin\/classes\?annee=/);
+    await expect(page.getByText('Classe prepa-a', { exact: true })).toBeVisible();
+    await expect(page.getByText(/en préparation/)).toBeVisible();
+
+    // « Copier depuis la classe… » lists the classes of that year, not the current one.
+    await page.getByRole('link', { name: /Matières de Classe prepa-b/ }).click();
+    await page.getByRole('button', { name: 'Copier depuis la classe…' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Copier les matières d’une autre classe' });
+    await expect(dialog.getByRole('option', { name: /Classe prepa-a/ })).toHaveCount(1);
+    await dialog.getByLabel('Copier depuis').selectOption(first.id);
+    await dialog.getByRole('button', { name: 'Copier les matières' }).click();
+    await expect(page.getByText(/Copié depuis Classe prepa-a : 1 matière ajoutée/)).toBeVisible();
+    await axeAtBothWidths(page);
+  } finally {
+    for (const id of [first.id, second.id]) {
+      for (const row of (await (await request.get(`/api/classes/${id}/subjects`, { headers: admin })).json()) as { id: string }[]) {
+        await request.delete(`/api/class-subjects/${row.id}`, { headers: admin });
+      }
+      await request.delete(`/api/classes/${id}`, { headers: admin });
+    }
+    await request.delete(`/api/school-years/${year.id}`, { headers: admin });
   }
 });

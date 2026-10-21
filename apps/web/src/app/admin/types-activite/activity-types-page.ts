@@ -1,10 +1,11 @@
-import { NgTemplateOutlet } from '@angular/common';
+import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import type { ActivityTypeDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
+import { focusPageHeading } from '../shared/focus';
 import { ActivityTypeChip } from './activity-type-chip';
 import { ActivityTypeFormModal } from './activity-type-form-modal';
 import { flagLabels } from './activity-palette';
@@ -152,6 +153,8 @@ type PendingAction = 'archive' | 'delete' | 'promote';
       [busy]="busy()"
       [error]="actionError()"
       [(open)]="confirmOpen"
+      [restoreFocus]="!leaving()"
+      (closed)="afterConfirmClosed()"
       (confirmed)="runAction()"
     >
       @switch (action()) {
@@ -187,6 +190,8 @@ type PendingAction = 'archive' | 'delete' | 'promote';
 export class ActivityTypesPage {
   readonly #api = inject(ApiClient);
   readonly #auth = inject(AuthStore);
+  readonly #document = inject(DOCUMENT);
+  protected readonly leaving = signal(false);
 
   protected readonly isAdmin = computed(() => this.#auth.role() === 'admin');
   protected readonly types = resource({ loader: () => this.#api.school.activityTypes(true) });
@@ -238,6 +243,13 @@ export class ActivityTypesPage {
     return apiMessage(error, 'Impossible de charger les types. Réessayez dans un instant.');
   }
 
+  /** After a confirmed action that removed the opener, focus goes to the page heading. */
+  protected afterConfirmClosed(): void {
+    if (!this.leaving()) return;
+    this.leaving.set(false);
+    focusPageHeading(this.#document);
+  }
+
   protected startCreate(): void {
     this.editing.set(null);
     this.formOpen.set(true);
@@ -282,6 +294,7 @@ export class ActivityTypesPage {
           break;
       }
       this.pageError.set(null);
+      this.leaving.set(true);
       this.confirmOpen.set(false);
       this.types.reload();
     } catch (error) {
@@ -295,6 +308,7 @@ export class ActivityTypesPage {
     this.pageError.set(null);
     try {
       await this.#api.school.updateActivityType(type.id, { archived: false });
+      focusPageHeading(this.#document);
       this.notice.set(`« ${type.label} » est de nouveau proposé.`);
       this.types.reload();
     } catch (error) {

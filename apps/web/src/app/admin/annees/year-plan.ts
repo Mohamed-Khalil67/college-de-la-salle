@@ -102,7 +102,11 @@ export function entriesOfSection(
   sectionOfClass: ReadonlyMap<string, string>,
 ): TimelineEntry[] {
   return entries.filter((entry) => {
-    if (entry.classIds.length) return entry.classIds.some((id) => sectionOfClass.get(id) === sectionId);
+    if (entry.classIds.length) {
+      // Classes not loaded yet (or their request failed): show the day in every section rather than nowhere.
+      if (!entry.classIds.some((id) => sectionOfClass.has(id))) return true;
+      return entry.classIds.some((id) => sectionOfClass.get(id) === sectionId);
+    }
     return entry.sectionId === null || entry.sectionId === sectionId;
   });
 }
@@ -209,8 +213,9 @@ export function buildChecklist(input: ChecklistInput): ChecklistStep[] {
     {
       id: 'dates',
       title: 'Dates de l’année',
-      status: year.isCurrent ? 'done' : 'partial',
-      detail: `${formatRange(year.startsOn, year.endsOn)}${year.isCurrent ? '.' : ' : cette année n’est pas encore l’année en cours.'}`,
+      // The dates exist and are valid as soon as the year does; making it the current year is the admin's own decision.
+      status: 'done',
+      detail: `${formatRange(year.startsOn, year.endsOn)}${year.isCurrent ? '.' : ' ; ce n’est pas encore l’année en cours (l’administration la choisit).'}`,
       action: 'Modifier les dates',
     },
     {
@@ -290,4 +295,14 @@ export function rangeProblem(
     return `Les dates doivent être comprises dans l’année ${year.label} (${formatRange(year.startsOn, year.endsOn)}).`;
   }
   return null;
+}
+
+/** A single date (a start) must fall inside the school year; same wording as `rangeProblem`. */
+export function dayInYearProblem(
+  day: string,
+  year: { readonly label: string; readonly startsOn: string; readonly endsOn: string },
+): string | null {
+  return day < year.startsOn || day > year.endsOn
+    ? `Les dates doivent être comprises dans l’année ${year.label} (${formatRange(year.startsOn, year.endsOn)}).`
+    : null;
 }
