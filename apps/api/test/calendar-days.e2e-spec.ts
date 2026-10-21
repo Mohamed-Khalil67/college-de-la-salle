@@ -290,8 +290,8 @@ describe('Calendar days (e2e)', () => {
     });
 
     it('is readable by every signed-in user, and by nobody anonymous', async () => {
-      await t.http().get('/api/calendar-days').set(bearer(bacToken)).expect(200);
-      await t.http().get('/api/calendar-days').expect(401);
+      await t.http().get('/api/calendar-days?schoolYearId=' + yearId).set(bearer(bacToken)).expect(200);
+      await t.http().get('/api/calendar-days?schoolYearId=' + yearId).expect(401);
     });
   });
 });

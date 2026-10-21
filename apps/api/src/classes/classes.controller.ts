@@ -109,7 +109,7 @@ export class ClassesController {
   @Delete('enrollments/:id')
   @HttpCode(204)
   @ApiNoContentResponse()
-  unenroll(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.classes.unenroll(id);
+  unenroll(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthUser): Promise<void> {
+    return this.classes.unenroll(id, actor);
   }
 }

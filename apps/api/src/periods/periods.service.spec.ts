@@ -146,7 +146,7 @@ describe('PeriodsService', () => {
 
     it('keeps the period inside the school year and its end after its start', async () => {
       await expect(
-        periods.create('y1', { ...dto, endsOn: '2026-09-06' }, ADMIN),
+        periods.create('y1', { ...dto, endsOn: '2026-09-05' }, ADMIN),
       ).rejects.toBeInstanceOf(BadRequestException);
       await expect(periods.create('y1', { ...dto, endsOn: '2027-07-15' }, ADMIN)).rejects.toThrow(
         /comprise dans l’année/,

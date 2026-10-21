@@ -1,4 +1,10 @@
-import { checkRoster, columnName, headerProblems, type RosterContext } from './roster-import.js';
+import {
+  checkRoster,
+  columnName,
+  headerProblems,
+  identityKey,
+  type RosterContext,
+} from './roster-import.js';
 
 const context = (overrides: Partial<RosterContext> = {}): RosterContext => ({
   role: 'student',
@@ -9,6 +15,8 @@ const context = (overrides: Partial<RosterContext> = {}): RosterContext => ({
   ]),
   takenEmails: new Set(['nour.saad@demo.cdls.test']),
   existingByNumber: new Map([['CDLS-1', 'nour.saad@demo.cdls.test']]),
+  existingByIdentity: new Map(),
+  createAnyway: new Set<number>(),
   ...overrides,
 });
 
@@ -131,5 +139,61 @@ describe('checkRoster', () => {
     );
     expect(errors).toEqual([]);
     expect(rows[0]).toMatchObject({ email: 'marc.lefevre@demo.cdls.test', classId: null });
+  });
+});
+
+describe('checkRoster: the same person again', () => {
+  const known = identityKey('student', 'Nour', 'Saad', 'bac', 'c-seconde')!;
+  const withKnown = (extra: Partial<RosterContext> = {}) =>
+    context({ existingByIdentity: new Map([[known, 'nour.saad@demo.cdls.test']]), ...extra });
+
+  it('marks a line without student number whose name, section and class exist as already present', () => {
+    const { rows } = checkRoster([student({ firstName: 'NOUR', lastName: 'saad' })], withKnown());
+    expect(rows[0]).toMatchObject({
+      alreadyImported: true,
+      matchedBy: 'name',
+      createAnyway: false,
+      email: 'nour.saad@demo.cdls.test',
+    });
+  });
+
+  it('keeps a student of another class, or with another student number, as a new person', () => {
+    const other = checkRoster([student({ class: 'seconde', section: 'bac' })], context());
+    expect(other.rows[0]!.alreadyImported).toBe(false);
+    const elsewhere = checkRoster(
+      [student({ section: 'nationale', class: 'secondaire-1' })],
+      withKnown(),
+    );
+    expect(elsewhere.rows[0]!.alreadyImported).toBe(false);
+    const numbered = checkRoster([student({ studentNumber: 'NEW-9' })], withKnown());
+    expect(numbered.rows[0]).toMatchObject({ alreadyImported: false, matchedBy: null });
+  });
+
+  it('creates a genuine homonym only on the explicit per-line choice, with the next number', () => {
+    const taken = new Set(['nour.saad@demo.cdls.test']);
+    const { rows } = checkRoster(
+      [student(), student({ firstName: 'Nour' })],
+      withKnown({ takenEmails: taken, createAnyway: new Set([3]) }),
+    );
+    expect(rows[0]).toMatchObject({ alreadyImported: true, matchedBy: 'name' });
+    expect(rows[1]).toMatchObject({
+      alreadyImported: false,
+      createAnyway: true,
+      email: 'nour.saad2@demo.cdls.test',
+      emailNumber: 2,
+    });
+  });
+
+  it('matches teachers by name alone and reports the real line numbers', () => {
+    const key = identityKey('teacher', 'Anne', 'Lefèvre', null, null)!;
+    const { rows } = checkRoster(
+      [{ lastName: 'LEFEVRE', firstName: 'anne' }],
+      context({
+        role: 'teacher',
+        existingByIdentity: new Map([[key, 'anne.lefevre@demo.cdls.test']]),
+      }),
+      [7],
+    );
+    expect(rows[0]).toMatchObject({ line: 7, alreadyImported: true, matchedBy: 'name' });
   });
 });

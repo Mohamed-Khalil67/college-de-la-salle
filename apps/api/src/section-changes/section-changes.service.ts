@@ -114,15 +114,32 @@ export class SectionChangesService {
       throw new ConflictException(ALREADY_PENDING);
 
     try {
-      const row = await this.prisma.sectionChangeRequest.create({
-        data: {
-          studentId,
-          fromSectionId: student.sectionId,
-          toSectionId: toSection.id,
-          reason: dto.reason,
-          requestedById: user.id,
-        },
-        include,
+      const row = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.sectionChangeRequest.create({
+          data: {
+            studentId,
+            fromSectionId: student.sectionId!,
+            toSectionId: toSection.id,
+            reason: dto.reason,
+            requestedById: user.id,
+          },
+          include,
+        });
+        await audit(tx, [
+          {
+            actorId: user.id,
+            action: 'section_change.create',
+            entity: 'section_change_request',
+            entityId: created.id,
+            after: {
+              studentId,
+              fromSectionId: student.sectionId,
+              toSectionId: toSection.id,
+              byStudent: user.role === 'student',
+            },
+          },
+        ]);
+        return created;
       });
       return toSectionChangeDto(row);
     } catch (error) {
@@ -217,14 +234,28 @@ export class SectionChangesService {
   }
 
   async reject(id: string, dto: RejectSectionChangeDto, actor: AuthUser): Promise<SectionChangeDto> {
-    const rejected = await this.prisma.sectionChangeRequest.updateMany({
-      where: { id, status: 'pending' },
-      data: {
-        status: 'rejected',
-        decidedById: actor.id,
-        decidedAt: new Date(),
-        decisionNote: dto.note,
-      },
+    const rejected = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.sectionChangeRequest.updateMany({
+        where: { id, status: 'pending' },
+        data: {
+          status: 'rejected',
+          decidedById: actor.id,
+          decidedAt: new Date(),
+          decisionNote: dto.note,
+        },
+      });
+      if (result.count)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'section_change.reject',
+            entity: 'section_change_request',
+            entityId: id,
+            before: { status: 'pending' },
+            after: { status: 'rejected' },
+          },
+        ]);
+      return result;
     });
     if (rejected.count === 0) {
       await this.get(id);

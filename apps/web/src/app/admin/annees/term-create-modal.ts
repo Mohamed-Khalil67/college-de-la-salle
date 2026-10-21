@@ -65,7 +65,7 @@ export class TermCreateModal {
     validate(p.endsOn, ({ value, valueOf }) => {
       if (!value()) return null;
       const start = valueOf(p.startsOn);
-      if (start && value() <= start) return { kind: 'order', message: 'La fin doit venir après le début.' };
+      if (start && value() < start) return { kind: 'order', message: 'La fin ne peut pas précéder le début.' };
       return this.#outsideYear(value());
     });
   });

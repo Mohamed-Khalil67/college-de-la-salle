@@ -71,10 +71,15 @@ export class EventsService {
   /** Teachers create events for the classes they teach, or section/school-wide ungraded events. */
   async create(dto: CreateEventDto, user: AuthUser): Promise<EventDto> {
     if (!user.teacherId) throw forbidden();
-    const fields = await this.check(withDefaults(dto), user, null);
-    const row = await this.prisma.event.create({
-      data: { ...toData(fields), authorId: user.teacherId },
-      include: eventInclude,
+    const input = withDefaults(dto);
+    const row = await this.prisma.$transaction(async (tx) => {
+      // The type's flags are read after taking its shared lock and stay put until this event commits.
+      await this.types.lockForEvent(tx, input.activityTypeId);
+      const fields = await this.check(input, user, null);
+      return tx.event.create({
+        data: { ...toData(fields), authorId: user.teacherId! },
+        include: eventInclude,
+      });
     });
     return toEventDto(row);
   }
@@ -110,16 +115,15 @@ export class EventsService {
         'Des notes existent : le type, la classe et la matière ne peuvent plus changer.',
       );
     }
-    const fields = await this.check(merged, user, current);
-    if (hasGrades && fields.periodId !== current.periodId) {
-      throw new ConflictException(
-        'Des notes existent : l’événement ne peut plus changer de période. Gardez la période ou supprimez les notes.',
-      );
-    }
-    const row = await this.prisma.event.update({
-      where: { id },
-      data: toData(fields),
-      include: eventInclude,
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.types.lockForEvent(tx, merged.activityTypeId);
+      const fields = await this.check(merged, user, current);
+      if (hasGrades && fields.periodId !== current.periodId) {
+        throw new ConflictException(
+          'Des notes existent : l’événement ne peut plus changer de période. Gardez la période ou supprimez les notes.',
+        );
+      }
+      return tx.event.update({ where: { id }, data: toData(fields), include: eventInclude });
     });
     return toEventDto(row);
   }

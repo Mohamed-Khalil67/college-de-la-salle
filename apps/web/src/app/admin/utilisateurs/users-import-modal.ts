@@ -68,9 +68,9 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                 </cdls-alert>
               } @else {
                 <cdls-alert tone="success">
-                  <strong>{{ plural(newCount(), 'compte sera créé', 'comptes seront créés') }}.</strong>
+                  <strong>{{ newCount() ? plural(newCount(), 'compte sera créé', 'comptes seront créés') : 'Aucun compte ne sera créé' }}.</strong>
                   @if (checked.rows.length > newCount()) {
-                    {{ plural(checked.rows.length - newCount(), 'élève est déjà au collège', 'élèves sont déjà au collège') }} : leur compte et leur adresse ne changent pas.
+                    {{ plural(checked.rows.length - newCount(), 'personne est déjà présente', 'personnes sont déjà présentes') }} : leur compte et leur adresse ne changent pas.
                   }
                   Vérifiez les adresses e-mail générées : rien n’est créé tant que vous n’avez pas confirmé.
                 </cdls-alert>
@@ -100,9 +100,20 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                           <td data-label="Adresse e-mail :">
                             {{ row.email }}
                             @if (row.alreadyImported) {
-                              <span class="cell-sub d-block">déjà au collège : compte conservé, rien n’est créé</span>
+                              <span class="cell-sub d-block">déjà présent : compte conservé, rien n’est créé</span>
                             } @else if (row.emailNote) {
                               <span class="cell-sub d-block">numéro {{ row.emailNumber }}, {{ row.emailNote }}</span>
+                            }
+                            @if (row.matchedBy === 'name') {
+                              <label class="check cell-sub d-block">
+                                <input
+                                  type="checkbox"
+                                  [checked]="row.createAnyway"
+                                  [disabled]="busy()"
+                                  (change)="toggleCreateAnyway(row.line, $any($event.target).checked)"
+                                />
+                                <span>Créer quand même (homonyme, ligne {{ row.line }})</span>
+                              </label>
                             }
                           </td>
                           @if (checked.role === 'student') {
@@ -237,6 +248,8 @@ export class UsersImportModal {
   protected readonly failure = signal<string | null>(null);
   protected readonly lineErrors = signal<readonly ImportUsersError[]>([]);
   protected readonly preview = signal<ImportPreviewResponse | null>(null);
+  /** Lines the administration chose to create although the person already has an account (homonyms). */
+  protected readonly createAnyway = signal<readonly number[]>([]);
   protected readonly result = signal<ImportUsersResponse | null>(null);
   protected readonly createdLabel = signal('');
   protected readonly newCount = computed(() => this.preview()?.rows.filter((r) => !r.alreadyImported).length ?? 0);
@@ -252,6 +265,7 @@ export class UsersImportModal {
         this.step.set('choose');
         this.result.set(null);
         this.preview.set(null);
+        this.createAnyway.set([]);
         this.resetFile();
       });
     });
@@ -284,9 +298,27 @@ export class UsersImportModal {
   protected backToChoose(): void {
     this.resetFile();
     this.preview.set(null);
+    this.createAnyway.set([]);
     this.step.set('choose');
     this.failure.set(null);
     this.focusBody();
+  }
+
+  /** Ticks or unticks « créer quand même » for a line, and asks the API again so the new address shows. */
+  protected async toggleCreateAnyway(line: number, checked: boolean): Promise<void> {
+    const file = this.file();
+    if (!file) return;
+    const next = checked ? [...this.createAnyway(), line] : this.createAnyway().filter((l) => l !== line);
+    this.busy.set(true);
+    this.failure.set(null);
+    try {
+      this.preview.set(await this.#api.users.previewImport(file, this.role(), next));
+      this.createAnyway.set(next);
+    } catch (error) {
+      this.failure.set(apiMessage(error));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Step 1 → 2: the API checks every line and returns the generated e-mails; nothing is created. */
@@ -306,6 +338,7 @@ export class UsersImportModal {
     this.failure.set(null);
     this.lineErrors.set([]);
     try {
+      this.createAnyway.set([]);
       const checked = await this.#api.users.previewImport(file, this.role());
       // A header problem (line 1) means the file cannot be read as a roster: stay on the choice step
       // with the list. Problems on data lines are shown in the preview.
@@ -331,7 +364,7 @@ export class UsersImportModal {
     this.busy.set(true);
     this.failure.set(null);
     try {
-      const result = await this.#api.users.import(file, this.role());
+      const result = await this.#api.users.import(file, this.role(), this.createAnyway());
       this.createdLabel.set(`${plural(result.created.length, 'compte créé.', 'comptes créés.')}`);
       this.result.set(result);
       this.step.set('done');

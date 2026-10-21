@@ -40,6 +40,18 @@ import { UsersModule } from './users/users.module.js';
             ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
             limit: config.get('THROTTLE_LIMIT', { infer: true }),
           },
+          // Counts by address alone on every route; sign-in routes override `default` to count by address
+          // and account (see AuthController) and keep this one as the ceiling per address.
+          {
+            name: 'ip',
+            ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
+            limit: config.get('THROTTLE_LIMIT', { infer: true }),
+            // Only the sign-in routes need it (they override its limit); elsewhere `default` already counts by address.
+            skipIf: (context) => {
+              const path = String(context.switchToHttp().getRequest<{ path?: string }>().path ?? '');
+              return !(path.endsWith('/auth/login') || path.endsWith('/auth/password'));
+            },
+          },
         ],
         // One counter per IPv4 address or IPv6 /64 (a client could rotate through its /64).
         getTracker: (req: Record<string, unknown>) => clientKey(req['ip'] as string | undefined),

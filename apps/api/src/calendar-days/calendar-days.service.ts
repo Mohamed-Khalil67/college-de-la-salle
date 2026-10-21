@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   CLOSED_DAY_TYPES,
+  daysBetween,
   type CalendarDayType,
   classTarget,
   type Closure,
@@ -25,6 +26,8 @@ const include = {
   schoolYear: true,
 } satisfies Prisma.CalendarDayInclude;
 
+const MAX_RANGE_DAYS = 400;
+
 type Row = Prisma.CalendarDayGetPayload<{ include: typeof include }>;
 
 /** Holidays, exam weeks, days without classes and special days of a school year. */
@@ -32,18 +35,53 @@ type Row = Prisma.CalendarDayGetPayload<{ include: typeof include }>;
 export class CalendarDaysService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** The year's days (or those overlapping [from, to]), by start day. */
-  async list(query: CalendarDayQueryDto): Promise<CalendarDayDto[]> {
+  /**
+   * The year's days, or those overlapping [from, to] (at most a year and a bit without a year), by start day. A year or a
+   * range is required. A student only gets what concerns them: days for the whole school, their section
+   * or their class, and of the classes a day names, only their own.
+   */
+  async list(query: CalendarDayQueryDto, user: AuthUser): Promise<CalendarDayDto[]> {
+    if (!query.schoolYearId && !(query.from && query.to))
+      throw new BadRequestException('Indiquez une année scolaire, ou une période (from et to).');
+    if (query.from && query.to) {
+      if (query.to < query.from) throw new BadRequestException('« to » doit suivre « from ».');
+      // With a school year the result is bounded already; the cap only guards a bare range.
+      if (!query.schoolYearId && daysBetween(query.from, query.to) > MAX_RANGE_DAYS)
+        throw new BadRequestException(`Période limitée à ${MAX_RANGE_DAYS} jours.`);
+    }
+    const student = user.role === 'student';
     const rows = await this.prisma.calendarDay.findMany({
       where: {
         ...(query.schoolYearId ? { schoolYearId: query.schoolYearId } : {}),
         ...(query.from ? { endsOn: { gte: fromDay(query.from) } } : {}),
         ...(query.to ? { startsOn: { lte: fromDay(query.to) } } : {}),
+        ...(student
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { sectionId: null },
+                    ...(user.sectionCode ? [{ section: { code: user.sectionCode } }] : []),
+                  ],
+                },
+                {
+                  OR: [
+                    { classes: { none: {} } },
+                    ...(user.classId ? [{ classes: { some: { classId: user.classId } } }] : []),
+                  ],
+                },
+              ],
+            }
+          : {}),
       },
       include,
       orderBy: [{ startsOn: 'asc' }, { label: 'asc' }],
     });
-    return rows.map(toCalendarDayDto);
+    return rows.map((row) => {
+      const dto = toCalendarDayDto(row);
+      if (student) dto.classIds = dto.classIds.filter((id) => id === user.classId);
+      return dto;
+    });
   }
 
   async create(dto: CreateCalendarDayDto, user: AuthUser): Promise<CalendarDayDto> {

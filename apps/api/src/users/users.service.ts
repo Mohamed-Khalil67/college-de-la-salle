@@ -4,11 +4,12 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import {
   describeSchoolEmails,
   type ImportRole,
   type Paginated,
+  schoolEmailPrefix,
   type SectionId,
 } from '@cdls/shared';
 import { hash } from 'argon2';
@@ -39,10 +40,13 @@ import {
   checkRoster,
   headerProblems,
   columnName,
+  identityKey,
   MAX_IMPORT_ROWS,
 } from './roster-import.js';
 
 const HASH_CONCURRENCY = 4;
+const MALFORMED_CSV =
+  'Le fichier CSV est illisible : vérifiez les guillemets et les colonnes, puis enregistrez-le de nouveau au format CSV (UTF-8).';
 const ARCHIVED = 'Compte archivé : restaurez-le avant de le modifier.';
 
 const include = {
@@ -82,6 +86,7 @@ function isUniqueViolation(error: unknown): boolean {
 @Injectable()
 export class UsersService {
   private readonly domain: string;
+  private readonly temporaryPasswordDays: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -90,6 +95,7 @@ export class UsersService {
     config: ConfigService<Env, true>,
   ) {
     this.domain = config.get('SCHOOL_EMAIL_DOMAIN', { infer: true });
+    this.temporaryPasswordDays = config.get('TEMP_PASSWORD_TTL_DAYS', { infer: true });
   }
 
   async list(query: UserListQueryDto): Promise<Paginated<UserDto>> {
@@ -127,7 +133,7 @@ export class UsersService {
    * Creates one account with a temporary password (shown once). Without an e-mail, the school address
    * `prenom.nom@<domain>` is generated. A student's class sets their section.
    */
-  async create(dto: CreateUserDto): Promise<CreatedUserDto> {
+  async create(dto: CreateUserDto, actor: AuthUser): Promise<CreatedUserDto> {
     if (dto.role !== 'student' && (dto.classId || dto.studentNumber || dto.birthDate)) {
       throw new BadRequestException(
         'Classe, matricule et date de naissance concernent uniquement les élèves.',
@@ -154,7 +160,7 @@ export class UsersService {
         await lockEmails(tx);
         email = await this.generatedEmail(tx, dto.firstName, dto.lastName);
       }
-      return tx.user.create({
+      const created = await tx.user.create({
         data: {
           email,
           passwordHash,
@@ -162,6 +168,7 @@ export class UsersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           mustChangePassword: true,
+          temporaryPasswordExpiresAt: this.temporaryPasswordExpiry(),
           ...(dto.role === 'teacher' ? { teacher: { create: {} } } : {}),
           ...(dto.role === 'student'
             ? {
@@ -187,6 +194,17 @@ export class UsersService {
         },
         include,
       });
+      // Never the password: who made which account, with which role.
+      await audit(tx, [
+        {
+          actorId: actor.id,
+          action: 'user.create',
+          entity: 'user',
+          entityId: created.id,
+          after: { email, role: dto.role, classId: dto.classId ?? null },
+        },
+      ]);
+      return created;
       });
       return { user: toUserDto(user), temporaryPassword };
     } catch (error) {
@@ -209,6 +227,8 @@ export class UsersService {
       dto.isCoordinator !== (current.teacher?.isCoordinator ?? false);
 
     const reset = dto.password !== undefined;
+    // Disabling or restoring ends the sessions already issued: their access tokens carry the old version.
+    const statusChanged = dto.status !== undefined && dto.status !== current.status;
     const passwordHash = reset ? await hash(dto.password!) : undefined;
     const user = await this.prisma.$transaction(async (tx) => {
       const row = await tx.user.update({
@@ -225,11 +245,39 @@ export class UsersService {
             : {}),
           // A reset password is temporary: the user chooses their own at next sign-in.
           ...(reset
-            ? { passwordHash, mustChangePassword: true, passwordChangedAt: new Date() }
-            : {}),
+            ? {
+                passwordHash,
+                mustChangePassword: true,
+                passwordChangedAt: new Date(),
+                temporaryPasswordExpiresAt: this.temporaryPasswordExpiry(),
+              }
+            : statusChanged
+              ? { passwordChangedAt: new Date() }
+              : {}),
         },
         include,
       });
+      if (reset)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'user.password_reset',
+            entity: 'user',
+            entityId: id,
+            after: { mustChangePassword: true },
+          },
+        ]);
+      if (dto.status !== undefined && dto.status !== current.status)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'user.status',
+            entity: 'user',
+            entityId: id,
+            before: { status: current.status },
+            after: { status: dto.status },
+          },
+        ]);
       // A permission change: keep a trace of who granted or removed it.
       if (coordinatorChange)
         await audit(tx, [
@@ -254,8 +302,12 @@ export class UsersService {
   }
 
   /** Checks a roster CSV and lists the accounts it would create, with their generated e-mails. */
-  async previewImport(csv: Buffer | undefined, role: ImportRole): Promise<ImportPreviewDto> {
-    const checked = await this.checkImport(csv, role);
+  async previewImport(
+    csv: Buffer | undefined,
+    role: ImportRole,
+    createAnyway: readonly number[] = [],
+  ): Promise<ImportPreviewDto> {
+    const checked = await this.checkImport(csv, role, createAnyway);
     return {
       role,
       rows: checked.rows.map(({ classId: _classId, ...row }) => row),
@@ -264,16 +316,22 @@ export class UsersService {
   }
 
   /** Roster CSV import, all or nothing: every account gets a generated e-mail and a temporary password. */
-  async importCsv(csv: Buffer | undefined, role: ImportRole): Promise<ImportUsersDto> {
-    const { rows, errors } = await this.checkImport(csv, role);
+  async importCsv(
+    csv: Buffer | undefined,
+    role: ImportRole,
+    actor: AuthUser,
+    createAnyway: readonly number[] = [],
+  ): Promise<ImportUsersDto> {
+    const { rows, errors } = await this.checkImport(csv, role, createAnyway);
     if (errors.length)
       throw new BadRequestException({
         statusCode: 400,
         message: 'Import refusé : corrigez les lignes en erreur.',
         errors,
       });
-    // Students already in the school (same student number) are kept as they are: a re-import never
-    // creates a second account or renumbers anyone.
+    // People already in the school (same student number, or same name, section and class) are kept as
+    // they are: a re-import never creates a second account or renumbers anyone, unless a line was
+    // explicitly marked « créer quand même ».
     const fresh = rows.filter((row) => !row.alreadyImported);
     if (!fresh.length) return { created: [] };
     const sectionIds = await this.sectionIds();
@@ -292,7 +350,7 @@ export class UsersService {
           // One import (or creation) at a time numbers the homonyms: take the lock, read the addresses
           // again, number from there. The unique index on the e-mail stays the last line of defence.
           await lockEmails(tx);
-          const taken = await this.takenEmails(tx);
+          const taken = await this.takenEmails(tx, fresh);
           const assigned = describeSchoolEmails(fresh, this.domain, taken);
           const created: string[] = [];
           for (const [i, row] of fresh.entries()) {
@@ -305,6 +363,7 @@ export class UsersService {
                 firstName: row.firstName,
                 lastName: row.lastName,
                 mustChangePassword: true,
+                temporaryPasswordExpiresAt: this.temporaryPasswordExpiry(),
                 ...(role === 'teacher'
                   ? { teacher: { create: {} } }
                   : {
@@ -323,6 +382,16 @@ export class UsersService {
             });
             created.push(email);
           }
+          // One row for the whole import: a count, never the addresses, names or passwords.
+          await audit(tx, [
+            {
+              actorId: actor.id,
+              action: 'user.import',
+              entity: 'user_import',
+              entityId: randomUUID(),
+              after: { role, created: created.length, skipped: rows.length - fresh.length },
+            },
+          ]);
           return created;
         },
         { timeout: 60_000 },
@@ -374,7 +443,10 @@ export class UsersService {
         ? 'Demande close : l’élève a obtenu son diplôme.'
         : 'Demande close : l’élève a quitté le collège.';
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.updateMany({ where: { id: { in: userIds } }, data: { status: 'archived' } });
+      await tx.user.updateMany({
+        where: { id: { in: userIds } },
+        data: { status: 'archived', passwordChangedAt: now },
+      });
       await tx.student.updateMany({
         where: { id: { in: studentIds } },
         data: { graduatedOn: dto.outcome === 'graduated' ? on : null },
@@ -406,6 +478,11 @@ export class UsersService {
     return { archived: targets.length };
   }
 
+  /** When a temporary password set now stops working. */
+  private temporaryPasswordExpiry(): Date {
+    return new Date(Date.now() + this.temporaryPasswordDays * 86_400_000);
+  }
+
   private async row(id: string): Promise<UserRow> {
     const user = await this.prisma.user.findUnique({ where: { id }, include });
     if (!user) throw notFound('Utilisateur');
@@ -418,7 +495,7 @@ export class UsersService {
     firstName: string,
     lastName: string,
   ): Promise<string> {
-    const [generated] = describeSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails(db));
+    const [generated] = describeSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails(db, [{ firstName, lastName }]));
     const email = generated?.email;
     if (!email)
       throw new BadRequestException(
@@ -427,9 +504,25 @@ export class UsersService {
     return email;
   }
 
-  private async takenEmails(db: Db = this.prisma): Promise<Set<string>> {
+  /**
+   * The addresses that could collide with these people's: only `prenom.nom%@domain` is read, not every
+   * account of the school.
+   */
+  private async takenEmails(
+    db: Db,
+    people: readonly { firstName: string; lastName: string }[],
+  ): Promise<Set<string>> {
+    const prefixes = [
+      ...new Set(people.map((p) => schoolEmailPrefix(p.firstName, p.lastName)).filter((p): p is string => !!p)),
+    ];
+    if (!prefixes.length) return new Set();
     const rows = await db.user.findMany({
-      where: { email: { endsWith: `@${this.domain}` } },
+      where: {
+        email: { endsWith: `@${this.domain}` },
+        OR: prefixes.map((prefix) => ({
+          email: { startsWith: prefix, mode: 'insensitive' as const },
+        })),
+      },
       select: { email: true },
     });
     return new Set(rows.map((r) => r.email));
@@ -440,12 +533,16 @@ export class UsersService {
     return new Map(sections.map((s) => [s.code as SectionId, s.id]));
   }
 
-  private async checkImport(csv: Buffer | undefined, role: ImportRole): Promise<CheckedRoster> {
+  private async checkImport(
+    csv: Buffer | undefined,
+    role: ImportRole,
+    createAnyway: readonly number[],
+  ): Promise<CheckedRoster> {
     if (!csv?.length) throw new BadRequestException('Fichier CSV manquant (champ « file »).');
     let headings: string[] = [];
-    let records: Record<string, string>[];
+    let parsed: { record: Record<string, string>; info: { lines: number }; raw: string }[];
     try {
-      records = parse(csv, {
+      parsed = parse(csv, {
         columns: (header: string[]) => {
           headings = header.map((c) => c.trim());
           return headings.map((c) => columnName(c) ?? c);
@@ -454,12 +551,19 @@ export class UsersService {
         trim: true,
         skip_empty_lines: true,
         delimiter: [',', ';'],
+        info: true,
+        raw: true,
       });
-    } catch (error) {
-      throw new BadRequestException(
-        `CSV illisible : ${error instanceof Error ? error.message : String(error)}`,
-      );
+    } catch {
+      // The parser's own message is English and technical: say what to check instead.
+      throw new BadRequestException(MALFORMED_CSV);
     }
+    const records = parsed.map((p) => p.record);
+    // The line each record starts on: `info.lines` is where it ends, and a quoted cell may span several.
+    const lineNumbers = parsed.map((p) => {
+      const body = p.raw.replace(/^[\r\n]+/, '').replace(/\r?\n?$/, '');
+      return p.info.lines - (body.match(/\n/g)?.length ?? 0);
+    });
     const header = headerProblems(headings, role);
     if (header.length)
       return { rows: [], errors: header.map((message) => ({ line: 1, message })) };
@@ -467,13 +571,13 @@ export class UsersService {
     if (records.length > MAX_IMPORT_ROWS)
       throw new BadRequestException(`Au plus ${MAX_IMPORT_ROWS} lignes par import.`);
 
-    const classes =
-      role === 'student'
-        ? await this.prisma.schoolClass.findMany({
-            where: { schoolYearId: (await this.access.currentYear()).id },
-            include: { section: true },
-          })
-        : [];
+    const year = role === 'student' ? await this.access.currentYear() : null;
+    const classes = year
+      ? await this.prisma.schoolClass.findMany({
+          where: { schoolYearId: year.id },
+          include: { section: true },
+        })
+      : [];
     const numbers = records.map((r) => (r['studentNumber'] ?? '').trim()).filter(Boolean);
     const existingByNumber = new Map<string, string>(
       numbers.length
@@ -485,15 +589,79 @@ export class UsersService {
           ).flatMap((s) => (s.studentNumber ? [[s.studentNumber, s.user.email] as const] : []))
         : [],
     );
-    return checkRoster(records, {
-      role,
-      domain: this.domain,
-      classes: new Map(
-        classes.map((c) => [`${c.section.code}/${c.code.toLowerCase()}`, { id: c.id, label: c.label }]),
-      ),
-      takenEmails: await this.takenEmails(),
-      existingByNumber,
+    const people = records
+      .map((r) => ({ firstName: (r['firstName'] ?? '').trim(), lastName: (r['lastName'] ?? '').trim() }))
+      .filter((p) => p.firstName && p.lastName);
+    return checkRoster(
+      records,
+      {
+        role,
+        domain: this.domain,
+        classes: new Map(
+          classes.map((c) => [`${c.section.code}/${c.code.toLowerCase()}`, { id: c.id, label: c.label }]),
+        ),
+        takenEmails: await this.takenEmails(this.prisma, people),
+        existingByNumber,
+        existingByIdentity: await this.existingByIdentity(role, people, year?.id ?? null),
+        createAnyway: new Set(createAnyway),
+      },
+      lineNumbers,
+    );
+  }
+
+  /**
+   * Accounts that look like one of these people: same exact normalised name and, for students, the same
+   * section and class this year. Candidates come from the `prenom.nom%` addresses and the exact names, then
+   * are compared on the normalised name.
+   */
+  private async existingByIdentity(
+    role: ImportRole,
+    people: readonly { firstName: string; lastName: string }[],
+    yearId: string | null,
+  ): Promise<Map<string, string>> {
+    const prefixes = [
+      ...new Set(people.map((p) => schoolEmailPrefix(p.firstName, p.lastName)).filter((p): p is string => !!p)),
+    ];
+    if (!people.length) return new Map();
+    const rows = await this.prisma.user.findMany({
+      where: {
+        role,
+        OR: [
+          ...prefixes.map((prefix) => ({ email: { startsWith: prefix } })),
+          ...people.map((p) => ({
+            firstName: { equals: p.firstName, mode: 'insensitive' as const },
+            lastName: { equals: p.lastName, mode: 'insensitive' as const },
+          })),
+        ],
+      },
+      select: {
+        email: true,
+        firstName: true,
+        lastName: true,
+        student: {
+          select: {
+            section: { select: { code: true } },
+            enrollments: {
+              where: { leftOn: null, ...(yearId ? { schoolYearId: yearId } : {}) },
+              select: { classId: true },
+              take: 1,
+            },
+          },
+        },
+      },
     });
+    const found = new Map<string, string>();
+    for (const row of rows) {
+      const key = identityKey(
+        role,
+        row.firstName,
+        row.lastName,
+        row.student?.section?.code ?? null,
+        row.student?.enrollments[0]?.classId ?? null,
+      );
+      if (key && !found.has(key)) found.set(key, row.email);
+    }
+    return found;
   }
 }
 

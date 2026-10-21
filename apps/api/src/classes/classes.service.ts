@@ -194,8 +194,11 @@ export class ClassesService {
     return toEnrollmentDto(enrollment);
   }
 
-  /** Removes a student from a class (the enrollment row is deleted). */
-  async unenroll(enrollmentId: string): Promise<void> {
+  /**
+   * Takes a student off a class roster. The enrolment is closed today (`leftOn`), not deleted: it stays as
+   * history, and the grades and attendance of that class keep their place. Closing a closed one is a no-op.
+   */
+  async unenroll(enrollmentId: string, actor: AuthUser): Promise<void> {
     const enrollment = await this.prisma.enrollment.findUnique({
       where: { id: enrollmentId },
       include: { student: { include: { user: { select: { status: true } } } } },
@@ -204,7 +207,25 @@ export class ClassesService {
     // An archived account is read-only, and its enrolments are history.
     if (enrollment.student.user.status === 'archived')
       throw new ConflictException('Ce compte est archivé : son inscription est conservée.');
-    await this.prisma.enrollment.delete({ where: { id: enrollmentId } });
+    if (enrollment.leftOn) return;
+    const today = fromDay(todayIso());
+    await this.prisma.$transaction(async (tx) => {
+      const closed = await tx.enrollment.updateMany({
+        where: { id: enrollmentId, leftOn: null },
+        data: { leftOn: today },
+      });
+      if (closed.count)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'enrollment.close',
+            entity: 'enrollment',
+            entityId: enrollmentId,
+            before: { classId: enrollment.classId, leftOn: null },
+            after: { leftOn: toDay(today) },
+          },
+        ]);
+    });
   }
 }
 

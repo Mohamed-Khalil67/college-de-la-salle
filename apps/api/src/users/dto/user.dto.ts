@@ -7,11 +7,13 @@ import {
   IsBoolean,
   IsEmail,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import {
@@ -171,6 +173,22 @@ export class ImportUsersQueryDto implements ImportUsersQuery {
   @ApiProperty({ enum: IMPORT_ROLES })
   @IsIn(IMPORT_ROLES)
   role: ImportRole;
+
+  /** File lines to create although a person with the same name, section and class exists: `3,7`. */
+  @ApiPropertyOptional({ type: String, example: '3,7' })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.trim()
+      ? value.split(',').map((n) => Number(n.trim()))
+      : Array.isArray(value)
+        ? value.map(Number)
+        : undefined,
+  )
+  @IsArray()
+  @ArrayMaxSize(500)
+  @IsInt({ each: true })
+  @Min(2, { each: true })
+  createAnyway?: number[];
 }
 
 class ImportPreviewRowDto implements ImportPreviewRow {
@@ -182,6 +200,9 @@ class ImportPreviewRowDto implements ImportPreviewRow {
   @ApiProperty({ type: String, nullable: true })
   emailNote: string | null;
   alreadyImported: boolean;
+  @ApiProperty({ enum: ['studentNumber', 'name'], nullable: true })
+  matchedBy: 'studentNumber' | 'name' | null;
+  createAnyway: boolean;
   @ApiProperty({ enum: SECTIONS, nullable: true })
   sectionCode: SectionId | null;
   @ApiProperty({ type: String, nullable: true })

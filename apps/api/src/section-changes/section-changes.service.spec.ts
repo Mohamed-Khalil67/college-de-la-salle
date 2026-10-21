@@ -57,8 +57,9 @@ const DTO_ROW = {
 };
 
 describe('SectionChangesService', () => {
+  const createRequest = vi.fn();
   const tx = {
-    sectionChangeRequest: { findUnique: vi.fn(), updateMany: vi.fn() },
+    sectionChangeRequest: { findUnique: vi.fn(), updateMany: vi.fn(), create: createRequest },
     student: { findUniqueOrThrow: vi.fn(), update: vi.fn() },
     schoolClass: { findUnique: vi.fn() },
     enrollment: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn() },
@@ -66,7 +67,7 @@ describe('SectionChangesService', () => {
   };
   const prisma = {
     $transaction: vi.fn((work: (t: typeof tx) => unknown) => work(tx)),
-    sectionChangeRequest: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
+    sectionChangeRequest: { findUnique: vi.fn(), findFirst: vi.fn(), create: createRequest },
     student: { findUnique: vi.fn() },
     section: { findUnique: vi.fn() },
   };

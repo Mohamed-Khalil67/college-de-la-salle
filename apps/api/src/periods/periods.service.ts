@@ -236,7 +236,7 @@ export class PeriodsService {
     year: { label: string; startsOn: Date; endsOn: Date },
     f: Fields,
   ): Promise<void> {
-    if (f.endsOn <= f.startsOn) throw new BadRequestException('La fin doit suivre le début.');
+    if (f.endsOn < f.startsOn) throw new BadRequestException('La fin ne peut pas précéder le début.');
     if (f.startsOn < toDay(year.startsOn) || f.endsOn > toDay(year.endsOn))
       throw new BadRequestException(`La période doit être comprise dans l’année ${year.label}.`);
     if (f.sectionId && !(await this.prisma.section.findUnique({ where: { id: f.sectionId } })))

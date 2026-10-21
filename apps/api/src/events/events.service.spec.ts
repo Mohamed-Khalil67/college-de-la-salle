@@ -95,15 +95,18 @@ describe('EventsService', () => {
     schoolClass: { findUnique: vi.fn() },
     room: { findUnique: vi.fn() },
     classSubject: { findUnique: vi.fn() },
+    // The write transaction runs on the same mocks.
+    $transaction: vi.fn(),
   };
   const access = { assertTeachesClass: vi.fn(), audienceFor: vi.fn(), placement: vi.fn() };
-  const types = { usable: vi.fn() };
+  const types = { usable: vi.fn(), lockForEvent: vi.fn() };
   const periods = { resolveFor: vi.fn(), assertOpen: vi.fn(), find: vi.fn() };
   const calendarDays = { closures: vi.fn() };
   let events: EventsService;
 
   beforeEach(async () => {
     vi.resetAllMocks();
+    prisma.$transaction.mockImplementation((fn: (t: typeof prisma) => Promise<unknown>) => fn(prisma));
     prisma.subject.findUnique.mockResolvedValue({ id: 'mathematiques' });
     prisma.schoolClass.findUnique.mockResolvedValue({ id: 'c1' });
     prisma.grade.count.mockResolvedValue(0);
