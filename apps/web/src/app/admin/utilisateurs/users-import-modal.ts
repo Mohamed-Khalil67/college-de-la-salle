@@ -68,7 +68,10 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                 </cdls-alert>
               } @else {
                 <cdls-alert tone="success">
-                  <strong>{{ plural(checked.rows.length, 'compte sera créé', 'comptes seront créés') }}.</strong>
+                  <strong>{{ plural(newCount(), 'compte sera créé', 'comptes seront créés') }}.</strong>
+                  @if (checked.rows.length > newCount()) {
+                    {{ plural(checked.rows.length - newCount(), 'élève est déjà au collège', 'élèves sont déjà au collège') }} : leur compte et leur adresse ne changent pas.
+                  }
                   Vérifiez les adresses e-mail générées : rien n’est créé tant que vous n’avez pas confirmé.
                 </cdls-alert>
               }
@@ -80,7 +83,7 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                       <tr>
                         <th scope="col">Ligne</th>
                         <th scope="col">Nom</th>
-                        <th scope="col">Adresse e-mail générée</th>
+                        <th scope="col">Adresse e-mail</th>
                         @if (checked.role === 'student') {
                           <th scope="col">Section</th>
                           <th scope="col">Classe</th>
@@ -94,7 +97,14 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                         <tr>
                           <td data-label="Ligne :">{{ row.line }}</td>
                           <th scope="row">{{ row.lastName }} {{ row.firstName }}</th>
-                          <td data-label="Adresse e-mail :">{{ row.email }}</td>
+                          <td data-label="Adresse e-mail :">
+                            {{ row.email }}
+                            @if (row.alreadyImported) {
+                              <span class="cell-sub d-block">déjà au collège : compte conservé, rien n’est créé</span>
+                            } @else if (row.emailNote) {
+                              <span class="cell-sub d-block">numéro {{ row.emailNumber }}, {{ row.emailNote }}</span>
+                            }
+                          </td>
                           @if (checked.role === 'student') {
                             <td data-label="Section :">{{ row.sectionCode ? sections[row.sectionCode] : '—' }}</td>
                             <td data-label="Classe :">{{ row.classLabel ?? '—' }}</td>
@@ -115,7 +125,7 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
               <button cdlsButton variant="secondary" type="button" (click)="backToChoose()">Changer de fichier</button>
               @if (canImport()) {
                 <button cdlsButton type="button" [disabled]="busy()" (click)="confirm()">
-                  {{ busy() ? 'Création…' : 'Créer ' + plural(preview()!.rows.length, 'compte', 'comptes') }}
+                  {{ busy() ? 'Création…' : 'Créer ' + plural(newCount(), 'compte', 'comptes') }}
                 </button>
               }
             </div>
@@ -229,9 +239,10 @@ export class UsersImportModal {
   protected readonly preview = signal<ImportPreviewResponse | null>(null);
   protected readonly result = signal<ImportUsersResponse | null>(null);
   protected readonly createdLabel = signal('');
+  protected readonly newCount = computed(() => this.preview()?.rows.filter((r) => !r.alreadyImported).length ?? 0);
   protected readonly canImport = computed(() => {
     const checked = this.preview();
-    return !!checked && checked.errors.length === 0 && checked.rows.length > 0;
+    return !!checked && checked.errors.length === 0 && this.newCount() > 0;
   });
 
   constructor() {

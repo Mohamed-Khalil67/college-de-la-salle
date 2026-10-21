@@ -191,8 +191,14 @@ export interface ImportPreviewRow {
   readonly line: number;
   readonly lastName: string;
   readonly firstName: string;
-  /** The generated login e-mail. */
+  /** The login e-mail: generated, or the one the student already has. */
   readonly email: string;
+  /** 1 for `prenom.nom`; n when the address was taken by n - 1 homonyms (`prenom.nom2`…). */
+  readonly emailNumber: number;
+  /** « car 1 homonyme » when the address carries a number, else null. */
+  readonly emailNote: string | null;
+  /** The student number is already in the school: that account is kept as it is (no new account or e-mail). */
+  readonly alreadyImported: boolean;
   readonly sectionCode: SectionId | null;
   readonly classLabel: string | null;
   readonly studentNumber: string | null;

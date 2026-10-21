@@ -171,6 +171,10 @@ class ImportPreviewRowDto implements ImportPreviewRow {
   lastName: string;
   firstName: string;
   email: string;
+  emailNumber: number;
+  @ApiProperty({ type: String, nullable: true })
+  emailNote: string | null;
+  alreadyImported: boolean;
   @ApiProperty({ enum: SECTIONS, nullable: true })
   sectionCode: SectionId | null;
   @ApiProperty({ type: String, nullable: true })

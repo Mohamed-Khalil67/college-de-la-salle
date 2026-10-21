@@ -6,7 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { randomInt } from 'node:crypto';
 import {
-  assignSchoolEmails,
+  describeSchoolEmails,
   type ImportRole,
   type Paginated,
   type SectionId,
@@ -63,6 +63,14 @@ const include = {
 } satisfies Prisma.UserInclude;
 
 type UserRow = Prisma.UserGetPayload<{ include: typeof include }>;
+
+type Db = PrismaService | Prisma.TransactionClient;
+
+/** Takes the lock that serialises address numbering until the transaction ends. */
+const EMAIL_LOCK_KEY = 4_242_001;
+async function lockEmails(tx: Prisma.TransactionClient): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${EMAIL_LOCK_KEY})`;
+}
 
 /** Prisma's unique-constraint violation. */
 function isUniqueViolation(error: unknown): boolean {
@@ -132,16 +140,24 @@ export class UsersService {
     if (dto.studentNumber && (await this.prisma.student.findUnique({ where: { studentNumber: dto.studentNumber } })))
       throw new ConflictException('Ce matricule est déjà utilisé.');
 
-    const email = dto.email ?? (await this.generatedEmail(dto.firstName, dto.lastName));
     if (dto.email && (await this.prisma.user.findUnique({ where: { email: dto.email } }))) {
       throw new ConflictException('Un compte existe déjà avec cette adresse e-mail.');
     }
     const temporaryPassword = generatePassword();
+    const passwordHash = await hash(temporaryPassword);
     try {
-      const user = await this.prisma.user.create({
+      const user = await this.prisma.$transaction(async (tx) => {
+      // A generated address is numbered under the same lock as the imports, so homonyms created at the
+      // same moment never get the same one.
+      let email = dto.email;
+      if (!email) {
+        await lockEmails(tx);
+        email = await this.generatedEmail(tx, dto.firstName, dto.lastName);
+      }
+      return tx.user.create({
         data: {
           email,
-          passwordHash: await hash(temporaryPassword),
+          passwordHash,
           role: dto.role,
           firstName: dto.firstName,
           lastName: dto.lastName,
@@ -170,6 +186,7 @@ export class UsersService {
             : {}),
         },
         include,
+      });
       });
       return { user: toUserDto(user), temporaryPassword };
     } catch (error) {
@@ -235,10 +252,14 @@ export class UsersService {
         message: 'Import refusé : corrigez les lignes en erreur.',
         errors,
       });
+    // Students already in the school (same student number) are kept as they are: a re-import never
+    // creates a second account or renumbers anyone.
+    const fresh = rows.filter((row) => !row.alreadyImported);
+    if (!fresh.length) return { created: [] };
     const sectionIds = await this.sectionIds();
     const schoolYearId = role === 'student' ? (await this.access.currentYear()).id : null;
 
-    const passwords = rows.map(() => generatePassword());
+    const passwords = fresh.map(() => generatePassword());
     const hashes: string[] = [];
     for (let i = 0; i < passwords.length; i += HASH_CONCURRENCY) {
       hashes.push(
@@ -246,50 +267,62 @@ export class UsersService {
       );
     }
     try {
-      await this.prisma.$transaction(
-        rows.map((row, i) =>
-          this.prisma.user.create({
-            data: {
-              email: row.email,
-              passwordHash: hashes[i]!,
-              role,
-              firstName: row.firstName,
-              lastName: row.lastName,
-              mustChangePassword: true,
-              ...(role === 'teacher'
-                ? { teacher: { create: {} } }
-                : {
-                    student: {
-                      create: {
-                        studentNumber: row.studentNumber,
-                        birthDate: row.birthDate ? fromDay(row.birthDate) : null,
-                        sectionId: sectionIds.get(row.sectionCode!)!,
-                        enrollments: {
-                          create: { classId: row.classId!, schoolYearId: schoolYearId! },
+      const emails = await this.prisma.$transaction(
+        async (tx) => {
+          // One import (or creation) at a time numbers the homonyms: take the lock, read the addresses
+          // again, number from there. The unique index on the e-mail stays the last line of defence.
+          await lockEmails(tx);
+          const taken = await this.takenEmails(tx);
+          const assigned = describeSchoolEmails(fresh, this.domain, taken);
+          const created: string[] = [];
+          for (const [i, row] of fresh.entries()) {
+            const email = assigned[i]!.email;
+            await tx.user.create({
+              data: {
+                email,
+                passwordHash: hashes[i]!,
+                role,
+                firstName: row.firstName,
+                lastName: row.lastName,
+                mustChangePassword: true,
+                ...(role === 'teacher'
+                  ? { teacher: { create: {} } }
+                  : {
+                      student: {
+                        create: {
+                          studentNumber: row.studentNumber,
+                          birthDate: row.birthDate ? fromDay(row.birthDate) : null,
+                          sectionId: sectionIds.get(row.sectionCode!)!,
+                          enrollments: {
+                            create: { classId: row.classId!, schoolYearId: schoolYearId! },
+                          },
                         },
                       },
-                    },
-                  }),
-            },
-          }),
-        ),
+                    }),
+              },
+            });
+            created.push(email);
+          }
+          return created;
+        },
+        { timeout: 60_000 },
       );
+      return {
+        created: fresh.map((row, i) => ({
+          email: emails[i]!,
+          role,
+          firstName: row.firstName,
+          lastName: row.lastName,
+          temporaryPassword: passwords[i]!,
+        })),
+      };
     } catch (error) {
       if (isUniqueViolation(error))
         throw new ConflictException(
-          'Un compte a été créé entre-temps avec la même adresse ou le même matricule : relancez l’import.',
+          'Un compte a été créé entre-temps avec le même matricule : relancez l’import.',
         );
       throw error;
     }
-    return {
-      created: rows.map((row, i) => ({
-        email: row.email,
-        role,
-        firstName: row.firstName,
-        lastName: row.lastName,
-        temporaryPassword: passwords[i]!,
-      })),
-    };
   }
 
   /**
@@ -360,8 +393,13 @@ export class UsersService {
   }
 
   /** The school e-mail for a name, numbered after the addresses already in use. */
-  private async generatedEmail(firstName: string, lastName: string): Promise<string> {
-    const [email] = assignSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails());
+  private async generatedEmail(
+    db: Db,
+    firstName: string,
+    lastName: string,
+  ): Promise<string> {
+    const [generated] = describeSchoolEmails([{ firstName, lastName }], this.domain, await this.takenEmails(db));
+    const email = generated?.email;
     if (!email)
       throw new BadRequestException(
         'Impossible de créer l’adresse e-mail : écrivez le nom et le prénom en lettres latines, ou saisissez l’adresse.',
@@ -369,8 +407,8 @@ export class UsersService {
     return email;
   }
 
-  private async takenEmails(): Promise<Set<string>> {
-    const rows = await this.prisma.user.findMany({
+  private async takenEmails(db: Db = this.prisma): Promise<Set<string>> {
+    const rows = await db.user.findMany({
       where: { email: { endsWith: `@${this.domain}` } },
       select: { email: true },
     });
@@ -417,14 +455,16 @@ export class UsersService {
           })
         : [];
     const numbers = records.map((r) => (r['studentNumber'] ?? '').trim()).filter(Boolean);
-    const takenNumbers = numbers.length
-      ? (
-          await this.prisma.student.findMany({
-            where: { studentNumber: { in: numbers } },
-            select: { studentNumber: true },
-          })
-        ).flatMap((s) => (s.studentNumber ? [s.studentNumber] : []))
-      : [];
+    const existingByNumber = new Map<string, string>(
+      numbers.length
+        ? (
+            await this.prisma.student.findMany({
+              where: { studentNumber: { in: numbers } },
+              select: { studentNumber: true, user: { select: { email: true } } },
+            })
+          ).flatMap((s) => (s.studentNumber ? [[s.studentNumber, s.user.email] as const] : []))
+        : [],
+    );
     return checkRoster(records, {
       role,
       domain: this.domain,
@@ -432,7 +472,7 @@ export class UsersService {
         classes.map((c) => [`${c.section.code}/${c.code.toLowerCase()}`, { id: c.id, label: c.label }]),
       ),
       takenEmails: await this.takenEmails(),
-      takenNumbers: new Set(takenNumbers),
+      existingByNumber,
     });
   }
 }

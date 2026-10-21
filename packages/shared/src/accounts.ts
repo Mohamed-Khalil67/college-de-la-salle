@@ -48,27 +48,53 @@ function cappedLocal(local: string): string {
   return local.length <= EMAIL_LOCAL_MAX ? local : local.slice(0, EMAIL_LOCAL_MAX).replace(/[-.]+$/, '');
 }
 
+/** A generated address and which number it got: 1 is `prenom.nom`, 2 is `prenom.nom2`… */
+export interface SchoolEmail {
+  readonly email: string;
+  /** 1 when the plain address was free; n when n - 1 homonyms already hold the earlier ones. */
+  readonly number: number;
+}
+
 /**
  * The school login e-mails of a list of people, in order: `prenom.nom@domain`, then `prenom.nom2@domain`,
- * `prenom.nom3@domain`… when the address is already `taken` (lower-case) or given earlier in the list.
- * Null for a person whose name gives no usable local part.
+ * `prenom.nom3@domain`… when the address is already `taken` or given earlier in the list. Names are
+ * compared as written in the address, so « Adèle Ben Youssef » and « adele ben-youssef » are homonyms;
+ * `taken` is compared case-insensitively. Null for a person whose name gives no usable local part.
+ * Existing accounts are never renumbered: pass their addresses in `taken`; only new people get one.
  */
-export function assignSchoolEmails(
+export function describeSchoolEmails(
   people: readonly { readonly firstName: string; readonly lastName: string }[],
   domain: string,
   taken: Iterable<string> = [],
-): (string | null)[] {
+): (SchoolEmail | null)[] {
   const used = new Set([...taken].map((email) => email.toLowerCase()));
   const host = domain.trim().toLowerCase();
   return people.map(({ firstName, lastName }) => {
     const full = schoolEmailLocalPart(firstName, lastName);
     if (!full) return null;
     const local = cappedLocal(full);
+    let number = 1;
     let email = `${local}@${host}`;
-    for (let n = 2; used.has(email); n++) email = `${local}${n}@${host}`;
+    while (used.has(email)) email = `${local}${++number}@${host}`;
     used.add(email);
-    return email;
+    return { email, number };
   });
+}
+
+/** Same as describeSchoolEmails, keeping only the addresses. */
+export function assignSchoolEmails(
+  people: readonly { readonly firstName: string; readonly lastName: string }[],
+  domain: string,
+  taken: Iterable<string> = [],
+): (string | null)[] {
+  return describeSchoolEmails(people, domain, taken).map((e) => e?.email ?? null);
+}
+
+/** Why an address carries a number, for the preview: « car 1 homonyme », « car 2 homonymes » (null for number 1). */
+export function emailNumberReason(number: number): string | null {
+  if (number <= 1) return null;
+  const homonyms = number - 1;
+  return `car ${homonyms} homonyme${homonyms > 1 ? 's' : ''}`;
 }
 
 export const PASSWORD_MIN_LENGTH = 10;

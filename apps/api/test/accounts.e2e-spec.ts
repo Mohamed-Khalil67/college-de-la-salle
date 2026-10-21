@@ -274,6 +274,80 @@ describe('Accounts (e2e)', () => {
       });
     });
 
+    it('numbers homonyms across the database and the file; a second import changes no address', async () => {
+      const last = `Homonyme${Date.now().toString(36)}`;
+      // One homonym already in the database (typed by the secretariat, with accents and a space).
+      const existing = await t
+        .http()
+        .post('/api/users')
+        .set(bearer(admin))
+        .send({ role: 'teacher', firstName: 'Adèle', lastName: last })
+        .expect(201);
+      const base = `adele.${last.toLowerCase()}`;
+      expect((existing.body as CreatedUserResponse).user.email).toBe(`${base}@${DOMAIN}`);
+
+      const file = csv([
+        header,
+        `${last},adele,bac,e2e-bac-a,H-1,`,
+        `${last},ADÈLE,bac,e2e-bac-a,H-2,`,
+      ]);
+      const preview = (await t
+        .http()
+        .post('/api/users/import/preview?role=student')
+        .set(bearer(admin))
+        .attach('file', file, { filename: 'h.csv', contentType: 'text/csv' })
+        .expect(200)).body as ImportPreviewResponse;
+      expect(preview.rows.map((r) => [r.email, r.emailNumber, r.emailNote])).toEqual([
+        [`${base}2@${DOMAIN}`, 2, 'car 1 homonyme'],
+        [`${base}3@${DOMAIN}`, 3, 'car 2 homonymes'],
+      ]);
+
+      const first = await t
+        .http()
+        .post('/api/users/import?role=student')
+        .set(bearer(admin))
+        .attach('file', file, { filename: 'h.csv', contentType: 'text/csv' })
+        .expect(201);
+      expect((first.body as ImportUsersResponse).created.map((c) => c.email)).toEqual([
+        `${base}2@${DOMAIN}`,
+        `${base}3@${DOMAIN}`,
+      ]);
+
+      // The same roster again: both students are recognised by their student number, kept as they are.
+      const again = (await t
+        .http()
+        .post('/api/users/import/preview?role=student')
+        .set(bearer(admin))
+        .attach('file', file, { filename: 'h.csv', contentType: 'text/csv' })
+        .expect(200)).body as ImportPreviewResponse;
+      expect(again.rows.map((r) => [r.email, r.alreadyImported])).toEqual([
+        [`${base}2@${DOMAIN}`, true],
+        [`${base}3@${DOMAIN}`, true],
+      ]);
+      const second = await t
+        .http()
+        .post('/api/users/import?role=student')
+        .set(bearer(admin))
+        .attach('file', file, { filename: 'h.csv', contentType: 'text/csv' })
+        .expect(201);
+      expect((second.body as ImportUsersResponse).created).toEqual([]);
+      const emails = (await t.prisma.user.findMany({ where: { lastName: last }, orderBy: { createdAt: 'asc' } })).map(
+        (u) => u.email,
+      );
+      expect(emails).toEqual([`${base}@${DOMAIN}`, `${base}2@${DOMAIN}`, `${base}3@${DOMAIN}`]);
+    });
+
+    it('gives distinct addresses to homonyms created at the same moment', async () => {
+      const last = `Simultane${Date.now().toString(36)}`;
+      const create = () =>
+        t.http().post('/api/users').set(bearer(admin)).send({ role: 'teacher', firstName: 'Omar', lastName: last });
+      const results = await Promise.all([create(), create(), create(), create()]);
+      for (const res of results) expect(res.status).toBe(201);
+      const emails = results.map((r) => (r.body as CreatedUserResponse).user.email).sort();
+      const base = `omar.${last.toLowerCase()}`;
+      expect(emails).toEqual([`${base}2@${DOMAIN}`, `${base}3@${DOMAIN}`, `${base}4@${DOMAIN}`, `${base}@${DOMAIN}`].sort());
+    });
+
     it('is for admins only', async () => {
       const teacher = await t.token(MATHS_TEACHER);
       await t

@@ -8,7 +8,7 @@ const context = (overrides: Partial<RosterContext> = {}): RosterContext => ({
     ['nationale/secondaire-1', { id: 'c-s1', label: '1re secondaire' }],
   ]),
   takenEmails: new Set(['nour.saad@demo.cdls.test']),
-  takenNumbers: new Set(['CDLS-1']),
+  existingByNumber: new Map([['CDLS-1', 'nour.saad@demo.cdls.test']]),
   ...overrides,
 });
 
@@ -79,7 +79,6 @@ describe('checkRoster', () => {
         student({ firstName: '' }),
         student({ section: 'lycee' }),
         student({ class: 'terminale' }),
-        student({ studentNumber: 'CDLS-1' }),
         student({ studentNumber: 'A 1' }),
         student({ birthDate: '31/02/2010' }),
         student({ firstName: 'محمد' }),
@@ -88,11 +87,36 @@ describe('checkRoster', () => {
       ],
       context(),
     );
-    expect(errors.map((e) => e.line)).toEqual([2, 3, 4, 5, 6, 7, 8, 10]);
-    expect(errors[3]!.message).toBe('matricule déjà utilisé : CDLS-1');
+    expect(errors.map((e) => e.line)).toEqual([2, 3, 4, 5, 6, 7, 9]);
+    expect(errors[6]!.message).toBe('matricule en double dans le fichier : X-2');
     expect(rows).toHaveLength(1);
     // A refused line does not take a number from the valid ones.
     expect(rows[0]!.email).toBe('nour.saad2@demo.cdls.test');
+  });
+
+  it('marks the homonym number with its reason in the preview', () => {
+    const { rows } = checkRoster([student(), student({ firstName: 'Omar' }), student()], context());
+    expect(rows.map((r) => [r.email, r.emailNumber, r.emailNote])).toEqual([
+      ['nour.saad2@demo.cdls.test', 2, 'car 1 homonyme'],
+      ['omar.saad@demo.cdls.test', 1, null],
+      ['nour.saad3@demo.cdls.test', 3, 'car 2 homonymes'],
+    ]);
+  });
+
+  it('keeps a student already in the school (same student number): no new e-mail, no renumbering', () => {
+    const { rows, errors } = checkRoster(
+      [student({ studentNumber: 'CDLS-1' }), student({ studentNumber: 'CDLS-9' })],
+      context(),
+    );
+    expect(errors).toEqual([]);
+    expect(rows[0]).toMatchObject({
+      alreadyImported: true,
+      email: 'nour.saad@demo.cdls.test',
+      emailNumber: 0,
+      emailNote: null,
+    });
+    // The newcomer is numbered after the existing address, as if the first one were a new account.
+    expect(rows[1]).toMatchObject({ alreadyImported: false, email: 'nour.saad2@demo.cdls.test' });
   });
 
   it('accepts section and class codes in any case', () => {

@@ -1,6 +1,7 @@
 import {
-  assignSchoolEmails,
   CLASSES,
+  describeSchoolEmails,
+  emailNumberReason,
   type ImportPreviewRow,
   type ImportRole,
   type ImportUsersError,
@@ -74,13 +75,17 @@ export interface RosterContext {
   readonly classes: ReadonlyMap<string, RosterClass>;
   /** E-mails already used by accounts (lower-case). */
   readonly takenEmails: ReadonlySet<string>;
-  /** Student numbers already used. */
-  readonly takenNumbers: ReadonlySet<string>;
+  /**
+   * Student numbers already in the school, with the e-mail of that student. A roster line with one of
+   * these numbers is the same student again: the account is kept as it is, never renumbered.
+   */
+  readonly existingByNumber: ReadonlyMap<string, string>;
 }
 
 export interface CheckedRow extends ImportPreviewRow {
   readonly classId: string | null;
 }
+
 
 export interface CheckedRoster {
   readonly rows: CheckedRow[];
@@ -97,7 +102,7 @@ export function checkRoster(
   context: RosterContext,
 ): CheckedRoster {
   const errors: ImportUsersError[] = [];
-  const valid: Omit<CheckedRow, 'email'>[] = [];
+  const valid: Omit<CheckedRow, 'email' | 'emailNumber' | 'emailNote'>[] = [];
   const numbers = new Set<string>();
 
   records.forEach((record, i) => {
@@ -124,6 +129,7 @@ export function checkRoster(
         classId: null,
         studentNumber: null,
         birthDate: null,
+        alreadyImported: false,
       });
       return;
     }
@@ -137,8 +143,8 @@ export function checkRoster(
     const studentNumber = get('studentNumber') || null;
     if (studentNumber && !STUDENT_NUMBER.test(studentNumber))
       return fail(`matricule invalide « ${studentNumber} » (lettres, chiffres et tirets, 32 au plus)`);
-    if (studentNumber && (context.takenNumbers.has(studentNumber) || numbers.has(studentNumber)))
-      return fail(`matricule déjà utilisé : ${studentNumber}`);
+    if (studentNumber && numbers.has(studentNumber))
+      return fail(`matricule en double dans le fichier : ${studentNumber}`);
     const rawDate = get('birthDate');
     const birthDate = rawDate ? parseRosterDate(rawDate) : null;
     if (rawDate && !birthDate)
@@ -153,11 +159,21 @@ export function checkRoster(
       classId: schoolClass.id,
       studentNumber,
       birthDate,
+      alreadyImported: !!studentNumber && context.existingByNumber.has(studentNumber),
     });
   });
 
-  const emails = assignSchoolEmails(valid, context.domain, context.takenEmails);
-  // Every valid row has a usable name (checked above), so every e-mail is set.
-  const rows = valid.map((row, i) => ({ ...row, email: emails[i]! }));
+  // Only new people get an address; students already in the school keep theirs. Numbers are counted
+  // after the addresses in the database and the earlier lines of the file.
+  const fresh = valid.filter((row) => !row.alreadyImported);
+  const generated = describeSchoolEmails(fresh, context.domain, context.takenEmails);
+  const byLine = new Map(fresh.map((row, i) => [row.line, generated[i]!] as const));
+  // Every valid row has a usable name (checked above), so every address is set.
+  const rows = valid.map((row): CheckedRow => {
+    if (row.alreadyImported)
+      return { ...row, email: context.existingByNumber.get(row.studentNumber!)!, emailNumber: 0, emailNote: null };
+    const { email, number } = byLine.get(row.line)!;
+    return { ...row, email, emailNumber: number, emailNote: emailNumberReason(number) };
+  });
   return { rows, errors };
 }

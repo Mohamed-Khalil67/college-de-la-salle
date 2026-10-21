@@ -79,7 +79,7 @@ export class UsersController {
 
   /** Roster CSV check (multipart field `file`, 1 MB max): the accounts it would create and the errors. */
   @Post('import/preview')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @HttpCode(200)
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 1024 * 1024, files: 1 } }))
   @ApiConsumes('multipart/form-data')
@@ -95,7 +95,7 @@ export class UsersController {
 
   /** Roster CSV import, all or nothing: generated e-mails, temporary passwords returned once. */
   @Post('import')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 1024 * 1024, files: 1 } }))
   @ApiConsumes('multipart/form-data')
   @ApiBody({ schema: CSV_BODY })
