@@ -63,6 +63,11 @@ function csvForm(file: File): FormData {
   return form;
 }
 
+/** `&createAnyway=3,7`: the file lines the administration chose to create although the person already exists. */
+function anyway(lines: readonly number[]): string {
+  return lines.length ? `&createAnyway=${lines.join(',')}` : '';
+}
+
 type Query = Readonly<Record<string, string | number | boolean | null | undefined>>;
 
 function params(query: Query = {}): HttpParams {
@@ -148,10 +153,11 @@ export class ApiClient {
     update: (id: string, body: UpdateUserRequest) => this.#patch<UserDto>(`/users/${id}`, body),
     remove: (id: string) => this.#delete(`/users/${id}`),
     /** Checks a roster CSV: the accounts it would create (generated e-mails) and the line errors. */
-    previewImport: (file: File, role: ImportRole) =>
-      this.#post<ImportPreviewResponse>(`/users/import/preview?role=${role}`, csvForm(file)),
+    previewImport: (file: File, role: ImportRole, createAnyway: readonly number[] = []) =>
+      this.#post<ImportPreviewResponse>(`/users/import/preview?role=${role}${anyway(createAnyway)}`, csvForm(file)),
     /** All or nothing (400 with `errors`); returns the temporary passwords, once. */
-    import: (file: File, role: ImportRole) => this.#post<ImportUsersResponse>(`/users/import?role=${role}`, csvForm(file)),
+    import: (file: File, role: ImportRole, createAnyway: readonly number[] = []) =>
+      this.#post<ImportUsersResponse>(`/users/import?role=${role}${anyway(createAnyway)}`, csvForm(file)),
     /** Students who graduated or left: archived accounts, closed enrolments. */
     archive: (body: ArchiveStudentsRequest) => this.#post<ArchiveStudentsResponse>('/users/archive', body),
   };
