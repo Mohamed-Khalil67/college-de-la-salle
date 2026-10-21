@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, BadRequestException } from '@nestjs/common';
+import type { GroupDto as GroupContract } from '@cdls/shared';
 import { canEditStructure } from '../access/grants.js';
 import { AccessService } from '../access/access.service.js';
 import { toStudentSummary } from '../classes/classes.service.js';
@@ -18,7 +19,6 @@ import type {
   AddGroupMembersDto,
   CreateGroupDto,
   GroupDetailDto,
-  GroupDto,
   GroupWithMembersDto,
   MyGroupDto,
   UpdateGroupDto,
@@ -309,12 +309,22 @@ export class GroupsService {
     });
     return {
       ...toGroupDto(row),
-      members: members.map((m) => ({ ...toStudentSummary(m.student), joinedOn: toDay(m.joinedOn) })),
+      members: members.map((m) => {
+        const s = toStudentSummary(m.student);
+        return {
+          id: s.id,
+          userId: s.userId,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          studentNumber: s.studentNumber,
+          joinedOn: toDay(m.joinedOn),
+        };
+      }),
     };
   }
 }
 
-function toGroupDto(r: GroupRow): GroupDto {
+function toGroupDto(r: GroupRow): GroupContract {
   return {
     id: r.id,
     classId: r.classId,
