@@ -6,6 +6,7 @@ import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Button, EmptyState, Field, FieldControl, Icon, Pagination, Tabs } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { fullName, isRole, plural, ROLE_LABELS, ROLE_TABS } from '../shared/admin-format';
+import { ArchiveModal, type ArchiveTarget } from './archive-modal';
 import { UserCreateModal } from './user-create-modal';
 import { UserEditModal } from './user-edit-modal';
 import { UsersImportModal } from './users-import-modal';
@@ -27,6 +28,7 @@ const PAGE_SIZE = 20;
     Pagination,
     Tabs,
     ConfirmModal,
+    ArchiveModal,
     UserCreateModal,
     UserEditModal,
     UsersImportModal,
@@ -72,6 +74,7 @@ const PAGE_SIZE = 20;
               [selfId]="selfId()"
               (edit)="startEdit($event)"
               (deactivate)="startDeactivate($event)"
+              (archive)="startArchive($event)"
             />
           </div>
           <cdls-pagination [total]="list.total" [pageSize]="pageSize" [noun]="labels().noun" [label]="'Pagination des ' + labels().noun" [(page)]="page" />
@@ -95,6 +98,7 @@ const PAGE_SIZE = 20;
     <app-user-create-modal [(open)]="createOpen" [classes]="classList()" [defaultRole]="role()" (created)="onChanged()" />
     <app-users-import-modal [(open)]="importOpen" (imported)="onChanged()" />
     <app-user-edit-modal [(open)]="editOpen" [user]="editing()" [selfId]="selfId()" (saved)="onSaved($event)" />
+    <app-archive-modal [(open)]="archiveOpen" [target]="archiveTarget()" (archived)="onArchived($event)" />
     <app-confirm-modal
       title="Désactiver ce compte ?"
       confirmLabel="Désactiver le compte"
@@ -170,6 +174,8 @@ export class UsersPage {
   protected readonly importOpen = signal(false);
   protected readonly editOpen = signal(false);
   protected readonly editing = signal<UserDto | null>(null);
+  protected readonly archiveOpen = signal(false);
+  protected readonly archiveTarget = signal<ArchiveTarget | null>(null);
   protected readonly deactivateOpen = signal(false);
   protected readonly deactivating = signal<UserDto | null>(null);
   protected readonly deactivatingName = computed(() => {
@@ -201,6 +207,17 @@ export class UsersPage {
   protected startEdit(user: UserDto): void {
     this.editing.set(user);
     this.editOpen.set(true);
+  }
+
+  protected startArchive(user: UserDto): void {
+    if (!user.studentId) return;
+    this.archiveTarget.set({ kind: 'student', studentId: user.studentId, name: fullName(user) });
+    this.archiveOpen.set(true);
+  }
+
+  protected onArchived(count: number): void {
+    this.notice.set(`${plural(count, 'compte archivé', 'comptes archivés')}.`);
+    this.onChanged();
   }
 
   protected startDeactivate(user: UserDto): void {

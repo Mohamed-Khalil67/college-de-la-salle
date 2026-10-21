@@ -1,4 +1,4 @@
-import type { Role } from '@cdls/shared';
+import type { Role, SectionId } from '@cdls/shared';
 
 /** The signed-in user, attached to the request by JwtAuthGuard. */
 export interface AuthUser {
@@ -13,6 +13,12 @@ export interface AuthUser {
   readonly classId: string | null;
   /** Teachers marked coordinateur: they also edit the year's structure. Read from the database on every request. */
   readonly isCoordinator: boolean;
+  /** Students: the label of that class. */
+  readonly classLabel: string | null;
+  /** Students: their section. */
+  readonly sectionCode: SectionId | null;
+  /** Still on a temporary password: only the routes marked @AllowDuringPasswordChange() are open. */
+  readonly mustChangePassword: boolean;
 }
 
 export interface AuthedRequest {

@@ -24,6 +24,7 @@ import { PostsModule } from './posts/posts.module.js';
 import { ReportCardsModule } from './report-cards/report-cards.module.js';
 import { RoomsModule } from './rooms/rooms.module.js';
 import { SchoolYearsModule } from './school-years/school-years.module.js';
+import { SectionChangesModule } from './section-changes/section-changes.module.js';
 import { SubjectsModule } from './subjects/subjects.module.js';
 import { TeachingAssignmentsModule } from './teaching-assignments/teaching-assignments.module.js';
 import { UsersModule } from './users/users.module.js';
@@ -65,6 +66,7 @@ import { UsersModule } from './users/users.module.js';
     PostsModule,
     ReportCardsModule,
     ContactModule,
+    SectionChangesModule,
   ],
   providers: [
     // Order matters: rate limit, then authentication, then roles.

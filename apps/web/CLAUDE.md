@@ -37,7 +37,7 @@ a colour; gold (`--color-accent`) is never text on light surfaces (use `--color-
   Read with `resource({ params, loader })`; write in async handlers. Show errors with `apiMessage(error)`.
 - `AuthStore` (`core/auth/auth-store.ts`): `user()` (with `studentId`/`teacherId`, and `classId` for students), `role()`, `displayName()`.
   The access token is memory-only; the interceptor adds it and refreshes once on a 401.
-- Guards: `roleGuard('student' | 'teacher' | 'admin')` on each area, `anonymousGuard` on `/connexion`.
+- Guards: `roleGuard('student' | 'teacher' | 'admin')` on each area, `anonymousGuard` on `/connexion`, `firstAccessGuard` on `/premier-acces`. While `user().mustChangePassword` is true every guard sends the user to `/premier-acces`, and the interceptor does the same on a 403 `PASSWORD_CHANGE_REQUIRED`. The account menu of `SpaceLayout` has « Changer mon mot de passe » (`layout/change-password-modal.ts`, same `auth/password-form.ts` as the first-access page).
 
 ## Page checklist (before you commit)
 

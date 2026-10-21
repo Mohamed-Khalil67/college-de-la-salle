@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import type { LoginRequest, Role, SessionResponse, SessionUser } from '@cdls/shared';
+import type { ChangePasswordRequest, LoginRequest, Role, SessionResponse, SessionUser } from '@cdls/shared';
 
 export type AuthStatus = 'unknown' | 'anonymous' | 'authenticated';
 
@@ -12,6 +12,14 @@ export const HOME_BY_ROLE: Readonly<Record<Role, string>> = {
   teacher: '/enseignant',
   admin: '/admin',
 };
+
+/** Where a user still on a temporary password (first sign-in, reset) must go first. */
+export const FIRST_ACCESS = '/premier-acces';
+
+/** The first page after signing in: the first-access page until a password is chosen, else the role's space. */
+export function landingFor(user: Pick<SessionUser, 'role' | 'mustChangePassword'>): string {
+  return user.mustChangePassword ? FIRST_ACCESS : HOME_BY_ROLE[user.role];
+}
 
 /**
  * The signed-in user. The access token lives only in memory; the refresh token is an httpOnly cookie
@@ -39,9 +47,11 @@ export class AuthStore {
     const user = this.#user();
     return user ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase() : '';
   });
+  /** Until the user has chosen a password, every page sends them to the first-access page. */
+  readonly mustChangePassword = computed(() => this.#user()?.mustChangePassword ?? false);
   readonly home = computed(() => {
-    const role = this.role();
-    return role ? HOME_BY_ROLE[role] : '/connexion';
+    const user = this.#user();
+    return user ? landingFor(user) : '/connexion';
   });
 
   get accessToken(): string | null {
@@ -64,6 +74,18 @@ export class AuthStore {
     return session.user;
   }
 
+  /**
+   * Chooses a new password. The API signs out every other session and answers with a fresh one for this
+   * browser (new access token and refresh cookie), with mustChangePassword cleared.
+   */
+  async changePassword(body: ChangePasswordRequest): Promise<SessionUser> {
+    const session = await firstValueFrom(
+      this.#http.post<SessionResponse>('/api/auth/password', body, { withCredentials: true }),
+    );
+    this.#accept(session);
+    return session.user;
+  }
+
   async logout(): Promise<void> {
     try {
       await firstValueFrom(this.#http.post('/api/auth/logout', {}, { withCredentials: true }));
@@ -71,6 +93,18 @@ export class AuthStore {
       // The session ends locally even if the server could not be reached.
     }
     this.#clear();
+  }
+
+  /**
+   * Fetches the current profile (section, class…) from /auth/me, which the API reads from the database
+   * on every call. Unlike refresh() it keeps the tokens and the session: a network error changes nothing.
+   */
+  async reloadUser(): Promise<void> {
+    try {
+      this.#user.set(await firstValueFrom(this.#http.get<SessionUser>('/api/auth/me')));
+    } catch {
+      // Keep what we have: the next call will show an error if the session really ended.
+    }
   }
 
   /** Exchanges the refresh cookie for a new access token. Concurrent callers share one request. */

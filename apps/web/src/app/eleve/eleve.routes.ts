@@ -38,6 +38,11 @@ export const ELEVE_ROUTES: Routes = [
     loadComponent: () => import('./absences/absences-page').then((m) => m.AbsencesPage),
   },
   {
+    path: 'section',
+    title: 'Ma section',
+    loadComponent: () => import('./section/section-page').then((m) => m.SectionPage),
+  },
+  {
     path: 'bulletins',
     title: 'Bulletins',
     loadComponent: () => import('./bulletins/report-cards-page').then((m) => m.ReportCardsPage),

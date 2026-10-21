@@ -172,12 +172,14 @@ export class GradesService {
 
     const eventWhere: Prisma.EventWhereInput = {};
     let schoolYearId: string | null = null;
+    let window: { from: Date; to: Date } | null = null;
     if (query.periodId) {
       // By the events' stored period, never by dates: editing a period's dates moves no grade.
       const period = await this.prisma.period.findUnique({ where: { id: query.periodId } });
       if (!period) throw notFound('Période');
       eventWhere.periodId = period.id;
       schoolYearId = period.schoolYearId;
+      window = { from: period.startsOn, to: period.endsOn };
     } else if (query.from || query.to) {
       eventWhere.date = {
         ...(query.from ? { gte: fromDay(query.from) } : {}),
@@ -205,7 +207,7 @@ export class GradesService {
       const key = g.event.subjectId ?? '';
       bySubject.set(key, [...(bySubject.get(key) ?? []), g]);
     }
-    const coefficients = await this.subjectCoefficients(studentId, schoolYearId);
+    const coefficients = await this.subjectCoefficients(studentId, schoolYearId, window);
     return {
       studentId,
       subjects: [...bySubject]
@@ -243,11 +245,24 @@ export class GradesService {
   private async subjectCoefficients(
     studentId: string,
     schoolYearId: string | null,
+    window: { from: Date; to: Date } | null,
   ): Promise<Map<string, number>> {
     const classId = schoolYearId
       ? (
-          await this.prisma.enrollment.findUnique({
-            where: { studentId_schoolYearId: { studentId, schoolYearId } },
+          // The class the student was in during the term (a section change closes the first enrolment
+          // and opens another), the latest one when they moved within the term.
+          await this.prisma.enrollment.findFirst({
+            where: {
+              studentId,
+              schoolYearId,
+              ...(window
+                ? {
+                    enrolledOn: { lte: window.to },
+                    OR: [{ leftOn: null }, { leftOn: { gte: window.from } }],
+                  }
+                : {}),
+            },
+            orderBy: { enrolledOn: 'desc' },
             select: { classId: true },
           })
         )?.classId

@@ -5,8 +5,10 @@
 import {
   type ClassDto,
   type ImportUsersError,
+  type ImportRole,
   type ImportUsersResponse,
   type Role,
+  ROSTER_HEADERS,
   SECTION_LABELS,
   type SectionId,
   type UserDto,
@@ -35,8 +37,10 @@ export interface UserStatus {
   readonly tone: BadgeTone;
 }
 
-export function userStatus(user: Pick<UserDto, 'isActive' | 'lastLoginAt'>): UserStatus {
-  if (!user.isActive) return { label: 'Désactivé', tone: 'neutral' };
+export function userStatus(user: Pick<UserDto, 'status' | 'mustChangePassword' | 'lastLoginAt'>): UserStatus {
+  if (user.status === 'archived') return { label: 'Archivé', tone: 'neutral' };
+  if (user.status === 'disabled') return { label: 'Désactivé', tone: 'neutral' };
+  if (user.mustChangePassword) return { label: 'Premier accès à faire', tone: 'info' };
   if (!user.lastLoginAt) return { label: 'Jamais connecté', tone: 'info' };
   return { label: 'Actif', tone: 'success' };
 }
@@ -135,24 +139,32 @@ export function importErrors(error: unknown): ImportUsersError[] | null {
   );
 }
 
-export const IMPORT_HEADER = 'email,firstName,lastName,role,studentNumber,section,class';
+/** The header row of a roster file (the e-mails are generated, so there is no e-mail column). */
+export function importHeader(role: ImportRole): string {
+  return ROSTER_HEADERS[role].join(',');
+}
 
-/** The template offered in the import dialog: one student, one teacher. */
-export const IMPORT_TEMPLATE = [
-  IMPORT_HEADER,
-  'prenom.nom@lasalle-daher.eg,Prénom,Nom,student,2026-0001,bac,seconde',
-  'enseignant.nom@lasalle-daher.eg,Prénom,Nom,teacher,,,',
-  '',
-].join('\n');
+/** The template offered in the import dialog: one example line. */
+export function importTemplate(role: ImportRole): string {
+  const example = role === 'student' ? 'Saad,Mariam,bac,seconde,2026-0001,2010-03-15' : 'Mansour,Hany';
+  return [importHeader(role), example, ''].join('\n');
+}
 
-function csvCell(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+/**
+ * One CSV cell. A value starting with = + - @ (or a tab or carriage return) would be read as a formula
+ * by a spreadsheet, so it gets a leading apostrophe; values with a comma, quote or line break are quoted.
+ */
+export function csvCell(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 /** The accounts created by an import, with their temporary passwords, as a CSV to hand out. */
 export function createdAccountsCsv(created: ImportUsersResponse['created']): string {
-  const rows = created.map((c) => [c.email, ROLE_LABELS[c.role].one, c.temporaryPassword].map(csvCell).join(','));
-  return ['email,role,motDePasseTemporaire', ...rows, ''].join('\n');
+  const rows = created.map((c) =>
+    [c.lastName, c.firstName, c.email, ROLE_LABELS[c.role].one, c.temporaryPassword].map(csvCell).join(','),
+  );
+  return ['nom,prenom,email,role,motDePasseTemporaire', ...rows, ''].join('\n');
 }
 
 /** No look-alike characters (0/O, 1/l/I), so a password read aloud or copied by hand works. */
@@ -185,4 +197,9 @@ export const STUDENT_NUMBER = /^[\w-]{1,32}$/;
 export function isYearLabel(label: string): boolean {
   const match = /^(\d{4})-(\d{4})$/.exec(label);
   return !!match && Number(match[2]) === Number(match[1]) + 1;
+}
+
+/** « Bac nationale → Bac français », for a section-change request. */
+export function sectionMove(from: SectionId, to: SectionId): string {
+  return `${sectionLabel(from)} → ${sectionLabel(to)}`;
 }

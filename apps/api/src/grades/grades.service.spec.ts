@@ -17,6 +17,9 @@ const TEACHER: AuthUser = {
   teacherId: 't1',
   classId: null,
   isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 
 const EXAM_TYPE = {
@@ -87,7 +90,7 @@ describe('GradesService', () => {
     grade: { findMany: vi.fn().mockResolvedValue([]) },
     student: { findUnique: vi.fn() },
     period: { findUnique: vi.fn() },
-    enrollment: { findUnique: vi.fn() },
+    enrollment: { findFirst: vi.fn() },
     classSubject: { findMany: vi.fn() },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
@@ -243,8 +246,13 @@ describe('GradesService', () => {
     });
 
     it("uses the class of the period's school year, and the events' stored period", async () => {
-      prisma.period.findUnique.mockResolvedValue({ id: 'p0', schoolYearId: 'y0' });
-      prisma.enrollment.findUnique.mockResolvedValue({ classId: 'c-old' });
+      prisma.period.findUnique.mockResolvedValue({
+        id: 'p0',
+        schoolYearId: 'y0',
+        startsOn: new Date('2025-09-01T00:00:00Z'),
+        endsOn: new Date('2025-12-20T00:00:00Z'),
+      });
+      prisma.enrollment.findFirst.mockResolvedValue({ classId: 'c-old' });
       await grades.forStudent('s1', { periodId: 'p0' }, STUDENT);
       // By periodId, never by the period's dates (editing them must not move grades).
       expect(prisma.grade.findMany).toHaveBeenCalledWith(
@@ -252,9 +260,9 @@ describe('GradesService', () => {
           where: expect.objectContaining({ event: expect.objectContaining({ periodId: 'p0' }) }),
         }),
       );
-      expect(prisma.enrollment.findUnique).toHaveBeenCalledWith(
+      expect(prisma.enrollment.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { studentId_schoolYearId: { studentId: 's1', schoolYearId: 'y0' } },
+          where: expect.objectContaining({ studentId: 's1', schoolYearId: 'y0' }),
         }),
       );
       expect(prisma.classSubject.findMany).toHaveBeenCalledWith(

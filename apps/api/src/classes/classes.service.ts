@@ -1,10 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import type { SectionId } from '@cdls/shared';
+import { type SectionId, todayIso } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { toDay } from '../common/dates.js';
+import { fromDay, toDay } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -152,24 +152,58 @@ export class ClassesService {
     });
   }
 
-  /** Enrols a student; moves them if they were in another class of the same year. */
+  /**
+   * Enrols a student in a class of their section; moves them if they were in another class of the same
+   * year (the old enrolment is closed today, or corrected when it started today). Changing section goes
+   * through a section-change request, and archived students are read-only.
+   */
   async enroll(classId: string, studentId: string): Promise<EnrollmentDto> {
     const schoolClass = await this.prisma.schoolClass.findUnique({ where: { id: classId } });
     if (!schoolClass) throw notFound('Classe');
-    if (!(await this.prisma.student.findUnique({ where: { id: studentId } })))
-      throw notFound('Élève');
-    const enrollment = await this.prisma.enrollment.upsert({
-      where: { studentId_schoolYearId: { studentId, schoolYearId: schoolClass.schoolYearId } },
-      create: { studentId, classId, schoolYearId: schoolClass.schoolYearId },
-      update: { classId, leftOn: null },
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      include: { user: { select: { status: true } } },
+    });
+    if (!student) throw notFound('Élève');
+    if (student.user.status === 'archived')
+      throw new ConflictException('Ce compte est archivé : restaurez-le avant de l’inscrire.');
+    if (student.sectionId && student.sectionId !== schoolClass.sectionId)
+      throw new ConflictException(
+        'Cette classe est dans une autre section : changez de section par une demande (Validations).',
+      );
+
+    const today = fromDay(todayIso());
+    const enrollment = await this.prisma.$transaction(async (tx) => {
+      // Read again inside the transaction: a section change may have been approved meanwhile.
+      const current = await tx.student.findUniqueOrThrow({ where: { id: studentId } });
+      if (current.sectionId && current.sectionId !== schoolClass.sectionId)
+        throw new ConflictException('La section de l’élève a changé : actualisez la page.');
+      if (!current.sectionId)
+        await tx.student.update({ where: { id: studentId }, data: { sectionId: schoolClass.sectionId } });
+      const open = await tx.enrollment.findFirst({
+        where: { studentId, schoolYearId: schoolClass.schoolYearId, leftOn: null },
+      });
+      if (open?.classId === classId) return open;
+      if (open && open.enrolledOn.getTime() >= today.getTime())
+        return tx.enrollment.update({ where: { id: open.id }, data: { classId } });
+      if (open) await tx.enrollment.update({ where: { id: open.id }, data: { leftOn: today } });
+      return tx.enrollment.create({
+        data: { studentId, classId, schoolYearId: schoolClass.schoolYearId, enrolledOn: today },
+      });
     });
     return toEnrollmentDto(enrollment);
   }
 
   /** Removes a student from a class (the enrollment row is deleted). */
   async unenroll(enrollmentId: string): Promise<void> {
-    const enrollment = await this.prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { student: { include: { user: { select: { status: true } } } } },
+    });
     if (!enrollment) throw notFound('Inscription');
+    // An archived account is read-only, and its enrolments are history.
+    if (enrollment.student.user.status === 'archived')
+      throw new ConflictException('Ce compte est archivé : son inscription est conservée.');
     await this.prisma.enrollment.delete({ where: { id: enrollmentId } });
   }
 }

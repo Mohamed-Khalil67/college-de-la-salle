@@ -3,7 +3,6 @@ import type {
   EventDto,
   GradeSheetDto,
   HomeworkDto,
-  ImportUsersResponse,
   OccurrenceDto,
   Paginated,
   PostDto,
@@ -286,44 +285,5 @@ describe('School flows (e2e)', () => {
       .expect(200);
     expect(pdf.headers['content-type']).toBe('application/pdf');
     expect((pdf.body as Buffer).subarray(0, 4).toString()).toBe('%PDF');
-  });
-
-  it('users: CSV import is all or nothing', async () => {
-    const header = 'email,firstName,lastName,role,studentNumber,section,class';
-    const bad = [
-      header,
-      'new.one@demo.cdls.test,New,One,student,,bac,premiere',
-      'oops,Bad,Row,student,,bac,premiere',
-    ].join('\n');
-    const refused = await t
-      .http()
-      .post('/api/users/import')
-      .set(bearer(admin))
-      .attach('file', Buffer.from(bad), { filename: 'eleves.csv', contentType: 'text/csv' })
-      .expect(400);
-    expect((refused.body as { errors: { line: number }[] }).errors).toEqual([
-      expect.objectContaining({ line: 3 }),
-    ]);
-    expect(await t.prisma.user.count({ where: { email: 'new.one@demo.cdls.test' } })).toBe(0);
-
-    const good = [
-      header,
-      'new.one@demo.cdls.test,New,One,student,X-1,bac,premiere',
-      'new.prof@demo.cdls.test,New,Prof,teacher,,,',
-    ].join('\n');
-    const created = await t
-      .http()
-      .post('/api/users/import')
-      .set(bearer(admin))
-      .attach('file', Buffer.from(good), { filename: 'comptes.csv', contentType: 'text/csv' })
-      .expect(201);
-    expect((created.body as ImportUsersResponse).created.map((c) => c.email)).toEqual([
-      'new.one@demo.cdls.test',
-      'new.prof@demo.cdls.test',
-    ]);
-    const enrolled = await t.prisma.enrollment.count({
-      where: { student: { user: { email: 'new.one@demo.cdls.test' } } },
-    });
-    expect(enrolled).toBe(1);
   });
 });

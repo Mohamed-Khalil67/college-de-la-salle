@@ -6,6 +6,7 @@ export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Utilisateurs', path: 'utilisateurs', icon: 'users' },
   { label: 'Classes', path: 'classes', icon: 'book' },
   { label: 'Affectations', path: 'affectations' },
+  { label: 'Validations', path: 'validations' },
   { label: 'Années et trimestres', path: 'annees', icon: 'calendar', short: 'Années' },
   { label: 'Bulletins', path: 'bulletins', icon: 'printer' },
   { label: 'Messages', path: 'messages', icon: 'mail' },
@@ -43,6 +44,11 @@ export const ADMIN_ROUTES: Routes = [
     path: 'bulletins',
     title: 'Bulletins',
     loadComponent: () => import('./bulletins/report-cards-page').then((m) => m.ReportCardsPage),
+  },
+  {
+    path: 'validations',
+    title: 'Validations',
+    loadComponent: () => import('./validations/validations-page').then((m) => m.ValidationsPage),
   },
   {
     path: 'messages',

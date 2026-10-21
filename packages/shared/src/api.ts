@@ -67,7 +67,19 @@ export interface SessionUser {
   readonly classId: string | null;
   /** Teachers marked coordinateur by the admin: they edit the year's structure too. */
   readonly isCoordinator: boolean;
+  /** Students: the label of that class (« Première »). */
+  readonly classLabel: string | null;
+  /** Students: their section (null when not set or not a student). */
+  readonly sectionCode: SectionId | null;
+  /**
+   * First sign-in or password reset by the administration: until the user chooses a password
+   * (POST /auth/password), every other route answers 403 with `error: PASSWORD_CHANGE_REQUIRED`.
+   */
+  readonly mustChangePassword: boolean;
 }
+
+/** `error` of the 403 sent while the user must still choose a password. */
+export const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
 
 /** Returned by POST /auth/login and POST /auth/refresh. Send `Authorization: Bearer <accessToken>`. */
 export interface SessionResponse {
@@ -77,9 +89,22 @@ export interface SessionResponse {
   readonly user: SessionUser;
 }
 
+/**
+ * POST /auth/password: the signed-in user chooses a new password (rules: `passwordProblems`). Every
+ * other session is signed out; the response is a fresh session for this one (new refresh cookie).
+ */
+export interface ChangePasswordRequest {
+  readonly currentPassword: string;
+  readonly newPassword: string;
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Users: /api/users (admin)
  * ---------------------------------------------------------------------------------------------- */
+
+/** `archived`: graduated or left the school; no sign-in, kept read-only. */
+export type UserStatus = 'active' | 'disabled' | 'archived';
+export const USER_STATUSES: readonly UserStatus[] = ['active', 'disabled', 'archived'];
 
 export interface UserDto {
   readonly id: string;
@@ -87,7 +112,9 @@ export interface UserDto {
   readonly role: Role;
   readonly firstName: string;
   readonly lastName: string;
-  readonly isActive: boolean;
+  readonly status: UserStatus;
+  /** Still on the temporary password given by the administration. */
+  readonly mustChangePassword: boolean;
   readonly lastLoginAt: string | null;
   readonly createdAt: string;
   readonly studentId: string | null;
@@ -97,50 +124,106 @@ export interface UserDto {
   readonly classId: string | null;
   /** Teachers only (false for everyone else). */
   readonly isCoordinator: boolean;
+  /** Students: their section. */
+  readonly sectionCode: SectionId | null;
+  /** Students: the day they graduated (archived accounts). */
+  readonly graduatedOn: string | null;
 }
 
 export interface UserListQuery extends PageQuery {
   readonly role?: Role;
+  readonly status?: UserStatus;
   /** Matches e-mail, first or last name. */
   readonly search?: string;
 }
 
 export interface CreateUserRequest {
-  readonly email: string;
+  /** Leave out to get the school e-mail `prenom.nom@<school domain>` (numbered when taken). */
+  readonly email?: string;
   readonly role: Role;
   readonly firstName: string;
   readonly lastName: string;
-  /** Omit to get a generated temporary password back. */
-  readonly password?: string;
   readonly studentNumber?: string;
-  /** Students: enrol in this class (current school year). */
+  /** Students: `YYYY-MM-DD`. */
+  readonly birthDate?: string;
+  /** Students: enrol in this class (current school year); it also sets the student's section. */
   readonly classId?: string;
 }
 
+/** The account is created with a temporary password, shown once; the user must change it at first sign-in. */
 export interface CreatedUserResponse {
   readonly user: UserDto;
-  /** Only when the password was generated; shown once. */
-  readonly temporaryPassword: string | null;
+  readonly temporaryPassword: string;
 }
 
 export interface UpdateUserRequest {
   readonly firstName?: string;
   readonly lastName?: string;
-  readonly isActive?: boolean;
+  /**
+   * `disabled` blocks sign-in (and signs the user out); `active` re-enables it, and also restores an
+   * archived account. Archiving goes through POST /users/archive.
+   */
+  readonly status?: Exclude<UserStatus, 'archived'>;
+  /** A new temporary password: the user is signed out and must choose their own at next sign-in. */
   readonly password?: string;
   /** Teachers only: coordinateur (edits subjects, rooms, periods, calendar days, school years). */
   readonly isCoordinator?: boolean;
 }
 
+/** Accounts a roster import creates (admins are created one by one). */
+export type ImportRole = 'student' | 'teacher';
+export const IMPORT_ROLES: readonly ImportRole[] = ['student', 'teacher'];
+
 /**
- * POST /users/import, multipart field `file`: a UTF-8 CSV with the header
- * `email,firstName,lastName,role,studentNumber,section,class` (section/class: codes, students only).
- * All rows are checked first; nothing is created if one is invalid (400 with `errors`).
+ * POST /users/import/preview and POST /users/import, multipart field `file` plus `?role=student|teacher`:
+ * a UTF-8 CSV (comma or semicolon) with a header row.
+ * - students: `lastName,firstName,section,class,studentNumber,birthDate` (section and class are codes,
+ *   e.g. `bac,seconde`; studentNumber and birthDate optional, birthDate `YYYY-MM-DD` or `JJ/MM/AAAA`);
+ * - teachers: `lastName,firstName`.
+ * E-mails are generated (`prenom.nom@<school domain>`). Every line is checked first: the preview lists
+ * the accounts and the errors, and the import creates nothing (400 with `errors`) if one line is invalid.
  */
+export interface ImportUsersQuery {
+  readonly role: ImportRole;
+}
+
+export const ROSTER_HEADERS: Readonly<Record<ImportRole, readonly string[]>> = {
+  student: ['lastName', 'firstName', 'section', 'class', 'studentNumber', 'birthDate'],
+  teacher: ['lastName', 'firstName'],
+};
+
+export interface ImportPreviewRow {
+  /** Line in the file (the header is line 1). */
+  readonly line: number;
+  readonly lastName: string;
+  readonly firstName: string;
+  /** The login e-mail: generated, or the one the student already has. */
+  readonly email: string;
+  /** 1 for `prenom.nom`; n when the address was taken by n - 1 homonyms (`prenom.nom2`…). */
+  readonly emailNumber: number;
+  /** « car 1 homonyme » when the address carries a number, else null. */
+  readonly emailNote: string | null;
+  /** The student number is already in the school: that account is kept as it is (no new account or e-mail). */
+  readonly alreadyImported: boolean;
+  readonly sectionCode: SectionId | null;
+  readonly classLabel: string | null;
+  readonly studentNumber: string | null;
+  readonly birthDate: string | null;
+}
+
+export interface ImportPreviewResponse {
+  readonly role: ImportRole;
+  readonly rows: readonly ImportPreviewRow[];
+  /** Empty when the file can be imported as it is. */
+  readonly errors: readonly ImportUsersError[];
+}
+
 export interface ImportUsersResponse {
   readonly created: readonly {
     readonly email: string;
     readonly role: Role;
+    readonly firstName: string;
+    readonly lastName: string;
     readonly temporaryPassword: string;
   }[];
 }
@@ -148,6 +231,84 @@ export interface ImportUsersResponse {
 export interface ImportUsersError {
   readonly line: number;
   readonly message: string;
+}
+
+/** Why a student's account is archived. */
+export type ArchiveOutcome = 'graduated' | 'left';
+export const ARCHIVE_OUTCOMES: readonly ArchiveOutcome[] = ['graduated', 'left'];
+
+/**
+ * POST /users/archive: students who graduated or left, by id or a whole class (exactly one of the two).
+ * Their accounts are archived (no sign-in), their current enrolment closed on `on`, their sessions ended
+ * and any pending section-change request rejected. Grades and report cards stay.
+ */
+export interface ArchiveStudentsRequest {
+  readonly studentIds?: readonly string[];
+  readonly classId?: string;
+  readonly outcome: ArchiveOutcome;
+  /** `YYYY-MM-DD`. */
+  readonly on: string;
+}
+
+export interface ArchiveStudentsResponse {
+  readonly archived: number;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Section changes: /api/section-changes. A student (or the secretariat for them) asks; an admin decides.
+ * ---------------------------------------------------------------------------------------------- */
+
+export type SectionChangeStatus = 'pending' | 'approved' | 'rejected';
+export const SECTION_CHANGE_STATUSES: readonly SectionChangeStatus[] = [
+  'pending',
+  'approved',
+  'rejected',
+];
+
+export const SECTION_CHANGE_LIMITS = { reason: 1000, note: 1000 } as const;
+
+export interface SectionChangeRequestDto {
+  readonly id: string;
+  readonly studentId: string;
+  readonly studentFirstName: string;
+  readonly studentLastName: string;
+  readonly studentEmail: string;
+  /** The student's current class (null when not enrolled). */
+  readonly currentClassLabel: string | null;
+  readonly fromSection: SectionId;
+  readonly toSection: SectionId;
+  readonly reason: string;
+  readonly status: SectionChangeStatus;
+  /** The name of whoever asked: the student, or a member of staff for them. */
+  readonly requestedByName: string;
+  readonly requestedByStudent: boolean;
+  readonly createdAt: string;
+  readonly decidedAt: string | null;
+  readonly decidedByName: string | null;
+  readonly decisionNote: string;
+  /** Approved requests: the class the student moved to. */
+  readonly newClassLabel: string | null;
+}
+
+export interface SectionChangeListQuery extends PageQuery {
+  readonly status?: SectionChangeStatus;
+}
+
+/** A student sends only `toSection` and `reason`; an admin also names the student. One pending request per student. */
+export interface CreateSectionChangeRequest {
+  readonly studentId?: string;
+  readonly toSection: SectionId;
+  readonly reason: string;
+}
+
+/** Moves the student, in one transaction, to `classId` (a class of the new section, current school year). */
+export interface ApproveSectionChangeRequest {
+  readonly classId: string;
+  readonly note?: string;
+}
+
+export interface RejectSectionChangeRequest {
+  readonly note: string;
 }
 
 /* ------------------------------------------------------------------------------------------------

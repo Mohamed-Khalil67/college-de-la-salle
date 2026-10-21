@@ -11,12 +11,14 @@ let nextId = 0;
   selector: 'cdls-modal',
   imports: [Icon],
   template: `
-    <dialog #dialog class="modal" [attr.aria-labelledby]="titleId" (close)="onClose()">
+    <dialog #dialog class="modal" [attr.aria-labelledby]="titleId" (close)="onClose()" (cancel)="onCancel($event)">
       <div class="modal__header">
         <h2 class="t-h2" [id]="titleId">{{ title() }}</h2>
-        <button class="modal__close" type="button" (click)="open.set(false)">
-          <cdls-icon name="close" /><span class="visually-hidden">Fermer</span>
-        </button>
+        @if (dismissible()) {
+          <button class="modal__close" type="button" (click)="open.set(false)">
+            <cdls-icon name="close" /><span class="visually-hidden">Fermer</span>
+          </button>
+        }
       </div>
       <ng-content />
     </dialog>
@@ -25,6 +27,11 @@ let nextId = 0;
 export class Modal {
   readonly title = input.required<string>();
   readonly open = model(false);
+  /**
+   * False while closing would lose something that is shown only once (temporary passwords) or while a
+   * request is running: Escape and the close button are then off, and the dialog's own button ends it.
+   */
+  readonly dismissible = input(true);
   readonly closed = output<void>();
 
   protected readonly titleId = `cdls-modal-${++nextId}`;
@@ -41,6 +48,10 @@ export class Modal {
         dialog.close();
       }
     });
+  }
+
+  protected onCancel(event: Event): void {
+    if (!this.dismissible()) event.preventDefault();
   }
 
   protected onClose(): void {

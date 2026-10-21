@@ -3,7 +3,7 @@ import { email, form, FormField, required, submit } from '@angular/forms/signals
 import { Router, RouterLink } from '@angular/router';
 import { NgOptimizedImage } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
-import { AuthStore, HOME_BY_ROLE } from '../core/auth/auth-store';
+import { AuthStore, HOME_BY_ROLE, landingFor } from '../core/auth/auth-store';
 import { apiMessage } from '../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Wordmark } from '../ui';
 
@@ -95,7 +95,8 @@ export class LoginPage {
         const user = await this.#auth.login(this.model());
         const home = HOME_BY_ROLE[user.role];
         const suite = this.suite();
-        await this.#router.navigateByUrl(suite?.startsWith(home) ? suite : home);
+        if (user.mustChangePassword) await this.#router.navigateByUrl(landingFor(user));
+        else await this.#router.navigateByUrl(suite?.startsWith(home) ? suite : home);
       } catch (error) {
         const status = (error as HttpErrorResponse).status;
         this.failure.set(

@@ -1,8 +1,14 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { SessionResponse, SessionUser } from '@cdls/shared';
+import { passwordProblems, type SectionId, type SessionResponse, type SessionUser } from '@cdls/shared';
 import { hash, verify } from 'argon2';
 import type { AuthUser } from '../common/auth-user.js';
 import { durationSeconds } from '../common/duration.js';
@@ -12,6 +18,16 @@ import { PrismaService } from '../prisma/prisma.service.js';
 export interface AccessTokenPayload {
   readonly sub: string;
   readonly role: SessionUser['role'];
+  /**
+   * Password version: the user's passwordChangedAt in milliseconds (0 before any change). A token whose
+   * version differs from the account's is refused, so a password change or reset ends every session.
+   */
+  readonly pv?: number;
+}
+
+/** The password version an access token must carry for this account. */
+function passwordVersion(user: { passwordChangedAt: Date | null }): number {
+  return user.passwordChangedAt?.getTime() ?? 0;
 }
 
 /** A session plus the refresh cookie value the controller must set. */
@@ -23,15 +39,17 @@ export interface IssuedSession {
 
 const INVALID_LOGIN = 'E-mail ou mot de passe incorrect.';
 const INVALID_SESSION = 'Session expirée. Reconnectez-vous.';
+const WRONG_CURRENT_PASSWORD = 'Le mot de passe actuel est incorrect.';
 
 const userInclude = {
   student: {
     select: {
       id: true,
-      // The current class (one enrollment per student and school year).
+      section: { select: { code: true } },
+      // The current class (one open enrollment per student and school year).
       enrollments: {
         where: { leftOn: null, schoolYear: { isCurrent: true } },
-        select: { classId: true },
+        select: { classId: true, schoolClass: { select: { label: true } } },
         take: 1,
       },
     },
@@ -66,10 +84,11 @@ export class AuthService {
     const ok = user
       ? await verify(user.passwordHash, password)
       : (await verify(await this.dummyHash, password), false);
-    if (!user || !ok || !user.isActive) throw new UnauthorizedException(INVALID_LOGIN);
+    // Disabled and archived accounts get the same answer as a wrong password.
+    if (!user || !ok || user.status !== 'active') throw new UnauthorizedException(INVALID_LOGIN);
 
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-    return this.issue(toAuthUser(user), randomUUID(), userAgent);
+    return this.issue(toAuthUser(user), passwordVersion(user), randomUUID(), userAgent);
   }
 
   /** Rotates the refresh token. A token used twice means it leaked: its whole family is revoked. */
@@ -87,7 +106,7 @@ export class AuthService {
       await this.revokeFamily(row.familyId);
       throw new UnauthorizedException(INVALID_SESSION);
     }
-    if (row.expiresAt <= new Date() || !row.user.isActive)
+    if (row.expiresAt <= new Date() || row.user.status !== 'active')
       throw new UnauthorizedException(INVALID_SESSION);
 
     const revoked = await this.prisma.refreshToken.updateMany({
@@ -99,7 +118,7 @@ export class AuthService {
       await this.revokeFamily(row.familyId);
       throw new UnauthorizedException(INVALID_SESSION);
     }
-    return this.issue(toAuthUser(row.user), row.familyId, userAgent);
+    return this.issue(toAuthUser(row.user), passwordVersion(row.user), row.familyId, userAgent);
   }
 
   async logout(token: string | undefined): Promise<void> {
@@ -107,6 +126,44 @@ export class AuthService {
     if (!parsed) return;
     const row = await this.prisma.refreshToken.findUnique({ where: { id: parsed.id } });
     if (row && this.matches(row.tokenHash, parsed.secret)) await this.revokeFamily(row.familyId);
+  }
+
+  /**
+   * The signed-in user chooses a new password: the current one must match, the new one follow
+   * passwordProblems and differ from it. Clears mustChangePassword, signs out every session (their
+   * access tokens carry the old password version and stop working) and returns a fresh session.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    userAgent = '',
+  ): Promise<IssuedSession> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: userInclude });
+    if (!user || user.status !== 'active') throw new UnauthorizedException(INVALID_SESSION);
+    if (!(await verify(user.passwordHash, currentPassword)))
+      throw new BadRequestException(WRONG_CURRENT_PASSWORD);
+    const problems = passwordProblems(newPassword, user.email);
+    if (problems.length) throw new BadRequestException(problems);
+    if (await verify(user.passwordHash, newPassword))
+      throw new BadRequestException('Choisissez un mot de passe différent de l’actuel.');
+
+    const newHash = await hash(newPassword);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Only if the password is still the one that was checked: a reset or another change in between wins.
+      const swapped = await tx.user.updateMany({
+        where: { id: userId, passwordHash: user.passwordHash, status: 'active' },
+        data: { passwordHash: newHash, mustChangePassword: false, passwordChangedAt: new Date() },
+      });
+      if (swapped.count === 0) throw new ConflictException('Votre mot de passe vient d’être modifié : reconnectez-vous.');
+      const row = await tx.user.findUniqueOrThrow({ where: { id: userId }, include: userInclude });
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return row;
+    });
+    return this.issue(toAuthUser(updated), passwordVersion(updated), randomUUID(), userAgent);
   }
 
   /** Signs out every session of a user (deactivation, password change). */
@@ -129,10 +186,18 @@ export class AuthService {
       where: { id: payload.sub },
       include: userInclude,
     });
-    return user?.isActive ? toAuthUser(user) : null;
+    if (!user || user.status !== 'active') return null;
+    // Tokens issued before a password change or reset no longer count.
+    if ((payload.pv ?? 0) !== passwordVersion(user)) return null;
+    return toAuthUser(user);
   }
 
-  private async issue(user: AuthUser, familyId: string, userAgent: string): Promise<IssuedSession> {
+  private async issue(
+    user: AuthUser,
+    pv: number,
+    familyId: string,
+    userAgent: string,
+  ): Promise<IssuedSession> {
     const secret = randomBytes(32).toString('base64url');
     const row = await this.prisma.refreshToken.create({
       data: {
@@ -143,7 +208,7 @@ export class AuthService {
         userAgent: userAgent.slice(0, 255),
       },
     });
-    const payload: AccessTokenPayload = { sub: user.id, role: user.role };
+    const payload: AccessTokenPayload = { sub: user.id, role: user.role, pv };
     const accessToken = await this.jwt.signAsync(payload, { expiresIn: this.accessTtl });
     return {
       session: { accessToken, expiresIn: this.accessTtl, user: toSessionUser(user) },
@@ -181,7 +246,12 @@ type UserWithProfiles = {
   role: AuthUser['role'];
   firstName: string;
   lastName: string;
-  student: { id: string; enrollments?: readonly { classId: string }[] } | null;
+  mustChangePassword: boolean;
+  student: {
+    id: string;
+    section?: { code: string } | null;
+    enrollments?: readonly { classId: string; schoolClass?: { label: string } }[];
+  } | null;
   teacher: { id: string; isCoordinator: boolean } | null;
 };
 
@@ -196,6 +266,9 @@ export function toAuthUser(u: UserWithProfiles): AuthUser {
     teacherId: u.teacher?.id ?? null,
     classId: u.student?.enrollments?.[0]?.classId ?? null,
     isCoordinator: u.teacher?.isCoordinator ?? false,
+    classLabel: u.student?.enrollments?.[0]?.schoolClass?.label ?? null,
+    sectionCode: (u.student?.section?.code as SectionId | undefined) ?? null,
+    mustChangePassword: u.mustChangePassword,
   };
 }
 

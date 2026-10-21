@@ -1,6 +1,7 @@
 import { plainToInstance, Transform } from 'class-transformer';
 import {
   IsIn,
+  IsFQDN,
   IsInt,
   IsNotEmpty,
   IsString,
@@ -13,6 +14,8 @@ import {
 import { DURATION } from '../common/duration.js';
 
 const PLACEHOLDER = /^replace-with-/;
+/** The demo domain of the seed and the tests; production must set the school's own. */
+export const DEMO_EMAIL_DOMAIN = 'demo.cdls.test';
 
 /** Every environment variable the API reads. Validated once at startup; the app refuses to boot otherwise. */
 export class Env {
@@ -82,6 +85,17 @@ export class Env {
   @Min(0)
   @Max(5)
   TRUST_PROXY = 0;
+
+  /**
+   * Domain of the school login e-mails built at import (`prenom.nom@<domain>`), without the @.
+   * Required in production (the demo domain is refused there).
+   */
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsFQDN(
+    { require_tld: true, allow_underscores: false },
+    { message: 'SCHOOL_EMAIL_DOMAIN must be a domain such as lasalle-daher.eg' },
+  )
+  SCHOOL_EMAIL_DOMAIN = DEMO_EMAIL_DOMAIN;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -97,6 +111,11 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   ) {
     throw new Error(
       'JWT secrets still hold the .env.example placeholders; set real random values in production.',
+    );
+  }
+  if (env.NODE_ENV === 'production' && env.SCHOOL_EMAIL_DOMAIN === DEMO_EMAIL_DOMAIN) {
+    throw new Error(
+      'SCHOOL_EMAIL_DOMAIN is the demo domain; set the login domain of the school in production.',
     );
   }
   return env;

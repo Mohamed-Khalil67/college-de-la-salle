@@ -6,6 +6,8 @@
  *
  * Run with `npm run db:seed` (also runs after `prisma migrate reset`). It wipes the tables first.
  * Passwords are random on every run and written only to apps/api/demo-credentials.local.md (gitignored).
+ * Demo accounts are marked as not needing a password change, so they sign in straight to their space;
+ * accounts created from the administration (or by the e2e tests) go through the first sign-in instead.
  */
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
@@ -13,9 +15,11 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PrismaPg } from '@prisma/adapter-pg';
 import {
+  assignSchoolEmails,
   CLASSES,
   MATIERES,
   matieresFor,
+  schoolEmailLocalPart,
   SECTION_LABELS,
   type SectionId,
   SYSTEM_ACTIVITY_TYPES,
@@ -50,13 +54,6 @@ const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.lengt
 
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const password = () => randomBytes(12).toString('base64url');
-const slug = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z]+/g, '-')
-    .replace(/^-|-$/g, '');
 
 /** `sections` limits a teacher to one track (French is taught by a different teacher in each). */
 const TEACHERS: readonly {
@@ -164,6 +161,7 @@ const TERMS = [
 async function wipe(): Promise<void> {
   // Children before parents.
   await prisma.auditLog.deleteMany();
+  await prisma.sectionChangeRequest.deleteMany();
   await prisma.reportCard.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.homeworkCompletion.deleteMany();
@@ -177,13 +175,13 @@ async function wipe(): Promise<void> {
   await prisma.schoolClass.deleteMany();
   await prisma.period.deleteMany();
   await prisma.schoolYear.deleteMany();
-  await prisma.section.deleteMany();
   await prisma.room.deleteMany();
   await prisma.activityType.deleteMany();
   await prisma.subject.deleteMany();
   await prisma.student.deleteMany();
   await prisma.teacher.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.section.deleteMany();
 }
 
 async function main(): Promise<void> {
@@ -259,13 +257,14 @@ async function main(): Promise<void> {
       role: Role.admin,
       firstName: 'Nadia',
       lastName: 'Fahmy',
+      mustChangePassword: false,
     },
   });
 
   const teacherBySubject = new Map<string, { id: string; userId: string }>();
   const teacherEmails: string[] = [];
   for (const t of TEACHERS) {
-    const email = `${slug(t.first)}.${slug(t.last)}@${DOMAIN}`;
+    const email = `${schoolEmailLocalPart(t.first, t.last)!}@${DOMAIN}`;
     const user = await prisma.user.create({
       data: {
         email,
@@ -273,6 +272,7 @@ async function main(): Promise<void> {
         role: Role.teacher,
         firstName: t.first,
         lastName: t.last,
+        mustChangePassword: false,
         // Ingy Samir coordinates the year's structure (the demo shows both teacher kinds).
         teacher: { create: { isCoordinator: t.last === 'Samir' } },
       },
@@ -320,9 +320,8 @@ async function main(): Promise<void> {
       for (let i = 0; i < STUDENTS_PER_CLASS; i++) {
         const first = pick(FIRST_NAMES);
         const last = pick(LAST_NAMES);
-        let email = `${slug(first)}.${slug(last)}@${DOMAIN}`;
-        for (let n = 2; usedEmails.has(email); n++)
-          email = `${slug(first)}.${slug(last)}${n}@${DOMAIN}`;
+        // The same school e-mail rule as the roster import (prenom.nom, numbered when taken).
+        const email = assignSchoolEmails([{ firstName: first, lastName: last }], DOMAIN, usedEmails)[0]!;
         usedEmails.add(email);
         studentNumber++;
         const user = await prisma.user.create({
@@ -332,8 +331,10 @@ async function main(): Promise<void> {
             role: Role.student,
             firstName: first,
             lastName: last,
+            mustChangePassword: false,
             student: {
               create: {
+                sectionId,
                 studentNumber: `CDLS-2026-${String(studentNumber).padStart(4, '0')}`,
                 enrollments: {
                   create: {

@@ -5,12 +5,13 @@ import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Avatar, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { fullName, plural, sectionLabel } from '../shared/admin-format';
+import { ArchiveModal, type ArchiveTarget } from '../utilisateurs/archive-modal';
 import { EnrollSearch } from './enroll-search';
 
 /** One class: its enrolled students, enrolment of existing students and removal. */
 @Component({
   selector: 'app-class-detail-page',
-  imports: [RouterLink, Alert, Avatar, Button, EmptyState, Icon, ConfirmModal, EnrollSearch],
+  imports: [RouterLink, Alert, Avatar, Button, EmptyState, Icon, ArchiveModal, ConfirmModal, EnrollSearch],
   template: `
     <p class="back"><a routerLink=".."><cdls-icon name="chevron-left" />Toutes les classes</a></p>
 
@@ -25,6 +26,11 @@ import { EnrollSearch } from './enroll-search';
             {{ track() }} · code {{ schoolClass.value().code }} · {{ plural(schoolClass.value().studentCount, 'élève', 'élèves') }}
           </p>
         </div>
+        @if (schoolClass.value().studentCount > 0) {
+          <div class="page__actions">
+            <button cdlsButton variant="secondary" type="button" (click)="archiveOpen.set(true)">Archiver la classe</button>
+          </div>
+        }
       </div>
     } @else {
       <div class="page__header"><div class="page__header-text"><h1 class="t-h1">Classe</h1></div></div>
@@ -79,6 +85,7 @@ import { EnrollSearch } from './enroll-search';
       <app-enroll-search [classId]="id()" [enrolledIds]="enrolledIds()" (enrolled)="onEnrolled($event)" />
     </div>
 
+    <app-archive-modal [(open)]="archiveOpen" [target]="archiveTarget()" (archived)="onArchived($event)" />
     <app-confirm-modal
       title="Retirer cet élève de la classe ?"
       confirmLabel="Retirer de la classe"
@@ -129,6 +136,12 @@ export class ClassDetailPage {
   protected readonly enrolledIds = computed(() => new Set(this.roster.hasValue() ? this.roster.value().map((s) => s.id) : []));
 
   protected readonly notice = signal<string | null>(null);
+  protected readonly archiveOpen = signal(false);
+  protected readonly archiveTarget = computed<ArchiveTarget | null>(() =>
+    this.schoolClass.hasValue()
+      ? { kind: 'class', classId: this.id(), label: this.schoolClass.value().label, count: this.schoolClass.value().studentCount }
+      : null,
+  );
   protected readonly removeOpen = signal(false);
   protected readonly removing = signal<ClassStudentDto | null>(null);
   protected readonly removingName = computed(() => {
@@ -148,6 +161,12 @@ export class ClassDetailPage {
 
   protected onEnrolled(name: string): void {
     this.notice.set(`${name} est inscrit dans la classe.`);
+    this.roster.reload();
+    this.schoolClass.reload();
+  }
+
+  protected onArchived(count: number): void {
+    this.notice.set(`${plural(count, 'élève archivé', 'élèves archivés')} : ils ne figurent plus dans la classe.`);
     this.roster.reload();
     this.schoolClass.reload();
   }

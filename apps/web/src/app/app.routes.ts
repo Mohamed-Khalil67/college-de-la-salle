@@ -1,6 +1,6 @@
 import type { Routes } from '@angular/router';
 import { ADMIN_NAV } from './admin/admin.routes';
-import { anonymousGuard, roleGuard } from './core/auth/auth.guards';
+import { anonymousGuard, firstAccessGuard, roleGuard } from './core/auth/auth.guards';
 import { ELEVE_NAV } from './eleve/eleve.routes';
 import { ENSEIGNANT_NAV } from './enseignant/enseignant.routes';
 
@@ -17,6 +17,12 @@ export const routes: Routes = [
     title: 'Connexion',
     canMatch: [anonymousGuard],
     loadComponent: () => import('./auth/login-page').then((m) => m.LoginPage),
+  },
+  {
+    path: 'premier-acces',
+    title: 'Premier accès',
+    canMatch: [firstAccessGuard],
+    loadComponent: () => import('./auth/first-access-page').then((m) => m.FirstAccessPage),
   },
   {
     path: 'eleve',
