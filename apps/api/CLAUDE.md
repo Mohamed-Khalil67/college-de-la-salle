@@ -21,8 +21,8 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 
 ## Auth and permissions
 
-- Every route needs a Bearer access token (global `JwtAuthGuard`) unless marked `@Public()`. `@Roles('admin', …)` restricts by role (global `RolesGuard`). `@CurrentUser()` gives the `AuthUser` (`id`, `role`, `studentId`, `teacherId`).
-- **Ownership is checked in services through `AccessService`** (`src/access/`), the API's version of `docs/legacy/firestore.rules`: students see their own records and the events/posts of their audience (`audienceFor`); teachers write grades, attendance and class events only where they have a `TeachingAssignment` (`assertTeachesClass(user, classId, subjectId)`); `assertCanReadStudent` for anything about one student. A role check alone is never enough.
+- Every route needs a Bearer access token (global `JwtAuthGuard`) unless marked `@Public()`. `@Roles('admin', …)` restricts by role (global `RolesGuard`); `@Roles('admin', 'coordinator')`, spelled `@StructureEditors()`, also lets in teachers the admin marked `isCoordinator` (read from the database on every request, so a revoked coordinator is refused at once). Writes to the year's structure (subjects, class subjects, rooms, periods, calendar days, school years) use `@StructureEditors()` and nothing else: don't scatter role checks. `@CurrentUser()` gives the `AuthUser` (`id`, `role`, `studentId`, `teacherId`, `classId`, `isCoordinator`).
+- **Ownership is checked in services through `AccessService`** (`src/access/`), the API's version of `docs/legacy/firestore.rules`: students see their own records and the events/posts of their audience (`audienceFor`); teachers write grades, attendance and class events only where they have a `TeachingAssignment` on a `ClassSubject` of that class (`assertTeachesClass(user, classId, subjectId)`); a teacher's own activity types are private to them until the admin promotes them (`ActivityTypesService.usable()` hides other teachers' types); `assertCanReadStudent` for anything about one student. A role check alone is never enough.
 - Refresh tokens: opaque, in the `cdls_refresh` httpOnly SameSite=Strict cookie (path `/api/auth`), stored as an HMAC, rotated on each refresh; reuse revokes the family. Deactivating a user or changing their password calls `AuthService.revokeAll`.
 - Never log passwords, tokens or full request bodies. Hash passwords with `argon2`. Login is limited to 5 attempts a minute.
 
@@ -35,7 +35,7 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 - snake_case tables and columns (`@@map` / `@map`), camelCase in TypeScript. Index every foreign key and common filter.
 - Multi-step writes use `prisma.$transaction`. Avoid N+1 queries: `include`/`select` what you need.
 - Grade changes write `AuditLog` rows in the same transaction (`common/audit.ts`).
-- Pure domain logic (averages, calendar occurrences, audiences, .ics) lives in `packages/shared` and is imported from `@cdls/shared`, not re-implemented here. Keep the Prisma `EventKind` enum in sync with the shared one (`src/prisma/enums.spec.ts` checks it).
+- Pure domain logic (averages, calendar occurrences, audiences, .ics) lives in `packages/shared` and is imported from `@cdls/shared`, not re-implemented here. Activity types live in the database (`activity_types`): code asks for the flags (`gradable`, `repeatable`, `homework`), never for a type `code` such as `'cours'` or `'devoir'`; the system types come from `SYSTEM_ACTIVITY_TYPES` (seed and the `20261021000300` migration, checked by `src/prisma/activity-types.spec.ts`). Grades and report cards follow `Event.periodId`, never date ranges, so editing a period's dates moves no grade; a closed period is locked (`PeriodsService.assertOpen`). Subject coefficients live on `ClassSubject`. Holidays: `occurrences()` and `toIcs()` take the closures from `CalendarDaysService.closures()`.
 
 ## Config
 

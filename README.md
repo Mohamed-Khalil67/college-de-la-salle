@@ -9,7 +9,7 @@ signed-in spaces run the school year:
 | **Public site** | Everyone | Home, history and heritage, the two tracks with their subjects, contact |
 | **Espace élève** `/eleve` | Students | Dashboard, timetable, homework (tick as done), grades with averages, absences, report cards (PDF) |
 | **Espace enseignant** `/enseignant` | Teachers | Their classes, the shared calendar, grade entry with a publish step, attendance, announcements |
-| **Administration** `/admin` | School staff | Accounts (one by one or CSV import), classes and enrolments, teaching assignments, school years and terms, report cards, messages from the contact form |
+| **Administration** `/admin` | School staff | Accounts (one by one or CSV import), classes and enrolments, teaching assignments, school years, periods and calendar days, subjects and the subjects of each class, rooms, activity types, report cards, messages from the contact form |
 
 Accounts are created by the college; there is no open sign-up. Built with **Angular 22** (standalone, zoneless,
 signals, Signal Forms, prerendering with hydration), **Tailwind CSS v4**, **NestJS 12**, **Prisma 7** and
@@ -63,11 +63,13 @@ by one or by CSV import); there is no open sign-up. Sign-in returns a 15-minute 
 | Area | Endpoints |
 | --- | --- |
 | Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me` |
-| Admin | `/users` (CRUD, `POST /users/import` CSV), `/school-years`, `/terms/:id/close`, `/classes`, `/enrollments`, `/subjects`, `/teaching-assignments`; `DELETE` an empty class, an unused school year (not the current one) or a term without grades (409 otherwise) |
-| Calendar | `/events` (range, `/occurrences` with weekly repeats, `/:id/ics`), `/homework` (done ticks), `/posts` |
+| Admin | `/users` (CRUD, `POST /users/import` CSV, `isCoordinator`), `/classes`, `/enrollments`, `/teaching-assignments`, `/periods/:id/close`, `POST /activity-types/:id/promote`; `DELETE` an empty class, an unused school year (not the current one) or a period without grades (409 otherwise) |
+| Structure (admin or coordinator) | `/school-years` (create, `PATCH`), `/school-years/:id/periods` and `/periods/:id` (trimesters or semesters, per section, no overlap, closed = locked), `/calendar-days` (holidays, exam weeks, days without classes), `/subjects` (create, rename, archive), `/classes/:id/subjects` (+ `/copy`) and `/class-subjects/:id` (coefficient, hours), `/rooms` |
+| Activity types | `GET/POST /activity-types`, `PATCH/DELETE /activity-types/:id`: school-wide types (cours, TD, TP, examen…) and teachers' private types, with the flags gradable / repeatable / homework |
+| Calendar | `/events` (range, `/occurrences` with weekly repeats minus holidays, `/:id/ics` with EXDATE for the cancelled sessions), `/homework` (done ticks), `/posts` |
 | Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
-| Report cards | `/terms/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
+| Report cards | `/periods/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
 | Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
 
 Who may do what mirrors the old Firestore rules (`docs/legacy/firestore.rules`): students only see their own records and what is addressed
