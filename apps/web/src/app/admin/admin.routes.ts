@@ -6,6 +6,7 @@ export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Utilisateurs', path: 'utilisateurs', icon: 'users' },
   { label: 'Classes', path: 'classes', icon: 'book' },
   { label: 'Affectations', path: 'affectations' },
+  { label: 'Emploi du temps', path: 'emploi-du-temps' },
   { label: 'Validations', path: 'validations' },
   { label: 'Années et trimestres', path: 'annees', icon: 'calendar', short: 'Années' },
   { label: 'Bulletins', path: 'bulletins', icon: 'printer' },
@@ -34,6 +35,12 @@ export const ADMIN_ROUTES: Routes = [
     path: 'affectations',
     title: 'Affectations',
     loadComponent: () => import('./affectations/assignments-page').then((m) => m.AssignmentsPage),
+  },
+  {
+    path: 'emploi-du-temps',
+    title: 'Emploi du temps',
+    loadComponent: () =>
+      import('./emploi-du-temps/timetable-editor-page').then((m) => m.TimetableEditorPage),
   },
   {
     path: 'annees',

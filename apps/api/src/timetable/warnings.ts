@@ -59,6 +59,7 @@ export function sessionWarnings(
     const first = list[0]!;
     out.push({
       code: 'exam_week',
+      slotId: first.slot.id,
       date: first.current.date,
       message: `Le ${longDay(first.current.date)} est en semaine d’examens (${sessionName(first.slot)})${more(list.length)}.`,
     });
@@ -75,6 +76,7 @@ export function sessionWarnings(
     if (!room || room.capacity === null || size === undefined || room.capacity >= size) continue;
     out.push({
       code: 'room_capacity',
+      slotId: first.slot.id,
       date: first.current.date,
       message: `${room.name} compte ${room.capacity} places pour ${size} élèves (${sessionName(first.slot)})${more(list.length)}.`,
     });
@@ -90,6 +92,7 @@ export function sessionWarnings(
     if (room?.kind === 'lab') continue;
     out.push({
       code: 'tp_outside_lab',
+      slotId: first.slot.id,
       date: first.current.date,
       message: `Un TP est prévu ${room ? `en ${room.name}, qui n’est pas un laboratoire` : 'sans salle'} (${sessionName(first.slot)})${more(list.length)}.`,
     });
@@ -103,6 +106,7 @@ export function sessionWarnings(
       days.add(key);
       out.push({
         code: 'assessments_overload',
+        slotId: o.slot.id,
         date: o.current.date,
         message: `La classe ${o.slot.row.classSubject.schoolClass.label} a déjà ${count} évaluations le ${longDay(o.current.date)}.`,
       });
@@ -123,6 +127,7 @@ export function hoursWarning(
   const fmt = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',');
   return {
     code: 'hours_exceeded',
+    slotId: slot.id,
     date: null,
     message: `${sessionName(slot)} : ${fmt(total)} h par semaine pour ${fmt(hoursPerWeek)} h prévues.`,
   };

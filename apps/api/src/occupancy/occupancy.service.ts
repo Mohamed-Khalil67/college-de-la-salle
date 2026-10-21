@@ -194,14 +194,13 @@ export class OccupancyService {
     if (!clashes.length) return [];
     const slotIds = [...new Set(clashes.flatMap((c) => (c.slotId ? [c.slotId] : [])))];
     const eventIds = [...new Set(clashes.flatMap((c) => (c.eventId ? [c.eventId] : [])))];
-    const [slots, events] = await Promise.all([
-      slotIds.length
-        ? db.timetableSlot.findMany({ where: { id: { in: slotIds } }, include: slotInclude })
-        : [],
-      eventIds.length
-        ? db.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, title: true } })
-        : [],
-    ]);
+    // One query at a time: a transaction has a single connection.
+    const slots = slotIds.length
+      ? await db.timetableSlot.findMany({ where: { id: { in: slotIds } }, include: slotInclude })
+      : [];
+    const events = eventIds.length
+      ? await db.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, title: true } })
+      : [];
     const slotLabel = new Map(
       slots.map((s) => {
         const c = s.classSubject.schoolClass;
@@ -215,15 +214,13 @@ export class OccupancyService {
     const roomIds = [...new Set(rows.flatMap((r) => (r.roomId ? [r.roomId] : [])))];
     const teacherIds = [...new Set(rows.flatMap((r) => (r.teacherId ? [r.teacherId] : [])))];
     const classIds = [...new Set(rows.flatMap((r) => (r.classId ? [r.classId] : [])))];
-    const [rooms, teachers, classes] = await Promise.all([
-      roomIds.length ? db.room.findMany({ where: { id: { in: roomIds } } }) : [],
-      teacherIds.length
-        ? db.teacher.findMany({ where: { id: { in: teacherIds } }, include: { user: true } })
-        : [],
-      classIds.length
-        ? db.schoolClass.findMany({ where: { id: { in: classIds } }, include: { section: true } })
-        : [],
-    ]);
+    const rooms = roomIds.length ? await db.room.findMany({ where: { id: { in: roomIds } } }) : [];
+    const teachers = teacherIds.length
+      ? await db.teacher.findMany({ where: { id: { in: teacherIds } }, include: { user: true } })
+      : [];
+    const classes = classIds.length
+      ? await db.schoolClass.findMany({ where: { id: { in: classIds } }, include: { section: true } })
+      : [];
     const roomName = new Map(rooms.map((r) => [r.id, r.name] as const));
     const teacherName = new Map(
       teachers.map((t) => [t.id, `${t.user.firstName} ${t.user.lastName}`] as const),
@@ -261,8 +258,11 @@ export class OccupancyService {
             : clash.kind === 'teacher'
               ? (teacherName.get(row.teacherId ?? '') ?? 'L’enseignant')
               : `La classe ${className.get(row.classId ?? '') ?? ''}`.trim();
+        const resourceId =
+          (clash.kind === 'room' ? row.roomId : clash.kind === 'teacher' ? row.teacherId : row.classId) ?? '';
         return {
           kind: clash.kind,
+          resourceId,
           date,
           startTime,
           endTime,

@@ -393,6 +393,7 @@ export class SlotExceptionDto implements SlotExceptionContract {
 export class TimetableWarningDto implements WarningContract {
   @ApiProperty({ enum: TIMETABLE_WARNING_CODES })
   code: TimetableWarningCode;
+  slotId: string;
   @ApiProperty({ type: String, nullable: true })
   date: string | null;
   message: string;
@@ -401,6 +402,7 @@ export class TimetableWarningDto implements WarningContract {
 export class TimetableConflictDto implements ConflictContract {
   @ApiProperty({ enum: ['room', 'teacher', 'class'] })
   kind: TimetableConflictKind;
+  resourceId: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -422,11 +424,14 @@ export class TimetableWriteResultDto implements WriteResultContract {
   endedSlot: TimetableSlotDto | null;
   @ApiProperty({ type: SlotExceptionDto, nullable: true })
   exception: SlotExceptionDto | null;
+  @ApiProperty({ type: () => [TimetableWarningDto] })
   warnings: readonly TimetableWarningDto[];
 }
 
 export class TimetableCheckResultDto implements CheckResultContract {
+  @ApiProperty({ type: () => [TimetableConflictDto] })
   conflicts: readonly TimetableConflictDto[];
+  @ApiProperty({ type: () => [TimetableWarningDto] })
   warnings: readonly TimetableWarningDto[];
   canSave: boolean;
 }

@@ -791,6 +791,8 @@ export const TIMETABLE_WARNING_LABELS: Readonly<Record<TimetableWarningCode, str
 
 export interface TimetableWarningDto {
   readonly code: TimetableWarningCode;
+  /** The weekly slot the warning is about (to badge its sessions and offer a fix). */
+  readonly slotId: string;
   /** The day concerned; null when it covers the whole series (hours, room type). */
   readonly date: string | null;
   /** French sentence naming the item (« Salle 8 (24 places) pour 30 élèves »). */
@@ -808,6 +810,8 @@ export type TimetableConflictKind = 'room' | 'teacher' | 'class';
 /** A hard conflict: the save is refused (409). */
 export interface TimetableConflictDto {
   readonly kind: TimetableConflictKind;
+  /** The room, teacher or class that is taken (its id). */
+  readonly resourceId: string;
   readonly date: string;
   readonly startTime: string;
   readonly endTime: string;

@@ -324,7 +324,7 @@ describe('Timetable (e2e)', () => {
             slot({ classSubjectId: base.csPhysB, teacherId: base.sherif, roomId: base.r3 }),
           ),
         ]);
-        expect([a.status, b.status].sort()).toEqual([201, 409]);
+        expect([a.status, b.status].sort((x, y) => x - y)).toEqual([201, 409]);
         const loser = a.status === 409 ? a : b;
         expect(blocked(loser.body).code).toBe('TIMETABLE_CONFLICT');
         expect((await slots()).length).toBe(1);
@@ -341,7 +341,7 @@ describe('Timetable (e2e)', () => {
         post(admin, slot({ classSubjectId: base.csMathsB, roomId: base.r2 })),
       ]);
       // Same teacher, same time.
-      expect([a.status, b.status].sort()).toEqual([201, 409]);
+      expect([a.status, b.status].sort((x, y) => x - y)).toEqual([201, 409]);
     });
   });
 

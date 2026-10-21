@@ -35,24 +35,23 @@ export class WarningsService {
       ...new Set(standing.flatMap((o) => (o.current.roomId ? [o.current.roomId] : []))),
     ];
 
-    const [examWeeks, sizes, rooms, assessments] = await Promise.all([
-      loadClosures(db, ['exam_week'], from, to),
-      db.enrollment.groupBy({
-        by: ['classId'],
-        where: { classId: { in: classIds }, leftOn: null },
-        _count: { _all: true },
-      }),
-      roomIds.length ? db.room.findMany({ where: { id: { in: roomIds } } }) : [],
-      db.event.groupBy({
-        by: ['classId', 'date'],
-        where: {
-          classId: { in: classIds },
-          date: { gte: fromDay(from), lte: fromDay(to) },
-          activityType: { gradable: true, homework: false, repeatable: false },
-        },
-        _count: { _all: true },
-      }),
-    ]);
+    // One query at a time: a transaction has a single connection.
+    const examWeeks = await loadClosures(db, ['exam_week'], from, to);
+    const sizes = await db.enrollment.groupBy({
+      by: ['classId'],
+      where: { classId: { in: classIds }, leftOn: null },
+      _count: { _all: true },
+    });
+    const rooms = roomIds.length ? await db.room.findMany({ where: { id: { in: roomIds } } }) : [];
+    const assessments = await db.event.groupBy({
+      by: ['classId', 'date'],
+      where: {
+        classId: { in: classIds },
+        date: { gte: fromDay(from), lte: fromDay(to) },
+        activityType: { gradable: true, homework: false, repeatable: false },
+      },
+      _count: { _all: true },
+    });
     const facts = {
       examWeeks,
       classSize: new Map(sizes.map((s) => [s.classId, s._count._all])),

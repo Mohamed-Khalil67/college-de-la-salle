@@ -221,14 +221,14 @@ export class TimetableReadService {
     };
   }
 
-  /** May this user cancel, move or change the room of the session? Admins and coordinators; a teacher their own. */
+  /** May this user cancel, move, change the room of or restore the session? Admins and coordinators; a teacher their own. */
   private canChange(
     o: TimetableOccurrence<SlotData>,
     user: AuthUser,
     today: string,
     taught: ReadonlySet<string>,
   ): boolean {
-    if (o.status === 'cancelled' || o.status === 'moved_from') return false;
+    if (o.status === 'moved_from') return false;
     if (o.original.date < today) return false;
     if (canEditStructure(user)) return true;
     const row: SlotRow = o.slot.row;
