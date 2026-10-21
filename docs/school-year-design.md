@@ -5,6 +5,16 @@ Status: **approved direction, decisions recorded below** (2026-10-20). Written 2
 - the current code (`apps/api/prisma/schema.prisma` and the services);
 - teacher and student screen patterns, with WCAG 2.2.
 
+## Status
+
+Updated 2026-10-21, after the integration of the two lanes (branch `integration-school-year`).
+
+- **Phase 1, API: in.** Subjects, class subjects (the coefficient lives there), rooms, activity types (replacing the `event_kind` enum), periods with `periodId` on events, calendar days, coordinators.
+- **Phase 4: in.** Roster import with generated e-mails (homonyms numbered), first sign-in password change, section-change requests and their approval, graduation and archived accounts.
+- **Phase 1, admin screens: NOT built.** There is no screen yet for subjects, class subjects, rooms, activity types, periods and calendar days. The web only follows the new contracts (it reads and writes through the changed endpoints, nothing more); the data is managed through the API and the seed.
+- **Phases 2 (timetable), 3 (targeting) and 5 (next year): not started.**
+- Known gap for phase 5: a student who changes section in the middle of a period keeps the grades of the old class, but the report card of that period is computed from the current class only.
+
 ## What the owner asked for
 
 1. Everyone who plans can edit the year's periods (trimesters or semesters, holidays, exam weeks) easily.

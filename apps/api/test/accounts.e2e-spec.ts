@@ -614,4 +614,62 @@ describe('Accounts (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('coordinator with a temporary password', () => {
+    it('cannot edit the structure until the password is chosen, and loses access when disabled', async () => {
+      const created = (
+        await t
+          .http()
+          .post('/api/users')
+          .set(bearer(admin))
+          .send({ role: 'teacher', firstName: 'Coord', lastName: 'Temporaire' })
+          .expect(201)
+      ).body as CreatedUserResponse;
+      await t
+        .http()
+        .patch(`/api/users/${created.user.id}`)
+        .set(bearer(admin))
+        .send({ isCoordinator: true })
+        .expect(200);
+      const login = await t
+        .http()
+        .post('/api/auth/login')
+        .send({ email: created.user.email, password: created.temporaryPassword })
+        .expect(200);
+      const temporary = (login.body as SessionResponse).accessToken;
+      // The coordinator role does not bypass the forced password change.
+      const blocked = await t
+        .http()
+        .post('/api/rooms')
+        .set(bearer(temporary))
+        .send({ name: 'Salle temporaire', kind: 'classroom' })
+        .expect(403);
+      expect((blocked.body as { error: string }).error).toBe('PASSWORD_CHANGE_REQUIRED');
+
+      const session = await firstSignIn(created, 'Un-bon-mot-de-passe-2026');
+      const room = await t
+        .http()
+        .post('/api/rooms')
+        .set(bearer(session.accessToken))
+        .send({ name: 'Salle temporaire', kind: 'classroom' })
+        .expect(201);
+      // Section changes and user management stay with the admin.
+      await t.http().get('/api/section-changes').set(bearer(session.accessToken)).expect(403);
+      await t.http().get('/api/users').set(bearer(session.accessToken)).expect(403);
+
+      await t
+        .http()
+        .patch(`/api/users/${created.user.id}`)
+        .set(bearer(admin))
+        .send({ status: 'disabled' })
+        .expect(200);
+      await t
+        .http()
+        .post('/api/rooms')
+        .set(bearer(session.accessToken))
+        .send({ name: 'Salle bloquée', kind: 'classroom' })
+        .expect(401);
+      await t.http().delete(`/api/rooms/${(room.body as { id: string }).id}`).set(bearer(admin));
+    });
+  });
 });
