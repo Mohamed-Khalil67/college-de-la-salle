@@ -1,6 +1,7 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { schoolToday } from '@cdls/shared';
+import { ApiClient } from '../../core/api/api-client';
 import { Button, EmptyState, Icon } from '../../ui';
 import { SessionItem } from '../../timetable/session-item';
 import { TimetableApi } from '../../timetable/timetable-api';
@@ -40,6 +41,9 @@ import { shiftWeek, weekLabel } from '../shared/week';
       </div>
     </div>
 
+    @if (groupsLine()) {
+      <p class="t-body-s my-groups">{{ groupsLine() }}</p>
+    }
     <app-load-state [ref]="week" label="Chargement de la semaine…" />
     @if (week.hasValue()) {
       @if (!week.value().length) {
@@ -97,6 +101,9 @@ import { shiftWeek, weekLabel } from '../shared/week';
     }
   `,
   styles: `
+    .my-groups {
+      margin-bottom: var(--space-4);
+    }
     .tt-days {
       display: grid;
       gap: var(--space-4);
@@ -130,6 +137,15 @@ import { shiftWeek, weekLabel } from '../shared/week';
 })
 export class StudentTimetablePage {
   readonly #api = inject(TimetableApi);
+  readonly #groupsApi = inject(ApiClient);
+  readonly #groups = resource({ loader: () => this.#groupsApi.groups.mine() });
+  /** « Vos groupes : TP A (TP) » : why some sessions of the class are not in the list. */
+  protected readonly groupsLine = computed(() => {
+    const list = this.#groups.hasValue() ? this.#groups.value() : [];
+    return list.length
+      ? `Vos groupes : ${list.map((g) => `${g.label} (${g.division})`).join(', ')}. Vous voyez les séances de ces groupes et celles de toute la classe.`
+      : '';
+  });
   protected readonly today = schoolToday();
   protected readonly day = signal(this.today);
   protected readonly label = computed(() => weekLabel(this.day()));

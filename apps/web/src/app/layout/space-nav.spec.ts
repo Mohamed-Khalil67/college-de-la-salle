@@ -38,16 +38,16 @@ describe('« Plus » lists every screen of the area', () => {
     expect(labels(menu(ELEVE_NAV, student))).toEqual(
       expect.arrayContaining(['Agenda', 'Absences', 'Bulletins']),
     );
-    expect(labels(menu(ENSEIGNANT_NAV, teacher))).toEqual(expect.arrayContaining(['Agenda', 'Annonces']));
+    expect(labels(menu(ENSEIGNANT_NAV, teacher))).toEqual(expect.arrayContaining(['Agenda', 'Groupes', 'Annonces']));
     expect(menu(ENSEIGNANT_NAV, teacher).map((i) => i.label)).not.toContain('Coordination');
     expect(menu(ENSEIGNANT_NAV, coordinator).map((i) => i.label)).toContain('Coordination');
     const adminPages = menu(ADMIN_NAV, admin).map((i) => i.label);
     expect(adminPages).toEqual(
-      expect.arrayContaining(['Matières', 'Salles', 'Types d’activité', 'Affectations', 'Validations', 'Bulletins', 'Messages']),
+      expect.arrayContaining(['Matières', 'Groupes', 'Salles', 'Types d’activité', 'Affectations', 'Validations', 'Bulletins', 'Messages']),
     );
     const coordinatorPages = menu(ADMIN_NAV, coordinator).map((i) => i.label);
     expect(coordinatorPages).toEqual(
-      expect.arrayContaining(['Matières', 'Salles', 'Types d’activité', 'Année scolaire', 'Mon espace enseignant']),
+      expect.arrayContaining(['Matières', 'Groupes', 'Salles', 'Types d’activité', 'Année scolaire', 'Mon espace enseignant']),
     );
     expect(coordinatorPages).not.toContain('Utilisateurs');
     expect(coordinatorPages).not.toContain('Bulletins');

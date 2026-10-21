@@ -4,6 +4,7 @@ import { Badge, Button, Icon, Modal } from '../../ui';
 import { saveFile } from './download';
 import { dayTitle, isAssessment, kindLabel, longDate, mark, subjectName, timeSpan, whereOf } from './format';
 import { eventIcs, fileName } from './week';
+import { eventTargetLine } from '../../groupes/groups-logic';
 
 /**
  * The details of one calendar occurrence in a dialog: when, where, who, the description, the https
@@ -33,6 +34,10 @@ import { eventIcs, fileName } from './week';
             @if (where()) {
               <dt>Lieu</dt>
               <dd>{{ where() }}</dd>
+            }
+            @if (!o.event.target.whole) {
+              <dt>Pour</dt>
+              <dd>{{ targetLine() }}</dd>
             }
             @if (gradable()) {
               <dt>Coefficient</dt>
@@ -92,6 +97,7 @@ export class EventDetails {
     const e = this.occurrence()?.event;
     return e ? whereOf(e) : '';
   });
+  protected readonly targetLine = computed(() => eventTargetLine(this.occurrence()?.event.target));
   protected readonly coefficient = computed(() => mark(this.occurrence()?.event.coefficient ?? 1));
   protected readonly day = computed(() => dayTitle(this.occurrence()?.day ?? '2000-01-01'));
   protected readonly until = computed(() => longDate(this.occurrence()?.event.repeatUntil ?? '2000-01-01'));

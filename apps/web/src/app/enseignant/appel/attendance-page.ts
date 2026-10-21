@@ -109,6 +109,7 @@ export class AttendancePage {
     if (isCalendarDay(value)) this.date.set(value);
   }
   protected sessionLabel(s: OccurrenceDto): string {
-    return `${timeSpan(s.event.startTime, s.event.endTime)}, ${s.event.title} (${kindLabel(s.event.type)})`;
+    const who = s.event.target.whole ? '' : `, ${s.event.target.groups.map((g) => g.label).join(', ') || 'élèves nommés'}`;
+    return `${timeSpan(s.event.startTime, s.event.endTime)}, ${s.event.title} (${kindLabel(s.event.type)}${who})`;
   }
 }

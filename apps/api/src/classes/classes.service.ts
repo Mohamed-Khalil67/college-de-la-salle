@@ -2,6 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { type SectionId, todayIso } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
+import { canEditStructure } from '../access/grants.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
@@ -133,7 +134,8 @@ export class ClassesService {
   /** The class list: admins and the class's teachers. */
   async students(classId: string, user: AuthUser): Promise<ClassStudentDto[]> {
     await this.get(classId);
-    await this.access.assertTeachesClass(user, classId);
+    // Admins and coordinators read any class list (they manage every group); a teacher, the classes they teach.
+    if (!canEditStructure(user)) await this.access.assertTeachesClass(user, classId);
     const enrollments = await this.#enrollments(classId);
     return enrollments.map((e) =>
       Object.assign(toStudentSummary(e.student), { enrollmentId: e.id }),

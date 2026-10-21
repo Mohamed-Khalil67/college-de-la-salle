@@ -4,6 +4,7 @@ import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Avatar, Badge, Button, GradeInput, Modal } from '../../ui';
 import { average, clockOf, mark, plural } from '../../eleve/shared/format';
 import { LoadState } from '../../eleve/shared/load-state';
+import { eventTargetLine } from '../../groupes/groups-logic';
 import { columnAverage, gradeIssues, isValidScore, issuesSentence, rowAverage } from '../shared/teacher';
 
 type Marks = Readonly<Record<string, number | null>>;
@@ -34,6 +35,12 @@ type Marks = Readonly<Record<string, number | null>>;
           <button cdlsButton size="sm" type="button" (click)="openConfirm()">Publier les notes</button>
         }
       </div>
+      <p class="t-body-s grid-target">
+        <b>Assignée à :</b> {{ targetLine() }}.
+        @if (!sheet.event.target.whole) {
+          Seuls ces élèves apparaissent ici ; les notes des autres élèves de la classe ne se saisissent pas.
+        }
+      </p>
       <p class="t-body-s t-muted grid-help">
         Saisissez une note de 0 à {{ outOfText() }} (virgule acceptée), ou laissez vide. Passez d’un élève à l’autre avec Tab.
       </p>
@@ -46,7 +53,7 @@ type Marks = Readonly<Record<string, number | null>>;
           <caption id="grid-caption" class="visually-hidden">Notes de {{ sheet.event.title }}, {{ className() }}</caption>
           <thead>
             <tr>
-              <th scope="col">Élève <span class="t-muted">({{ sheet.rows.length }})</span></th>
+              <th scope="col">Élève <span class="t-muted">({{ targetedRows().length }})</span></th>
               @for (other of others(); track other.event.id) {
                 <th scope="col" class="num">{{ other.event.title }}<span class="cell-sub">×{{ fmt(other.event.coefficient) }}, {{ isPublished(other) ? 'publié' : 'brouillon' }}</span></th>
               }
@@ -62,17 +69,22 @@ type Marks = Readonly<Record<string, number | null>>;
                   <td class="num">{{ scoreIn(other, row.student.id) }}</td>
                 }
                 <td>
-                  <cdls-grade-input
-                    [value]="marks()[row.student.id] ?? null"
-                    (valueChange)="setMark(row.student.id, $event)"
-                    [outOf]="outOf()"
-                    [label]="sheet.event.title + ', ' + name(row.student)"
-                    [describedBy]="'err-' + row.student.id"
-                  />
+                  @if (row.targeted) {
+                    <cdls-grade-input
+                      [value]="marks()[row.student.id] ?? null"
+                      (valueChange)="setMark(row.student.id, $event)"
+                      [outOf]="outOf()"
+                      [label]="sheet.event.title + ', ' + name(row.student)"
+                      [describedBy]="'err-' + row.student.id"
+                    />
+                  } @else {
+                    <span class="tabular">{{ scoreIn(sheet, row.student.id) }}</span>
+                    <cdls-badge tone="warning">N’est plus concerné : note conservée</cdls-badge>
+                  }
                 </td>
                 <td class="num"><b>{{ avg(studentAverage(row.student.id)) }}</b></td>
               </tr>
-              @if (!valid(row.student.id)) {
+              @if (row.targeted && !valid(row.student.id)) {
                 <tr class="grade-row-error" [id]="'err-' + row.student.id">
                   <td [attr.colspan]="others().length + 3">
                     <p class="field__error">{{ name(row.student) }} : la note doit être un nombre compris entre 0 et {{ outOfText() }}.</p>
@@ -99,7 +111,7 @@ type Marks = Readonly<Record<string, number | null>>;
           @if (published()) {
             <p>Les élèves de {{ className() }} ne verront plus ces notes, et leur moyenne sera recalculée sans elles.</p>
           } @else {
-            <p>Les {{ sheet.rows.length }} élèves de {{ className() }} verront leur note et leur nouvelle moyenne. Vous pourrez encore corriger une note après publication.</p>
+            <p>Les {{ targetedRows().length }} élèves concernés de {{ className() }} verront leur note et leur nouvelle moyenne. Vous pourrez encore corriger une note après publication.</p>
             @if (issuesText()) {
               <cdls-alert tone="warning">{{ issuesText() }} {{ issues().invalid.length ? 'Corrigez les notes hors barème avant de publier.' : 'Vous pouvez publier sans elles.' }}</cdls-alert>
             }
@@ -120,6 +132,9 @@ type Marks = Readonly<Record<string, number | null>>;
   styles: `
     .grid-help {
       margin-bottom: var(--space-4);
+    }
+    .grid-target {
+      margin-bottom: var(--space-2);
     }
   `,
 })
@@ -151,13 +166,16 @@ export class GradeGrid {
     const marks = this.marks();
     return Object.keys(saved).some((id) => !same(saved[id] ?? null, marks[id] ?? null));
   });
+  /** The students the work concerns today (a graded student who left the group is shown, read-only). */
+  protected readonly targetedRows = computed(() => (this.main()?.rows ?? []).filter((r) => r.targeted));
+  protected readonly targetLine = computed(() => eventTargetLine(this.main()?.event.target));
   protected readonly issues = computed(() =>
-    gradeIssues((this.main()?.rows ?? []).map((r) => ({ name: this.name(r.student), score: this.marks()[r.student.id] ?? null })), this.outOf()),
+    gradeIssues(this.targetedRows().map((r) => ({ name: this.name(r.student), score: this.marks()[r.student.id] ?? null })), this.outOf()),
   );
   protected readonly issuesText = computed(() => issuesSentence(this.issues()));
   protected readonly classAverage = computed(() => columnAverage(Object.values(this.marks()), this.outOf()));
   protected readonly countText = computed(() => {
-    const total = this.main()?.rows.length ?? 0;
+    const total = this.targetedRows().length;
     const given = Object.values(this.marks()).filter((m) => m !== null && isValidScore(m, this.outOf())).length;
     return `${plural(given, 'note')} sur ${total}`;
   });
@@ -227,7 +245,7 @@ export class GradeGrid {
     this.busy.set(true);
     this.failure.set(null);
     try {
-      const entries = sheet.rows.map((r) => ({
+      const entries = this.targetedRows().map((r) => ({
         studentId: r.student.id,
         score: this.marks()[r.student.id] ?? null,
         comment: r.grade?.comment ?? '',

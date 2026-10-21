@@ -56,7 +56,9 @@ export class HomeworkItem {
     const e = this.item().event;
     const subject = subjectName(e.subjectId);
     const when = this.done() ? 'fait' : `pour ${longDay(e.date)}`;
-    return subject ? `${subject}, ${when}` : when;
+    // Work for a group says so: « Groupe TP A ».
+    const group = e.target.whole ? '' : e.target.groups.map((g) => g.label).join(', ');
+    return [subject, when, group ? `groupe ${group}` : ''].filter(Boolean).join(', ');
   });
 
   protected async toggle(box: HTMLInputElement): Promise<void> {

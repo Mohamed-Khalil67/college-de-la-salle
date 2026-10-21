@@ -130,7 +130,8 @@ export class GradeEntryPage {
   );
 
   protected optionLabel(e: EventDto): string {
-    return `${dayTitle(e.date)} : ${e.title}`;
+    const who = e.target.whole ? '' : ` (${e.target.groups.map((g) => g.label).join(', ') || 'élèves nommés'})`;
+    return `${dayTitle(e.date)} : ${e.title}${who}`;
   }
   protected meta(e: EventDto): string {
     return `${kindLabel(e.type)} du ${dayTitle(e.date).toLowerCase()}, coefficient ${mark(e.coefficient)}`;

@@ -21,8 +21,8 @@ export const ELEVE_NAV: readonly SpaceNavItem[] = [
 ];
 
 /**
- * Phone bottom bar (five at most): Classes, Horaire, Notes, Appel, Plus. Agenda, Annonces and, for a coordinator,
- * Coordination are one tap away in « Plus ».
+ * Phone bottom bar (five at most): Classes, Horaire, Notes, Appel, Plus. Agenda, Groupes, Annonces and, for a
+ * coordinator, Coordination are one tap away in « Plus ».
  */
 export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Mes classes', path: '', icon: 'users', short: 'Classes' },
@@ -30,6 +30,7 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Agenda', path: 'agenda' },
   { label: 'Saisie des notes', path: 'notes', icon: 'edit', short: 'Notes' },
   { label: 'Appel', path: 'appel', icon: 'check' },
+  { label: 'Groupes', path: 'groupes' },
   { label: 'Annonces', path: 'annonces' },
   /** Teachers the admin marked coordinateur edit the year's structure in the administration area. */
   { label: 'Coordination', path: 'coordination', href: '/admin/matieres', access: 'coordinator' },
@@ -46,6 +47,7 @@ export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Classes', path: 'classes', icon: 'book' },
   { label: 'Emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
   { label: 'Matières', path: 'matieres' },
+  { label: 'Groupes', path: 'groupes', secondary: true },
   { label: 'Salles', path: 'salles', secondary: true },
   { label: 'Types d’activité', path: 'types-activite', short: 'Types', secondary: true },
   { label: 'Année scolaire', path: 'annees', icon: 'calendar', short: 'Année' },

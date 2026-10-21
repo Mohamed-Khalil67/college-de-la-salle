@@ -19,6 +19,7 @@ import {
 import { ApiClient, apiMessage } from '../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../ui';
 import { BlockedNotice } from './blocked-notice';
+import { GroupSelect } from './group-select';
 import { FreeRooms } from './free-rooms';
 import { blockedOf, TimetableApi } from './timetable-api';
 import { sessionSummary } from './timetable-format';
@@ -43,6 +44,7 @@ interface ChangeModel {
   endTime: string;
   weekParity: string;
   division: string;
+  groupId: string;
 }
 
 let nextId = 0;
@@ -55,7 +57,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'app-session-dialog',
-  imports: [Alert, BlockedNotice, Button, Field, FieldControl, FormField, FreeRooms, Modal],
+  imports: [Alert, BlockedNotice, Button, Field, FieldControl, FormField, FreeRooms, GroupSelect, Modal],
   template: `
     <cdls-modal title="Modifier la séance" [(open)]="open" [dismissible]="!busy()">
       @if (session(); as s) {
@@ -176,9 +178,12 @@ let nextId = 0;
                     }
                   </select>
                 </cdls-field>
-                <cdls-field label="Division des groupes" helper="Vide : toute la classe.">
-                  <input cdlsControl type="text" autocomplete="off" [formField]="changeForm.division" />
-                </cdls-field>
+                <app-group-select [classId]="seriesClassId()" [value]="model().groupId" (valueChange)="chooseGroup($event)" />
+                @if (!model().groupId) {
+                  <cdls-field label="Division des groupes" helper="Vide : toute la classe. Pour une séance de groupe, choisissez plutôt le groupe.">
+                    <input cdlsControl type="text" autocomplete="off" [formField]="changeForm.division" />
+                  </cdls-field>
+                }
               </div>
             }
             @case ('end') {
@@ -331,9 +336,16 @@ export class SessionDialog {
       endTime: slot?.endTime ?? s?.original.endTime ?? '',
       weekParity: slot?.weekParity ?? '',
       division: slot?.division ?? '',
+      groupId: slot?.groupId ?? '',
     };
   });
   protected readonly changeForm = form(this.model);
+  /** The class of the series being edited, whose groups the selector offers. */
+  protected readonly seriesClassId = computed(() => (this.#slot.hasValue() ? this.#slot.value().classId : ''));
+
+  protected chooseGroup(id: string): void {
+    this.model.update((m) => ({ ...m, groupId: id }));
+  }
 
   protected readonly submitLabel = computed(() => (this.warnings().length ? 'Enregistrer avec ces avertissements' : 'Enregistrer'));
 
@@ -484,14 +496,19 @@ export class SessionDialog {
   }
 
   /** Only the fields of the series that differ from what it has now. */
-  private changesOf(m: ChangeModel, slot: Required<Pick<TimetableSlotInput, 'weekday' | 'startTime' | 'endTime' | 'roomId' | 'weekParity' | 'division'>>): Partial<TimetableSlotInput> {
+  private changesOf(m: ChangeModel, slot: Required<Pick<TimetableSlotInput, 'weekday' | 'startTime' | 'endTime' | 'roomId' | 'weekParity' | 'division'>> & { groupId: string | null }): Partial<TimetableSlotInput> {
     const changes: { -readonly [K in keyof TimetableSlotInput]?: TimetableSlotInput[K] } = {};
     if (Number(m.weekday) !== slot.weekday) changes.weekday = Number(m.weekday);
     if (m.startTime !== slot.startTime) changes.startTime = m.startTime;
     if (m.endTime !== slot.endTime) changes.endTime = m.endTime;
     if ((m.roomId || null) !== slot.roomId) changes.roomId = m.roomId || null;
     if ((m.weekParity || null) !== slot.weekParity) changes.weekParity = (m.weekParity || null) as 'A' | 'B' | null;
-    if ((m.division.trim() || null) !== slot.division) changes.division = m.division.trim() || null;
+    if ((m.groupId || null) !== slot.groupId) {
+      // The division follows the group: the API derives it from the new group (or the whole class without one).
+      changes.groupId = m.groupId || null;
+    } else if (!m.groupId && (m.division.trim() || null) !== slot.division) {
+      changes.division = m.division.trim() || null;
+    }
     return changes;
   }
 }

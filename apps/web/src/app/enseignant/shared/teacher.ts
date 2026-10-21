@@ -1,4 +1,5 @@
 import {
+  type AssessmentTargetInput,
   type AttendanceStatus,
   averageOnTwenty,
   type ClassDto,
@@ -128,6 +129,8 @@ export function toEventInput(
   m: EventFormModel,
   assignments: readonly TeachingAssignmentDto[],
   types: readonly Pick<ActivityTypeSummary, 'id' | 'repeatable' | 'gradable'>[],
+  /** « Assigner à », for assessments and homework of a class; left out for other events. */
+  target?: AssessmentTargetInput,
 ): EventInput {
   const info = types.find((t) => t.id === m.activityTypeId) ?? { repeatable: false, gradable: false };
   const assignment = assignments.find((a) => a.id === m.assignmentId);
@@ -144,6 +147,7 @@ export function toEventInput(
     place: m.place.trim(),
     description: m.description.trim(),
     coefficient: info.gradable ? m.coefficient : 1,
+    ...(target ? { target } : {}),
   };
 }
 

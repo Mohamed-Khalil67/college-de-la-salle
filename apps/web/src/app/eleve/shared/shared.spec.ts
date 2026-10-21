@@ -37,6 +37,7 @@ const event = (over: Partial<EventDto> = {}): EventDto => ({
   description: '',
   attachments: [],
   coefficient: 1,
+  target: { whole: true, groups: [], studentIds: [], concerned: null },
   authorId: 't1',
   authorName: 'Hany Mansour',
   createdAt: '2026-10-01T08:00:00.000Z',

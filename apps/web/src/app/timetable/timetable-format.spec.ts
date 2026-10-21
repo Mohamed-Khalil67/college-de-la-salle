@@ -48,6 +48,8 @@ const session = (over: Partial<TimetableOccurrenceDto> = {}): TimetableOccurrenc
     homework: false,
   },
   division: null,
+  groupId: null,
+  groupLabel: null,
   canChange: false,
   ...over,
 });

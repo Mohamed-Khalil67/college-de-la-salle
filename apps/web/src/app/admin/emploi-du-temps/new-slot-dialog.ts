@@ -18,6 +18,7 @@ import {
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../ui';
 import { BlockedNotice } from '../../timetable/blocked-notice';
+import { GroupSelect } from '../../timetable/group-select';
 import { FreeRooms } from '../../timetable/free-rooms';
 import { blockedOf, TimetableApi } from '../../timetable/timetable-api';
 
@@ -47,6 +48,7 @@ interface NewSlotModel {
   endTime: string;
   weekParity: string;
   division: string;
+  groupId: string;
   validFrom: string;
   validTo: string;
 }
@@ -54,7 +56,7 @@ interface NewSlotModel {
 /** « Ajouter une séance »: a weekly slot for a class (subject, teacher, room, day and hours, rhythm). */
 @Component({
   selector: 'app-new-slot-dialog',
-  imports: [Alert, BlockedNotice, Button, Field, FieldControl, FormField, FreeRooms, Modal],
+  imports: [Alert, BlockedNotice, Button, Field, FieldControl, FormField, FreeRooms, GroupSelect, Modal],
   template: `
     <cdls-modal title="Ajouter une séance" [(open)]="open" [dismissible]="!busy()">
       <form class="stack stack--sm" novalidate (submit)="submit($event)">
@@ -119,9 +121,12 @@ interface NewSlotModel {
               }
             </select>
           </cdls-field>
-          <cdls-field label="Division des groupes" helper="Vide : toute la classe.">
-            <input cdlsControl type="text" autocomplete="off" [formField]="slotForm.division" />
-          </cdls-field>
+          <app-group-select [classId]="model().classId" [value]="model().groupId" (valueChange)="chooseGroup($event)" />
+          @if (!model().groupId) {
+            <cdls-field label="Division des groupes" helper="Vide : toute la classe. Pour une séance de groupe, choisissez plutôt le groupe.">
+              <input cdlsControl type="text" autocomplete="off" [formField]="slotForm.division" />
+            </cdls-field>
+          }
           <cdls-field label="À partir du">
             <input cdlsControl type="date" [formField]="slotForm.validFrom" />
           </cdls-field>
@@ -211,6 +216,7 @@ export class NewSlotDialog {
       endTime: d.endTime,
       weekParity: '',
       division: '',
+      groupId: '',
       validFrom: startOf(year),
       validTo: year?.endsOn ?? '',
     };
@@ -227,6 +233,7 @@ export class NewSlotDialog {
           ...m,
           classSubjectId: '',
           teacherId: '',
+          groupId: '',
           validFrom: year ? startOf(year) : m.validFrom,
           validTo: year?.endsOn ?? m.validTo,
         }));
@@ -262,6 +269,10 @@ export class NewSlotDialog {
 
   protected className(c: ClassDto): string {
     return `${c.label} (${SECTION_LABELS[c.sectionCode]})`;
+  }
+
+  protected chooseGroup(id: string): void {
+    this.model.update((m) => ({ ...m, groupId: id }));
   }
 
   protected chooseRoom(id: string): void {
@@ -323,7 +334,9 @@ export class NewSlotDialog {
       validFrom: m.validFrom,
       validTo: m.validTo,
       weekParity: (m.weekParity || null) as 'A' | 'B' | null,
-      division: m.division.trim() || null,
+      // With a group the division is the group's: the API derives it.
+      division: m.groupId ? null : m.division.trim() || null,
+      groupId: m.groupId || null,
     };
   }
 }

@@ -115,7 +115,7 @@ export class SessionItem {
     const place = s.status === 'moved_from' ? s.original : s.current;
     return [
       this.showClass() ? s.classLabel : '',
-      s.division ? `groupe ${s.division}` : '',
+      s.groupLabel ? `groupe ${s.groupLabel}` : s.division ? `groupe ${s.division}` : '',
       place.roomName ?? '',
       this.showTeacher() ? place.teacherName : '',
     ]

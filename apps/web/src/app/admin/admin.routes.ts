@@ -37,6 +37,11 @@ export const ADMIN_ROUTES: Routes = [
     loadComponent: () => import('./types-activite/activity-types-page').then((m) => m.ActivityTypesPage),
   },
   {
+    path: 'groupes',
+    title: 'Groupes',
+    loadComponent: () => import('../groupes/groups-page').then((m) => m.GroupsPage),
+  },
+  {
     path: 'emploi-du-temps',
     title: 'Emploi du temps',
     loadComponent: () =>

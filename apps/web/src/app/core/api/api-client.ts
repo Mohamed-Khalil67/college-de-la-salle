@@ -3,12 +3,14 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   ActivityTypeDto,
+  AddGroupMembersRequest,
   ApiError,
   CalendarDayDto,
   CalendarDayQuery,
   CopyClassSubjectsRequest,
   CreateActivityTypeRequest,
   CreateCalendarDayRequest,
+  CreateGroupRequest,
   CreateRoomRequest,
   CreateSubjectRequest,
   RoomDto,
@@ -42,11 +44,14 @@ import type {
   EventInput,
   EventRangeQuery,
   GradeSheetDto,
+  GroupDetailDto,
+  GroupWithMembersDto,
   HomeworkCompletionDto,
   HomeworkDto,
   ImportPreviewResponse,
   ImportRole,
   ImportUsersResponse,
+  MyGroupDto,
   OccurrenceDto,
   Paginated,
   PostDto,
@@ -66,6 +71,7 @@ import type {
   TeachingAssignmentDto,
   PeriodDto,
   UpdateClassSubjectRequest,
+  UpdateGroupRequest,
   UpdateUserRequest,
   UserDto,
   UserListQuery,
@@ -243,6 +249,21 @@ export class ApiClient {
     save: (eventId: string, body: SaveAttendanceRequest) => this.#put<AttendanceSheetDto>(`/events/${eventId}/attendance`, body),
     ofStudent: (studentId: string, query: { from?: string; to?: string } = {}) =>
       this.#get<StudentAttendanceDto[]>(`/students/${studentId}/attendance`, query),
+  };
+
+  /* Groups of a class (TP A, LV2 Allemand): staff manage them, a student reads only their own memberships */
+  readonly groups = {
+    /** The groups of a class with their members' ids. */
+    list: (classId: string) => this.#get<GroupWithMembersDto[]>('/groups', { classId }),
+    get: (id: string) => this.#get<GroupDetailDto>(`/groups/${id}`),
+    create: (body: CreateGroupRequest) => this.#post<GroupDetailDto>('/groups', body),
+    update: (id: string, body: UpdateGroupRequest) => this.#patch<GroupDetailDto>(`/groups/${id}`, body),
+    /** 409 while timetable sessions or assigned work use the group. */
+    remove: (id: string) => this.#delete(`/groups/${id}`),
+    /** 409 when a student is already in another group of the division, unless `move`. */
+    addMembers: (id: string, body: AddGroupMembersRequest) => this.#post<GroupDetailDto>(`/groups/${id}/members`, body),
+    removeMember: (id: string, studentId: string) => this.#delete<GroupDetailDto>(`/groups/${id}/members/${studentId}`),
+    mine: () => this.#get<MyGroupDto[]>('/groups/mine'),
   };
 
   /* Contact form (public) and its messages (admin) */
