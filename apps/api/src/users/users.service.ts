@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import {
   describeSchoolEmails,
   type ImportRole,
@@ -127,7 +127,7 @@ export class UsersService {
    * Creates one account with a temporary password (shown once). Without an e-mail, the school address
    * `prenom.nom@<domain>` is generated. A student's class sets their section.
    */
-  async create(dto: CreateUserDto): Promise<CreatedUserDto> {
+  async create(dto: CreateUserDto, actor: AuthUser): Promise<CreatedUserDto> {
     if (dto.role !== 'student' && (dto.classId || dto.studentNumber || dto.birthDate)) {
       throw new BadRequestException(
         'Classe, matricule et date de naissance concernent uniquement les élèves.',
@@ -154,7 +154,7 @@ export class UsersService {
         await lockEmails(tx);
         email = await this.generatedEmail(tx, dto.firstName, dto.lastName);
       }
-      return tx.user.create({
+      const created = await tx.user.create({
         data: {
           email,
           passwordHash,
@@ -187,6 +187,17 @@ export class UsersService {
         },
         include,
       });
+      // Never the password: who made which account, with which role.
+      await audit(tx, [
+        {
+          actorId: actor.id,
+          action: 'user.create',
+          entity: 'user',
+          entityId: created.id,
+          after: { email, role: dto.role, classId: dto.classId ?? null },
+        },
+      ]);
+      return created;
       });
       return { user: toUserDto(user), temporaryPassword };
     } catch (error) {
@@ -230,6 +241,27 @@ export class UsersService {
         },
         include,
       });
+      if (reset)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'user.password_reset',
+            entity: 'user',
+            entityId: id,
+            after: { mustChangePassword: true },
+          },
+        ]);
+      if (dto.status !== undefined && dto.status !== current.status)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'user.status',
+            entity: 'user',
+            entityId: id,
+            before: { status: current.status },
+            after: { status: dto.status },
+          },
+        ]);
       // A permission change: keep a trace of who granted or removed it.
       if (coordinatorChange)
         await audit(tx, [
@@ -264,7 +296,11 @@ export class UsersService {
   }
 
   /** Roster CSV import, all or nothing: every account gets a generated e-mail and a temporary password. */
-  async importCsv(csv: Buffer | undefined, role: ImportRole): Promise<ImportUsersDto> {
+  async importCsv(
+    csv: Buffer | undefined,
+    role: ImportRole,
+    actor: AuthUser,
+  ): Promise<ImportUsersDto> {
     const { rows, errors } = await this.checkImport(csv, role);
     if (errors.length)
       throw new BadRequestException({
@@ -323,6 +359,16 @@ export class UsersService {
             });
             created.push(email);
           }
+          // One row for the whole import: a count, never the addresses, names or passwords.
+          await audit(tx, [
+            {
+              actorId: actor.id,
+              action: 'user.import',
+              entity: 'user_import',
+              entityId: randomUUID(),
+              after: { role, created: created.length, skipped: rows.length - fresh.length },
+            },
+          ]);
           return created;
         },
         { timeout: 60_000 },

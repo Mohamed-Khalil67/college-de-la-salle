@@ -73,8 +73,8 @@ export class UsersController {
    */
   @Post()
   @ApiCreatedResponse({ type: CreatedUserDto })
-  create(@Body() body: CreateUserDto): Promise<CreatedUserDto> {
-    return this.users.create(body);
+  create(@Body() body: CreateUserDto, @CurrentUser() actor: AuthUser): Promise<CreatedUserDto> {
+    return this.users.create(body, actor);
   }
 
   /** Roster CSV check (multipart field `file`, 1 MB max): the accounts it would create and the errors. */
@@ -107,8 +107,9 @@ export class UsersController {
   import(
     @Query() query: ImportUsersQueryDto,
     @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() actor: AuthUser,
   ): Promise<ImportUsersDto> {
-    return this.users.importCsv(file?.buffer, query.role);
+    return this.users.importCsv(file?.buffer, query.role, actor);
   }
 
   /**

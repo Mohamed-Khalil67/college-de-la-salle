@@ -1,14 +1,23 @@
-import type { ApiError, ClassSubjectDto } from '@cdls/shared';
+import type {
+  ApiError,
+  ClassSubjectDto,
+  CreatedUserResponse,
+  ImportUsersResponse,
+  SectionChangeRequestDto,
+} from '@cdls/shared';
 import {
   ADMIN,
   bearer,
   COORDINATOR,
   createTestApp,
+  DOMAIN,
   MATHS_TEACHER,
+  studentOf,
   type TestApp,
 } from './helpers.js';
 
 const message = (body: unknown) => String((body as ApiError).message);
+const json = (v: unknown) => JSON.stringify(v, (_, x: unknown) => (typeof x === 'bigint' ? Number(x) : x));
 const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 /** Fixes from the independent review (H1, H2, M1…), each in its own isolated school year. */
@@ -49,7 +58,27 @@ describe('Review fixes (e2e)', () => {
     bacId = (await t.prisma.section.findFirstOrThrow({ where: { code: 'bac' } })).id;
   });
 
-  afterAll(() => t.close());
+  /** A class of the current year, for accounts created by these tests; their enrolments are closed at the end. */
+  let currentClassId: string;
+  const closeEnrolments = async () => {
+    await t.prisma.enrollment.updateMany({
+      where: { classId: currentClassId, leftOn: null },
+      data: { leftOn: new Date('2026-09-06T00:00:00Z') },
+    });
+  };
+  beforeAll(async () => {
+    const current = await t.prisma.schoolYear.findFirstOrThrow({ where: { isCurrent: true } });
+    currentClassId = (
+      await t.prisma.schoolClass.create({
+        data: { schoolYearId: current.id, sectionId: bacId, code: 'fix-current', label: 'Fix' },
+      })
+    ).id;
+  });
+
+  afterAll(async () => {
+    await closeEnrolments();
+    await t.close();
+  });
 
   describe('H1: coefficients freeze with the period', () => {
     it('refuses a coefficient change and a copy overwrite once a period is closed or has report cards', async () => {
@@ -119,6 +148,119 @@ describe('Review fixes (e2e)', () => {
       expect(Number(unchanged.coefficient)).toBe(6);
       // Same coefficient: nothing to protect, so a no-op edit still passes.
       await patch(admin, 6).expect(200);
+    });
+  });
+  describe('H2: audit trail of account changes', () => {
+    const trail = (action: string, entityId?: string) =>
+      t.prisma.auditLog.findMany({ where: { action, ...(entityId ? { entityId } : {}) } });
+
+    it('records account creation, password reset, disable and restore without any secret', async () => {
+      const res = await t
+        .http()
+        .post('/api/users')
+        .set(bearer(admin))
+        .send({ role: 'teacher', firstName: 'Audit', lastName: 'Trace' })
+        .expect(201);
+      const { user, temporaryPassword } = res.body as CreatedUserResponse;
+      const created = await trail('user.create', user.id);
+      expect(created).toHaveLength(1);
+      expect(created[0]!.actorId).not.toBeNull();
+
+      await t
+        .http()
+        .patch(`/api/users/${user.id}`)
+        .set(bearer(admin))
+        .send({ password: 'Un-Autre-Mot-2026' })
+        .expect(200);
+      await t.http().patch(`/api/users/${user.id}`).set(bearer(admin)).send({ status: 'disabled' }).expect(200);
+      await t.http().patch(`/api/users/${user.id}`).set(bearer(admin)).send({ status: 'active' }).expect(200);
+      expect(await trail('user.password_reset', user.id)).toHaveLength(1);
+      const statuses = await trail('user.status', user.id);
+      expect(statuses.map((r) => [r.before, r.after])).toEqual([
+        [{ status: 'active' }, { status: 'disabled' }],
+        [{ status: 'disabled' }, { status: 'active' }],
+      ]);
+
+      const all = json(await t.prisma.auditLog.findMany({ where: { entityId: user.id } }));
+      expect(all).not.toContain(temporaryPassword);
+      expect(all).not.toContain('Un-Autre-Mot-2026');
+      expect(all).not.toMatch(/argon2/);
+    });
+
+    it('records an import as one row with a count, never the people or their passwords', async () => {
+      const last = `Audit${Date.now().toString(36)}`;
+      const file = Buffer.from(
+        ['lastName,firstName', `${last},Alice`, `${last},Bob`].join('\n'),
+      );
+      const before = (await trail('user.import')).length;
+      const res = await t
+        .http()
+        .post('/api/users/import?role=teacher')
+        .set(bearer(admin))
+        .attach('file', file, { filename: 'p.csv', contentType: 'text/csv' })
+        .expect(201);
+      const created = (res.body as ImportUsersResponse).created;
+      const rows = await trail('user.import');
+      expect(rows).toHaveLength(before + 1);
+      const row = rows.at(-1)!;
+      expect(row.after).toEqual({ role: 'teacher', created: 2, skipped: 0 });
+      const text = json(row);
+      for (const c of created) {
+        expect(text).not.toContain(c.temporaryPassword);
+        expect(text).not.toContain(c.email);
+      }
+      expect(text).not.toContain(last.toLowerCase());
+    });
+
+    it('records section-change requests and rejections', async () => {
+      const { studentId } = await studentOf(t.prisma, 'bac', 'seconde');
+      const request = (
+        await t
+          .http()
+          .post('/api/section-changes')
+          .set(bearer(admin))
+          .send({ studentId, toSection: 'nationale', reason: 'Audit' })
+          .expect(201)
+      ).body as SectionChangeRequestDto;
+      const created = await trail('section_change.create', request.id);
+      expect(created).toHaveLength(1);
+      expect(created[0]!.after).toMatchObject({ studentId, byStudent: false });
+      await t
+        .http()
+        .post(`/api/section-changes/${request.id}/reject`)
+        .set(bearer(admin))
+        .send({ note: 'Non.' })
+        .expect(200);
+      expect(await trail('section_change.reject', request.id)).toHaveLength(1);
+      // A second rejection changes nothing and leaves no second row.
+      await t
+        .http()
+        .post(`/api/section-changes/${request.id}/reject`)
+        .set(bearer(admin))
+        .send({ note: 'Encore non.' })
+        .expect(409);
+      expect(await trail('section_change.reject', request.id)).toHaveLength(1);
+    });
+  });
+
+  describe('section changes: who may call what', () => {
+    it('keeps /mine to students and refuses a student who asks for someone else', async () => {
+      const mine = await studentOf(t.prisma, 'bac', 'seconde');
+      const student = await t.token(mine.email);
+      const other = await studentOf(t.prisma, 'nationale', 'secondaire-1');
+      await t
+        .http()
+        .post('/api/section-changes')
+        .set(bearer(student))
+        .send({ studentId: other.studentId, toSection: 'bac', reason: 'Pour un autre' })
+        .expect(403);
+      for (const token of [maths, admin, coordinator])
+        await t.http().get('/api/section-changes/mine').set(bearer(token)).expect(403);
+      await t.http().get('/api/section-changes/mine').set(bearer(student)).expect(200);
+      await t.http().get('/api/section-changes').set(bearer(student)).expect(403);
+      expect(
+        await t.prisma.sectionChangeRequest.count({ where: { studentId: other.studentId } }),
+      ).toBe(0);
     });
   });
 });
