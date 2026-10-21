@@ -53,7 +53,8 @@ export class AuthController {
 
   /** New access token from the refresh cookie; the cookie is rotated. */
   @Public()
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  // Every page load refreshes once: 30 a minute, or LOGIN_THROTTLE_LIMIT when that is raised for the browser e2e run.
+  @Throttle({ default: { limit: () => Math.max(30, loginLimit()), ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(200)
   @ApiCookieAuth(REFRESH_COOKIE)
