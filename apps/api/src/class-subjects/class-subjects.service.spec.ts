@@ -46,8 +46,11 @@ describe('ClassSubjectsService', () => {
       update: vi.fn(),
       delete: vi.fn(),
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       upsert: vi.fn(),
     },
+    schoolClass: { findUniqueOrThrow: vi.fn() },
+    reportCard: { count: vi.fn() },
     grade: { count: vi.fn() },
     event: { count: vi.fn() },
     auditLog: { createMany: vi.fn() },
@@ -65,6 +68,10 @@ describe('ClassSubjectsService', () => {
     prisma.$transaction.mockImplementation((fn: (t: typeof tx) => Promise<unknown>) => fn(tx));
     prisma.schoolClass.findUnique.mockResolvedValue(klass('c1'));
     prisma.classSubject.findMany.mockResolvedValue([]);
+    tx.classSubject.findMany.mockResolvedValue([]);
+    tx.schoolClass.findUniqueOrThrow.mockResolvedValue({ schoolYearId: 'y1', sectionId: 'sec' });
+    tx.$queryRaw.mockResolvedValue([{ id: 'p1', closed_at: null }]);
+    tx.reportCard.count.mockResolvedValue(0);
     const moduleRef = await Test.createTestingModule({
       providers: [ClassSubjectsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
