@@ -263,4 +263,36 @@ describe('Review fixes (e2e)', () => {
       ).toBe(0);
     });
   });
+  describe('M1: every-section and section periods cannot overlap, even outside the service', () => {
+    it('is refused by the database itself, in both orders, and allows adjacent dates', async () => {
+      const { year, n } = await isolatedYear(); // already holds T1 for every section, n-09-01 to n-12-20
+      const insert = (sectionId: string | null, number: number, from: string, to: string) =>
+        t.prisma.$executeRaw`
+          INSERT INTO periods (id, school_year_id, kind, section_id, number, label, starts_on, ends_on)
+          VALUES (gen_random_uuid(), ${year.id}::uuid, 'trimester', ${sectionId}::uuid, ${number},
+                  'raw', ${from}::date, ${to}::date)`;
+      // A section period inside the every-section one.
+      await expect(insert(bacId, 2, `${n}-10-01`, `${n}-10-31`)).rejects.toThrow(
+        /periods_no_overlap/,
+      );
+      // After it: fine; then an every-section period reaching into it is refused (the other order).
+      await insert(bacId, 2, `${n}-12-21`, `${n + 1}-03-01`);
+      await expect(insert(null, 3, `${n + 1}-02-01`, `${n + 1}-03-15`)).rejects.toThrow(
+        /periods_no_overlap/,
+      );
+      // Moving a row into an overlap is refused too (UPDATE).
+      await expect(
+        t.prisma.$executeRaw`
+          UPDATE periods SET starts_on = ${`${n}-12-01`}::date
+          WHERE school_year_id = ${year.id}::uuid AND section_id = ${bacId}::uuid`,
+      ).rejects.toThrow(/periods_no_overlap/);
+      // The service answers 409 as before.
+      await t
+        .http()
+        .post(`/api/school-years/${year.id}/periods`)
+        .set(bearer(admin))
+        .send({ number: 3, label: 'X', sectionId: null, startsOn: `${n + 1}-02-01`, endsOn: `${n + 1}-03-15` })
+        .expect(409);
+    });
+  });
 });
