@@ -91,14 +91,17 @@ export class ActivityTypesService {
       throw new BadRequestException(
         'Un type du système garde ses options et ne s’archive pas : seuls le nom, la couleur et l’icône changent.',
       );
-    if (flagsChange) {
-      checkFlags({ ...pickFlags(current), ...definedFlags(dto) });
-      if (await this.prisma.event.count({ where: { activityTypeId: id } }))
-        throw new ConflictException(
-          'Des événements utilisent ce type : ses options (noté, hebdomadaire, devoir) ne peuvent plus changer.',
-        );
-    }
+    if (flagsChange) checkFlags({ ...pickFlags(current), ...definedFlags(dto) });
     return this.prisma.$transaction(async (tx) => {
+      if (flagsChange) {
+        // Exclusive lock: an event being created with this type (it holds the shared lock, see
+        // lockForEvent) commits first and is counted; one that starts later waits for this commit.
+        await tx.$queryRaw`SELECT id FROM activity_types WHERE id = ${id}::uuid FOR UPDATE`;
+        if (await tx.event.count({ where: { activityTypeId: id } }))
+          throw new ConflictException(
+            'Des événements utilisent ce type : ses options (noté, hebdomadaire, devoir) ne peuvent plus changer.',
+          );
+      }
       const row = await tx.activityType.update({
         where: { id },
         data: {
@@ -191,6 +194,14 @@ export class ActivityTypesService {
     if (row.archivedAt && row.id !== keepId)
       throw new BadRequestException('Ce type d’activité est archivé.');
     return row;
+  }
+
+  /**
+   * Inside the transaction that writes an event: takes a shared lock on its type, so the flags cannot be
+   * changed (exclusive lock in `update`) between the event's checks and its commit.
+   */
+  async lockForEvent(tx: Prisma.TransactionClient, id: string): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM activity_types WHERE id = ${id}::uuid FOR SHARE`;
   }
 
   /** Teachers see school-wide types and their own; the admin sees all. */

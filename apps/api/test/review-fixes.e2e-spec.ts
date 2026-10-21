@@ -9,13 +9,17 @@ import type {
 } from '@cdls/shared';
 import type { AuthUser } from '../src/common/auth-user.js';
 import { UsersService } from '../src/users/users.service.js';
+import { ActivityTypesService } from '../src/activity-types/activity-types.service.js';
 import {
+  activityTypeId,
   ADMIN,
   bearer,
   COORDINATOR,
   createTestApp,
   DOMAIN,
+  FRENCH_TEACHER,
   MATHS_TEACHER,
+  seededEvent,
   studentOf,
   type TestApp,
 } from './helpers.js';
@@ -64,9 +68,10 @@ describe('Review fixes (e2e)', () => {
 
   /** A class of the current year, for accounts created by these tests; their enrolments are closed at the end. */
   let currentClassId: string;
+  let natClassId: string | undefined;
   const closeEnrolments = async () => {
     await t.prisma.enrollment.updateMany({
-      where: { classId: currentClassId, leftOn: null },
+      where: { classId: { in: [currentClassId, ...(natClassId ? [natClassId] : [])] }, leftOn: null },
       data: { leftOn: new Date('2026-09-06T00:00:00Z') },
     });
   };
@@ -522,6 +527,225 @@ ${last},Nabil`), 'teacher', actor),
         .set(bearer(admin))
         .send({ startsOn: `${n + 1}-01-09`, endsOn: `${n + 1}-01-09` })
         .expect(200);
+    });
+  });
+  /** A class with maths, its teacher, one gradable event in an open period and one enrolled student. */
+  async function gradingSetup() {
+    const base = await isolatedYear();
+    const teacher = await t.prisma.teacher.findFirstOrThrow({
+      where: { user: { email: { startsWith: 'hany.mansour@' } } },
+    });
+    const classSubject = await t.prisma.classSubject.create({
+      data: { classId: base.schoolClass.id, subjectId: 'mathematiques', coefficient: 2 },
+    });
+    await t.prisma.teachingAssignment.create({
+      data: { teacherId: teacher.id, classSubjectId: classSubject.id },
+    });
+    const event = await t.prisma.event.create({
+      data: {
+        activityTypeId: await activityTypeId(t.prisma, 'examen'),
+        title: 'Examen',
+        subjectId: 'mathematiques',
+        classId: base.schoolClass.id,
+        date: day(`${base.n}-10-05`),
+        periodId: base.period.id,
+        authorId: teacher.id,
+      },
+    });
+    const student = await studentOf(t.prisma, 'bac', 'seconde');
+    await t.prisma.enrollment.create({
+      data: {
+        studentId: student.studentId,
+        classId: base.schoolClass.id,
+        schoolYearId: base.year.id,
+      },
+    });
+    return { ...base, teacher, event, studentId: student.studentId };
+  }
+
+  describe('activity type flags and event creation', () => {
+    it('the flags stay locked while an event using the type is being written', async () => {
+      const type = (
+        await t
+          .http()
+          .post('/api/activity-types')
+          .set(bearer(maths))
+          .send({
+            label: `Course${Date.now().toString(36)}`,
+            colour: 'brick',
+            icon: 'edit',
+            gradable: false,
+            repeatable: false,
+            homework: false,
+          })
+          .expect(201)
+      ).body as { id: string };
+      const teacher = await t.prisma.teacher.findFirstOrThrow({
+        where: { user: { email: { startsWith: 'hany.mansour@' } } },
+      });
+      const service = t.app.get(ActivityTypesService);
+      let locked!: () => void;
+      const lockTaken = new Promise<void>((resolve) => (locked = resolve));
+      let release!: () => void;
+      const hold = new Promise<void>((resolve) => (release = resolve));
+      // An event creation in flight: shared lock on the type, the event inserted, not yet committed.
+      const creating = t.prisma.$transaction(
+        async (tx) => {
+          await service.lockForEvent(tx, type.id);
+          await tx.event.create({
+            data: {
+              activityTypeId: type.id,
+              title: 'En vol',
+              date: day('2071-01-05'),
+              authorId: teacher.id,
+            },
+          });
+          locked();
+          await hold;
+        },
+        { timeout: 20_000 },
+      );
+      await lockTaken;
+      let answered: number | null = null;
+      const patching = t
+        .http()
+        .patch(`/api/activity-types/${type.id}`)
+        .set(bearer(maths))
+        .send({ gradable: true })
+        .then((res) => (answered = res.status));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(answered).toBeNull(); // waiting for the creation, not deciding on a stale count
+      release();
+      await creating;
+      await patching;
+      expect(answered).toBe(409);
+      const after = await t.prisma.activityType.findUniqueOrThrow({ where: { id: type.id } });
+      expect(after.gradable).toBe(false);
+    });
+  });
+
+  describe('events: who may write what', () => {
+    it("refuses a teacher who doesn't teach the class, and a graded event for a subject outside the class", async () => {
+      const french = await t.token(FRENCH_TEACHER);
+      const nationale = await studentOf(t.prisma, 'nationale', 'secondaire-1');
+      const cours = await activityTypeId(t.prisma, 'cours');
+      await t
+        .http()
+        .post('/api/events')
+        .set(bearer(french))
+        .send({
+          activityTypeId: cours,
+          title: 'Pas le leur',
+          classId: nationale.classId,
+          date: '2026-11-03',
+        })
+        .expect(403);
+      const mathsExam = await seededEvent(t.prisma, nationale.classId, 'examen', 'mathematiques');
+      await t
+        .http()
+        .patch(`/api/events/${mathsExam.id}`)
+        .set(bearer(french))
+        .send({ title: 'Détourné' })
+        .expect(403);
+      const unchanged = await t.prisma.event.findUniqueOrThrow({ where: { id: mathsExam.id } });
+      expect(unchanged.title).toBe(mathsExam.title);
+
+      // A graded event for a subject the class does not have (and the teacher does not teach there).
+      const bac = await studentOf(t.prisma, 'bac', 'seconde');
+      const examen = await activityTypeId(t.prisma, 'examen');
+      const before = await t.prisma.event.count();
+      const res = await t
+        .http()
+        .post('/api/events')
+        .set(bearer(maths))
+        .send({
+          activityTypeId: examen,
+          title: 'Hors matière',
+          subjectId: 'arabe',
+          classId: bac.classId,
+          date: '2026-11-04',
+        });
+      expect([400, 403]).toContain(res.status);
+      expect(await t.prisma.event.count()).toBe(before);
+    });
+  });
+
+  describe('section changes: concurrent approvals', () => {
+    it('lets exactly one of two parallel approvals win and opens exactly one enrolment', async () => {
+      const current = await t.prisma.schoolYear.findFirstOrThrow({ where: { isCurrent: true } });
+      const nationaleId = (await t.prisma.section.findFirstOrThrow({ where: { code: 'nationale' } }))
+        .id;
+      const target = await t.prisma.schoolClass.create({
+        data: { schoolYearId: current.id, sectionId: nationaleId, code: 'fix-nat', label: 'Fix nat' },
+      });
+      natClassId = target.id;
+      const student = (
+        await t
+          .http()
+          .post('/api/users')
+          .set(bearer(admin))
+          .send({
+            role: 'student',
+            firstName: 'Course',
+            lastName: `Approbation${Date.now().toString(36)}`,
+            classId: currentClassId,
+          })
+          .expect(201)
+      ).body as CreatedUserResponse;
+      const request = (
+        await t
+          .http()
+          .post('/api/section-changes')
+          .set(bearer(admin))
+          .send({ studentId: student.user.studentId, toSection: 'nationale', reason: 'Parallèle' })
+          .expect(201)
+      ).body as SectionChangeRequestDto;
+      const approve = () =>
+        t
+          .http()
+          .post(`/api/section-changes/${request.id}/approve`)
+          .set(bearer(admin))
+          .send({ classId: target.id });
+      const results = await Promise.all([approve(), approve()]);
+      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+      const studentId = student.user.studentId!;
+      const open = await t.prisma.enrollment.findMany({
+        where: { studentId, schoolYearId: current.id, leftOn: null },
+      });
+      expect(open.map((e) => e.classId)).toEqual([target.id]);
+      expect(await t.prisma.enrollment.count({ where: { studentId, classId: target.id } })).toBe(1);
+      expect(
+        await t.prisma.auditLog.count({
+          where: { action: 'student.section_change', entityId: studentId },
+        }),
+      ).toBe(1);
+    });
+  });
+
+  describe('grades and closing a period at the same moment', () => {
+    it('never saves a grade into a period that closed first, and never loses one it accepted', async () => {
+      for (let round = 0; round < 6; round++) {
+        const setup = await gradingSetup();
+        const put = () =>
+          t
+            .http()
+            .put(`/api/events/${setup.event.id}/grades`)
+            .set(bearer(maths))
+            .send({ entries: [{ studentId: setup.studentId, score: 12 }] });
+        const close = () =>
+          t.http().post(`/api/periods/${setup.period.id}/close`).set(bearer(admin));
+        const [saved, closed] = await Promise.all([put(), close()]);
+        expect(closed.status).toBe(200);
+        const grades = await t.prisma.grade.count({ where: { eventId: setup.event.id } });
+        if (saved.status === 200) expect(grades).toBe(1);
+        else {
+          expect(saved.status).toBe(409);
+          expect(grades).toBe(0);
+        }
+        // Once closed, the period stays locked.
+        await put().expect(409);
+        expect(await t.prisma.grade.count({ where: { eventId: setup.event.id } })).toBe(grades);
+      }
     });
   });
 });

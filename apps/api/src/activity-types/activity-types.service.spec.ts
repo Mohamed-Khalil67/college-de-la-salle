@@ -55,6 +55,8 @@ const dto = {
 describe('ActivityTypesService', () => {
   const tx = {
     activityType: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    event: { count: vi.fn() },
+    $queryRaw: vi.fn(),
     auditLog: { createMany: vi.fn() },
   };
   const prisma = {
@@ -161,7 +163,7 @@ describe('ActivityTypesService', () => {
 
     it('locks the flags once events use the type', async () => {
       prisma.activityType.findFirst.mockResolvedValue(type());
-      prisma.event.count.mockResolvedValue(2);
+      tx.event.count.mockResolvedValue(2);
       await expect(types.update('ty1', { gradable: false }, TEACHER)).rejects.toBeInstanceOf(
         ConflictException,
       );
