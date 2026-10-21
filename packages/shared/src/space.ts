@@ -5,6 +5,8 @@
 
 export type SectionId = 'nationale' | 'bac';
 
+export const SECTION_IDS: readonly SectionId[] = ['nationale', 'bac'];
+
 export const SECTION_LABELS: Readonly<Record<SectionId, string>> = {
   nationale: 'Bac nationale',
   bac: 'Bac français',

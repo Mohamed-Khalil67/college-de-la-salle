@@ -25,19 +25,32 @@ enum Role {
   @@map("role")
 }
 
-/// Must match EventKind in packages/shared (checked by src/prisma/enums.spec.ts).
-enum EventKind {
-  cours
-  td
-  tp
-  examen
-  controle
-  devoir
-  revision
-  activite
-  reunion
+/// RoomKind in packages/shared.
+enum RoomKind {
+  classroom
+  lab
+  gym
+  hall
 
-  @@map("event_kind")
+  @@map("room_kind")
+}
+
+/// PeriodKind in packages/shared.
+enum PeriodKind {
+  trimester
+  semester
+
+  @@map("period_kind")
+}
+
+/// CalendarDayType in packages/shared. `holiday` and `no_classes` cancel the weekly sessions of their audience.
+enum CalendarDayType {
+  holiday
+  exam_week
+  no_classes
+  event_day
+
+  @@map("calendar_day_type")
 }
 
 enum AttendanceStatus {
@@ -97,11 +110,15 @@ model Student {
 }
 
 model Teacher {
-  id     String @id @default(uuid(7)) @db.Uuid
-  userId String @unique @map("user_id") @db.Uuid
+  id            String  @id @default(uuid(7)) @db.Uuid
+  userId        String  @unique @map("user_id") @db.Uuid
+  /// Coordinateur: also edits the year's structure (subjects, rooms, periods, calendar days). Set by the admin.
+  isCoordinator Boolean @default(false) @map("is_coordinator")
 
   user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments        TeachingAssignment[]
+  /// The teacher's private activity types.
+  activityTypes      ActivityType[]
   events             Event[]
   gradesEntered      Grade[]
   attendanceRecorded Attendance[]
@@ -143,31 +160,77 @@ model SchoolYear {
   /// Exactly one year is current (enforced by the service).
   isCurrent Boolean  @default(false) @map("is_current")
 
-  terms       Term[]
-  classes     SchoolClass[]
-  enrollments Enrollment[]
+  periods      Period[]
+  calendarDays CalendarDay[]
+  classes      SchoolClass[]
+  enrollments  Enrollment[]
 
   @@index([isCurrent])
   @@map("school_years")
 }
 
-model Term {
-  id           String    @id @default(uuid(7)) @db.Uuid
-  schoolYearId String    @map("school_year_id") @db.Uuid
-  /// 1, 2 or 3.
-  number       Int       @db.SmallInt
-  label        String    @db.VarChar(40)
-  startsOn     DateTime  @map("starts_on") @db.Date
-  endsOn       DateTime  @map("ends_on") @db.Date
-  /// Set when the admin closes the term; report cards are generated after that.
-  closedAt     DateTime? @map("closed_at") @db.Timestamptz(3)
+/// A trimester or semester of a school year, for every section (sectionId null) or one section.
+/// Periods of the same year, section and kind never overlap: EXCLUDE constraint `periods_no_overlap`
+/// (btree_gist) in the migration SQL.
+model Period {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  schoolYearId String     @map("school_year_id") @db.Uuid
+  kind         PeriodKind @default(trimester)
+  sectionId    String?    @map("section_id") @db.Uuid
+  /// 1 to 3 (trimesters), 1 or 2 (semesters); unique per year, section and kind.
+  number       Int        @db.SmallInt
+  label        String     @db.VarChar(40)
+  startsOn     DateTime   @map("starts_on") @db.Date
+  endsOn       DateTime   @map("ends_on") @db.Date
+  /// Set when the period is closed: it is locked (no edit, no grade change) and report cards are generated.
+  closedAt     DateTime?  @map("closed_at") @db.Timestamptz(3)
 
   schoolYear  SchoolYear   @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  section     Section?     @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   reportCards ReportCard[]
+  /// Gradable events whose grades count for this period.
+  events      Event[]
 
-  @@unique([schoolYearId, number])
+  @@index([schoolYearId, kind])
+  @@index([sectionId])
   @@index([startsOn, endsOn])
-  @@map("terms")
+  @@map("periods")
+}
+
+/// Holidays, exam weeks, days without classes, special days. Audience: the listed classes when there are
+/// any, else the section, else the whole school. `holiday` and `no_classes` cancel the weekly sessions.
+model CalendarDay {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  schoolYearId String          @map("school_year_id") @db.Uuid
+  type         CalendarDayType
+  label        String          @db.VarChar(120)
+  startsOn     DateTime        @map("starts_on") @db.Date
+  /// Included (CHECK ends_on >= starts_on in the migration SQL).
+  endsOn       DateTime        @map("ends_on") @db.Date
+  sectionId    String?         @map("section_id") @db.Uuid
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  schoolYear SchoolYear         @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
+  section    Section?           @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  classes    CalendarDayClass[]
+
+  @@index([schoolYearId, startsOn])
+  @@index([startsOn, endsOn])
+  @@index([sectionId])
+  @@map("calendar_days")
+}
+
+/// A class a calendar day is limited to.
+model CalendarDayClass {
+  calendarDayId String @map("calendar_day_id") @db.Uuid
+  classId       String @map("class_id") @db.Uuid
+
+  calendarDay CalendarDay @relation(fields: [calendarDayId], references: [id], onDelete: Cascade)
+  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@id([calendarDayId, classId])
+  @@index([classId])
+  @@map("calendar_day_classes")
 }
 
 /// A track: `nationale` (Bac nationale) or `bac` (Bac français). Codes match SectionId in packages/shared.
@@ -176,9 +239,11 @@ model Section {
   code  String @unique @db.VarChar(20)
   label String @db.VarChar(80)
 
-  classes SchoolClass[]
-  events  Event[]
-  posts   Post[]
+  classes      SchoolClass[]
+  events       Event[]
+  posts        Post[]
+  periods      Period[]
+  calendarDays CalendarDay[]
 
   @@map("sections")
 }
@@ -192,13 +257,14 @@ model SchoolClass {
   code         String @db.VarChar(40)
   label        String @db.VarChar(80)
 
-  schoolYear  SchoolYear           @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
-  section     Section              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
-  enrollments Enrollment[]
-  assignments TeachingAssignment[]
-  events      Event[]
-  posts       Post[]
-  reportCards ReportCard[]
+  schoolYear   SchoolYear         @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
+  section      Section            @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  enrollments  Enrollment[]
+  subjects     ClassSubject[]
+  events       Event[]
+  posts        Post[]
+  reportCards  ReportCard[]
+  calendarDays CalendarDayClass[]
 
   @@unique([schoolYearId, sectionId, code])
   @@index([sectionId])
@@ -225,37 +291,100 @@ model Enrollment {
   @@map("enrollments")
 }
 
-/// A catalogue subject. `id` is the stable slug from packages/shared MATIERES (`mathematiques`…).
+/// A catalogue subject, created by the admin or a coordinator (seeded from MATIERES in packages/shared).
+/// `id` is a stable slug made from the name (`mathematiques`), stored on events and posts.
 model Subject {
-  id    String @id @db.VarChar(40)
-  name  String @db.VarChar(120)
-  /// MatiereGroup in packages/shared.
-  group String @db.VarChar(60)
+  id         String    @id @db.VarChar(40)
+  name       String    @db.VarChar(120)
+  /// Display group (« Sciences »…).
+  group      String    @db.VarChar(60)
+  /// Section codes (SectionId in packages/shared) the subject can be taught in.
+  sections   String[]  @default([]) @db.VarChar(20)
+  /// Archived subjects stay on past grades but can't be added to a class.
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
 
-  assignments TeachingAssignment[]
-  events      Event[]
-  posts       Post[]
+  classSubjects ClassSubject[]
+  events        Event[]
+  posts         Post[]
 
   @@map("subjects")
 }
 
-/// Who teaches which subject in which class. Drives the « a teacher only edits the classes they teach » guards.
-model TeachingAssignment {
-  id          String  @id @default(uuid(7)) @db.Uuid
-  teacherId   String  @map("teacher_id") @db.Uuid
-  classId     String  @map("class_id") @db.Uuid
-  subjectId   String  @map("subject_id") @db.VarChar(40)
-  /// Weight of this subject in the class's general average (report cards).
-  coefficient Decimal @default(1) @db.Decimal(4, 2)
+/// A subject taught in a class, with its weight in the class's general average (report cards, averages).
+model ClassSubject {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  classId      String   @map("class_id") @db.Uuid
+  subjectId    String   @map("subject_id") @db.VarChar(40)
+  coefficient  Decimal  @default(1) @db.Decimal(4, 2)
+  /// Hours per week, null when not set.
+  hoursPerWeek Decimal? @map("hours_per_week") @db.Decimal(4, 2)
 
-  teacher     Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  schoolClass SchoolClass          @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject     Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  assignments TeachingAssignment[]
 
-  @@unique([teacherId, classId, subjectId])
-  @@index([classId, subjectId])
+  @@unique([classId, subjectId])
   @@index([subjectId])
+  @@map("class_subjects")
+}
+
+/// A teacher of a class subject. Drives the « a teacher only edits the classes they teach » guards.
+model TeachingAssignment {
+  id             String @id @default(uuid(7)) @db.Uuid
+  teacherId      String @map("teacher_id") @db.Uuid
+  classSubjectId String @map("class_subject_id") @db.Uuid
+
+  teacher      Teacher      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, classSubjectId])
+  @@index([classSubjectId])
   @@map("teaching_assignments")
+}
+
+/// A room of the school. Events may book one (`Event.roomId`); clashes are checked from phase 2 on (an
+/// occupancy table with exclusion constraints).
+model Room {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique @db.VarChar(60)
+  /// Seats, null when unknown.
+  capacity  Int?     @db.SmallInt
+  kind      RoomKind @default(classroom)
+  /// Inactive rooms can't be chosen for new events.
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  events Event[]
+
+  @@map("rooms")
+}
+
+/// A type of calendar activity (cours, TD, examen… or a teacher's own); replaced the `event_kind` enum.
+/// Code relies on the flags, never on `code`. A private type has an owner; school-wide types have none.
+model ActivityType {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  /// Stable slug; for system types, the old enum value.
+  code           String    @unique @db.VarChar(40)
+  label          String    @db.VarChar(60)
+  /// A token of ACTIVITY_COLOURS in packages/shared (never a free hex value).
+  colour         String    @db.VarChar(20)
+  /// One of ACTIVITY_ICONS in packages/shared.
+  icon           String    @db.VarChar(20)
+  gradable       Boolean   @default(false)
+  repeatable     Boolean   @default(false)
+  homework       Boolean   @default(false)
+  isSystem       Boolean   @default(false) @map("is_system")
+  ownerTeacherId String?   @map("owner_teacher_id") @db.Uuid
+  /// System types first, in the order of SYSTEM_ACTIVITY_TYPES.
+  sortOrder      Int       @default(100) @map("sort_order") @db.SmallInt
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  owner  Teacher? @relation(fields: [ownerTeacherId], references: [id], onDelete: Cascade)
+  events Event[]
+
+  @@index([ownerTeacherId])
+  @@map("activity_types")
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -265,29 +394,36 @@ model TeachingAssignment {
 /// A calendar event (CalendarEvent in packages/shared): course slot, exam, homework deadline, meeting…
 /// Audience: classId set → one class; only sectionId set → a whole section; both null → the whole school.
 model Event {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  kind        EventKind
-  title       String    @db.VarChar(120)
-  subjectId   String?   @map("subject_id") @db.VarChar(40)
-  classId     String?   @map("class_id") @db.Uuid
-  sectionId   String?   @map("section_id") @db.Uuid
+  id             String    @id @default(uuid(7)) @db.Uuid
+  activityTypeId String    @map("activity_type_id") @db.Uuid
+  title          String    @db.VarChar(120)
+  subjectId      String?   @map("subject_id") @db.VarChar(40)
+  classId        String?   @map("class_id") @db.Uuid
+  sectionId      String?   @map("section_id") @db.Uuid
   /// The day, or the first day of a weekly series.
-  date        DateTime  @db.Date
+  date           DateTime  @db.Date
   /// HH:MM, null for an all-day event.
-  startTime   String?   @map("start_time") @db.VarChar(5)
-  endTime     String?   @map("end_time") @db.VarChar(5)
-  /// Repeats every week until this day (included); null for a single event. Only repeatable kinds.
-  repeatUntil DateTime? @map("repeat_until") @db.Date
-  place       String    @default("") @db.VarChar(120)
-  description String    @default("") @db.VarChar(2000)
+  startTime      String?   @map("start_time") @db.VarChar(5)
+  endTime        String?   @map("end_time") @db.VarChar(5)
+  /// Repeats every week until this day (included); null for a single event. Only repeatable types.
+  repeatUntil    DateTime? @map("repeat_until") @db.Date
+  /// A room of the school; `place` stays free text (for places outside the school).
+  roomId         String?   @map("room_id") @db.Uuid
+  place          String    @default("") @db.VarChar(120)
+  /// Gradable events: the period their grades count for (report cards read this, never the dates).
+  periodId       String?   @map("period_id") @db.Uuid
+  description    String    @default("") @db.VarChar(2000)
   /// [{ label, url }], https links only (validated by the API).
-  attachments Json      @default("[]")
-  /// Weight of the grades given for it (gradable kinds).
-  coefficient Decimal   @default(1) @db.Decimal(4, 2)
-  authorId    String    @map("author_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  attachments    Json      @default("[]")
+  /// Weight of the grades given for it (gradable types).
+  coefficient    Decimal   @default(1) @db.Decimal(4, 2)
+  authorId       String    @map("author_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  activityType        ActivityType         @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
+  room                Room?                @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  period              Period?              @relation(fields: [periodId], references: [id], onDelete: Restrict)
   subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   schoolClass         SchoolClass?         @relation(fields: [classId], references: [id], onDelete: Cascade)
   section             Section?             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
@@ -301,7 +437,9 @@ model Event {
   @@index([date])
   @@index([authorId])
   @@index([subjectId])
-  @@index([kind, date])
+  @@index([activityTypeId, date])
+  @@index([roomId, date])
+  @@index([periodId])
   @@map("events")
 }
 
@@ -367,12 +505,12 @@ model Attendance {
   @@map("attendance")
 }
 
-/// A student's report card for a term (bulletin), generated after the term is closed.
+/// A student's report card for a period (bulletin), generated after the period is closed.
 model ReportCard {
   id           String    @id @default(uuid(7)) @db.Uuid
   studentId    String    @map("student_id") @db.Uuid
-  termId       String    @map("term_id") @db.Uuid
-  /// The class the student was in for that term.
+  periodId     String    @map("period_id") @db.Uuid
+  /// The class the student was in for that period.
   classId      String    @map("class_id") @db.Uuid
   /// General average on 20, null when there were no grades.
   average      Decimal?  @db.Decimal(4, 2)
@@ -385,11 +523,11 @@ model ReportCard {
   publishedAt  DateTime? @map("published_at") @db.Timestamptz(3)
 
   student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  term        Term        @relation(fields: [termId], references: [id], onDelete: Restrict)
+  period      Period      @relation(fields: [periodId], references: [id], onDelete: Restrict)
   schoolClass SchoolClass @relation(fields: [classId], references: [id], onDelete: Restrict)
 
-  @@unique([studentId, termId])
-  @@index([termId, classId])
+  @@unique([studentId, periodId])
+  @@index([periodId, classId])
   @@index([classId])
   @@map("report_cards")
 }
