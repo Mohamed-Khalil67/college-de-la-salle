@@ -39,6 +39,8 @@ export interface IssuedSession {
 
 const INVALID_LOGIN = 'E-mail ou mot de passe incorrect.';
 const INVALID_SESSION = 'Session expirée. Reconnectez-vous.';
+const EXPIRED_TEMPORARY_PASSWORD =
+  'Ce mot de passe provisoire a expiré. Demandez-en un nouveau au secrétariat.';
 const WRONG_CURRENT_PASSWORD = 'Le mot de passe actuel est incorrect.';
 
 const userInclude = {
@@ -86,6 +88,13 @@ export class AuthService {
       : (await verify(await this.dummyHash, password), false);
     // Disabled and archived accounts get the same answer as a wrong password.
     if (!user || !ok || user.status !== 'active') throw new UnauthorizedException(INVALID_LOGIN);
+    // Said only to someone who knows the temporary password, so it reveals nothing about other accounts.
+    if (
+      user.mustChangePassword &&
+      user.temporaryPasswordExpiresAt &&
+      user.temporaryPasswordExpiresAt <= new Date()
+    )
+      throw new UnauthorizedException(EXPIRED_TEMPORARY_PASSWORD);
 
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     return this.issue(toAuthUser(user), passwordVersion(user), randomUUID(), userAgent);
@@ -153,7 +162,12 @@ export class AuthService {
       // Only if the password is still the one that was checked: a reset or another change in between wins.
       const swapped = await tx.user.updateMany({
         where: { id: userId, passwordHash: user.passwordHash, status: 'active' },
-        data: { passwordHash: newHash, mustChangePassword: false, passwordChangedAt: new Date() },
+        data: {
+          passwordHash: newHash,
+          mustChangePassword: false,
+          passwordChangedAt: new Date(),
+          temporaryPasswordExpiresAt: null,
+        },
       });
       if (swapped.count === 0) throw new ConflictException('Votre mot de passe vient d’être modifié : reconnectez-vous.');
       const row = await tx.user.findUniqueOrThrow({ where: { id: userId }, include: userInclude });

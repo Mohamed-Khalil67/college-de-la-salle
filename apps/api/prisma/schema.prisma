@@ -86,21 +86,23 @@ enum AttendanceStatus {
 
 /// An account. Created by an admin (no open sign-up). A teacher or student also has a profile row.
 model User {
-  id                 String     @id @default(uuid(7)) @db.Uuid
+  id                         String     @id @default(uuid(7)) @db.Uuid
   /// Stored lower-cased.
-  email              String     @unique @db.VarChar(254)
-  passwordHash       String     @map("password_hash")
-  role               Role
-  firstName          String     @map("first_name") @db.VarChar(80)
-  lastName           String     @map("last_name") @db.VarChar(80)
-  status             UserStatus @default(active)
+  email                      String     @unique @db.VarChar(254)
+  passwordHash               String     @map("password_hash")
+  role                       Role
+  firstName                  String     @map("first_name") @db.VarChar(80)
+  lastName                   String     @map("last_name") @db.VarChar(80)
+  status                     UserStatus @default(active)
   /// Set on every account the administration creates or resets: the user must choose a password first.
-  mustChangePassword Boolean    @default(true) @map("must_change_password")
+  mustChangePassword         Boolean    @default(true) @map("must_change_password")
   /// Access tokens issued before this instant are refused (password change or reset).
-  passwordChangedAt  DateTime?  @map("password_changed_at") @db.Timestamptz(3)
-  lastLoginAt        DateTime?  @map("last_login_at") @db.Timestamptz(3)
-  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  passwordChangedAt          DateTime?  @map("password_changed_at") @db.Timestamptz(3)
+  /// While mustChangePassword: the temporary password stops working at this instant (null = no expiry).
+  temporaryPasswordExpiresAt DateTime?  @map("temporary_password_expires_at") @db.Timestamptz(3)
+  lastLoginAt                DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt                  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   student                 Student?
   teacher                 Teacher?

@@ -3,6 +3,7 @@ import type {
   ClassSubjectDto,
   CreatedUserResponse,
   ImportUsersResponse,
+  SessionResponse,
   SectionChangeRequestDto,
 } from '@cdls/shared';
 import {
@@ -293,6 +294,110 @@ describe('Review fixes (e2e)', () => {
         .set(bearer(admin))
         .send({ number: 3, label: 'X', sectionId: null, startsOn: `${n + 1}-02-01`, endsOn: `${n + 1}-03-15` })
         .expect(409);
+    });
+  });
+  describe('M2: sign-in limits per account, temporary passwords expire', () => {
+    const create = async (firstName: string) =>
+      (
+        await t
+          .http()
+          .post('/api/users')
+          .set(bearer(admin))
+          .send({ role: 'teacher', firstName, lastName: `Expire${Date.now().toString(36)}` })
+          .expect(201)
+      ).body as CreatedUserResponse;
+    const login = (email: string, password: string) =>
+      t.http().post('/api/auth/login').send({ email, password });
+
+    it('counts sign-in attempts by address and e-mail: one account locks, the others still sign in', async () => {
+      const before = process.env['LOGIN_THROTTLE_LIMIT'];
+      process.env['LOGIN_THROTTLE_LIMIT'] = '3';
+      try {
+        const a = await create('Limite');
+        const b = await create('Limite');
+        for (let i = 0; i < 3; i++) await login(a.user.email, 'faux').expect(401);
+        await login(a.user.email, 'faux').expect(429);
+        // A classmate behind the same address is not locked out.
+        await login(b.user.email, b.temporaryPassword).expect(200);
+      } finally {
+        if (before === undefined) delete process.env['LOGIN_THROTTLE_LIMIT'];
+        else process.env['LOGIN_THROTTLE_LIMIT'] = before;
+      }
+    });
+
+    it('refuses an expired temporary password with a clear message, and a reset restarts the clock', async () => {
+      const created = await create('Perime');
+      const days = (row: { temporaryPasswordExpiresAt: Date | null }) =>
+        Math.round((row.temporaryPasswordExpiresAt!.getTime() - Date.now()) / 86_400_000);
+      expect(days(await t.prisma.user.findUniqueOrThrow({ where: { id: created.user.id } }))).toBe(14);
+
+      await t.prisma.user.update({
+        where: { id: created.user.id },
+        data: { temporaryPasswordExpiresAt: new Date(Date.now() - 1000) },
+      });
+      const wrong = await login(created.user.email, 'faux').expect(401);
+      expect(message(wrong.body)).toMatch(/incorrect/);
+      const expired = await login(created.user.email, created.temporaryPassword).expect(401);
+      expect(message(expired.body)).toMatch(/expiré.*secrétariat/);
+
+      await t
+        .http()
+        .patch(`/api/users/${created.user.id}`)
+        .set(bearer(admin))
+        .send({ password: 'Nouveau-Provisoire-1' })
+        .expect(200);
+      expect(days(await t.prisma.user.findUniqueOrThrow({ where: { id: created.user.id } }))).toBe(14);
+      await login(created.user.email, 'Nouveau-Provisoire-1').expect(200);
+    });
+
+    it('clears the expiry once the person has chosen a password', async () => {
+      const created = await create('Choisi');
+      const session = (await login(created.user.email, created.temporaryPassword).expect(200))
+        .body as SessionResponse;
+      await t
+        .http()
+        .post('/api/auth/password')
+        .set(bearer(session.accessToken))
+        .send({ currentPassword: created.temporaryPassword, newPassword: 'Mon-Mot-De-Passe-2026' })
+        .expect(200);
+      const row = await t.prisma.user.findUniqueOrThrow({ where: { id: created.user.id } });
+      expect(row).toMatchObject({ mustChangePassword: false, temporaryPasswordExpiresAt: null });
+    });
+  });
+
+  describe('disable and restore', () => {
+    it('refuses an access token issued before the account was disabled, even after it is restored', async () => {
+      const created = (
+        await t
+          .http()
+          .post('/api/users')
+          .set(bearer(admin))
+          .send({ role: 'teacher', firstName: 'Reactive', lastName: `Jeton${Date.now().toString(36)}` })
+          .expect(201)
+      ).body as CreatedUserResponse;
+      const old = (
+        await t
+          .http()
+          .post('/api/auth/login')
+          .send({ email: created.user.email, password: created.temporaryPassword })
+          .expect(200)
+      ).body as SessionResponse;
+      await t.http().get('/api/auth/me').set(bearer(old.accessToken)).expect(200);
+      const set = (status: 'disabled' | 'active') =>
+        t.http().patch(`/api/users/${created.user.id}`).set(bearer(admin)).send({ status }).expect(200);
+      await set('disabled');
+      await t.http().get('/api/auth/me').set(bearer(old.accessToken)).expect(401);
+      await set('active');
+      await t.http().get('/api/auth/me').set(bearer(old.accessToken)).expect(401);
+      // A fresh sign-in works.
+      const fresh = (
+        await t
+          .http()
+          .post('/api/auth/login')
+          .send({ email: created.user.email, password: created.temporaryPassword })
+          .expect(200)
+      ).body as SessionResponse;
+      await t.http().get('/api/auth/me').set(bearer(fresh.accessToken)).expect(200);
     });
   });
 });

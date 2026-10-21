@@ -75,6 +75,13 @@ export class Env {
   @Min(1)
   CONTACT_THROTTLE_LIMIT = 5;
 
+  /** Days a temporary password (new, imported or reset account) stays valid before the secretariat must issue another. */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  TEMP_PASSWORD_TTL_DAYS = 14;
+
   /**
    * Reverse proxies in front of the API (Express `trust proxy` hops), so rate limits see the visitor's
    * address from X-Forwarded-For. 0 (default) when clients connect directly; set it to the number of

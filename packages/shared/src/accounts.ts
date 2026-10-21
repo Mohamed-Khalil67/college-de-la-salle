@@ -48,6 +48,15 @@ function cappedLocal(local: string): string {
   return local.length <= EMAIL_LOCAL_MAX ? local : local.slice(0, EMAIL_LOCAL_MAX).replace(/[-.]+$/, '');
 }
 
+/**
+ * The start every generated address of this name shares (`prenom.nom`, capped like the addresses are):
+ * `prenom.nom@d`, `prenom.nom2@d`… all begin with it. Null when the name has no usable letter.
+ */
+export function schoolEmailPrefix(firstName: string, lastName: string): string | null {
+  const full = schoolEmailLocalPart(firstName, lastName);
+  return full ? cappedLocal(full) : null;
+}
+
 /** A generated address and which number it got: 1 is `prenom.nom`, 2 is `prenom.nom2`… */
 export interface SchoolEmail {
   readonly email: string;

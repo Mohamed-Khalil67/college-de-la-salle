@@ -82,6 +82,7 @@ function isUniqueViolation(error: unknown): boolean {
 @Injectable()
 export class UsersService {
   private readonly domain: string;
+  private readonly temporaryPasswordDays: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -90,6 +91,7 @@ export class UsersService {
     config: ConfigService<Env, true>,
   ) {
     this.domain = config.get('SCHOOL_EMAIL_DOMAIN', { infer: true });
+    this.temporaryPasswordDays = config.get('TEMP_PASSWORD_TTL_DAYS', { infer: true });
   }
 
   async list(query: UserListQueryDto): Promise<Paginated<UserDto>> {
@@ -162,6 +164,7 @@ export class UsersService {
           firstName: dto.firstName,
           lastName: dto.lastName,
           mustChangePassword: true,
+          temporaryPasswordExpiresAt: this.temporaryPasswordExpiry(),
           ...(dto.role === 'teacher' ? { teacher: { create: {} } } : {}),
           ...(dto.role === 'student'
             ? {
@@ -220,6 +223,8 @@ export class UsersService {
       dto.isCoordinator !== (current.teacher?.isCoordinator ?? false);
 
     const reset = dto.password !== undefined;
+    // Disabling or restoring ends the sessions already issued: their access tokens carry the old version.
+    const statusChanged = dto.status !== undefined && dto.status !== current.status;
     const passwordHash = reset ? await hash(dto.password!) : undefined;
     const user = await this.prisma.$transaction(async (tx) => {
       const row = await tx.user.update({
@@ -236,8 +241,15 @@ export class UsersService {
             : {}),
           // A reset password is temporary: the user chooses their own at next sign-in.
           ...(reset
-            ? { passwordHash, mustChangePassword: true, passwordChangedAt: new Date() }
-            : {}),
+            ? {
+                passwordHash,
+                mustChangePassword: true,
+                passwordChangedAt: new Date(),
+                temporaryPasswordExpiresAt: this.temporaryPasswordExpiry(),
+              }
+            : statusChanged
+              ? { passwordChangedAt: new Date() }
+              : {}),
         },
         include,
       });
@@ -341,6 +353,7 @@ export class UsersService {
                 firstName: row.firstName,
                 lastName: row.lastName,
                 mustChangePassword: true,
+                temporaryPasswordExpiresAt: this.temporaryPasswordExpiry(),
                 ...(role === 'teacher'
                   ? { teacher: { create: {} } }
                   : {
@@ -420,7 +433,10 @@ export class UsersService {
         ? 'Demande close : l’élève a obtenu son diplôme.'
         : 'Demande close : l’élève a quitté le collège.';
     await this.prisma.$transaction(async (tx) => {
-      await tx.user.updateMany({ where: { id: { in: userIds } }, data: { status: 'archived' } });
+      await tx.user.updateMany({
+        where: { id: { in: userIds } },
+        data: { status: 'archived', passwordChangedAt: now },
+      });
       await tx.student.updateMany({
         where: { id: { in: studentIds } },
         data: { graduatedOn: dto.outcome === 'graduated' ? on : null },
@@ -450,6 +466,11 @@ export class UsersService {
       );
     });
     return { archived: targets.length };
+  }
+
+  /** When a temporary password set now stops working. */
+  private temporaryPasswordExpiry(): Date {
+    return new Date(Date.now() + this.temporaryPasswordDays * 86_400_000);
   }
 
   private async row(id: string): Promise<UserRow> {

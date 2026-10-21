@@ -13,6 +13,7 @@ import type { Request, Response } from 'express';
 import { API_PREFIX } from '../app.prefix.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { AllowDuringPasswordChange, CurrentUser, Public } from '../common/decorators.js';
+import { loginTracker, passwordTracker } from '../common/client-key.js';
 import type { Env } from '../config/env.validation.js';
 import { AuthService, type IssuedSession, toSessionUser } from './auth.service.js';
 import { ChangePasswordDto, LoginDto, SessionDto, SessionUserDto } from './dto/auth.dto.js';
@@ -22,6 +23,14 @@ export const REFRESH_COOKIE = 'cdls_refresh';
 /** Read per request from the validated environment (defaults to 5). */
 function loginLimit(): number {
   return Number(process.env['LOGIN_THROTTLE_LIMIT'] ?? 5) || 5;
+}
+
+/**
+ * Per address and account, so a class behind one school address can sign in together; the address as a
+ * whole stays capped by the `ip` limit (twelve times the account limit, at least 60 a minute).
+ */
+function ipCeiling(): number {
+  return Math.max(loginLimit() * 12, 60);
 }
 
 @ApiTags('auth')
@@ -36,9 +45,12 @@ export class AuthController {
     this.secureCookie = config.get('NODE_ENV', { infer: true }) === 'production';
   }
 
-  /** Signs in; sets the refresh token as an httpOnly cookie. Limited to LOGIN_THROTTLE_LIMIT (5) attempts a minute. */
+  /** Signs in; sets the refresh token as an httpOnly cookie. Limited to LOGIN_THROTTLE_LIMIT (5) attempts a minute per address and e-mail. */
   @Public()
-  @Throttle({ default: { limit: loginLimit, ttl: 60_000 } })
+  @Throttle({
+    default: { limit: loginLimit, ttl: 60_000, getTracker: loginTracker },
+    ip: { limit: ipCeiling, ttl: 60_000 },
+  })
   @Post('login')
   @HttpCode(200)
   @ApiOkResponse({ type: SessionDto })
@@ -86,7 +98,10 @@ export class AuthController {
    * every other session and returns a fresh one with a new refresh cookie. Limited like the login.
    */
   @AllowDuringPasswordChange()
-  @Throttle({ default: { limit: loginLimit, ttl: 60_000 } })
+  @Throttle({
+    default: { limit: loginLimit, ttl: 60_000, getTracker: passwordTracker },
+    ip: { limit: ipCeiling, ttl: 60_000 },
+  })
   @Post('password')
   @HttpCode(200)
   @ApiBearerAuth()
