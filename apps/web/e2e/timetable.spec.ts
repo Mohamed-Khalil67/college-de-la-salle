@@ -37,6 +37,22 @@ async function adminApi(request: APIRequestContext) {
   };
 }
 
+/**
+ * Saves a dialog; when the API answers with warnings (a room too small for a class that grew, say), accepts
+ * each with a reason, as a person would, and saves again.
+ */
+async function saveAccepting(page: Page, dialog: ReturnType<Page['getByRole']>, button: string): Promise<void> {
+  await dialog.getByRole('button', { name: button }).click();
+  const accept = dialog.getByRole('button', { name: 'Enregistrer avec ces avertissements' });
+  const done = page.locator('.alert--success').filter({ hasText: /nregistr/ });
+  await expect(accept.or(done)).toBeVisible();
+  if (await accept.isVisible()) {
+    const reasons = dialog.getByLabel(/^Motif : /);
+    for (let i = 0; i < (await reasons.count()); i++) await reasons.nth(i).fill('Accepté pour le test');
+    await accept.click();
+  }
+}
+
 const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 
 /** Removes the slots and exceptions the tests added (they all carry the 17:00 hour or the test reason). */
@@ -85,8 +101,8 @@ test.describe('timetable', () => {
 
     // First séance: Seconde (Bac français), Humanités, Sunday 17:00, Salle 14.
     const first = await addSlot('Seconde (Bac français)', 'Humanités, littérature et philosophie');
-    await first.getByRole('button', { name: 'Ajouter la séance' }).click();
-    await expect(page.locator('.alert--success').filter({ hasText: 'Modification enregistrée' })).toBeVisible();
+    await saveAccepting(page, first, 'Ajouter la séance');
+    await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
     await expect(page.getByRole('grid')).toContainText('Humanités, littérature et philosophie');
 
     // Second: another class, another teacher, the same room and hour: refused, with the conflict named.
@@ -100,8 +116,8 @@ test.describe('timetable', () => {
     const suggestions = second.getByRole('list', { name: 'Salles libres à ce moment-là' });
     await expect(suggestions).toBeVisible();
     await suggestions.getByRole('button').first().click();
-    await second.getByRole('button', { name: 'Ajouter la séance' }).click();
-    await expect(page.locator('.alert--success').filter({ hasText: 'Modification enregistrée' })).toBeVisible();
+    await saveAccepting(page, second, 'Ajouter la séance');
+    await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Conflits \(\d+\)/ })).toBeVisible();
   });
 
@@ -149,7 +165,7 @@ test.describe('timetable', () => {
     await expect(dialog.getByRole('radio', { name: 'Cette séance' })).toBeChecked();
     await dialog.getByLabel('Motif').fill('Test Playwright');
     await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
-    await expect(page.locator('.alert--success').filter({ hasText: 'Modification enregistrée' })).toBeVisible();
+    await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
     await expect(grid.locator('.cs--struck').first()).toBeVisible();
 
     // The student of that class: next week, the same session, struck through, with the word and the reason.
