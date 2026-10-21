@@ -134,7 +134,7 @@ interface ClassCards {
         <cdls-empty-state
           icon="calendar"
           title="Aucun trimestre clôturé"
-          description="Les bulletins se calculent sur un trimestre clôturé. Clôturez-le dans « Années et trimestres »."
+          description="Les bulletins se calculent sur un trimestre clôturé. Clôturez-le dans « Année scolaire »."
         />
       }
     } @else {

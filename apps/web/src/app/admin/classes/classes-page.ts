@@ -2,6 +2,7 @@ import { Component, computed, inject, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { ClassDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
+import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { groupBySection, plural } from '../shared/admin-format';
@@ -17,9 +18,11 @@ import { ClassFormModal } from './class-form-modal';
         <h1 class="t-h1">Classes</h1>
         <p class="t-muted">{{ subtitle() }}</p>
       </div>
-      <div class="page__actions">
-        <button cdlsButton type="button" [disabled]="!currentYear()" (click)="startCreate()"><cdls-icon name="plus" />Créer une classe</button>
-      </div>
+      @if (isAdmin()) {
+        <div class="page__actions">
+          <button cdlsButton type="button" [disabled]="!currentYear()" (click)="startCreate()"><cdls-icon name="plus" />Créer une classe</button>
+        </div>
+      }
     </div>
 
     @if (notice()) {
@@ -31,11 +34,13 @@ import { ClassFormModal } from './class-form-modal';
     } @else if (classes.hasValue() && years.hasValue()) {
       @if (!currentYear()) {
         <cdls-empty-state icon="calendar" title="Aucune année scolaire en cours" description="Créez une année et définissez-la comme année en cours.">
-          <a cdlsButton variant="secondary" routerLink="../annees">Années et trimestres</a>
+          <a cdlsButton variant="secondary" routerLink="../annees">Année scolaire</a>
         </cdls-empty-state>
       } @else if (!groups().length) {
         <cdls-empty-state icon="book" title="Aucune classe pour cette année" description="Créez la première classe de l’année.">
-          <button cdlsButton variant="secondary" type="button" (click)="startCreate()">Créer une classe</button>
+          @if (isAdmin()) {
+            <button cdlsButton variant="secondary" type="button" (click)="startCreate()">Créer une classe</button>
+          }
         </cdls-empty-state>
       } @else {
         <div class="stack sections">
@@ -63,14 +68,16 @@ import { ClassFormModal } from './class-form-modal';
                         <td class="num">
                           <span class="row-actions">
                             <a cdlsButton variant="tertiary" size="sm" [routerLink]="[item.id]">
-                              Voir les élèves<span class="visually-hidden"> de {{ item.label }}</span>
+                              {{ isAdmin() ? 'Élèves et matières' : 'Matières' }}<span class="visually-hidden"> de {{ item.label }}</span>
                             </a>
-                            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startRename(item)">
-                              Renommer<span class="visually-hidden"> {{ item.label }}</span>
-                            </button>
-                            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDelete(item)">
-                              Supprimer<span class="visually-hidden"> {{ item.label }}</span>
-                            </button>
+                            @if (isAdmin()) {
+                              <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startRename(item)">
+                                Renommer<span class="visually-hidden"> {{ item.label }}</span>
+                              </button>
+                              <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDelete(item)">
+                                Supprimer<span class="visually-hidden"> {{ item.label }}</span>
+                              </button>
+                            }
                           </span>
                         </td>
                       </tr>
@@ -126,6 +133,9 @@ import { ClassFormModal } from './class-form-modal';
 })
 export class ClassesPage {
   readonly #api = inject(ApiClient);
+  readonly #auth = inject(AuthStore);
+  /** Creating, renaming and deleting classes is the admin's; a coordinator opens a class for its subjects. */
+  protected readonly isAdmin = computed(() => this.#auth.role() === 'admin');
 
   protected readonly years = resource({ loader: () => this.#api.school.years() });
   protected readonly classes = resource({ loader: () => this.#api.school.classes() });

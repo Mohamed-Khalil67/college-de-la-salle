@@ -30,6 +30,9 @@ interface UserRow {
               <th scope="col">Classe</th>
               <th scope="col">Filière</th>
             }
+            @if (isTeachers()) {
+              <th scope="col">Coordinateur</th>
+            }
             <th scope="col">Statut</th>
             <th scope="col">Dernière connexion</th>
             <th scope="col" class="num"><span class="visually-hidden">Actions</span></th>
@@ -47,6 +50,19 @@ interface UserRow {
               @if (isStudents()) {
                 <td data-label="Classe :">{{ row.className }}</td>
                 <td data-label="Filière :">{{ row.track }}</td>
+              }
+              @if (isTeachers()) {
+                <td>
+                  <label class="check">
+                    <input
+                      type="checkbox"
+                      [checked]="row.user.isCoordinator"
+                      [disabled]="row.user.status !== 'active' || busyId() === row.user.id"
+                      (change)="toggle($event, row.user)"
+                    />
+                    <span>Coordinateur<span class="visually-hidden"> : {{ row.name }}</span></span>
+                  </label>
+                </td>
               }
               <td data-label="Statut :"><cdls-badge [tone]="row.status.tone">{{ row.status.label }}</cdls-badge></td>
               <td class="t-muted" data-label="Dernière connexion :">{{ row.lastLogin }}</td>
@@ -89,13 +105,24 @@ export class UsersTable {
   readonly classes = input<ReadonlyMap<string, ClassDto>>(new Map());
   readonly now = input.required<Date>();
   readonly selfId = input<string | null>(null);
+  /** The teacher whose coordinateur flag is being saved. */
+  readonly busyId = input<string | null>(null);
   readonly edit = output<UserDto>();
   readonly deactivate = output<UserDto>();
   /** A student who graduated or left the school. */
   readonly archive = output<UserDto>();
+  /** The admin ticked or unticked « Coordinateur » for a teacher; `value` is the new state. */
+  readonly coordinator = output<{ readonly user: UserDto; readonly value: boolean }>();
 
   protected readonly captionId = `users-caption-${++nextId}`;
   protected readonly isStudents = computed(() => this.role() === 'student');
+  protected readonly isTeachers = computed(() => this.role() === 'teacher');
+  /** The box shows the saved state until the API confirms: it goes back at once and follows the data. */
+  protected toggle(event: Event, user: UserDto): void {
+    (event.target as HTMLInputElement).checked = user.isCoordinator;
+    this.coordinator.emit({ user, value: !user.isCoordinator });
+  }
+
   protected readonly rows = computed<UserRow[]>(() =>
     this.users().map((user) => {
       const schoolClass = user.classId ? this.classes().get(user.classId) : undefined;

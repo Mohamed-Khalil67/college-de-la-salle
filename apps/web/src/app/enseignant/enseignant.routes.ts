@@ -7,6 +7,8 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Saisie des notes', path: 'notes', icon: 'edit', short: 'Notes' },
   { label: 'Appel', path: 'appel', icon: 'check' },
   { label: 'Annonces', path: 'annonces', icon: 'bell' },
+  /** Teachers the admin marked coordinateur edit the year's structure in the administration area. */
+  { label: 'Coordination', path: 'coordination', href: '/admin/matieres', icon: 'book', access: 'coordinator' },
 ];
 
 /** The teacher space (/enseignant). Pages are ported from design/prototypes/enseignant-*.html. */
