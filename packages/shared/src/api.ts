@@ -415,7 +415,7 @@ export interface StudentSummaryDto {
   readonly studentNumber: string | null;
 }
 
-/** GET /classes/:id/students: a student of the roster with the enrolment to remove them (DELETE /enrollments/:id). */
+/** GET /classes/:id/students: a student of the roster with the enrolment to remove them (DELETE /enrollments/:id, which closes the enrolment: it stays as history). */
 export interface ClassStudentDto extends StudentSummaryDto {
   readonly enrollmentId: string;
 }

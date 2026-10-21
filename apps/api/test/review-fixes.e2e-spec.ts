@@ -799,4 +799,46 @@ ${last},Nabil`), 'teacher', actor),
       await t.http().get('/api/calendar-days?from=2027-01-01&to=2027-06-30').set(bearer(student)).expect(200);
     });
   });
+  describe('unenrolling keeps the history', () => {
+    it('closes the enrolment instead of deleting it, and allows enrolling again', async () => {
+      const created = (
+        await t
+          .http()
+          .post('/api/users')
+          .set(bearer(admin))
+          .send({
+            role: 'student',
+            firstName: 'Retrait',
+            lastName: `Historique${Date.now().toString(36)}`,
+            classId: currentClassId,
+          })
+          .expect(201)
+      ).body as CreatedUserResponse;
+      const studentId = created.user.studentId!;
+      const open = await t.prisma.enrollment.findFirstOrThrow({
+        where: { studentId, classId: currentClassId, leftOn: null },
+      });
+      await t.http().delete(`/api/enrollments/${open.id}`).set(bearer(admin)).expect(204);
+      const kept = await t.prisma.enrollment.findUniqueOrThrow({ where: { id: open.id } });
+      expect(kept.leftOn).not.toBeNull();
+      // Idempotent, audited once, and gone from the roster and the head count.
+      await t.http().delete(`/api/enrollments/${open.id}`).set(bearer(admin)).expect(204);
+      expect(
+        await t.prisma.auditLog.count({ where: { action: 'enrollment.close', entityId: open.id } }),
+      ).toBe(1);
+      const roster = (
+        await t.http().get(`/api/classes/${currentClassId}/students`).set(bearer(admin)).expect(200)
+      ).body as { id: string }[];
+      expect(roster.map((s) => s.id)).not.toContain(studentId);
+      await t
+        .http()
+        .post(`/api/classes/${currentClassId}/enrollments`)
+        .set(bearer(admin))
+        .send({ studentId })
+        .expect(201);
+      expect(
+        await t.prisma.enrollment.count({ where: { studentId, classId: currentClassId } }),
+      ).toBe(2);
+    });
+  });
 });
