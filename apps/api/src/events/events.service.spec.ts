@@ -18,6 +18,9 @@ const TEACHER: AuthUser = {
   teacherId: 't1',
   classId: null,
   isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 
 const type = (over: Record<string, unknown> = {}) => ({

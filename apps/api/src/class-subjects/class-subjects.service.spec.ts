@@ -14,6 +14,9 @@ const ADMIN: AuthUser = {
   teacherId: null,
   classId: null,
   isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 
 const klass = (id: string, section = 'bac') => ({ id, section: { code: section } });

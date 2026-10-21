@@ -14,6 +14,9 @@ const ADMIN: AuthUser = {
   teacherId: null,
   classId: null,
   isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 const room = (over: Record<string, unknown> = {}) => ({
   id: 'r1',

@@ -14,6 +14,9 @@ const ADMIN: AuthUser = {
   teacherId: null,
   classId: null,
   isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
 };
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const row = (over: Record<string, unknown> = {}) => ({

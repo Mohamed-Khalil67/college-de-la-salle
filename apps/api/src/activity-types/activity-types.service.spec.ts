@@ -19,6 +19,9 @@ const user = (role: AuthUser['role'], over: Partial<AuthUser> = {}): AuthUser =>
   teacherId: role === 'teacher' ? 't1' : null,
   classId: null,
   isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
   ...over,
 });
 const ADMIN = user('admin');

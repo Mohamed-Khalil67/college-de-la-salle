@@ -434,7 +434,7 @@ describe('Accounts (e2e)', () => {
 
       // Give the student a grade in the old class, to check it survives.
       const oldClass = classOf('nationale', 'e2e-nat-a');
-      const exam = await t.prisma.event.findFirstOrThrow({ where: { kind: 'examen' } });
+      const exam = await t.prisma.event.findFirstOrThrow({ where: { activityType: { code: 'examen' } } });
       gradeId = (await t.prisma.grade.create({
         data: { eventId: exam.id, studentId, score: 15, gradedById: exam.authorId, published: true },
       })).id;
