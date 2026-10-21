@@ -33,11 +33,17 @@ import {
 export class CalendarDaysController {
   constructor(private readonly days: CalendarDaysService) {}
 
-  /** Holidays, exam weeks and other days, by start day (everyone may read them). */
+  /**
+   * Holidays, exam weeks and other days, by start day. Needs a school year or a range (from and to);
+   * students only see the days that concern their section and class.
+   */
   @Get()
   @ApiOkResponse({ type: [CalendarDayDto] })
-  list(@Query() query: CalendarDayQueryDto): Promise<CalendarDayDto[]> {
-    return this.days.list(query);
+  list(
+    @Query() query: CalendarDayQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CalendarDayDto[]> {
+    return this.days.list(query, user);
   }
 
   /** Admin or coordinator. */

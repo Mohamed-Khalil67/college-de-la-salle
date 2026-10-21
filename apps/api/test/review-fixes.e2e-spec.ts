@@ -748,4 +748,55 @@ ${last},Nabil`), 'teacher', actor),
       }
     });
   });
+  describe('calendar days: bounded and filtered for students', () => {
+    it('needs a year or a range, and shows a student only what concerns them', async () => {
+      const current = await t.prisma.schoolYear.findFirstOrThrow({ where: { isCurrent: true } });
+      const mine = await studentOf(t.prisma, 'bac', 'seconde');
+      const sibling = await studentOf(t.prisma, 'bac', 'premiere');
+      const student = await t.token(mine.email);
+      const make = async (body: object) =>
+        (
+          await t
+            .http()
+            .post('/api/calendar-days')
+            .set(bearer(admin))
+            .send({ schoolYearId: current.id, type: 'holiday', startsOn: '2027-04-05', endsOn: '2027-04-05', ...body })
+            .expect(201)
+        ).body as { id: string };
+      const natId = (await t.prisma.section.findFirstOrThrow({ where: { code: 'nationale' } })).id;
+      const created = [
+        await make({ label: 'Fix-Tous' }),
+        await make({ label: 'Fix-Nationale', sectionId: natId }),
+        await make({ label: 'Fix-Classes', classIds: [mine.classId, sibling.classId] }),
+        await make({ label: 'Fix-Autre', classIds: [sibling.classId] }),
+      ];
+      try {
+        const query = `?schoolYearId=${current.id}&from=2027-04-05&to=2027-04-05`;
+        const seen = (await t.http().get(`/api/calendar-days${query}`).set(bearer(student)).expect(200))
+          .body as { label: string; classIds: string[] }[];
+        const ours = seen.filter((d) => d.label.startsWith('Fix-'));
+        expect(ours.map((d) => d.label).sort()).toEqual(['Fix-Classes', 'Fix-Tous']);
+        // The other class named by a day is not disclosed.
+        expect(ours.find((d) => d.label === 'Fix-Classes')!.classIds).toEqual([mine.classId]);
+
+        const staff = (await t.http().get(`/api/calendar-days${query}`).set(bearer(maths)).expect(200))
+          .body as { label: string; classIds: string[] }[];
+        expect(staff.filter((d) => d.label.startsWith('Fix-'))).toHaveLength(4);
+        expect(staff.find((d) => d.label === 'Fix-Classes')!.classIds).toHaveLength(2);
+      } finally {
+        for (const day of created)
+          await t.http().delete(`/api/calendar-days/${day.id}`).set(bearer(admin)).expect(204);
+      }
+
+      // Unbounded or oversized reads are refused.
+      await t.http().get('/api/calendar-days').set(bearer(student)).expect(400);
+      await t.http().get('/api/calendar-days?from=2027-01-01').set(bearer(student)).expect(400);
+      await t
+        .http()
+        .get('/api/calendar-days?from=2020-01-01&to=2030-01-01')
+        .set(bearer(student))
+        .expect(400);
+      await t.http().get('/api/calendar-days?from=2027-01-01&to=2027-06-30').set(bearer(student)).expect(200);
+    });
+  });
 });

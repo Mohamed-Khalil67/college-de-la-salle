@@ -634,7 +634,10 @@ export interface CalendarDayDto {
   readonly classIds: readonly string[];
 }
 
-/** GET /calendar-days: a year's days and/or those overlapping [from, to], by start day. */
+/**
+ * GET /calendar-days: a year's days and/or those overlapping [from, to], by start day. A school year or a
+ * range (`from` and `to`, a year and a bit at most) is required; students only get what concerns them.
+ */
 export interface CalendarDayQuery {
   readonly schoolYearId?: string;
   readonly from?: string;
