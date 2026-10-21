@@ -5,6 +5,13 @@
  */
 import type { ActivityColour, ActivityIcon, Attachment } from './calendar.js';
 import type { SectionId } from './space.js';
+import type {
+  OccurrenceStatus,
+  SessionChange,
+  SlotExceptionKind,
+  SlotScope,
+  WeekParity,
+} from './timetable.js';
 
 export type Role = 'admin' | 'teacher' | 'student';
 export const ROLES: readonly Role[] = ['admin', 'teacher', 'student'];
@@ -731,6 +738,283 @@ export interface OccurrenceDto {
   readonly key: string;
   readonly day: string;
   readonly event: EventDto;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Timetable: /api/timetable. A weekly rule (slot) plus one-off changes (exceptions); the sessions are
+ * computed from them (@cdls/shared `expandTimetable`) with holidays removed.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The fields of a weekly slot. `roomId` null: no room (outside the school). */
+export interface TimetableSlotInput {
+  readonly classSubjectId: string;
+  /** Must teach that subject in that class. */
+  readonly teacherId: string;
+  readonly roomId: string | null;
+  /** A repeatable activity type (cours, TD, TP…). */
+  readonly activityTypeId: string;
+  /** 0 = Sunday … 6 = Saturday. */
+  readonly weekday: number;
+  /** HH:MM */
+  readonly startTime: string;
+  readonly endTime: string;
+  /** Included; inside the class's school year. */
+  readonly validFrom: string;
+  readonly validTo: string;
+  /** A or B: the slot runs every other week (week A is the one containing the school year's first day). */
+  readonly weekParity: WeekParity | null;
+  /**
+   * Division of the groups that run in parallel (« TP », « LV2 »): two slots of one class may overlap only
+   * when both carry the same division. Null: the whole class. Groups come with phase 3.
+   */
+  readonly division: string | null;
+}
+
+export interface TimetableSlotDto extends TimetableSlotInput {
+  readonly id: string;
+  readonly classId: string;
+  readonly classLabel: string;
+  readonly subjectId: string;
+  readonly subjectName: string;
+  readonly teacherName: string;
+  readonly roomName: string | null;
+  readonly activityType: ActivityTypeSummary;
+  /** Reserved for phase 3 (groups): always null today. */
+  readonly groupId: string | null;
+}
+
+/** Soft rules: they warn, and the save needs a reason for each. */
+export type TimetableWarningCode =
+  | 'exam_week'
+  | 'room_capacity'
+  | 'tp_outside_lab'
+  | 'assessments_overload'
+  | 'hours_exceeded';
+export const TIMETABLE_WARNING_CODES: readonly TimetableWarningCode[] = [
+  'exam_week',
+  'room_capacity',
+  'tp_outside_lab',
+  'assessments_overload',
+  'hours_exceeded',
+];
+export const TIMETABLE_WARNING_LABELS: Readonly<Record<TimetableWarningCode, string>> = {
+  exam_week: 'Séance en semaine d’examens',
+  room_capacity: 'Salle trop petite',
+  tp_outside_lab: 'TP hors laboratoire',
+  assessments_overload: 'Trop d’évaluations le même jour',
+  hours_exceeded: 'Volume horaire dépassé',
+};
+
+export interface TimetableWarningDto {
+  readonly code: TimetableWarningCode;
+  /** The weekly slot the warning is about (to badge its sessions and offer a fix). */
+  readonly slotId: string;
+  /** The day concerned; null when it covers the whole series (hours, room type). */
+  readonly date: string | null;
+  /** French sentence naming the item (« Salle 8 (24 places) pour 30 élèves »). */
+  readonly message: string;
+}
+
+/** A warning the person chose to accept, with the reason that goes to the audit log. */
+export interface AcknowledgedWarning {
+  readonly code: TimetableWarningCode;
+  readonly reason: string;
+}
+
+export type TimetableConflictKind = 'room' | 'teacher' | 'class';
+
+/** A hard conflict: the save is refused (409). */
+export interface TimetableConflictDto {
+  readonly kind: TimetableConflictKind;
+  /** The room, teacher or class that is taken (its id). */
+  readonly resourceId: string;
+  readonly date: string;
+  readonly startTime: string;
+  readonly endTime: string;
+  /** French sentence naming the conflicting item (« Salle 12 est déjà prise le … par Mathématiques, Première »). */
+  readonly message: string;
+  /** How many sessions clash with this same item (1 when only `date` does). */
+  readonly count: number;
+  /** What it clashes with: a weekly slot, an exception, or a one-off event. */
+  readonly withSource: 'slot' | 'exception' | 'event';
+  readonly withId: string | null;
+  readonly withSlotId: string | null;
+  readonly withLabel: string;
+}
+
+export interface SlotExceptionInput {
+  readonly kind: SlotExceptionKind;
+  /** moved: the new day (default: same day). */
+  readonly newDate?: string | null;
+  /** moved: both or neither. */
+  readonly newStart?: string | null;
+  readonly newEnd?: string | null;
+  /** room_change (required), moved (optional). */
+  readonly newRoomId?: string | null;
+  /** substitute (required). */
+  readonly newTeacherId?: string | null;
+  readonly reason?: string;
+}
+
+export interface SlotExceptionDto {
+  readonly id: string;
+  readonly slotId: string;
+  /** The original day of the session. */
+  readonly date: string;
+  readonly kind: SlotExceptionKind;
+  readonly newDate: string | null;
+  readonly newStart: string | null;
+  readonly newEnd: string | null;
+  readonly newRoomId: string | null;
+  readonly newTeacherId: string | null;
+  readonly reason: string;
+}
+
+/** POST /timetable/slots (admin or coordinator). */
+export interface CreateTimetableSlotRequest extends TimetableSlotInput {
+  readonly acknowledgedWarnings?: readonly AcknowledgedWarning[];
+}
+
+/**
+ * PATCH /timetable/slots/:id: « Cette séance / Celle-ci et les suivantes / Toute la série ».
+ * - `this`: needs `date` and `exception` (an exception on that session; the only scope a teacher has).
+ * - `following`: needs `date` and `changes`; the slot ends the day before and a new slot starts on `date`.
+ * - `all`: needs `changes`; edits the series from today on (sessions already held are never rewritten: the
+ *   series is split at today when it already started).
+ */
+export interface UpdateTimetableSlotRequest {
+  readonly scope: SlotScope;
+  readonly date?: string;
+  readonly changes?: Partial<TimetableSlotInput>;
+  readonly exception?: SlotExceptionInput;
+  readonly acknowledgedWarnings?: readonly AcknowledgedWarning[];
+}
+
+/** DELETE /timetable/slots/:id?scope=…&date=…: this session cancelled, the series ended, or deleted. */
+export interface DeleteTimetableSlotQuery {
+  readonly scope: SlotScope;
+  readonly date?: string;
+}
+
+/** POST /timetable/slots/:id/exceptions: one session changed (replaces the one it already had). */
+export interface CreateSlotExceptionRequest extends SlotExceptionInput {
+  /** The original day of the session. */
+  readonly date: string;
+  readonly acknowledgedWarnings?: readonly AcknowledgedWarning[];
+}
+
+/** What a write did. */
+export interface TimetableWriteResult {
+  /** The slot holding the change (the new one for a split); null when a series was removed. */
+  readonly slot: TimetableSlotDto | null;
+  /** The old slot when the series was split or ended. */
+  readonly endedSlot: TimetableSlotDto | null;
+  readonly exception: SlotExceptionDto | null;
+  /** Warnings that were accepted. */
+  readonly warnings: readonly TimetableWarningDto[];
+}
+
+/**
+ * POST /timetable/check: what a write would do, without doing it. Without `slotId` it checks a new slot
+ * (`slot`); with it, an edit (`scope`, `date`, `changes`, `exception`) as PATCH would take it.
+ */
+export interface TimetableCheckRequest {
+  readonly slotId?: string;
+  readonly slot?: TimetableSlotInput;
+  readonly scope?: SlotScope;
+  readonly date?: string;
+  readonly changes?: Partial<TimetableSlotInput>;
+  readonly exception?: SlotExceptionInput;
+}
+
+export interface TimetableCheckResult {
+  readonly conflicts: readonly TimetableConflictDto[];
+  readonly warnings: readonly TimetableWarningDto[];
+  /** No hard conflict (warnings still need a reason). */
+  readonly canSave: boolean;
+}
+
+export const TIMETABLE_CONFLICT = 'TIMETABLE_CONFLICT';
+export const WARNINGS_NOT_ACKNOWLEDGED = 'WARNINGS_NOT_ACKNOWLEDGED';
+
+/** Body of the 409 a refused write answers with (`code` tells the two cases apart). */
+export interface TimetableBlockedError extends ApiError {
+  readonly code: typeof TIMETABLE_CONFLICT | typeof WARNINGS_NOT_ACKNOWLEDGED;
+  readonly conflicts: readonly TimetableConflictDto[];
+  readonly warnings: readonly TimetableWarningDto[];
+}
+
+/** GET /timetable/slots: the weekly slots, filtered by class, teacher or room. */
+export interface TimetableSlotListQuery extends PageQuery {
+  readonly classId?: string;
+  readonly teacherId?: string;
+  readonly roomId?: string;
+}
+
+/** The values of a session at one moment, with names for display. */
+export interface SessionValuesDto {
+  readonly date: string;
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly roomId: string | null;
+  readonly roomName: string | null;
+  readonly teacherId: string;
+  readonly teacherName: string;
+}
+
+/** One session of the timetable. */
+export interface TimetableOccurrenceDto {
+  /** `slotId@originalDate`, `:from` added on the trace of a moved session. */
+  readonly key: string;
+  readonly slotId: string;
+  readonly originalDate: string;
+  readonly status: OccurrenceStatus;
+  /** Maintenant. For a cancelled session, the values it had. */
+  readonly current: SessionValuesDto;
+  /** Avant: what the weekly rule says. */
+  readonly original: SessionValuesDto;
+  /** The fields that differ between the two. */
+  readonly changes: readonly SessionChange[];
+  /** `moved_from` only: where the session went. */
+  readonly movedTo: SessionValuesDto | null;
+  readonly exceptionId: string | null;
+  readonly reason: string;
+  readonly classId: string;
+  readonly classLabel: string;
+  readonly subjectId: string;
+  readonly subjectName: string;
+  readonly activityType: ActivityTypeSummary;
+  readonly division: string | null;
+  /** The signed-in user may cancel, move or change the room of this session. */
+  readonly canChange: boolean;
+}
+
+/** GET /timetable/occurrences?classId|teacherId|roomId&from&to (at most 62 days). */
+export interface TimetableOccurrenceQuery {
+  readonly classId?: string;
+  readonly teacherId?: string;
+  readonly roomId?: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+/** GET /timetable/warnings: the soft warnings of the stored timetable in a range, for the « Conflits » panel. */
+export type TimetableWarningQuery = TimetableOccurrenceQuery;
+
+/** GET /timetable/free-rooms?date&startTime&endTime: active rooms free during that time. */
+export interface FreeRoomsQuery {
+  readonly date: string;
+  readonly startTime: string;
+  readonly endTime: string;
+  /** Sort the rooms that seat this class first and flag the others. */
+  readonly classId?: string;
+  /** The session being moved: its own room does not count as taken. */
+  readonly ignoreSlotId?: string;
+}
+
+export interface FreeRoomDto extends RoomDto {
+  /** True when the room seats the class (or when either is unknown). */
+  readonly fitsClass: boolean;
 }
 
 /* ------------------------------------------------------------------------------------------------

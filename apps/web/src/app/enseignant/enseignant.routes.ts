@@ -3,10 +3,11 @@ import type { SpaceNavItem } from '../layout/space-layout';
 
 export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Mes classes', path: '', icon: 'users', short: 'Classes' },
+  { label: 'Mon emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
   { label: 'Agenda', path: 'agenda', icon: 'calendar' },
   { label: 'Saisie des notes', path: 'notes', icon: 'edit', short: 'Notes' },
   { label: 'Appel', path: 'appel', icon: 'check' },
-  { label: 'Annonces', path: 'annonces', icon: 'bell' },
+  { label: 'Annonces', path: 'annonces' },
 ];
 
 /** The teacher space (/enseignant). Pages are ported from design/prototypes/enseignant-*.html. */
@@ -15,6 +16,12 @@ export const ENSEIGNANT_ROUTES: Routes = [
     path: '',
     title: 'Mes classes',
     loadComponent: () => import('./mes-classes/classes-page').then((m) => m.ClassesPage),
+  },
+  {
+    path: 'emploi-du-temps',
+    title: 'Mon emploi du temps',
+    loadComponent: () =>
+      import('./emploi-du-temps/my-timetable-page').then((m) => m.MyTimetablePage),
   },
   {
     path: 'agenda',

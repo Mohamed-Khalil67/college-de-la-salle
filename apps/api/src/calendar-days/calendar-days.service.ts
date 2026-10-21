@@ -8,6 +8,8 @@ import {
   type SectionId,
 } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
+import { OccupancyService } from '../occupancy/occupancy.service.js';
+import { loadClosures } from './closures.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
@@ -19,6 +21,9 @@ import type {
   CreateCalendarDayDto,
   UpdateCalendarDayDto,
 } from './dto/calendar-day.dto.js';
+
+/** A holiday can rewrite the index of many slots. */
+const TX = { timeout: 30_000 };
 
 const include = {
   classes: { select: { classId: true } },
@@ -33,7 +38,10 @@ type Row = Prisma.CalendarDayGetPayload<{ include: typeof include }>;
 /** Holidays, exam weeks, days without classes and special days of a school year. */
 @Injectable()
 export class CalendarDaysService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly occupancy: OccupancyService,
+  ) {}
 
   /**
    * The year's days, or those overlapping [from, to] (at most a year and a bit without a year), by start day. A year or a
@@ -109,8 +117,9 @@ export class CalendarDaysService {
           after: snapshot(row),
         },
       ]);
+      await this.reindex(tx, row);
       return toCalendarDayDto(row);
-    });
+    }, TX);
   }
 
   async update(id: string, dto: UpdateCalendarDayDto, user: AuthUser): Promise<CalendarDayDto> {
@@ -153,8 +162,9 @@ export class CalendarDaysService {
           after: snapshot(row),
         },
       ]);
+      await this.reindex(tx, current, row);
       return toCalendarDayDto(row);
-    });
+    }, TX);
   }
 
   async remove(id: string, user: AuthUser): Promise<void> {
@@ -170,7 +180,20 @@ export class CalendarDaysService {
           before: snapshot(current),
         },
       ]);
-    });
+      await this.reindex(tx, current);
+    }, TX);
+  }
+
+  /**
+   * Holidays and days without classes remove sessions from the timetable: the occupancy index of the slots
+   * they touch is rewritten in the same transaction (a removed holiday can bring back a clash: 409).
+   */
+  private async reindex(tx: Prisma.TransactionClient, ...days: Row[]): Promise<void> {
+    const closed = days.filter((d) => (CLOSED_DAY_TYPES as readonly string[]).includes(d.type));
+    if (!closed.length) return;
+    const from = closed.map((d) => toDay(d.startsOn)).sort()[0]!;
+    const to = closed.map((d) => toDay(d.endsOn)).sort().at(-1)!;
+    await this.occupancy.reindexRange(tx, from, to);
   }
 
   /**
@@ -178,26 +201,7 @@ export class CalendarDaysService {
    * model's notation (`all`, `bac`, `bac-premiere`), for occurrences() and the .ics export.
    */
   async closures(from: string, to: string): Promise<Closure[]> {
-    const rows = await this.prisma.calendarDay.findMany({
-      where: {
-        type: { in: [...CLOSED_DAY_TYPES] as CalendarDayType[] },
-        startsOn: { lte: fromDay(to) },
-        endsOn: { gte: fromDay(from) },
-      },
-      include: {
-        section: true,
-        classes: { include: { schoolClass: { include: { section: true } } } },
-      },
-    });
-    return rows.map((r) => ({
-      startsOn: toDay(r.startsOn),
-      endsOn: toDay(r.endsOn),
-      targets: r.classes.length
-        ? r.classes.map((c) =>
-            classTarget(c.schoolClass.section.code as SectionId, c.schoolClass.code),
-          )
-        : [r.section?.code ?? 'all'],
-    }));
+    return loadClosures(this.prisma, CLOSED_DAY_TYPES, from, to);
   }
 
   private async find(id: string): Promise<Row> {

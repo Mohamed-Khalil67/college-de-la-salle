@@ -151,6 +151,8 @@ model Teacher {
 
   user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments        TeachingAssignment[]
+  timetableSlots     TimetableSlot[]
+  slotExceptions     SlotException[]
   /// The teacher's private activity types.
   activityTypes      ActivityType[]
   events             Event[]
@@ -363,6 +365,7 @@ model ClassSubject {
   schoolClass SchoolClass          @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject     Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
   assignments TeachingAssignment[]
+  slots       TimetableSlot[]
 
   @@unique([classId, subjectId])
   @@index([subjectId])
@@ -395,7 +398,9 @@ model Room {
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  events Event[]
+  events         Event[]
+  slots          TimetableSlot[]
+  slotExceptions SlotException[]
 
   @@map("rooms")
 }
@@ -421,11 +426,146 @@ model ActivityType {
   archivedAt     DateTime? @map("archived_at") @db.Timestamptz(3)
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  owner  Teacher? @relation(fields: [ownerTeacherId], references: [id], onDelete: Cascade)
+  owner  Teacher?        @relation(fields: [ownerTeacherId], references: [id], onDelete: Cascade)
   events Event[]
+  slots  TimetableSlot[]
 
   @@index([ownerTeacherId])
   @@map("activity_types")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Timetable (phase 2): the weekly rule and its exceptions are the source of truth; `occupancy` is an index
+// ---------------------------------------------------------------------------------------------------
+
+/// WeekParity in packages/shared: a fortnightly slot runs in week A or week B only.
+enum WeekParity {
+  A
+  B
+
+  @@map("week_parity")
+}
+
+/// SlotExceptionKind in packages/shared.
+enum SlotExceptionKind {
+  cancelled
+  moved
+  substitute
+  room_change
+
+  @@map("slot_exception_kind")
+}
+
+/// OccupancySource in packages/shared.
+enum OccupancySource {
+  slot
+  exception
+  event
+
+  @@map("occupancy_source")
+}
+
+/// A weekly lesson of a class: a subject, a teacher, a room, a day and a time, valid from one day to another.
+/// Sessions are computed from it (`expandTimetable` in packages/shared); holidays are never stored.
+model TimetableSlot {
+  id             String      @id @default(uuid(7)) @db.Uuid
+  classSubjectId String      @map("class_subject_id") @db.Uuid
+  /// Placeholder for phase 3 (groups): no foreign key yet, always null.
+  groupId        String?     @map("group_id") @db.Uuid
+  /// Division of the groups that run in parallel (« TP », « LV2 »). Null: the whole class. Two slots of one
+  /// class may overlap only when both carry the same division.
+  division       String?     @db.VarChar(40)
+  teacherId      String      @map("teacher_id") @db.Uuid
+  roomId         String?     @map("room_id") @db.Uuid
+  activityTypeId String      @map("activity_type_id") @db.Uuid
+  /// 0 = Sunday … 6 = Saturday.
+  weekday        Int         @db.SmallInt
+  startTime      String      @map("start_time") @db.VarChar(5)
+  endTime        String      @map("end_time") @db.VarChar(5)
+  /// Included (CHECKs on the weekday, the times and the dates in the migration SQL).
+  validFrom      DateTime    @map("valid_from") @db.Date
+  validTo        DateTime    @map("valid_to") @db.Date
+  weekParity     WeekParity? @map("week_parity")
+  createdById    String?     @map("created_by_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  classSubject ClassSubject    @relation(fields: [classSubjectId], references: [id], onDelete: Restrict)
+  teacher      Teacher         @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  room         Room?           @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  activityType ActivityType    @relation(fields: [activityTypeId], references: [id], onDelete: Restrict)
+  exceptions   SlotException[]
+  occupancy    Occupancy[]
+
+  @@index([classSubjectId, validFrom])
+  @@index([teacherId, validFrom])
+  @@index([roomId, validFrom])
+  @@index([activityTypeId])
+  @@index([validFrom, validTo])
+  @@map("timetable_slots")
+}
+
+/// One change to one session of a slot (`date` is the session's ORIGINAL day; one exception per session).
+model SlotException {
+  id           String            @id @default(uuid(7)) @db.Uuid
+  slotId       String            @map("slot_id") @db.Uuid
+  date         DateTime          @db.Date
+  kind         SlotExceptionKind
+  newDate      DateTime?         @map("new_date") @db.Date
+  newStart     String?           @map("new_start") @db.VarChar(5)
+  newEnd       String?           @map("new_end") @db.VarChar(5)
+  newRoomId    String?           @map("new_room_id") @db.Uuid
+  newTeacherId String?           @map("new_teacher_id") @db.Uuid
+  reason       String            @default("") @db.VarChar(500)
+  createdById  String?           @map("created_by_id") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  slot       TimetableSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  newRoom    Room?         @relation(fields: [newRoomId], references: [id], onDelete: Restrict)
+  newTeacher Teacher?      @relation(fields: [newTeacherId], references: [id], onDelete: Restrict)
+  occupancy  Occupancy[]
+
+  @@unique([slotId, date])
+  @@index([date])
+  @@index([newRoomId])
+  @@index([newTeacherId])
+  @@map("slot_exceptions")
+}
+
+/// The occupancy INDEX: who holds which room, teacher and class during which time. Rebuilt in the same
+/// transaction as every change to a slot, an exception or a one-off event (raw SQL; this model only lets
+/// Prisma own the table). Exclusion constraints in the migration SQL (btree_gist) make a double booking
+/// impossible even when two people save at once:
+///   occupancy_room_no_overlap, occupancy_teacher_no_overlap, occupancy_class_whole_no_overlap,
+///   occupancy_class_division_no_overlap.
+model Occupancy {
+  id          String                 @id @default(uuid(7)) @db.Uuid
+  source      OccupancySource
+  slotId      String?                @map("slot_id") @db.Uuid
+  exceptionId String?                @map("exception_id") @db.Uuid
+  eventId     String?                @map("event_id") @db.Uuid
+  /// The session's original day (slots, exceptions) or the event's day.
+  day         DateTime               @db.Date
+  roomId      String?                @map("room_id") @db.Uuid
+  teacherId   String?                @map("teacher_id") @db.Uuid
+  classId     String?                @map("class_id") @db.Uuid
+  /// Non-null: groups of the same division may share the class.
+  divisionKey String?                @map("division_key") @db.VarChar(40)
+  /// Wall-clock time of the school, no time zone.
+  during      Unsupported("tsrange")
+
+  slot      TimetableSlot? @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  exception SlotException? @relation(fields: [exceptionId], references: [id], onDelete: Cascade)
+  event     Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([slotId])
+  @@index([exceptionId])
+  @@index([eventId])
+  @@index([day])
+  @@index([roomId])
+  @@index([teacherId])
+  @@index([classId])
+  @@map("occupancy")
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -472,6 +612,7 @@ model Event {
   grades              Grade[]
   homeworkCompletions HomeworkCompletion[]
   attendance          Attendance[]
+  occupancy           Occupancy[]
 
   @@index([classId, date])
   @@index([sectionId, date])

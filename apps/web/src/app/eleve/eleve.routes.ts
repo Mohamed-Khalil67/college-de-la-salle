@@ -20,6 +20,13 @@ export const ELEVE_ROUTES: Routes = [
   {
     path: 'emploi-du-temps',
     title: 'Emploi du temps',
+    loadComponent: () =>
+      import('./emploi-du-temps/student-timetable-page').then((m) => m.StudentTimetablePage),
+  },
+  {
+    // The calendar of events: exams, tests, homework deadlines and one-off activities.
+    path: 'agenda',
+    title: 'Examens et devoirs',
     loadComponent: () => import('./emploi-du-temps/timetable-page').then((m) => m.TimetablePage),
   },
   {
