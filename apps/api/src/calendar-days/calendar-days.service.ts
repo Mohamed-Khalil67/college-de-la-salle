@@ -1,12 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import {
-  CLOSED_DAY_TYPES,
-  daysBetween,
-  type CalendarDayType,
-  classTarget,
-  type Closure,
-  type SectionId,
-} from '@cdls/shared';
+import { CLOSED_DAY_TYPES, daysBetween, type Closure } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { loadClosures } from './closures.js';

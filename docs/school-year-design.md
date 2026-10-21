@@ -7,11 +7,11 @@ Status: **approved direction, decisions recorded below** (2026-10-20). Written 2
 
 ## Status
 
-Updated 2026-10-21, after the integration of the two lanes (branch `integration-school-year`).
+Updated 2026-10-21, after the second integration (branch `integration-2`: `review-fixes`, `p2-timetable` and `p1-admin-screens` on top of `integration-school-year`).
 
 - **Phase 1, API: in.** Subjects, class subjects (the coefficient lives there), rooms, activity types (replacing the `event_kind` enum), periods with `periodId` on events, calendar days, coordinators.
 - **Phase 4: in.** Roster import with generated e-mails (homonyms numbered), first sign-in password change, section-change requests and their approval, graduation and archived accounts.
-- **Phase 1, admin screens: NOT built.** There is no screen yet for subjects, class subjects, rooms, activity types, periods and calendar days. The web only follows the new contracts (it reads and writes through the changed endpoints, nothing more); the data is managed through the API and the seed.
+- **Phase 1, admin screens: in** (`apps/web/src/app/admin/`): Matières, « Matières de la classe » (a tab of the class page, coefficient and hours edited in place, copy from another class), Salles, Types d'activité (share a teacher type with the school: admin), Année scolaire (resumable checklist and annual calendar with typed dates; closing a period: admin) and the Coordinateur toggle on the teachers list (admin). Coordinators (teachers marked coordinateur) reach the structure screens from « Coordination » in the teacher space; the other admin pages send them back to `/admin/matieres`.
 - **Phase 2, timetable and conflicts: built** (branch `p2-timetable`).
   - Model: `TimetableSlot`, `SlotException`, and the `Occupancy` index with four exclusion constraints (btree_gist): `occupancy_room_no_overlap`, `occupancy_teacher_no_overlap`, `occupancy_class_whole_no_overlap`, `occupancy_class_division_no_overlap`. The rule (slot plus exceptions) stays the source of truth; the index rows are rewritten in the same transaction as every change, and by calendar days (holidays) and one-off events.
   - Engine in `@cdls/shared` (`timetable.ts`): week A/B counted from the school year's first week, holidays and days without classes per class or section, exceptions, « avant / maintenant ».
@@ -21,7 +21,6 @@ Updated 2026-10-21, after the integration of the two lanes (branch `integration-
   - **Legacy weekly events are not converted.** The weekly `cours` events created before this phase (the seed's two per class) still work in the calendar, attendance and the .ics export, but they are not in the occupancy index, so they never clash. Convert them to slots by hand, then delete them.
   - The `division` of a slot is the key groups will plug into (`group_id` exists, always null, no foreign key yet).
 - **Review fixes (branch `review-fixes`):** coefficients frozen with the period, audit trail of account changes, database trigger for every-section/section period overlaps, per-account sign-in throttle and 14-day temporary passwords, « déjà présent » detection in imports, soft-close of enrolments, bounded and filtered `GET /calendar-days`.
-- **Phases 3 (targeting) and 5 (next year): not started.**
 - Known gap for phase 5: a student who changes section in the middle of a period keeps the grades of the old class, but the report card of that period is computed from the current class only.
 
 ## What the owner asked for

@@ -39,6 +39,11 @@ const PAGE_SIZE = 20;
       <div class="page__header-text">
         <h1 class="t-h1">Utilisateurs</h1>
         <p class="t-muted">{{ subtitle() }}</p>
+        @if (role() === 'teacher') {
+          <p class="t-body-s t-muted">
+            Un coordinateur modifie les matières, les salles, les périodes, les vacances et les semaines d’examens, comme l’administration.
+          </p>
+        }
       </div>
       <div class="page__actions">
         <button cdlsButton variant="secondary" type="button" (click)="importOpen.set(true)"><cdls-icon name="upload" />Importer un CSV</button>
@@ -48,6 +53,9 @@ const PAGE_SIZE = 20;
 
     @if (notice()) {
       <cdls-alert tone="success">{{ notice() }}</cdls-alert>
+    }
+    @if (pageError()) {
+      <cdls-alert tone="danger">{{ pageError() }}</cdls-alert>
     }
 
     <cdls-tabs [tabs]="tabs()" label="Type de compte" [(value)]="tab">
@@ -72,6 +80,9 @@ const PAGE_SIZE = 20;
               [classes]="classById()"
               [now]="now"
               [selfId]="selfId()"
+              [busyId]="coordinatorBusyId()"
+              [revision]="revision()"
+              (coordinator)="setCoordinator($event)"
               (edit)="startEdit($event)"
               (deactivate)="startDeactivate($event)"
               (archive)="startArchive($event)"
@@ -185,6 +196,30 @@ export class UsersPage {
   protected readonly busy = signal(false);
   protected readonly actionError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly pageError = signal<string | null>(null);
+  protected readonly coordinatorBusyId = signal<string | null>(null);
+  protected readonly revision = signal(0);
+
+  protected async setCoordinator(change: { readonly user: UserDto; readonly value: boolean }): Promise<void> {
+    if (this.coordinatorBusyId()) return;
+    this.coordinatorBusyId.set(change.user.id);
+    this.pageError.set(null);
+    try {
+      await this.#api.users.update(change.user.id, { isCoordinator: change.value });
+      this.notice.set(
+        change.value
+          ? `${fullName(change.user)} est maintenant coordinateur : ${change.user.firstName} modifie la structure de l’année.`
+          : `${fullName(change.user)} n’est plus coordinateur.`,
+      );
+      this.users.reload();
+    } catch (error) {
+      this.notice.set(null);
+      this.pageError.set(apiMessage(error));
+      this.revision.update((n) => n + 1);
+    } finally {
+      this.coordinatorBusyId.set(null);
+    }
+  }
 
   protected errorText(error: unknown): string {
     return apiMessage(error, 'Impossible de charger les comptes. Réessayez dans un instant.');

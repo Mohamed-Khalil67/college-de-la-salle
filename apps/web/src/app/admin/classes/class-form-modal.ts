@@ -114,7 +114,7 @@ export class ClassFormModal {
             label: value.label.trim(),
           });
         } else {
-          this.failure.set('Aucune année scolaire en cours : définissez-la dans « Années et trimestres ».');
+          this.failure.set('Aucune année scolaire en cours : définissez-la dans « Année scolaire ».');
           return;
         }
         this.saved.emit(saved);

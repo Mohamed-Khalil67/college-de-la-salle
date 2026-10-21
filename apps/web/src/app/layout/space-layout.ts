@@ -3,17 +3,11 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
-import { Avatar, Icon, type IconName, Wordmark } from '../ui';
+import { Avatar, Icon, Wordmark } from '../ui';
 import { ChangePasswordModal } from './change-password-modal';
+import { type SpaceNavItem, visibleNav } from './space-nav';
 
-export interface SpaceNavItem {
-  readonly label: string;
-  /** Relative to the area (e.g. 'notes'); '' is the area's home. */
-  readonly path: string;
-  /** Shown in the phone's bottom bar (at most five items). */
-  readonly icon?: IconName;
-  readonly short?: string;
-}
+export type { SpaceNavItem } from './space-nav';
 
 /**
  * The frame of the student, teacher and admin spaces: navy app bar with the area's navigation, the
@@ -28,11 +22,11 @@ export interface SpaceNavItem {
 
       <header class="app-bar on-inverse">
         <div class="app-bar__inner">
-          <cdls-wordmark tone="dark" [subtitle]="areaLabel()" [link]="base()" [label]="'Collège de la Salle, ' + areaLabel() + ' : accueil'" />
+          <cdls-wordmark tone="dark" [subtitle]="area()" [link]="base()" [label]="'Collège de la Salle, ' + area() + ' : accueil'" />
           <p class="app-bar__title" aria-hidden="true">{{ pageTitle() }}</p>
-          <nav class="app-bar__nav" [attr.aria-label]="areaLabel()">
+          <nav class="app-bar__nav" [attr.aria-label]="area()">
             <ul role="list">
-              @for (item of nav(); track item.path) {
+              @for (item of desktopNav(); track item.path) {
                 <li>
                   <a
                     class="nav-link"
@@ -153,6 +147,8 @@ export interface SpaceNavItem {
 export class SpaceLayout {
   /** From route data. */
   readonly areaLabel = input('Espace');
+  /** Shown instead of `areaLabel` to a teacher who is a coordinateur (in the administration). */
+  readonly coordinatorAreaLabel = input<string | null>(null);
   readonly nav = input<readonly SpaceNavItem[]>([]);
 
   protected readonly auth = inject(AuthStore);
@@ -163,7 +159,17 @@ export class SpaceLayout {
   protected readonly accountOpen = signal(false);
   protected readonly passwordOpen = signal(false);
   protected readonly base = computed(() => '/' + (this.#route.snapshot.pathFromRoot.flatMap((r) => r.url.map((s) => s.path)).join('/') || ''));
-  protected readonly mobileNav = computed(() => this.nav().filter((item) => item.icon).slice(0, 5));
+  protected readonly area = computed(() =>
+    this.auth.role() === 'teacher' && this.coordinatorAreaLabel() ? (this.coordinatorAreaLabel() ?? '') : this.areaLabel(),
+  );
+  /** The items this user may see: admin-only and coordinator-only entries are filtered by role. */
+  protected readonly visibleNav = computed(() => visibleNav(this.nav(), this.auth.user()));
+  protected readonly desktopNav = computed(() => this.visibleNav().filter((item) => !item.mobileOnly));
+  /** At most five icons in the bottom bar: when there are more, the last entry (« Plus », « Coordination ») keeps its place. */
+  protected readonly mobileNav = computed(() => {
+    const items = this.visibleNav().filter((item) => item.icon);
+    return items.length > 5 ? [...items.slice(0, 4), items[items.length - 1]] : items;
+  });
   protected readonly roleLabel = computed(() => {
     switch (this.auth.role()) {
       case 'student':
@@ -196,6 +202,7 @@ export class SpaceLayout {
   }
 
   protected link(item: SpaceNavItem): string {
+    if (item.href) return item.href;
     return item.path ? `${this.base()}/${item.path}` : this.base();
   }
 

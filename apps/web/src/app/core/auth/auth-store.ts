@@ -102,9 +102,21 @@ export class AuthStore {
   async reloadUser(): Promise<void> {
     try {
       this.#user.set(await firstValueFrom(this.#http.get<SessionUser>('/api/auth/me')));
+      this.#profileLoadedAt = Date.now();
     } catch {
       // Keep what we have: the next call will show an error if the session really ended.
     }
+  }
+
+  #profileLoadedAt = 0;
+
+  /**
+   * reloadUser(), but at most once every `maxAgeMs`: for guards that run on every navigation. A session
+   * that has just been established counts as fresh.
+   */
+  async reloadUserIfStale(maxAgeMs = 60_000, now = Date.now()): Promise<void> {
+    if (now - this.#profileLoadedAt < maxAgeMs) return;
+    await this.reloadUser();
   }
 
   /** Exchanges the refresh cookie for a new access token. Concurrent callers share one request. */
@@ -127,6 +139,7 @@ export class AuthStore {
   #accept(session: SessionResponse): void {
     this.#accessToken = session.accessToken;
     this.#user.set(session.user);
+    this.#profileLoadedAt = Date.now();
     this.#status.set('authenticated');
   }
 
