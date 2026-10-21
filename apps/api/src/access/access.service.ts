@@ -4,6 +4,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { forbidden } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { canEditStructure } from './grants.js';
 
 export interface StudentPlacement {
   readonly classId: string;
@@ -19,6 +20,7 @@ export interface StudentPlacement {
  *   events and posts addressed to the whole school, their section or their class;
  * - a teacher reads every event and post, but writes grades, attendance and class events only for the
  *   classes (and subjects) of their teaching assignments, and edits only what they authored;
+ * - a coordinator (a teacher marked so by the admin) also edits the year's structure;
  * - an admin may do everything.
  */
 @Injectable()
@@ -55,9 +57,14 @@ export class AccessService {
     return { OR: [wholeSchool, { classId: null, sectionId: p.sectionId }, { classId: p.classId }] };
   }
 
+  /** The admin or a coordinator; everyone else is refused (structure writes reached from other routes). */
+  assertCanEditStructure(user: AuthUser): void {
+    if (!canEditStructure(user)) throw forbidden();
+  }
+
   async teaches(teacherId: string, classId: string, subjectId?: string | null): Promise<boolean> {
     const count = await this.prisma.teachingAssignment.count({
-      where: { teacherId, classId, ...(subjectId ? { subjectId } : {}) },
+      where: { teacherId, classSubject: { classId, ...(subjectId ? { subjectId } : {}) } },
     });
     return count > 0;
   }
@@ -94,9 +101,9 @@ export class AccessService {
   /** Subjects this teacher teaches in this class (to scope what they see of a student's grades). */
   async subjectsTaught(teacherId: string, classId: string): Promise<string[]> {
     const rows = await this.prisma.teachingAssignment.findMany({
-      where: { teacherId, classId },
-      select: { subjectId: true },
+      where: { teacherId, classSubject: { classId } },
+      select: { classSubject: { select: { subjectId: true } } },
     });
-    return rows.map((r) => r.subjectId);
+    return rows.map((r) => r.classSubject.subjectId);
   }
 }

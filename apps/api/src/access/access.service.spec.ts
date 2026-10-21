@@ -13,6 +13,7 @@ const user = (role: AuthUser['role'], ids: Partial<AuthUser> = {}): AuthUser => 
   studentId: null,
   teacherId: null,
   classId: null,
+  isCoordinator: false,
   ...ids,
 });
 
@@ -42,7 +43,7 @@ describe('AccessService', () => {
       prisma.teachingAssignment.count.mockResolvedValue(1);
       await access.assertTeachesClass(user('teacher', { teacherId: 't1' }), 'c1', 'mathematiques');
       expect(prisma.teachingAssignment.count).toHaveBeenCalledWith({
-        where: { teacherId: 't1', classId: 'c1', subjectId: 'mathematiques' },
+        where: { teacherId: 't1', classSubject: { classId: 'c1', subjectId: 'mathematiques' } },
       });
     });
 

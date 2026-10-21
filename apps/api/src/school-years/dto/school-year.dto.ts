@@ -1,23 +1,13 @@
-import { Transform, Type } from 'class-transformer';
-import { IsInt, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { Matches } from 'class-validator';
+import { IsOptional } from 'class-validator';
 import type {
   CreateSchoolYearRequest,
-  CreateTermRequest,
   SchoolYearDto as SchoolYearContract,
-  TermDto as TermContract,
+  UpdateSchoolYearRequest,
 } from '@cdls/shared';
 import { IsDay } from '../../common/dates.js';
-import { trim } from '../../common/transforms.js';
-
-export class TermDto implements TermContract {
-  id: string;
-  schoolYearId: string;
-  number: number;
-  label: string;
-  startsOn: string;
-  endsOn: string;
-  closedAt: string | null;
-}
+import { PeriodDto } from '../../periods/dto/period.dto.js';
 
 export class SchoolYearDto implements SchoolYearContract {
   id: string;
@@ -25,7 +15,8 @@ export class SchoolYearDto implements SchoolYearContract {
   startsOn: string;
   endsOn: string;
   isCurrent: boolean;
-  terms: TermDto[];
+  @ApiProperty({ type: [PeriodDto] })
+  periods: PeriodDto[];
 }
 
 export class CreateSchoolYearDto implements CreateSchoolYearRequest {
@@ -40,22 +31,16 @@ export class CreateSchoolYearDto implements CreateSchoolYearRequest {
   endsOn: string;
 }
 
-export class CreateTermDto implements CreateTermRequest {
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(4)
-  number: number;
+export class UpdateSchoolYearDto implements UpdateSchoolYearRequest {
+  @IsOptional()
+  @Matches(/^\d{4}-\d{4}$/)
+  label?: string;
 
-  @Transform(trim)
-  @IsString()
-  @MinLength(1)
-  @MaxLength(40)
-  label: string;
-
+  @IsOptional()
   @IsDay()
-  startsOn: string;
+  startsOn?: string;
 
+  @IsOptional()
   @IsDay()
-  endsOn: string;
+  endsOn?: string;
 }

@@ -34,7 +34,16 @@ describe('App (e2e)', () => {
       '/api/events/{id}/attendance',
       '/api/homework',
       '/api/posts',
-      '/api/terms/{id}/report-cards/generate',
+      '/api/periods/{id}/report-cards/generate',
+      '/api/subjects',
+      '/api/classes/{id}/subjects',
+      '/api/class-subjects/{id}',
+      '/api/rooms',
+      '/api/activity-types',
+      '/api/activity-types/{id}/promote',
+      '/api/periods/{id}',
+      '/api/school-years/{id}/periods',
+      '/api/calendar-days',
       '/api/report-cards/{id}/pdf',
     ]) {
       expect(paths).toContain(path);

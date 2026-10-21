@@ -7,10 +7,13 @@ import {
 } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { toDay } from '../common/dates.js';
+import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
 import type { EventDto } from './dto/event.dto.js';
 
 /** What every event query includes, so it can be mapped to the API shape and to the shared model. */
 export const eventInclude = {
+  activityType: true,
+  room: true,
   author: { include: { user: { select: { firstName: true, lastName: true } } } },
   schoolClass: { include: { section: true } },
   section: true,
@@ -21,7 +24,8 @@ export type EventRow = Prisma.EventGetPayload<{ include: typeof eventInclude }>;
 export function toEventDto(e: EventRow): EventDto {
   return {
     id: e.id,
-    kind: e.kind,
+    activityTypeId: e.activityTypeId,
+    type: toActivityTypeSummary(e.activityType),
     title: e.title,
     subjectId: e.subjectId,
     classId: e.classId,
@@ -30,7 +34,10 @@ export function toEventDto(e: EventRow): EventDto {
     startTime: e.startTime,
     endTime: e.endTime,
     repeatUntil: e.repeatUntil ? toDay(e.repeatUntil) : null,
+    roomId: e.roomId,
+    roomName: e.room?.name ?? null,
     place: e.place,
+    periodId: e.periodId,
     description: e.description,
     attachments: (e.attachments ?? []) as unknown as Attachment[],
     coefficient: Number(e.coefficient),
@@ -53,7 +60,7 @@ export function toCalendarEvent(e: EventRow): CalendarEvent {
   const dto = toEventDto(e);
   return {
     id: dto.id,
-    kind: dto.kind,
+    type: dto.type,
     title: dto.title,
     subject: dto.subjectId ?? '',
     target: eventTarget(e),

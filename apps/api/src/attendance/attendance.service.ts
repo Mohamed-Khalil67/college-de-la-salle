@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { occurrences } from '@cdls/shared';
 import type { Attendance } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
+import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
 import { ClassesService } from '../classes/classes.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
@@ -12,6 +13,7 @@ import {
   toCalendarEvent,
   toEventDto,
 } from '../events/event.mapper.js';
+import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   AttendanceRecordDto,
@@ -28,6 +30,7 @@ export class AttendanceService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly classes: ClassesService,
+    private readonly calendarDays: CalendarDaysService,
   ) {}
 
   async sheet(eventId: string, date: string, user: AuthUser): Promise<AttendanceSheetDto> {
@@ -97,7 +100,7 @@ export class AttendanceService {
           ...(query.to ? { lte: fromDay(query.to) } : {}),
         },
       },
-      include: { event: true },
+      include: { event: { include: { activityType: true } } },
       orderBy: [{ date: 'desc' }],
       take: 500,
     });
@@ -105,7 +108,7 @@ export class AttendanceService {
       record: toRecordDto(r),
       event: {
         id: r.event.id,
-        kind: r.event.kind,
+        type: toActivityTypeSummary(r.event.activityType),
         title: r.event.title,
         subjectId: r.event.subjectId,
         startTime: r.event.startTime,
@@ -124,7 +127,8 @@ export class AttendanceService {
     if (!event.classId)
       throw new BadRequestException("L'appel se fait sur un événement de classe.");
     await this.access.assertTeachesClass(user, event.classId);
-    if (!occurrences([toCalendarEvent(event)], date, date).length) {
+    const closures = await this.calendarDays.closures(date, date);
+    if (!occurrences([toCalendarEvent(event)], date, date, closures).length) {
       throw new BadRequestException(`Cet événement n'a pas lieu le ${date}.`);
     }
     return event;

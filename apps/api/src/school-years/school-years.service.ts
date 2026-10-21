@@ -1,16 +1,20 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import type { SchoolYear, Term } from '../generated/prisma/client.js';
+import type { Period, Prisma, SchoolYear } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { fromDay, toDay, toIso } from '../common/dates.js';
+import { fromDay, toDay } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
+import { toPeriodDto } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
   CreateSchoolYearDto,
-  CreateTermDto,
   SchoolYearDto,
-  TermDto,
+  UpdateSchoolYearDto,
 } from './dto/school-year.dto.js';
+
+const withPeriods = {
+  periods: { orderBy: [{ startsOn: 'asc' as const }, { number: 'asc' as const }] },
+} satisfies Prisma.SchoolYearInclude;
 
 @Injectable()
 export class SchoolYearsService {
@@ -18,22 +22,89 @@ export class SchoolYearsService {
 
   async list(): Promise<SchoolYearDto[]> {
     const years = await this.prisma.schoolYear.findMany({
-      include: { terms: { orderBy: { number: 'asc' } } },
+      include: withPeriods,
       orderBy: { startsOn: 'desc' },
     });
     return years.map(toSchoolYearDto);
   }
 
-  async create(dto: CreateSchoolYearDto): Promise<SchoolYearDto> {
+  async create(dto: CreateSchoolYearDto, user: AuthUser): Promise<SchoolYearDto> {
     if (dto.endsOn <= dto.startsOn) throw new BadRequestException('La fin doit suivre le début.');
     if (await this.prisma.schoolYear.findUnique({ where: { label: dto.label } })) {
       throw new ConflictException(`L'année ${dto.label} existe déjà.`);
     }
-    const year = await this.prisma.schoolYear.create({
-      data: { label: dto.label, startsOn: fromDay(dto.startsOn), endsOn: fromDay(dto.endsOn) },
-      include: { terms: true },
+    return this.prisma.$transaction(async (tx) => {
+      const year = await tx.schoolYear.create({
+        data: { label: dto.label, startsOn: fromDay(dto.startsOn), endsOn: fromDay(dto.endsOn) },
+        include: withPeriods,
+      });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'school_year.create',
+          entity: 'school_year',
+          entityId: year.id,
+          after: { label: dto.label, startsOn: dto.startsOn, endsOn: dto.endsOn },
+        },
+      ]);
+      return toSchoolYearDto(year);
     });
-    return toSchoolYearDto(year);
+  }
+
+  /**
+   * Renames the year or moves its dates. The new dates must still contain every period and calendar day
+   * of the year, so nothing is left outside it.
+   */
+  async update(id: string, dto: UpdateSchoolYearDto, user: AuthUser): Promise<SchoolYearDto> {
+    const current = await this.find(id);
+    const startsOn = dto.startsOn ?? toDay(current.startsOn);
+    const endsOn = dto.endsOn ?? toDay(current.endsOn);
+    if (endsOn <= startsOn) throw new BadRequestException('La fin doit suivre le début.');
+    if (dto.label && dto.label !== current.label) {
+      if (await this.prisma.schoolYear.findUnique({ where: { label: dto.label } }))
+        throw new ConflictException(`L'année ${dto.label} existe déjà.`);
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${id}::uuid FOR UPDATE`;
+      const outside = await Promise.all([
+        tx.period.count({
+          where: {
+            schoolYearId: id,
+            OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
+          },
+        }),
+        tx.calendarDay.count({
+          where: {
+            schoolYearId: id,
+            OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
+          },
+        }),
+      ]);
+      if (outside[0] || outside[1])
+        throw new ConflictException(
+          'Des périodes ou des jours du calendrier sortiraient de l’année : modifiez-les d’abord.',
+        );
+      const year = await tx.schoolYear.update({
+        where: { id },
+        data: { label: dto.label, startsOn: fromDay(startsOn), endsOn: fromDay(endsOn) },
+        include: withPeriods,
+      });
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'school_year.update',
+          entity: 'school_year',
+          entityId: id,
+          before: {
+            label: current.label,
+            startsOn: toDay(current.startsOn),
+            endsOn: toDay(current.endsOn),
+          },
+          after: { label: year.label, startsOn, endsOn },
+        },
+      ]);
+      return toSchoolYearDto(year);
+    });
   }
 
   /** Makes this the current year (exactly one is current). */
@@ -47,46 +118,13 @@ export class SchoolYearsService {
       this.prisma.schoolYear.update({
         where: { id },
         data: { isCurrent: true },
-        include: { terms: { orderBy: { number: 'asc' } } },
+        include: withPeriods,
       }),
     ]);
     return toSchoolYearDto(year);
   }
 
-  async addTerm(schoolYearId: string, dto: CreateTermDto): Promise<TermDto> {
-    const year = await this.find(schoolYearId);
-    if (dto.endsOn <= dto.startsOn) throw new BadRequestException('La fin doit suivre le début.');
-    if (dto.startsOn < toDay(year.startsOn) || dto.endsOn > toDay(year.endsOn)) {
-      throw new BadRequestException(`Le trimestre doit être compris dans l'année ${year.label}.`);
-    }
-    const exists = await this.prisma.term.findUnique({
-      where: { schoolYearId_number: { schoolYearId, number: dto.number } },
-    });
-    if (exists) throw new ConflictException(`Le trimestre ${dto.number} existe déjà.`);
-    const term = await this.prisma.term.create({
-      data: {
-        schoolYearId,
-        number: dto.number,
-        label: dto.label,
-        startsOn: fromDay(dto.startsOn),
-        endsOn: fromDay(dto.endsOn),
-      },
-    });
-    return toTermDto(term);
-  }
-
-  /** Closes (or reopens) a term. Report cards are generated and published for closed terms. */
-  async closeTerm(id: string, closed: boolean): Promise<TermDto> {
-    const term = await this.prisma.term.findUnique({ where: { id } });
-    if (!term) throw notFound('Trimestre');
-    const updated = await this.prisma.term.update({
-      where: { id },
-      data: { closedAt: closed ? new Date() : null },
-    });
-    return toTermDto(updated);
-  }
-
-  /** Deletes a school year created by mistake: not the current one, and without classes. Its terms go with it. */
+  /** Deletes a school year created by mistake: not the current one, and without classes. Its periods go with it. */
   async removeYear(id: string, user: AuthUser): Promise<void> {
     const year = await this.find(id);
     const hasClasses = `L’année ${year.label} a encore des classes : supprimez-les avant de supprimer l’année.`;
@@ -116,43 +154,6 @@ export class SchoolYearsService {
     await conflictOnReference(work, hasClasses);
   }
 
-  /** Deletes a term without grades or report cards (grades of its year's classes dated in the term). */
-  async removeTerm(id: string, user: AuthUser): Promise<void> {
-    const hasReportCards = 'Ce trimestre a des bulletins : il ne peut pas être supprimé.';
-    const work = this.prisma.$transaction(async (tx) => {
-      const term = await tx.term.findUnique({ where: { id } });
-      if (!term) throw notFound('Trimestre');
-      const [reportCards, grades] = await Promise.all([
-        tx.reportCard.count({ where: { termId: id } }),
-        tx.grade.count({
-          where: {
-            event: {
-              date: { gte: term.startsOn, lte: term.endsOn },
-              schoolClass: { schoolYearId: term.schoolYearId },
-            },
-          },
-        }),
-      ]);
-      if (reportCards) throw new ConflictException(hasReportCards);
-      if (grades)
-        throw new ConflictException(
-          'Des notes ont déjà été saisies pendant ce trimestre : il ne peut pas être supprimé.',
-        );
-      await tx.term.delete({ where: { id } });
-      await audit(tx, [
-        {
-          actorId: user.id,
-          action: 'term.delete',
-          entity: 'term',
-          entityId: id,
-          before: { schoolYearId: term.schoolYearId, number: term.number, label: term.label },
-        },
-      ]);
-    });
-    // Report cards generated between the check and the delete (restrict foreign key).
-    await conflictOnReference(work, hasReportCards);
-  }
-
   private async find(id: string): Promise<SchoolYear> {
     const year = await this.prisma.schoolYear.findUnique({ where: { id } });
     if (!year) throw notFound('Année scolaire');
@@ -160,25 +161,13 @@ export class SchoolYearsService {
   }
 }
 
-export function toTermDto(t: Term): TermDto {
-  return {
-    id: t.id,
-    schoolYearId: t.schoolYearId,
-    number: t.number,
-    label: t.label,
-    startsOn: toDay(t.startsOn),
-    endsOn: toDay(t.endsOn),
-    closedAt: toIso(t.closedAt),
-  };
-}
-
-function toSchoolYearDto(y: SchoolYear & { terms: Term[] }): SchoolYearDto {
+function toSchoolYearDto(y: SchoolYear & { periods: Period[] }): SchoolYearDto {
   return {
     id: y.id,
     label: y.label,
     startsOn: toDay(y.startsOn),
     endsOn: toDay(y.endsOn),
     isCurrent: y.isCurrent,
-    terms: y.terms.map(toTermDto),
+    periods: y.periods.map(toPeriodDto),
   };
 }

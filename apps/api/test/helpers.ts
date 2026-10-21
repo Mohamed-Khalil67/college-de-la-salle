@@ -12,6 +12,8 @@ export const DOMAIN = 'demo.cdls.test';
 export const ADMIN = `admin@${DOMAIN}`;
 /** Teaches mathématiques in every class. */
 export const MATHS_TEACHER = `hany.mansour@${DOMAIN}`;
+/** A coordinateur (informatique, SES): edits the year's structure without being an admin. */
+export const COORDINATOR = `ingy.samir@${DOMAIN}`;
 /** Teaches français and humanités: Bac français classes only. */
 export const FRENCH_TEACHER = `claire.dubois@${DOMAIN}`;
 
@@ -66,6 +68,11 @@ export async function studentOf(prisma: PrismaService, section: string, classCod
   };
 }
 
+/** The id of a system activity type (`cours`, `examen`, `devoir`…). */
+export async function activityTypeId(prisma: PrismaService, code: string): Promise<string> {
+  return (await prisma.activityType.findUniqueOrThrow({ where: { code } })).id;
+}
+
 /** A class event of a given kind (and optionally subject) from the seed. */
 export function seededEvent(
   prisma: PrismaService,
@@ -74,6 +81,6 @@ export function seededEvent(
   subjectId?: string,
 ) {
   return prisma.event.findFirstOrThrow({
-    where: { classId, kind, ...(subjectId ? { subjectId } : {}) },
+    where: { classId, activityType: { code: kind }, ...(subjectId ? { subjectId } : {}) },
   });
 }

@@ -25,7 +25,7 @@ export class HomeworkService {
     const audience = this.access.audienceFor(await this.access.placement(user.studentId));
     const rows = await this.prisma.event.findMany({
       where: {
-        kind: 'devoir',
+        activityType: { homework: true },
         date: { gte: fromDay(from ?? addDays(todayIso(), -7)) },
         ...audience,
       },
@@ -46,7 +46,8 @@ export class HomeworkService {
   async setDone(eventId: string, done: boolean, user: AuthUser): Promise<HomeworkDto> {
     if (!user.studentId) throw forbidden();
     const event = await this.events.visible(eventId, user);
-    if (event.kind !== 'devoir') throw new BadRequestException('Seuls les devoirs se cochent.');
+    if (!event.activityType.homework)
+      throw new BadRequestException('Seuls les devoirs se cochent.');
     const key = { eventId_studentId: { eventId, studentId: user.studentId } };
     if (done) {
       const row = await this.prisma.homeworkCompletion.upsert({

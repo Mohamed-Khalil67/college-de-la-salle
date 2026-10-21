@@ -28,9 +28,9 @@ import { ReportCardsService } from './report-cards.service.js';
 export class ReportCardsController {
   constructor(private readonly cards: ReportCardsService) {}
 
-  /** Computes the term's (unpublished) report cards from published grades. The term must be closed. */
+  /** Computes the period's (unpublished) report cards from published grades. The period must be closed. */
   @Roles('admin')
-  @Post('terms/:id/report-cards/generate')
+  @Post('periods/:id/report-cards/generate')
   @HttpCode(200)
   @ApiOkResponse({ type: ReportCardBatchResultDto })
   generate(
@@ -43,7 +43,7 @@ export class ReportCardsController {
 
   /** Makes the generated report cards visible to the students. */
   @Roles('admin')
-  @Post('terms/:id/report-cards/publish')
+  @Post('periods/:id/report-cards/publish')
   @HttpCode(200)
   @ApiOkResponse({ type: ReportCardBatchResultDto })
   publish(
@@ -54,16 +54,16 @@ export class ReportCardsController {
     return this.cards.publish(id, body.classId, user);
   }
 
-  /** A term's report cards. Teachers must name a class they teach. */
+  /** A period's report cards. Teachers must name a class they teach. */
   @Roles('admin', 'teacher')
-  @Get('terms/:id/report-cards')
+  @Get('periods/:id/report-cards')
   @ApiOkResponse({ type: [ReportCardDto] })
-  forTerm(
+  forPeriod(
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ReportCardListQueryDto,
     @CurrentUser() user: AuthUser,
   ): Promise<ReportCardDto[]> {
-    return this.cards.forTerm(id, query.classId, user);
+    return this.cards.forPeriod(id, query.classId, user);
   }
 
   /** A student's report cards. Students: their own, published only. */

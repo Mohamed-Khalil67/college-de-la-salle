@@ -17,6 +17,7 @@ import {
   bearer,
   createTestApp,
   MATHS_TEACHER,
+  activityTypeId,
   seededEvent,
   studentOf,
   type TestApp,
@@ -29,6 +30,8 @@ describe('School flows (e2e)', () => {
   let admin: string;
   let teacher: string;
   let pupil: string;
+  let cours: string;
+  let examen: string;
 
   beforeAll(async () => {
     t = await createTestApp();
@@ -36,6 +39,8 @@ describe('School flows (e2e)', () => {
     admin = await t.token(ADMIN);
     teacher = await t.token(MATHS_TEACHER);
     pupil = await t.token(student.email);
+    cours = await activityTypeId(t.prisma, 'cours');
+    examen = await activityTypeId(t.prisma, 'examen');
   });
 
   afterAll(() => t.close());
@@ -48,7 +53,7 @@ describe('School flows (e2e)', () => {
       .expect(200);
     return (res.body as StudentGradesDto).subjects
       .flatMap((s) => s.grades)
-      .find((g) => g.event.kind === 'examen' && g.event.subjectId === 'mathematiques');
+      .find((g) => g.event.type.code === 'examen' && g.event.subjectId === 'mathematiques');
   };
 
   it('exam: correct a grade (audited), unpublish, publish, the student sees the new mark', async () => {
@@ -170,7 +175,7 @@ describe('School flows (e2e)', () => {
       .post('/api/events')
       .set(bearer(teacher))
       .send({
-        kind: 'cours',
+        activityTypeId: cours,
         title: 'Soutien de maths',
         subjectId: 'mathematiques',
         classId: student.classId,
@@ -199,14 +204,14 @@ describe('School flows (e2e)', () => {
       .http()
       .post('/api/events')
       .set(bearer(teacher))
-      .send({ kind: 'examen', title: 'Sans classe', date: '2026-11-03' })
+      .send({ activityTypeId: examen, title: 'Sans classe', date: '2026-11-03' })
       .expect(400);
     await t
       .http()
       .post('/api/events')
       .set(bearer(teacher))
       .send({
-        kind: 'cours',
+        activityTypeId: cours,
         title: 'Lien',
         classId: student.classId,
         date: '2026-11-03',
@@ -224,22 +229,22 @@ describe('School flows (e2e)', () => {
     expect(titles).not.toContain('Lectures du trimestre'); // Seconde only
   });
 
-  it('report cards: close the term, generate, publish, download the PDF', async () => {
+  it('report cards: close the period, generate, publish, download the PDF', async () => {
     const years = await t.http().get('/api/school-years').set(bearer(admin)).expect(200);
-    const term = (years.body as SchoolYearDto[])
+    const period = (years.body as SchoolYearDto[])
       .find((y) => y.isCurrent)!
-      .terms.find((x) => x.number === 1)!;
+      .periods.find((x) => x.number === 1)!;
 
     await t
       .http()
-      .post(`/api/terms/${term.id}/report-cards/generate`)
+      .post(`/api/periods/${period.id}/report-cards/generate`)
       .set(bearer(admin))
       .send({})
       .expect(409);
-    await t.http().post(`/api/terms/${term.id}/close`).set(bearer(admin)).expect(200);
+    await t.http().post(`/api/periods/${period.id}/close`).set(bearer(admin)).expect(200);
     const generated = await t
       .http()
-      .post(`/api/terms/${term.id}/report-cards/generate`)
+      .post(`/api/periods/${period.id}/report-cards/generate`)
       .set(bearer(admin))
       .send({})
       .expect(200);
@@ -254,7 +259,7 @@ describe('School flows (e2e)', () => {
 
     await t
       .http()
-      .post(`/api/terms/${term.id}/report-cards/publish`)
+      .post(`/api/periods/${period.id}/report-cards/publish`)
       .set(bearer(admin))
       .send({})
       .expect(200);

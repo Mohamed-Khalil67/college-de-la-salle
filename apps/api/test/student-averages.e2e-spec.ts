@@ -44,14 +44,12 @@ describe('Student session and averages (e2e)', () => {
     const grades = res.body as StudentGradesDto;
     expect(grades.subjects.length).toBeGreaterThan(0);
 
-    const assignments = await t.prisma.teachingAssignment.findMany({
+    const classSubjects = await t.prisma.classSubject.findMany({
       where: { classId: student.classId },
     });
     for (const subject of grades.subjects) {
-      const weights = assignments
-        .filter((a) => a.subjectId === subject.subjectId)
-        .map((a) => Number(a.coefficient));
-      expect(subject.coefficient).toBe(weights.length ? Math.max(...weights) : null);
+      const classSubject = classSubjects.find((c) => c.subjectId === subject.subjectId);
+      expect(subject.coefficient).toBe(classSubject ? Number(classSubject.coefficient) : null);
     }
     expect(generalAverage(grades.subjects)).not.toBeNull();
   });

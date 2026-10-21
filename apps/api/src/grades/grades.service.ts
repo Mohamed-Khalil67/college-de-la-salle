@@ -1,13 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { averageOnTwenty, kindInfo } from '@cdls/shared';
+import { averageOnTwenty } from '@cdls/shared';
 import type { Grade, Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
+import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
 import { ClassesService } from '../classes/classes.service.js';
 import { audit, type AuditEntry } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { eventInclude, type EventRow, toEventDto } from '../events/event.mapper.js';
+import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { subjectWeights } from '../report-cards/compute.js';
 import type {
@@ -20,7 +22,7 @@ import type {
 } from './dto/grade.dto.js';
 
 /**
- * Grades are entered per gradable event (examen, contrôle, TP, devoir) by a teacher of that class and
+ * Grades are entered per gradable event (an activity type with the gradable flag) by a teacher of that class and
  * subject, stay drafts until published, and every change is written to the audit log.
  */
 @Injectable()
@@ -29,6 +31,7 @@ export class GradesService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly classes: ClassesService,
+    private readonly periods: PeriodsService,
   ) {}
 
   /** The whole class with each student's grade, for the entry grid. */
@@ -48,6 +51,7 @@ export class GradesService {
   /** Creates, corrects or removes (score null) grades; one audit row per change. */
   async save(eventId: string, dto: SaveGradesDto, user: AuthUser): Promise<GradeSheetDto> {
     const event = await this.gradableEvent(eventId, user);
+    await this.periods.assertOpen(this.prisma, event.periodId);
     const roster = new Set((await this.classes.roster(event.classId!)).map((s) => s.id));
     const seen = new Set<string>();
     for (const entry of dto.entries) {
@@ -131,7 +135,8 @@ export class GradesService {
 
   /** Shows (or hides again) all the grades of an event to the students. */
   async publish(eventId: string, dto: PublishGradesDto, user: AuthUser): Promise<GradeSheetDto> {
-    await this.gradableEvent(eventId, user);
+    const event = await this.gradableEvent(eventId, user);
+    await this.periods.assertOpen(this.prisma, event.periodId);
     await this.prisma.$transaction(async (tx) => {
       const { count } = await tx.grade.updateMany({
         where: { eventId },
@@ -165,11 +170,12 @@ export class GradesService {
 
     const eventWhere: Prisma.EventWhereInput = {};
     let schoolYearId: string | null = null;
-    if (query.termId) {
-      const term = await this.prisma.term.findUnique({ where: { id: query.termId } });
-      if (!term) throw notFound('Trimestre');
-      eventWhere.date = { gte: term.startsOn, lte: term.endsOn };
-      schoolYearId = term.schoolYearId;
+    if (query.periodId) {
+      // By the events' stored period, never by dates: editing a period's dates moves no grade.
+      const period = await this.prisma.period.findUnique({ where: { id: query.periodId } });
+      if (!period) throw notFound('Période');
+      eventWhere.periodId = period.id;
+      schoolYearId = period.schoolYearId;
     } else if (query.from || query.to) {
       eventWhere.date = {
         ...(query.from ? { gte: fromDay(query.from) } : {}),
@@ -188,7 +194,7 @@ export class GradesService {
         ...(user.role === 'student' ? { published: true } : {}),
         event: eventWhere,
       },
-      include: { event: true },
+      include: { event: { include: { activityType: true } } },
       orderBy: { event: { date: 'desc' } },
     });
 
@@ -216,11 +222,12 @@ export class GradesService {
             grade: toGradeDto(g),
             event: {
               id: g.event.id,
-              kind: g.event.kind,
+              type: toActivityTypeSummary(g.event.activityType),
               title: g.event.title,
               date: toDay(g.event.date),
               subjectId: g.event.subjectId,
               coefficient: Number(g.event.coefficient),
+              periodId: g.event.periodId,
             },
           })),
         })),
@@ -244,7 +251,7 @@ export class GradesService {
         )?.classId
       : (await this.access.placement(studentId))?.classId;
     if (!classId) return new Map();
-    const rows = await this.prisma.teachingAssignment.findMany({
+    const rows = await this.prisma.classSubject.findMany({
       where: { classId },
       include: { subject: true },
     });
@@ -259,7 +266,7 @@ export class GradesService {
       include: eventInclude,
     });
     if (!event) throw notFound('Événement');
-    if (!kindInfo(event.kind).gradable || !event.classId)
+    if (!event.activityType.gradable || !event.classId)
       throw new BadRequestException('Cet événement ne se note pas.');
     await this.access.assertTeachesClass(user, event.classId, event.subjectId);
     return event;

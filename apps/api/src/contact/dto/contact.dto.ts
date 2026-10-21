@@ -9,7 +9,7 @@ import {
   type UpdateContactMessageRequest,
 } from '@cdls/shared';
 import { PaginationQueryDto } from '../../common/pagination.js';
-import { trim } from '../../common/transforms.js';
+import { queryBoolean, trim } from '../../common/transforms.js';
 
 /** The public contact form. Messages are in French: the site shows them to visitors. */
 export class CreateContactMessageDto implements ContactMessageRequest {
@@ -79,10 +79,6 @@ export class ContactMessageDto implements ContactMessageContract {
   @ApiProperty({ type: String, nullable: true })
   handledByName: string | null;
 }
-
-/** `'true'` / `'false'` from the query string. */
-const queryBoolean = ({ value }: { value: unknown }) =>
-  value === 'true' ? true : value === 'false' ? false : value;
 
 export class ContactMessageListQueryDto
   extends PaginationQueryDto

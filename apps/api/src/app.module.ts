@@ -3,7 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AccessModule } from './access/access.module.js';
+import { ActivityTypesModule } from './activity-types/activity-types.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CalendarDaysModule } from './calendar-days/calendar-days.module.js';
+import { ClassSubjectsModule } from './class-subjects/class-subjects.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { clientKey } from './common/client-key.js';
 import { RolesGuard } from './common/roles.guard.js';
@@ -16,8 +19,10 @@ import { ContactModule } from './contact/contact.module.js';
 import { EventsModule } from './events/events.module.js';
 import { GradesModule } from './grades/grades.module.js';
 import { HomeworkModule } from './homework/homework.module.js';
+import { PeriodsModule } from './periods/periods.module.js';
 import { PostsModule } from './posts/posts.module.js';
 import { ReportCardsModule } from './report-cards/report-cards.module.js';
+import { RoomsModule } from './rooms/rooms.module.js';
 import { SchoolYearsModule } from './school-years/school-years.module.js';
 import { SubjectsModule } from './subjects/subjects.module.js';
 import { TeachingAssignmentsModule } from './teaching-assignments/teaching-assignments.module.js';
@@ -45,8 +50,13 @@ import { UsersModule } from './users/users.module.js';
     HealthModule,
     UsersModule,
     SchoolYearsModule,
+    PeriodsModule,
+    CalendarDaysModule,
     ClassesModule,
     SubjectsModule,
+    ClassSubjectsModule,
+    RoomsModule,
+    ActivityTypesModule,
     TeachingAssignmentsModule,
     EventsModule,
     HomeworkModule,

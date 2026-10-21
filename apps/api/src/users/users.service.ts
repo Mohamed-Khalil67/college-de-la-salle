@@ -15,6 +15,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { AuthService } from '../auth/auth.service.js';
 import type { AuthUser } from '../common/auth-user.js';
+import { audit } from '../common/audit.js';
 import { toIso } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { pageArgs, paginated } from '../common/pagination.js';
@@ -32,7 +33,7 @@ const MAX_IMPORT_ROWS = 2000;
 const HASH_CONCURRENCY = 4;
 
 const include = {
-  teacher: { select: { id: true } },
+  teacher: { select: { id: true, isCoordinator: true } },
   student: {
     select: {
       id: true,
@@ -122,18 +123,41 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto, actor: AuthUser): Promise<UserDto> {
-    await this.get(id);
+    const current = await this.get(id);
     if (id === actor.id && dto.isActive === false)
       throw new BadRequestException('Vous ne pouvez pas désactiver votre propre compte.');
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: {
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        isActive: dto.isActive,
-        ...(dto.password ? { passwordHash: await hash(dto.password) } : {}),
-      },
-      include,
+    if (dto.isCoordinator !== undefined && current.role !== 'teacher')
+      throw new BadRequestException('Seul un enseignant peut être coordinateur.');
+    const coordinatorChange =
+      dto.isCoordinator !== undefined && dto.isCoordinator !== current.isCoordinator;
+    const passwordHash = dto.password ? await hash(dto.password) : undefined;
+    const user = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.user.update({
+        where: { id },
+        data: {
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          isActive: dto.isActive,
+          passwordHash,
+          ...(coordinatorChange
+            ? { teacher: { update: { isCoordinator: dto.isCoordinator } } }
+            : {}),
+        },
+        include,
+      });
+      // A permission change: keep a trace of who granted or removed it.
+      if (coordinatorChange)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: dto.isCoordinator ? 'teacher.coordinator.grant' : 'teacher.coordinator.revoke',
+            entity: 'user',
+            entityId: id,
+            before: { isCoordinator: current.isCoordinator },
+            after: { isCoordinator: dto.isCoordinator ?? false },
+          },
+        ]);
+      return row;
     });
     if (dto.password || dto.isActive === false) await this.auth.revokeAll(id);
     return toUserDto(user);
@@ -312,5 +336,6 @@ export function toUserDto(u: UserRow): UserDto {
     teacherId: u.teacher?.id ?? null,
     studentNumber: u.student?.studentNumber ?? null,
     classId: u.student?.enrollments[0]?.classId ?? null,
+    isCoordinator: u.teacher?.isCoordinator ?? false,
   };
 }

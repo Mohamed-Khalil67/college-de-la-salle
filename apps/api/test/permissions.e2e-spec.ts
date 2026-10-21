@@ -2,6 +2,7 @@ import type { OccurrenceDto, StudentGradesDto } from '@cdls/shared';
 import {
   ADMIN,
   bearer,
+  activityTypeId,
   createTestApp,
   FRENCH_TEACHER,
   MATHS_TEACHER,
@@ -57,7 +58,7 @@ describe('Permissions (e2e)', () => {
         grades.every((g) => g.grade.published && g.grade.studentId === bacStudent.studentId),
       ).toBe(true);
       // The seeded contrôle is still a draft: it must not show.
-      expect(grades.some((g) => g.event.kind === 'controle')).toBe(false);
+      expect(grades.some((g) => g.event.type.code === 'controle')).toBe(false);
     });
 
     it('only sees the events of their class, their section and the whole school', async () => {
@@ -83,11 +84,12 @@ describe('Permissions (e2e)', () => {
       await t.http().get('/api/users').set(bearer(token)).expect(403);
       const exam = await seededEvent(t.prisma, bacStudent.classId, 'examen');
       await t.http().get(`/api/events/${exam.id}/grades`).set(bearer(token)).expect(403);
+      const cours = await activityTypeId(t.prisma, 'cours');
       await t
         .http()
         .post('/api/events')
         .set(bearer(token))
-        .send({ kind: 'cours', title: 'x', date: '2026-11-01' })
+        .send({ activityTypeId: cours, title: 'x', date: '2026-11-01' })
         .expect(403);
     });
   });
@@ -159,12 +161,13 @@ describe('Permissions (e2e)', () => {
 
     it("can't create events for another class or edit another teacher's event", async () => {
       const token = await t.token(FRENCH_TEACHER);
+      const examen = await activityTypeId(t.prisma, 'examen');
       await t
         .http()
         .post('/api/events')
         .set(bearer(token))
         .send({
-          kind: 'examen',
+          activityTypeId: examen,
           title: 'Intrus',
           classId: nationaleStudent.classId,
           date: '2026-11-10',

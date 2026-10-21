@@ -36,7 +36,7 @@ const userInclude = {
       },
     },
   },
-  teacher: { select: { id: true } },
+  teacher: { select: { id: true, isCoordinator: true } },
 } as const;
 
 @Injectable()
@@ -182,7 +182,7 @@ type UserWithProfiles = {
   firstName: string;
   lastName: string;
   student: { id: string; enrollments?: readonly { classId: string }[] } | null;
-  teacher: { id: string } | null;
+  teacher: { id: string; isCoordinator: boolean } | null;
 };
 
 export function toAuthUser(u: UserWithProfiles): AuthUser {
@@ -195,6 +195,7 @@ export function toAuthUser(u: UserWithProfiles): AuthUser {
     studentId: u.student?.id ?? null,
     teacherId: u.teacher?.id ?? null,
     classId: u.student?.enrollments?.[0]?.classId ?? null,
+    isCoordinator: u.teacher?.isCoordinator ?? false,
   };
 }
 

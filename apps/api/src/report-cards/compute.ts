@@ -8,31 +8,24 @@ export interface SubjectWeight {
 }
 
 /**
- * A class's subjects and their coefficients from its teaching assignments (in their order); when two
- * teachers share a subject, the highest coefficient counts.
+ * A class's subjects and their weights, from its class subjects (one coefficient per subject and class,
+ * however many teachers share it).
  */
 export function subjectWeights(
-  assignments: readonly {
+  classSubjects: readonly {
     readonly subjectId: string;
     readonly coefficient: number;
     readonly subject: { readonly name: string };
   }[],
 ): SubjectWeight[] {
-  const bySubject = new Map<string, SubjectWeight>();
-  for (const a of assignments) {
-    const current = bySubject.get(a.subjectId);
-    if (!current || a.coefficient > current.coefficient) {
-      bySubject.set(a.subjectId, {
-        subjectId: a.subjectId,
-        subjectName: a.subject.name,
-        coefficient: a.coefficient,
-      });
-    }
-  }
-  return [...bySubject.values()];
+  return classSubjects.map((c) => ({
+    subjectId: c.subjectId,
+    subjectName: c.subject.name,
+    coefficient: c.coefficient,
+  }));
 }
 
-export interface TermGrade {
+export interface PeriodGrade {
   readonly studentId: string;
   readonly subjectId: string;
   readonly score: number;
@@ -54,7 +47,7 @@ export interface ComputedReportCard {
 }
 
 /**
- * Term report cards of one class. Subject average: the shared averageOnTwenty over the term's published
+ * Period report cards of one class. Subject average: the shared averageOnTwenty over the term's published
  * grades (weighted by each event's coefficient). General average: the subject averages weighted by
  * the subjects' coefficients, ignoring subjects without grades. Rank: by general average, ties share
  * a rank (1, 2, 2, 4), students without an average are not ranked.
@@ -62,7 +55,7 @@ export interface ComputedReportCard {
 export function computeReportCards(
   studentIds: readonly string[],
   subjects: readonly SubjectWeight[],
-  grades: readonly TermGrade[],
+  grades: readonly PeriodGrade[],
 ): ComputedReportCard[] {
   const cards = studentIds.map((studentId) => {
     const mine = grades.filter((g) => g.studentId === studentId);

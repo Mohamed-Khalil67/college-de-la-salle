@@ -1,5 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import type { Prisma, ReportCard, Term } from '../generated/prisma/client.js';
+import type { Period, Prisma, ReportCard } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { ClassesService } from '../classes/classes.service.js';
 import { audit } from '../common/audit.js';
@@ -20,7 +20,7 @@ const SCHOOL_NAME = 'Collège de la Salle — Daher';
 const include = { student: { include: { user: true } } } satisfies Prisma.ReportCardInclude;
 type CardRow = Prisma.ReportCardGetPayload<{ include: typeof include }>;
 
-/** Term report cards: generated from published grades once the term is closed, then published. */
+/** Period report cards: generated from published grades once the period is closed, then published. */
 @Injectable()
 export class ReportCardsService {
   constructor(
@@ -29,22 +29,23 @@ export class ReportCardsService {
     private readonly classes: ClassesService,
   ) {}
 
-  /** (Re)computes the unpublished report cards of a closed term; published ones are left as they are. */
+  /** (Re)computes the unpublished report cards of a closed period; published ones are left as they are. */
   async generate(
-    termId: string,
+    periodId: string,
     classId: string | undefined,
     user: AuthUser,
   ): Promise<ReportCardBatchResultDto> {
-    const term = await this.closedTerm(termId);
+    const period = await this.closedPeriod(periodId);
     let count = 0;
-    for (const schoolClass of await this.classesOf(term, classId)) {
+    for (const schoolClass of await this.classesOf(period, classId)) {
       const roster = await this.classes.roster(schoolClass.id);
       const subjects = await this.subjectWeights(schoolClass.id);
       const grades = await this.prisma.grade.findMany({
         where: {
           published: true,
           studentId: { in: roster.map((s) => s.id) },
-          event: { classId: schoolClass.id, date: { gte: term.startsOn, lte: term.endsOn } },
+          // The events' stored period, never their dates: editing a period's dates moves no grade.
+          event: { classId: schoolClass.id, periodId },
         },
         include: { event: { select: { subjectId: true, coefficient: true } } },
       });
@@ -63,7 +64,7 @@ export class ReportCardsService {
         (
           await this.prisma.reportCard.findMany({
             where: {
-              termId,
+              periodId,
               studentId: { in: roster.map((s) => s.id) },
               publishedAt: { not: null },
             },
@@ -82,8 +83,8 @@ export class ReportCardsService {
             generatedAt: new Date(),
           };
           return this.prisma.reportCard.upsert({
-            where: { studentId_termId: { studentId: c.studentId, termId } },
-            create: { ...data, studentId: c.studentId, termId },
+            where: { studentId_periodId: { studentId: c.studentId, periodId } },
+            create: { ...data, studentId: c.studentId, periodId },
             update: data,
           });
         });
@@ -94,8 +95,8 @@ export class ReportCardsService {
       {
         actorId: user.id,
         action: 'report_cards.generate',
-        entity: 'term',
-        entityId: termId,
+        entity: 'period',
+        entityId: periodId,
         after: { classId: classId ?? null, count },
       },
     ]);
@@ -103,22 +104,22 @@ export class ReportCardsService {
   }
 
   async publish(
-    termId: string,
+    periodId: string,
     classId: string | undefined,
     user: AuthUser,
   ): Promise<ReportCardBatchResultDto> {
-    await this.closedTerm(termId);
+    await this.closedPeriod(periodId);
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.reportCard.updateMany({
-        where: { termId, publishedAt: null, ...(classId ? { classId } : {}) },
+        where: { periodId, publishedAt: null, ...(classId ? { classId } : {}) },
         data: { publishedAt: new Date() },
       });
       await audit(tx, [
         {
           actorId: user.id,
           action: 'report_cards.publish',
-          entity: 'term',
-          entityId: termId,
+          entity: 'period',
+          entityId: periodId,
           after: { classId: classId ?? null, count },
         },
       ]);
@@ -126,9 +127,9 @@ export class ReportCardsService {
     });
   }
 
-  /** A term's report cards (admins: all or one class; teachers: a class they teach), by rank. */
-  async forTerm(
-    termId: string,
+  /** A period's report cards (admins: all or one class; teachers: a class they teach), by rank. */
+  async forPeriod(
+    periodId: string,
     classId: string | undefined,
     user: AuthUser,
   ): Promise<ReportCardDto[]> {
@@ -137,7 +138,7 @@ export class ReportCardsService {
       await this.access.assertTeachesClass(user, classId);
     }
     const rows = await this.prisma.reportCard.findMany({
-      where: { termId, ...(classId ? { classId } : {}) },
+      where: { periodId, ...(classId ? { classId } : {}) },
       include,
       orderBy: [{ classId: 'asc' }, { rank: { sort: 'asc', nulls: 'last' } }],
     });
@@ -150,7 +151,7 @@ export class ReportCardsService {
     const rows = await this.prisma.reportCard.findMany({
       where: { studentId, ...(user.role === 'student' ? { publishedAt: { not: null } } : {}) },
       include,
-      orderBy: { term: { startsOn: 'desc' } },
+      orderBy: { period: { startsOn: 'desc' } },
     });
     return rows.map(toReportCardDto);
   }
@@ -170,19 +171,19 @@ export class ReportCardsService {
 
   async pdf(id: string, user: AuthUser): Promise<{ filename: string; content: Buffer }> {
     const card = await this.readable(id, user);
-    const [term, schoolClass, classSize] = await Promise.all([
-      this.prisma.term.findUniqueOrThrow({
-        where: { id: card.termId },
+    const [period, schoolClass, classSize] = await Promise.all([
+      this.prisma.period.findUniqueOrThrow({
+        where: { id: card.periodId },
         include: { schoolYear: true },
       }),
       this.prisma.schoolClass.findUniqueOrThrow({ where: { id: card.classId } }),
-      this.prisma.reportCard.count({ where: { termId: card.termId, classId: card.classId } }),
+      this.prisma.reportCard.count({ where: { periodId: card.periodId, classId: card.classId } }),
     ]);
     const dto = toReportCardDto(card);
     const content = await reportCardPdf(dto, {
       schoolName: SCHOOL_NAME,
-      termLabel: term.label,
-      yearLabel: term.schoolYear.label,
+      termLabel: period.label,
+      yearLabel: period.schoolYear.label,
       classLabel: schoolClass.label,
       classSize,
     });
@@ -190,7 +191,7 @@ export class ReportCardsService {
       .normalize('NFD')
       .replace(/[^\w]+/g, '-')
       .toLowerCase();
-    return { filename: `bulletin-${term.number}-${slug}.pdf`, content };
+    return { filename: `bulletin-${period.number}-${slug}.pdf`, content };
   }
 
   /** Students: their own published card; teachers: cards of classes they teach; admins: all. */
@@ -205,24 +206,29 @@ export class ReportCardsService {
     return card;
   }
 
-  private async closedTerm(termId: string): Promise<Term> {
-    const term = await this.prisma.term.findUnique({ where: { id: termId } });
-    if (!term) throw notFound('Trimestre');
-    if (!term.closedAt) throw new ConflictException('Clôturez le trimestre avant les bulletins.');
-    return term;
+  private async closedPeriod(periodId: string): Promise<Period> {
+    const period = await this.prisma.period.findUnique({ where: { id: periodId } });
+    if (!period) throw notFound('Période');
+    if (!period.closedAt) throw new ConflictException('Clôturez la période avant les bulletins.');
+    return period;
   }
 
-  private async classesOf(term: Term, classId: string | undefined) {
+  /** The classes of the period's school year, limited to its section when it has one. */
+  private async classesOf(period: Period, classId: string | undefined) {
     const classes = await this.prisma.schoolClass.findMany({
-      where: { schoolYearId: term.schoolYearId, ...(classId ? { id: classId } : {}) },
+      where: {
+        schoolYearId: period.schoolYearId,
+        ...(period.sectionId ? { sectionId: period.sectionId } : {}),
+        ...(classId ? { id: classId } : {}),
+      },
     });
     if (classId && !classes.length) throw notFound('Classe');
     return classes;
   }
 
-  /** The class's subjects and coefficients (the highest when two teachers share a subject). */
+  /** The class's subjects and their coefficients (its class subjects). */
   private async subjectWeights(classId: string): Promise<SubjectWeight[]> {
-    const rows = await this.prisma.teachingAssignment.findMany({
+    const rows = await this.prisma.classSubject.findMany({
       where: { classId },
       include: { subject: true },
       orderBy: { subject: { name: 'asc' } },
@@ -236,7 +242,7 @@ function toReportCardDto(c: CardRow | (ReportCard & CardRow)): ReportCardDto {
     id: c.id,
     studentId: c.studentId,
     studentName: `${c.student.user.firstName} ${c.student.user.lastName}`,
-    termId: c.termId,
+    periodId: c.periodId,
     classId: c.classId,
     average: c.average === null ? null : Number(c.average),
     rank: c.rank,

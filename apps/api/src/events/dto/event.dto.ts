@@ -3,7 +3,6 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
-  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -18,18 +17,16 @@ import {
 } from 'class-validator';
 import {
   type Attachment,
-  EVENT_KINDS,
   EVENT_LIMITS,
   type EventDto as EventContract,
   type EventInput,
-  type EventKind,
   type EventRangeQuery,
   type OccurrenceDto as OccurrenceContract,
 } from '@cdls/shared';
 import { IsDay } from '../../common/dates.js';
+import { ActivityTypeSummaryDto } from '../../activity-types/dto/activity-type.dto.js';
 import { emptyToNull, trim } from '../../common/transforms.js';
 
-const KINDS = EVENT_KINDS.map((k) => k.id);
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export class AttachmentDto implements Attachment {
@@ -47,8 +44,8 @@ export class AttachmentDto implements Attachment {
 
 export class EventDto implements EventContract {
   id: string;
-  @ApiProperty({ enum: KINDS })
-  kind: EventKind;
+  activityTypeId: string;
+  type: ActivityTypeSummaryDto;
   title: string;
   subjectId: string | null;
   classId: string | null;
@@ -57,7 +54,13 @@ export class EventDto implements EventContract {
   startTime: string | null;
   endTime: string | null;
   repeatUntil: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  roomId: string | null;
+  @ApiProperty({ type: String, nullable: true })
+  roomName: string | null;
   place: string;
+  @ApiProperty({ type: String, nullable: true })
+  periodId: string | null;
   description: string;
   @ApiProperty({ type: [AttachmentDto] })
   attachments: AttachmentDto[];
@@ -77,9 +80,9 @@ export class OccurrenceDto implements OccurrenceContract {
 
 /** Audience: classId → one class; only sectionId → a section; neither → the whole school. */
 export class CreateEventDto implements EventInput {
-  @ApiProperty({ enum: KINDS })
-  @IsIn(KINDS)
-  kind: EventKind;
+  /** A school-wide type or one of the author's own (GET /activity-types). */
+  @IsUUID()
+  activityTypeId: string;
 
   @Transform(trim)
   @IsString()
@@ -117,17 +120,32 @@ export class CreateEventDto implements EventInput {
   @Matches(CLOCK)
   endTime?: string | null;
 
-  /** Repeats every week until this day (repeatable kinds: cours, TD, TP, révision, activité). */
+  /** Repeats every week until this day (repeatable types only). */
   @IsOptional()
   @Transform(emptyToNull)
   @IsDay()
   repeatUntil?: string | null;
 
+  /** A room of the school (GET /rooms). */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(emptyToNull)
+  @IsUUID()
+  roomId?: string | null;
+
+  /** Free text, for places outside the school. */
   @IsOptional()
   @Transform(trim)
   @IsString()
   @MaxLength(EVENT_LIMITS.place)
   place?: string;
+
+  /** Gradable types: the period its grades count for (default: the period containing the date). */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @Transform(emptyToNull)
+  @IsUUID()
+  periodId?: string | null;
 
   @IsOptional()
   @IsString()
@@ -141,7 +159,7 @@ export class CreateEventDto implements EventInput {
   @Type(() => AttachmentDto)
   attachments?: AttachmentDto[];
 
-  /** Weight of the grades given for it (gradable kinds), 1 by default. */
+  /** Weight of the grades given for it (gradable types), 1 by default. */
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })

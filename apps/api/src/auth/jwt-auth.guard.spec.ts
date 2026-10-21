@@ -14,6 +14,7 @@ const USER: AuthUser = {
   studentId: 's1',
   teacherId: null,
   classId: 'c1',
+  isCoordinator: false,
 };
 
 function context(authorization?: string) {

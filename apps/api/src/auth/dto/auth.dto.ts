@@ -24,6 +24,8 @@ export class SessionUserDto implements SessionUser {
   teacherId: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Students: their current class.' })
   classId: string | null;
+  /** Teachers marked coordinateur by the admin. */
+  isCoordinator: boolean;
 }
 
 export class SessionDto implements SessionResponse {

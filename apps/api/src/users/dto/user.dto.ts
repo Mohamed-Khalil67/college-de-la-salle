@@ -38,6 +38,7 @@ export class UserDto implements UserContract {
   teacherId: string | null;
   studentNumber: string | null;
   classId: string | null;
+  isCoordinator: boolean;
 }
 
 export class UserListQueryDto extends PaginationQueryDto implements UserListQuery {
@@ -116,6 +117,11 @@ export class UpdateUserDto implements UpdateUserRequest {
   @MinLength(10)
   @MaxLength(200)
   password?: string;
+
+  /** Teachers only: coordinateur (edits the year's structure). */
+  @IsOptional()
+  @IsBoolean()
+  isCoordinator?: boolean;
 }
 
 export class CreatedUserDto implements CreatedUserResponse {

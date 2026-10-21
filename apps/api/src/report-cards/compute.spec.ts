@@ -46,12 +46,11 @@ describe('computeReportCards', () => {
 });
 
 describe('subjectWeights', () => {
-  it('keeps one weight per subject, the highest when two teachers share it', () => {
+  it('weighs each subject of the class by its class-subject coefficient', () => {
     expect(
       subjectWeights([
-        { subjectId: 'maths', coefficient: 3, subject: { name: 'Mathématiques' } },
-        { subjectId: 'arabe', coefficient: 2, subject: { name: 'Arabe' } },
         { subjectId: 'maths', coefficient: 4, subject: { name: 'Mathématiques' } },
+        { subjectId: 'arabe', coefficient: 2, subject: { name: 'Arabe' } },
       ]),
     ).toEqual([
       { subjectId: 'maths', subjectName: 'Mathématiques', coefficient: 4 },
