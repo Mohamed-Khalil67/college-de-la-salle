@@ -81,6 +81,7 @@ const PAGE_SIZE = 20;
               [now]="now"
               [selfId]="selfId()"
               [busyId]="coordinatorBusyId()"
+              [revision]="revision()"
               (coordinator)="setCoordinator($event)"
               (edit)="startEdit($event)"
               (deactivate)="startDeactivate($event)"
@@ -197,6 +198,7 @@ export class UsersPage {
   protected readonly notice = signal<string | null>(null);
   protected readonly pageError = signal<string | null>(null);
   protected readonly coordinatorBusyId = signal<string | null>(null);
+  protected readonly revision = signal(0);
 
   protected async setCoordinator(change: { readonly user: UserDto; readonly value: boolean }): Promise<void> {
     if (this.coordinatorBusyId()) return;
@@ -213,6 +215,7 @@ export class UsersPage {
     } catch (error) {
       this.notice.set(null);
       this.pageError.set(apiMessage(error));
+      this.revision.update((n) => n + 1);
     } finally {
       this.coordinatorBusyId.set(null);
     }

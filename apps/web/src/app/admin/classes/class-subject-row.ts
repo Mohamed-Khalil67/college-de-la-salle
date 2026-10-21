@@ -73,6 +73,24 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
     .status--error {
       color: var(--color-danger);
     }
+    @media (max-width: 40rem) {
+      /* Stacked row: a label and its box on one line, and no empty « État : » line when there is nothing to say. */
+      td.num[data-label] {
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+      }
+      .cell-input {
+        width: 4.5rem;
+      }
+      .status {
+        min-width: 0;
+      }
+      .status:has(> span:empty)::before {
+        content: none !important;
+      }
+    }
   `,
 })
 export class ClassSubjectRow {

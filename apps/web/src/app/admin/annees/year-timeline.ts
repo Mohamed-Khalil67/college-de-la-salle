@@ -35,15 +35,15 @@ const ROW_REM = 2.5;
   selector: 'app-year-timeline',
   template: `
     <div
-      class="timeline"
+      class="ytl"
       role="region"
       tabindex="0"
       [attr.aria-label]="'Calendrier annuel ' + year().label + ', à faire défiler horizontalement'"
     >
-      <div class="timeline__inner">
-        <div class="timeline__months" aria-hidden="true">
+      <div class="ytl__inner">
+        <div class="ytl__months" aria-hidden="true">
           @for (month of months(); track month.day) {
-            <span class="timeline__month" [style.left.%]="month.left" [style.width.%]="month.width">{{ month.label }}</span>
+            <span class="ytl__month" [style.left.%]="month.left" [style.width.%]="month.width">{{ month.label }}</span>
           }
         </div>
         @for (block of blocks(); track block.section.id) {
@@ -88,29 +88,29 @@ const ROW_REM = 2.5;
     </div>
   `,
   styles: `
-    .timeline {
+    .ytl {
       overflow-x: auto;
       border: 1px solid var(--color-line);
       border-radius: var(--radius-md);
       background: var(--color-surface);
     }
-    .timeline:focus-visible {
+    .ytl:focus-visible {
       outline: 2px solid var(--color-focus);
       outline-offset: 2px;
     }
-    .timeline__inner {
+    .ytl__inner {
       min-width: 60rem;
       padding: var(--space-4) var(--space-6) var(--space-6);
       display: grid;
       gap: var(--space-4);
     }
-    .timeline__months {
+    .ytl__months {
       position: relative;
       height: 1.5rem;
       color: var(--color-muted);
       font-size: var(--text-label-s);
     }
-    .timeline__month {
+    .ytl__month {
       position: absolute;
       top: 0;
       overflow: hidden;

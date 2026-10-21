@@ -220,7 +220,7 @@ export function buildChecklist(input: ChecklistInput): ChecklistStep[] {
       detail: sections.length
         ? `${withPeriods.length} filière${withPeriods.length > 1 ? 's' : ''} sur ${sections.length} ${withPeriods.length > 1 ? 'ont' : 'a'} ses périodes.`
         : 'Aucune filière.',
-      action: 'Ajouter une période',
+      action: 'Ajouter les périodes',
     },
     {
       id: 'closures',
@@ -230,7 +230,7 @@ export function buildChecklist(input: ChecklistInput): ChecklistStep[] {
         closuresStatus === 'done'
           ? `${plural(holidays, 'période de vacances', 'périodes de vacances')} et ${plural(exams, 'semaine d’examens', 'semaines d’examens')}.`
           : `Il manque ${missingClosures}.`,
-      action: 'Ajouter des vacances',
+      action: 'Saisir les vacances',
     },
     {
       id: 'classes',

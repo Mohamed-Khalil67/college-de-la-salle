@@ -39,7 +39,7 @@ interface UserRow {
           </tr>
         </thead>
         <tbody>
-          @for (row of rows(); track row.user.id) {
+          @for (row of rows(); track row.user.id + ':' + revision()) {
             <tr>
               <th scope="row">
                 <span class="person">
@@ -107,6 +107,8 @@ export class UsersTable {
   readonly selfId = input<string | null>(null);
   /** The teacher whose coordinateur flag is being saved. */
   readonly busyId = input<string | null>(null);
+  /** Bumped by the page when a change was refused: the rows are drawn again from the data, so a box that flipped goes back. */
+  readonly revision = input(0);
   readonly edit = output<UserDto>();
   readonly deactivate = output<UserDto>();
   /** A student who graduated or left the school. */
@@ -117,10 +119,9 @@ export class UsersTable {
   protected readonly captionId = `users-caption-${++nextId}`;
   protected readonly isStudents = computed(() => this.role() === 'student');
   protected readonly isTeachers = computed(() => this.role() === 'teacher');
-  /** The box shows the saved state until the API confirms: it goes back at once and follows the data. */
+  /** The box flips at once and is disabled while the API answers; a refusal draws the rows again. */
   protected toggle(event: Event, user: UserDto): void {
-    (event.target as HTMLInputElement).checked = user.isCoordinator;
-    this.coordinator.emit({ user, value: !user.isCoordinator });
+    this.coordinator.emit({ user, value: (event.target as HTMLInputElement).checked });
   }
 
   protected readonly rows = computed<UserRow[]>(() =>

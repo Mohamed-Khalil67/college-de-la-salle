@@ -54,11 +54,11 @@ import { classSubjectTotals, copyMessage, copySummary, formatDecimal } from './c
               <tfoot>
                 <tr>
                   <th scope="row">Total : {{ totals().count }} matières</th>
-                  <td></td>
+                  <td class="cell-empty"></td>
                   <td class="num" data-label="Coefficients :">{{ formatDecimal(totals().coefficient) }}</td>
                   <td class="num" data-label="Heures :">{{ totals().hours === null ? '—' : formatDecimal(totals().hours) }}</td>
-                  <td></td>
-                  <td></td>
+                  <td class="cell-empty"></td>
+                  <td class="cell-empty"></td>
                 </tr>
               </tfoot>
             </table>
@@ -102,6 +102,11 @@ import { classSubjectTotals, copyMessage, copySummary, formatDecimal } from './c
       align-items: flex-start;
       justify-content: space-between;
       gap: var(--space-4);
+    }
+    @media (max-width: 40rem) {
+      .cell-empty {
+        display: none !important;
+      }
     }
     .toolbar-row p {
       max-width: 38rem;

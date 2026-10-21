@@ -77,7 +77,7 @@ type PendingAction = 'archive' | 'delete' | 'promote';
       <div class="table-wrap" role="region" [attr.aria-labelledby]="'caption-' + id" tabindex="0">
         <table class="table table--stack">
           <caption [id]="'caption-' + id" class="visually-hidden">
-            {{ id === 'school' ? 'Types de l’école' : isAdmin() ? 'Types des enseignants' : 'Vos types privés' }}
+            {{ id === 'school' ? 'Liste des types de l’école' : isAdmin() ? 'Liste des types des enseignants' : 'Liste de vos types privés' }}
           </caption>
           <thead>
             <tr>
