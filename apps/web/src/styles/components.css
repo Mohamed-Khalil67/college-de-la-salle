@@ -1101,7 +1101,10 @@ textarea.field__control {
 }
 .app-bar__nav ul {
   display: flex;
-  gap: var(--space-6);
+  gap: var(--space-4);
+}
+.app-bar__nav .nav-link {
+  white-space: nowrap;
 }
 .app-bar__end {
   margin-left: auto;

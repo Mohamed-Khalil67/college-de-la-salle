@@ -1,8 +1,6 @@
 import type { Routes } from '@angular/router';
-import { ADMIN_NAV } from './admin/admin.routes';
 import { anonymousGuard, firstAccessGuard, roleGuard, structureGuard } from './core/auth/auth.guards';
-import { ELEVE_NAV } from './eleve/eleve.routes';
-import { ENSEIGNANT_NAV } from './enseignant/enseignant.routes';
+import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from './layout/space-navs';
 
 const spaceLayout = () => import('./layout/space-layout').then((m) => m.SpaceLayout);
 

@@ -2,29 +2,6 @@ import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
 import { adminOnlyGuard, COORDINATOR_HOME } from '../core/auth/auth.guards';
 import { AuthStore } from '../core/auth/auth-store';
-import type { SpaceNavItem } from '../layout/space-layout';
-
-/**
- * Navigation of /admin. Entries without `access` are the structure screens: the admin and the coordinators
- * (teachers marked coordinateur) open them. `access: 'admin'` ones are the admin's alone. Items with an icon
- * go in the phone's bottom bar (five at most); « Plus » lists every screen there.
- */
-export const ADMIN_NAV: readonly SpaceNavItem[] = [
-  { label: 'Utilisateurs', path: 'utilisateurs', icon: 'users', access: 'admin' },
-  { label: 'Classes', path: 'classes', icon: 'book' },
-  { label: 'Emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
-  { label: 'Matières', path: 'matieres' },
-  { label: 'Salles', path: 'salles' },
-  { label: 'Types d’activité', path: 'types-activite', short: 'Types' },
-  { label: 'Année scolaire', path: 'annees', icon: 'calendar', short: 'Année' },
-  { label: 'Affectations', path: 'affectations', access: 'admin' },
-  { label: 'Validations', path: 'validations', access: 'admin' },
-  { label: 'Bulletins', path: 'bulletins', access: 'admin' },
-  { label: 'Messages', path: 'messages', access: 'admin' },
-  /** A coordinator also teaches: the way back to the teacher space. */
-  { label: 'Mon espace enseignant', path: 'enseignant', href: '/enseignant', access: 'coordinator' },
-  { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
-];
 
 /** The administration (/admin). Pages are ported from design/prototypes/admin-*.html. */
 export const ADMIN_ROUTES: Routes = [

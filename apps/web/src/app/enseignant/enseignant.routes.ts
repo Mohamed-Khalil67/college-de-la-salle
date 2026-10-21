@@ -1,21 +1,4 @@
 import type { Routes } from '@angular/router';
-import type { SpaceNavItem } from '../layout/space-layout';
-
-/**
- * Phone bottom bar (five at most): Classes, Horaire, Notes, Appel, Plus. Agenda, Annonces and, for a coordinator,
- * Coordination are one tap away in « Plus ».
- */
-export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
-  { label: 'Mes classes', path: '', icon: 'users', short: 'Classes' },
-  { label: 'Mon emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
-  { label: 'Agenda', path: 'agenda' },
-  { label: 'Saisie des notes', path: 'notes', icon: 'edit', short: 'Notes' },
-  { label: 'Appel', path: 'appel', icon: 'check' },
-  { label: 'Annonces', path: 'annonces' },
-  /** Teachers the admin marked coordinateur edit the year's structure in the administration area. */
-  { label: 'Coordination', path: 'coordination', href: '/admin/matieres', access: 'coordinator' },
-  { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
-];
 
 /** The teacher space (/enseignant). Pages are ported from design/prototypes/enseignant-*.html. */
 export const ENSEIGNANT_ROUTES: Routes = [

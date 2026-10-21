@@ -5,7 +5,7 @@ import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
 import { Avatar, Icon, Wordmark } from '../ui';
 import { ChangePasswordModal } from './change-password-modal';
-import { type SpaceNavItem, visibleNav } from './space-nav';
+import { desktopNav, mobileNav, type SpaceNavItem, visibleNav } from './space-nav';
 
 export type { SpaceNavItem } from './space-nav';
 
@@ -164,12 +164,8 @@ export class SpaceLayout {
   );
   /** The items this user may see: admin-only and coordinator-only entries are filtered by role. */
   protected readonly visibleNav = computed(() => visibleNav(this.nav(), this.auth.user()));
-  protected readonly desktopNav = computed(() => this.visibleNav().filter((item) => !item.mobileOnly));
-  /** At most five icons in the bottom bar: when there are more, the last entry (« Plus », « Coordination ») keeps its place. */
-  protected readonly mobileNav = computed(() => {
-    const items = this.visibleNav().filter((item) => item.icon);
-    return items.length > 5 ? [...items.slice(0, 4), items[items.length - 1]] : items;
-  });
+  protected readonly desktopNav = computed(() => desktopNav(this.visibleNav()));
+  protected readonly mobileNav = computed(() => mobileNav(this.visibleNav()));
   protected readonly roleLabel = computed(() => {
     switch (this.auth.role()) {
       case 'student':

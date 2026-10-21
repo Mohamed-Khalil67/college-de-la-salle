@@ -1,20 +1,4 @@
 import type { Routes } from '@angular/router';
-import type { SpaceNavItem } from '../layout/space-layout';
-
-/**
- * Phone bottom bar (five at most): Accueil, Horaire, Devoirs, Notes, Plus. Examens et devoirs (the events
- * calendar), Absences and Bulletins are in « Plus ».
- */
-export const ELEVE_NAV: readonly SpaceNavItem[] = [
-  { label: 'Tableau de bord', path: '', icon: 'home', short: 'Accueil' },
-  { label: 'Emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
-  { label: 'Examens et devoirs', path: 'agenda', short: 'Agenda' },
-  { label: 'Devoirs', path: 'devoirs', icon: 'book' },
-  { label: 'Notes', path: 'notes', icon: 'file-text' },
-  { label: 'Absences', path: 'absences' },
-  { label: 'Bulletins', path: 'bulletins' },
-  { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
-];
 
 /** The student space (/eleve). Pages are ported from design/prototypes/eleve-*.html. */
 export const ELEVE_ROUTES: Routes = [
