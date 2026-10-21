@@ -103,6 +103,8 @@ test.describe('timetable', () => {
     const first = await addSlot('Seconde (Bac français)', 'Humanités, littérature et philosophie');
     await saveAccepting(page, first, 'Ajouter la séance');
     await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
+    // A new series starts today, so its first Sunday may be next week: look there.
+    await page.getByRole('button', { name: 'Semaine suivante' }).click();
     await expect(page.getByRole('grid')).toContainText('Humanités, littérature et philosophie');
 
     // Second: another class, another teacher, the same room and hour: refused, with the conflict named.
