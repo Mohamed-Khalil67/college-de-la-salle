@@ -96,15 +96,19 @@ describe('TimetableService (rules checked before anything is written)', () => {
     await expect(
       update(TEACHER, { scope: 'following', date: '2026-11-02', changes: { roomId: 'r2' } }),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(update(TEACHER, { scope: 'all', changes: { roomId: 'r2' } })).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      update(TEACHER, { scope: 'all', changes: { roomId: 'r2' } }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     expect(tx.slotException.upsert).not.toHaveBeenCalled();
   });
 
   it('a teacher cannot touch another teacher’s session, even one they could teach', async () => {
     await expect(
-      update(OTHER_TEACHER, { scope: 'this', date: '2026-11-02', exception: { kind: 'cancelled' } }),
+      update(OTHER_TEACHER, {
+        scope: 'this',
+        date: '2026-11-02',
+        exception: { kind: 'cancelled' },
+      }),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 

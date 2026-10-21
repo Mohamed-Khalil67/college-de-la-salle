@@ -80,7 +80,9 @@ describe('sessionWarnings', () => {
       sessionWarnings(
         [session('2026-11-01', 'small')],
         facts({
-          rooms: new Map([['small', { name: 'Salle 3', capacity: null, kind: 'classroom' as const }]]),
+          rooms: new Map([
+            ['small', { name: 'Salle 3', capacity: null, kind: 'classroom' as const }],
+          ]),
         }),
       ),
     ).toEqual([]);
@@ -88,9 +90,9 @@ describe('sessionWarnings', () => {
 
   it('warns about a TP outside a laboratory (or without a room), not in one, not for other types', () => {
     const tp = slot({}, { isSystem: true, code: 'tp' });
-    expect(sessionWarnings([session('2026-11-01', 'big', tp)], facts()).map((w) => w.code)).toEqual([
-      'tp_outside_lab',
-    ]);
+    expect(sessionWarnings([session('2026-11-01', 'big', tp)], facts()).map((w) => w.code)).toEqual(
+      ['tp_outside_lab'],
+    );
     expect(sessionWarnings([session('2026-11-01', null, tp)], facts())[0]!.message).toMatch(
       /sans salle/,
     );

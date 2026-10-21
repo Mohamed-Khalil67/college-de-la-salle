@@ -3,7 +3,7 @@ import {
   minutesOf,
   SECTION_LABELS,
   shiftTime,
-  todayIso,
+  schoolToday,
   type ClassDto,
   type TimetableBlockedError,
   type TimetableOccurrenceDto,
@@ -215,7 +215,7 @@ export class TimetableEditorPage {
   readonly #api = inject(TimetableApi);
 
   protected readonly views = VIEWS;
-  protected readonly today = todayIso();
+  protected readonly today = schoolToday();
   protected readonly day = signal(this.today);
   protected readonly label = computed(() => weekLabel(this.day()));
   protected readonly view = signal<GridView>('class');

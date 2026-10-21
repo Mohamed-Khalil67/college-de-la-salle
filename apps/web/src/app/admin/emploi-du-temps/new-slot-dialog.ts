@@ -7,7 +7,7 @@ import {
   type SchoolYearDto,
   SCHOOL_WEEKDAYS,
   SECTION_LABELS,
-  todayIso,
+  schoolToday,
   slotProblems,
   type TimetableBlockedError,
   type TimetableWarningCode,
@@ -30,7 +30,7 @@ export interface NewSlotDefaults {
 
 /** A new series starts today (or when the year starts, if later): the past is never built. */
 function startOf(year: SchoolYearDto | undefined): string {
-  const today = todayIso();
+  const today = schoolToday();
   return year && year.startsOn > today ? year.startsOn : today;
 }
 

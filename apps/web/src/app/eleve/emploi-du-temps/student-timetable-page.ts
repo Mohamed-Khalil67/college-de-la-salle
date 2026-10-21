@@ -1,6 +1,6 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { todayIso } from '@cdls/shared';
+import { schoolToday } from '@cdls/shared';
 import { Button, EmptyState, Icon } from '../../ui';
 import { SessionItem } from '../../timetable/session-item';
 import { TimetableApi } from '../../timetable/timetable-api';
@@ -130,7 +130,7 @@ import { shiftWeek, weekLabel } from '../shared/week';
 })
 export class StudentTimetablePage {
   readonly #api = inject(TimetableApi);
-  protected readonly today = todayIso();
+  protected readonly today = schoolToday();
   protected readonly day = signal(this.today);
   protected readonly label = computed(() => weekLabel(this.day()));
 

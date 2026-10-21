@@ -1,5 +1,5 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
-import { todayIso, type TimetableOccurrenceDto, type TimetableWriteResult } from '@cdls/shared';
+import { schoolToday, type TimetableOccurrenceDto, type TimetableWriteResult } from '@cdls/shared';
 import { apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Button, EmptyState, Icon } from '../../ui';
@@ -129,7 +129,7 @@ export class MyTimetablePage {
   readonly #api = inject(TimetableApi);
   readonly #auth = inject(AuthStore);
 
-  protected readonly today = todayIso();
+  protected readonly today = schoolToday();
   protected readonly day = signal(this.today);
   protected readonly label = computed(() => weekLabel(this.day()));
 

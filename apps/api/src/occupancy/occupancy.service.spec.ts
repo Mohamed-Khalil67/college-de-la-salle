@@ -62,7 +62,9 @@ describe('OccupancyService', () => {
   describe('guard', () => {
     it('turns the exclusion error of a lost race into a 409', async () => {
       const raced = Promise.reject(
-        new Error('conflicting key value violates exclusion constraint "occupancy_room_no_overlap"'),
+        new Error(
+          'conflicting key value violates exclusion constraint "occupancy_room_no_overlap"',
+        ),
       );
       await expect(service.guard(raced)).rejects.toBeInstanceOf(ConflictException);
     });

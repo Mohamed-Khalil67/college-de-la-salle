@@ -506,3 +506,11 @@ export function exceptionProblems(e: {
   }
   return out;
 }
+
+/** The school's time zone: « today » for the timetable, whatever the browser's or the server's own zone. */
+export const SCHOOL_TIME_ZONE = 'Africa/Cairo';
+
+/** Today's date in Cairo as `YYYY-MM-DD` (sessions already held are never rewritten). */
+export function schoolToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: SCHOOL_TIME_ZONE }).format(now);
+}

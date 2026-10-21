@@ -12,7 +12,15 @@ Updated 2026-10-21, after the integration of the two lanes (branch `integration-
 - **Phase 1, API: in.** Subjects, class subjects (the coefficient lives there), rooms, activity types (replacing the `event_kind` enum), periods with `periodId` on events, calendar days, coordinators.
 - **Phase 4: in.** Roster import with generated e-mails (homonyms numbered), first sign-in password change, section-change requests and their approval, graduation and archived accounts.
 - **Phase 1, admin screens: NOT built.** There is no screen yet for subjects, class subjects, rooms, activity types, periods and calendar days. The web only follows the new contracts (it reads and writes through the changed endpoints, nothing more); the data is managed through the API and the seed.
-- **Phases 2 (timetable), 3 (targeting) and 5 (next year): not started.**
+- **Phase 2, timetable and conflicts: built** (branch `p2-timetable`).
+  - Model: `TimetableSlot`, `SlotException`, and the `Occupancy` index with four exclusion constraints (btree_gist): `occupancy_room_no_overlap`, `occupancy_teacher_no_overlap`, `occupancy_class_whole_no_overlap`, `occupancy_class_division_no_overlap`. The rule (slot plus exceptions) stays the source of truth; the index rows are rewritten in the same transaction as every change, and by calendar days (holidays) and one-off events.
+  - Engine in `@cdls/shared` (`timetable.ts`): week A/B counted from the school year's first week, holidays and days without classes per class or section, exceptions, « avant / maintenant ».
+  - API: `/timetable` (slots, exceptions, `check`, `free-rooms`, `occurrences`, `warnings`). Hard conflicts answer 409 `TIMETABLE_CONFLICT`; warnings need `acknowledgedWarnings` with a reason, written to the audit log (409 `WARNINGS_NOT_ACKNOWLEDGED` otherwise).
+  - Screens: admin week editor (ARIA grid, « Déplacer… », « Conflits (n) » panel), teacher « Mon emploi du temps », student week (the old events calendar of the student moved to `/eleve/agenda`, « Examens et devoirs »).
+  - Decisions taken while building: a teacher only uses « Cette séance » (cancel, move, room) for their own sessions; « Toute la série » edits from today on (it splits the series at today once it has started, so past sessions are never rewritten); the TP-outside-a-lab warning applies to the system TP type only; one-off events with a room or a class and a time now hold the room and the class (hard conflict with a lesson).
+  - **Legacy weekly events are not converted.** The weekly `cours` events created before this phase (the seed's two per class) still work in the calendar, attendance and the .ics export, but they are not in the occupancy index, so they never clash. Convert them to slots by hand, then delete them.
+  - The `division` of a slot is the key groups will plug into (`group_id` exists, always null, no foreign key yet).
+- **Phases 3 (targeting) and 5 (next year): not started.**
 - Known gap for phase 5: a student who changes section in the middle of a period keeps the grades of the old class, but the report card of that period is computed from the current class only.
 
 ## What the owner asked for

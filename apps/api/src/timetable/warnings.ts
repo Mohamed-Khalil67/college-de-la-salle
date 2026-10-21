@@ -1,5 +1,6 @@
 import {
   type Closure,
+  closureCovers,
   longDay,
   MAX_ASSESSMENTS_PER_DAY,
   needsLab,
@@ -49,9 +50,7 @@ export function sessionWarnings(
       (c) =>
         c.startsOn <= o.current.date &&
         o.current.date <= c.endsOn &&
-        c.targets.some(
-          (t) => t === 'all' || t === o.slot.target || o.slot.target.startsWith(`${t}-`),
-        ),
+        closureCovers(c, o.slot.target),
     ),
   );
   // One warning per series (slot), with its first day.

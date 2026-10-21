@@ -41,6 +41,12 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 - Grade changes write `AuditLog` rows in the same transaction (`common/audit.ts`).
 - Pure domain logic (averages, calendar occurrences, audiences, .ics) lives in `packages/shared` and is imported from `@cdls/shared`, not re-implemented here. Activity types live in the database (`activity_types`): code asks for the flags (`gradable`, `repeatable`, `homework`), never for a type `code` such as `'cours'` or `'devoir'`; the system types come from `SYSTEM_ACTIVITY_TYPES` (seed and the `20261021000300` migration, checked by `src/prisma/activity-types.spec.ts`). Grades and report cards follow `Event.periodId`, never date ranges, so editing a period's dates moves no grade; a closed period is locked (`PeriodsService.assertOpen`). Subject coefficients live on `ClassSubject`. Holidays: `occurrences()` and `toIcs()` take the closures from `CalendarDaysService.closures()`.
 
+## Timetable
+
+- `timetable/` (writes, reads, soft warnings) and `occupancy/` (the index). **Every write runs in one transaction** (`TimetableService.run`): save the slot or exception, clear and rebuild the `occupancy` rows of the slots it touches, detect hard conflicts (409 `TIMETABLE_CONFLICT`), compute soft warnings (409 `WARNINGS_NOT_ACKNOWLEDGED` unless `acknowledgedWarnings` carries a reason for each; reasons go to the audit log). `POST /timetable/check` is the same pipeline, rolled back. The exclusion constraints of `occupancy` are the last guard against two parallel requests (`OccupancyService.guard` turns their error into a 409). Queries inside a transaction run one after the other.
+- The weekly rule is the source of truth; never edit `occupancy` by hand. Calendar days (`CalendarDaysService`) and one-off events (`EventsService`) call `OccupancyService` in their own transactions. Legacy weekly events are not indexed.
+- « Aujourd'hui » is `schoolToday()` (Cairo, from `@cdls/shared`): sessions before it are never rewritten. Teachers change only `this` session of their own slots (cancel, move, room; no replacement); the series scopes are `@StructureEditors()` only.
+
 ## Config
 
 - All environment variables are declared and validated in `src/config/env.validation.ts`; add new ones there and to `.env.example` (placeholders only, never real secrets). Read them with `ConfigService<Env, true>`.

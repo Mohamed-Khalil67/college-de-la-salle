@@ -176,12 +176,16 @@ export class OccupancyService {
       eventId: f.event_id,
     }));
     // Rows of the same change that clash with each other (a session moved onto another one of its series).
-    rows.forEach((a, i) =>
-      rows.slice(i + 1).forEach((b) => {
-        for (const kind of entriesClash(a, b))
-          clashes.push({ i, kind, slotId: a.slotId, exceptionId: null, eventId: a.eventId });
-      }),
-    );
+    // Sweep by start time: a row can only clash with the rows that start before it ends.
+    const order = rows
+      .map((_, i) => i)
+      .sort((x, y) => rows[x]!.startsAt.localeCompare(rows[y]!.startsAt));
+    order.forEach((i, at) => {
+      const a = rows[i]!;
+      for (let k = at + 1; k < order.length && rows[order[k]!]!.startsAt < a.endsAt; k++)
+        for (const kind of entriesClash(a, rows[order[k]!]!))
+          clashes.push({ i, kind, slotId: null, exceptionId: null, eventId: null });
+    });
     return this.describe(db, rows, clashes);
   }
 
@@ -199,7 +203,10 @@ export class OccupancyService {
       ? await db.timetableSlot.findMany({ where: { id: { in: slotIds } }, include: slotInclude })
       : [];
     const events = eventIds.length
-      ? await db.event.findMany({ where: { id: { in: eventIds } }, select: { id: true, title: true } })
+      ? await db.event.findMany({
+          where: { id: { in: eventIds } },
+          select: { id: true, title: true },
+        })
       : [];
     const slotLabel = new Map(
       slots.map((s) => {
@@ -219,7 +226,10 @@ export class OccupancyService {
       ? await db.teacher.findMany({ where: { id: { in: teacherIds } }, include: { user: true } })
       : [];
     const classes = classIds.length
-      ? await db.schoolClass.findMany({ where: { id: { in: classIds } }, include: { section: true } })
+      ? await db.schoolClass.findMany({
+          where: { id: { in: classIds } },
+          include: { section: true },
+        })
       : [];
     const roomName = new Map(rooms.map((r) => [r.id, r.name] as const));
     const teacherName = new Map(
@@ -259,7 +269,11 @@ export class OccupancyService {
               ? (teacherName.get(row.teacherId ?? '') ?? 'L’enseignant')
               : `La classe ${className.get(row.classId ?? '') ?? ''}`.trim();
         const resourceId =
-          (clash.kind === 'room' ? row.roomId : clash.kind === 'teacher' ? row.teacherId : row.classId) ?? '';
+          (clash.kind === 'room'
+            ? row.roomId
+            : clash.kind === 'teacher'
+              ? row.teacherId
+              : row.classId) ?? '';
         return {
           kind: clash.kind,
           resourceId,
@@ -297,8 +311,20 @@ export class OccupancyService {
   async reindexRange(db: Db, from: string, to: string): Promise<void> {
     const slots = await db.timetableSlot.findMany({
       where: {
-        validFrom: { lte: new Date(`${to}T00:00:00Z`) },
-        validTo: { gte: new Date(`${from}T00:00:00Z`) },
+        OR: [
+          {
+            validFrom: { lte: new Date(`${to}T00:00:00Z`) },
+            validTo: { gte: new Date(`${from}T00:00:00Z`) },
+          },
+          // A session moved into the range from a series that ends before it.
+          {
+            exceptions: {
+              some: {
+                newDate: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) },
+              },
+            },
+          },
+        ],
       },
       select: { id: true },
     });

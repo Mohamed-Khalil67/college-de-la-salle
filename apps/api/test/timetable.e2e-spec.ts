@@ -579,6 +579,29 @@ describe('Timetable (e2e)', () => {
       expect(list[0]!.status).toBe('normal');
     });
 
+    it('a teacher cannot undo a replacement the administration named', async () => {
+      const mine = await create();
+      const when = future(1, 3);
+      const sub = (
+        await t
+          .http()
+          .post(`/api/timetable/slots/${mine.id}/exceptions`)
+          .set(bearer(admin))
+          .send({ date: when, kind: 'substitute', newTeacherId: base.sherif })
+          .expect(201)
+      ).body as TimetableWriteResult;
+      await t
+        .http()
+        .delete(`/api/timetable/exceptions/${sub.exception!.id}`)
+        .set(bearer(maths))
+        .expect(403);
+      await t
+        .http()
+        .delete(`/api/timetable/exceptions/${sub.exception!.id}`)
+        .set(bearer(admin))
+        .expect(200);
+    });
+
     it('students read their own class timetable only; teachers read any', async () => {
       const student = await studentOf(t.prisma, 'bac', 'premiere');
       const token = await t.token(student.email);
@@ -980,6 +1003,29 @@ describe('Timetable (e2e)', () => {
         .post(`/api/timetable/slots/${made.id}/exceptions`)
         .set(bearer(admin))
         .send({ date: monday, kind: 'moved', newDate: addDays(monday, 7) })
+        .expect(400);
+      expect(message(res.body)).toMatch(/sans cours/);
+      await t.prisma.calendarDay.deleteMany({ where: { schoolYearId: base.yearId } });
+    });
+
+    it('a session cannot be moved to an earlier day without classes either', async () => {
+      const made = await create({ validFrom: addDays(TODAY, 1) });
+      const monday = nextDay(addDays(TODAY, 15), 1);
+      const earlier = addDays(monday, -7);
+      await t.prisma.calendarDay.create({
+        data: {
+          schoolYearId: base.yearId,
+          type: 'holiday',
+          label: 'Vacances',
+          startsOn: new Date(`${earlier}T00:00:00Z`),
+          endsOn: new Date(`${earlier}T00:00:00Z`),
+        },
+      });
+      const res = await t
+        .http()
+        .post(`/api/timetable/slots/${made.id}/exceptions`)
+        .set(bearer(admin))
+        .send({ date: monday, kind: 'moved', newDate: earlier })
         .expect(400);
       expect(message(res.body)).toMatch(/sans cours/);
       await t.prisma.calendarDay.deleteMany({ where: { schoolYearId: base.yearId } });

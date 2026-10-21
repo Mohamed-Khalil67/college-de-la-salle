@@ -3,6 +3,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   addDays,
   CLOSED_DAY_TYPES,
+  closureCovers,
   exceptionProblems,
   slotProblems,
   slotRunsOn,
@@ -137,6 +138,8 @@ export class TimetableService {
       if (!ex) throw notFound('Exception');
       const row = await this.load(tx, ex.slotId);
       await this.authorize(row, user);
+      // A teacher restores what a teacher may do, not a replacement the administration named.
+      if (!canEditStructure(user) && !TEACHER_KINDS.has(ex.kind)) throw forbidden();
       if (toDay(ex.date) < this.today()) throw new BadRequestException(PAST);
       await tx.slotException.delete({ where: { id } });
       return {
@@ -255,15 +258,26 @@ export class TimetableService {
     });
     const today = this.today();
     const sessions: TimetableOccurrence<ReturnType<typeof toSlotData>>[] = [];
-    for (const row of rows) {
-      const slot = toSlotData(row);
-      const days = [
-        slot.validFrom,
-        slot.validTo,
+    const ranges = rows.map((row) =>
+      [
+        toDay(row.validFrom),
+        toDay(row.validTo),
         ...row.exceptions.flatMap((e) => (e.newDate ? [toDay(e.newDate)] : [])),
-      ].sort();
-      const closures = await loadClosures(tx, CLOSED_DAY_TYPES, days[0]!, days.at(-1)!);
-      sessions.push(...expandSlots([slot], days[0]!, days.at(-1)!, closures));
+      ].sort(),
+    );
+    if (rows.length) {
+      // One query for the holidays of every slot.
+      const from = ranges.map((r) => r[0]!).sort()[0]!;
+      const to = ranges
+        .map((r) => r.at(-1)!)
+        .sort()
+        .at(-1)!;
+      const closures = await loadClosures(tx, CLOSED_DAY_TYPES, from, to);
+      rows.forEach((row, i) =>
+        sessions.push(
+          ...expandSlots([toSlotData(row)], ranges[i]![0]!, ranges[i]!.at(-1)!, closures),
+        ),
+      );
     }
     const wanted = applied.onlySession
       ? sessions.filter(
@@ -530,7 +544,9 @@ export class TimetableService {
     const today = this.today();
     if (date < today) throw new BadRequestException(PAST);
     const slot = toSlotData(row);
-    const closures = await loadClosures(tx, CLOSED_DAY_TYPES, date, input.newDate ?? date);
+    const [lo, hi] =
+      input.newDate && input.newDate < date ? [input.newDate, date] : [date, input.newDate ?? date];
+    const closures = await loadClosures(tx, CLOSED_DAY_TYPES, lo, hi);
     if (!slotRunsOn(slot, date, { closures, parityAnchor: slot.parityAnchor }))
       throw new BadRequestException(
         'Cette séance n’a pas lieu ce jour-là (autre jour, semaine de l’autre rythme ou jour sans cours).',
@@ -542,9 +558,7 @@ export class TimetableService {
           (c) =>
             c.startsOn <= input.newDate! &&
             input.newDate! <= c.endsOn &&
-            c.targets.some(
-              (t) => t === 'all' || t === slot.target || slot.target.startsWith(`${t}-`),
-            ),
+            closureCovers(c, slot.target),
         )
       )
         throw new BadRequestException('Ce jour est sans cours pour cette classe.');

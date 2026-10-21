@@ -27,10 +27,5 @@ export function IsDay(options?: ValidationOptions): PropertyDecorator {
     });
 }
 
-/** The school's time zone: « today » for the timetable (sessions already held are never rewritten). */
-export const SCHOOL_TIME_ZONE = 'Africa/Cairo';
-
-/** Today's date in Cairo as `YYYY-MM-DD`. */
-export function schoolToday(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: SCHOOL_TIME_ZONE }).format(now);
-}
+/** The school's « today » (Cairo), shared with the web: sessions already held are never rewritten. */
+export { SCHOOL_TIME_ZONE, schoolToday } from '@cdls/shared';
