@@ -78,7 +78,8 @@ export class CalendarDaysService {
     });
     return rows.map((row) => {
       const dto = toCalendarDayDto(row);
-      return student ? { ...dto, classIds: dto.classIds.filter((id) => id === user.classId) } : dto;
+      if (student) dto.classIds = dto.classIds.filter((id) => id === user.classId);
+      return dto;
     });
   }
 

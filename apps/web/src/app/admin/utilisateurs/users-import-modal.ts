@@ -68,7 +68,7 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                 </cdls-alert>
               } @else {
                 <cdls-alert tone="success">
-                  <strong>{{ plural(newCount(), 'compte sera créé', 'comptes seront créés') }}.</strong>
+                  <strong>{{ newCount() ? plural(newCount(), 'compte sera créé', 'comptes seront créés') : 'Aucun compte ne sera créé' }}.</strong>
                   @if (checked.rows.length > newCount()) {
                     {{ plural(checked.rows.length - newCount(), 'personne est déjà présente', 'personnes sont déjà présentes') }} : leur compte et leur adresse ne changent pas.
                   }

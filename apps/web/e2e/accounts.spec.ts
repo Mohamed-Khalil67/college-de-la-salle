@@ -304,6 +304,44 @@ test('roster import: preview the generated e-mails, then create the accounts', a
   await dialog.getByRole('button', { name: 'Terminé' }).click();
 });
 
+test('roster import: a person already present is skipped unless « créer quand même » is ticked', async ({ page }) => {
+  const last = uniqueName('Doublon');
+  const csv = ['lastName,firstName', `${last},Samir`].join('\n');
+  const slug = last.toLowerCase();
+
+  await signIn(page, ACCOUNTS.admin);
+  await page.locator('.app-bar').waitFor();
+  const upload = async () => {
+    await page.getByRole('button', { name: 'Importer un CSV' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Importer une liste' });
+    await dialog.getByRole('radio', { name: 'Enseignants' }).check({ force: true });
+    await dialog.getByLabel('Fichier CSV').setInputFiles({ name: 'profs.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+    await dialog.getByRole('button', { name: 'Vérifier le fichier' }).click();
+    return dialog;
+  };
+
+  let dialog = await upload();
+  await dialog.getByRole('button', { name: 'Créer 1 compte' }).click();
+  await expect(dialog.getByText('1 compte créé')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Terminé' }).click();
+
+  // The same list again: nothing to create, the line says why and offers the explicit choice.
+  dialog = await upload();
+  await expect(dialog.getByText('déjà présent : compte conservé')).toBeVisible();
+  await expect(dialog.getByText('Aucun compte ne sera créé')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Créer/ })).toHaveCount(0);
+  const choice = dialog.getByRole('checkbox', { name: /Créer quand même/ });
+  await expect(choice).not.toBeChecked();
+  await axeAtBothWidths(page);
+
+  await choice.check();
+  await expect(dialog.getByRole('cell', { name: `samir.${slug}2@demo.cdls.test` })).toBeVisible();
+  await axeAtBothWidths(page);
+  await dialog.getByRole('button', { name: 'Créer 1 compte' }).click();
+  await expect(dialog.getByText('1 compte créé')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Terminé' }).click();
+});
+
 test('graduating a student: confirmation first, then the account cannot sign in', async ({ page, request }) => {
   const student = await createStudent(request, 'bac', 'terminale');
   await signIn(page, ACCOUNTS.admin);

@@ -13,6 +13,7 @@ Updated 2026-10-21, after the integration of the two lanes (branch `integration-
 - **Phase 4: in.** Roster import with generated e-mails (homonyms numbered), first sign-in password change, section-change requests and their approval, graduation and archived accounts.
 - **Phase 1, admin screens: NOT built.** There is no screen yet for subjects, class subjects, rooms, activity types, periods and calendar days. The web only follows the new contracts (it reads and writes through the changed endpoints, nothing more); the data is managed through the API and the seed.
 - **Phases 2 (timetable), 3 (targeting) and 5 (next year): not started.**
+- **Review fixes (branch `review-fixes`):** coefficients frozen with the period, audit trail of account changes, database trigger for every-section/section period overlaps, per-account sign-in throttle and 14-day temporary passwords, « déjà présent » detection in imports, soft-close of enrolments, bounded and filtered `GET /calendar-days`.
 - Known gap for phase 5: a student who changes section in the middle of a period keeps the grades of the old class, but the report card of that period is computed from the current class only.
 
 ## What the owner asked for

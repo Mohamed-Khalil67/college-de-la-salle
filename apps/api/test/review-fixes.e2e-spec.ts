@@ -707,7 +707,7 @@ ${last},Nabil`), 'teacher', actor),
           .set(bearer(admin))
           .send({ classId: target.id });
       const results = await Promise.all([approve(), approve()]);
-      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(results.map((r) => r.status).sort((a, b) => a - b)).toEqual([200, 409]);
       const studentId = student.user.studentId!;
       const open = await t.prisma.enrollment.findMany({
         where: { studentId, schoolYearId: current.id, leftOn: null },
