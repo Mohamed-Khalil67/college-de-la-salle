@@ -39,6 +39,14 @@ a colour; gold (`--color-accent`) is never text on light surfaces (use `--color-
   The access token is memory-only; the interceptor adds it and refreshes once on a 401.
 - Guards: `roleGuard('student' | 'teacher')` on those areas; `/admin` uses `structureGuard` (the admin and coordinator teachers) and its admin-only pages `adminOnlyGuard`; nav entries carry `access: 'admin' | 'coordinator'`; `anonymousGuard` on `/connexion`, `firstAccessGuard` on `/premier-acces`. While `user().mustChangePassword` is true every guard sends the user to `/premier-acces`, and the interceptor does the same on a 403 `PASSWORD_CHANGE_REQUIRED`. The account menu of `SpaceLayout` has « Changer mon mot de passe » (`layout/change-password-modal.ts`, same `auth/password-form.ts` as the first-access page).
 
+## Navigation
+
+The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENSEIGNANT_NAV`, `ADMIN_NAV`), read by `SpaceLayout` and by the shared « Plus » page (`layout/menu-page.ts`, routed as `menu` in each space). Rules that `layout/space-nav.spec.ts` checks:
+
+- An item with an `icon` goes in the phone's bottom bar: five at most, the `mobileOnly` « Plus » entry last. Everything else is reached through « Plus », which lists every screen the user may see.
+- `access: 'admin' | 'coordinator'` filters by role; `href` links to another space; `secondary` items move behind « Plus » in the top bar once there are more than eight entries.
+- A new screen goes in its space's list, in « Plus » at least, and in the spec.
+
 ## Page checklist (before you commit)
 
 1. One `h1` per page (space pages start with `.page__header`); headings in order. Space pages never add a `<main>`

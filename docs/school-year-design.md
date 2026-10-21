@@ -21,6 +21,22 @@ Updated 2026-10-21, after the second integration (branch `integration-2`: `revie
   - **Legacy weekly events are not converted.** The weekly `cours` events created before this phase (the seed's two per class) still work in the calendar, attendance and the .ics export, but they are not in the occupancy index, so they never clash. Convert them to slots by hand, then delete them.
   - The `division` of a slot is the key groups will plug into (`group_id` exists, always null, no foreign key yet).
 - **Review fixes (branch `review-fixes`):** coefficients frozen with the period, audit trail of account changes, database trigger for every-section/section period overlaps, per-account sign-in throttle and 14-day temporary passwords, « déjà présent » detection in imports, soft-close of enrolments, bounded and filtered `GET /calendar-days`.
+- **Phases 3 (groups, « Assigner à ») and 5 (next year, rollover): not started.** Phase 3 plugs into `TimetableSlot.groupId` / `division` (the column exists, always null, no foreign key yet) and into the occupancy index's `division_key`; phase 5 must copy slots and rewrite the occupancy index through `OccupancyService`, and reuse the per-year advisory lock of `PeriodsService` for periods.
+- **Known leftovers:**
+  - Legacy weekly events (the seed's two `cours` events per class, and anything created the same way before phase 2) are not converted to timetable slots: the demo calendar shows them next to the slots, and attendance still runs on them.
+  - Student group sizes for the room-capacity warning: it counts open enrolments of the class (`leftOn` null), not the members of a group, until phase 3.
+  - Section change report card gap (below): a student who changes section in the middle of a period.
+- **Integration notes (`integration-2`):**
+  - Migrations: the timetable migration (`20261021055918`) sorts before the two review-fix ones (`20261022…`). They touch different tables, so `prisma migrate deploy` applies all of them from an empty database and as an upgrade from `20261021000500_calendar_days`; no reconciling migration was needed. A database that already ran the review-fix migrations but not the timetable one still takes the timetable migration with `migrate deploy` (`migrate dev` would call it out of order and ask for a reset).
+  - `CalendarDaysService`: the list needs a year or a range (review-fixes), writes reindex the occupancy of the sessions a holiday removes (phase 2). `EventsService.create/update`: the type lock and the check run inside the transaction, then the event is indexed in the same transaction. Periods are written only through `PeriodsService` (advisory lock per year); nothing of phase 2 writes periods.
+  - Deleting a room, a subject of a class or a class that timetable sessions use answers 409 (restrict foreign keys).
+  - Navigation (one model, `apps/web/src/app/layout/space-navs.ts`; `space-nav.spec.ts` records it). Phone bottom bar, five items at most, « Plus » (`/<espace>/menu`, one shared page) last and listing every screen of the space:
+    - student: Accueil, Horaire, Devoirs, Notes, Plus (Examens et devoirs, Absences and Bulletins are in Plus);
+    - teacher (a coordinator too): Classes, Horaire, Notes, Appel, Plus (Agenda, Annonces and, for a coordinator, Coordination are in Plus);
+    - admin: Utilisateurs, Classes, Horaire, Année, Plus (Matières, Salles, Types, Affectations, Validations, Bulletins, Messages are in Plus);
+    - coordinator in the administration: Classes, Horaire, Année, Plus (Matières, Salles, Types, Mon espace enseignant).
+    On wide screens the top bar shows everything up to eight entries; the admin has more, so Salles, Types d'activité and Messages move behind « Plus ».
+  - A new timetable series starts today, so the first session of a series made on a Wednesday is next week: the Playwright flow looks at next week.
 - Known gap for phase 5: a student who changes section in the middle of a period keeps the grades of the old class, but the report card of that period is computed from the current class only.
 
 ## What the owner asked for
