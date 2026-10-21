@@ -7,7 +7,8 @@ import { conflictOnReference, conflictOnUnique, notFound } from '../common/error
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateRoomDto, RoomDto, UpdateRoomDto } from './dto/room.dto.js';
 
-const IN_USE = 'Des événements utilisent cette salle : désactivez-la plutôt que de la supprimer.';
+const IN_USE =
+  'Des événements ou des séances de l’emploi du temps utilisent cette salle : désactivez-la plutôt que de la supprimer.';
 
 /** The school's rooms. Booking clashes are checked from phase 2 on (occupancy table). */
 @Injectable()
@@ -72,7 +73,10 @@ export class RoomsService {
   /** Deletes a room no event uses; 409 otherwise (deactivate it instead). */
   async remove(id: string, user: AuthUser): Promise<void> {
     const current = await this.find(id);
-    if (await this.prisma.event.count({ where: { roomId: id } }))
+    if (
+      (await this.prisma.event.count({ where: { roomId: id } })) ||
+      (await this.prisma.timetableSlot.count({ where: { OR: [{ roomId: id }, { exceptions: { some: { newRoomId: id } } }] } }))
+    )
       throw new ConflictException(IN_USE);
     const work = this.prisma.$transaction(async (tx) => {
       await tx.room.delete({ where: { id } });

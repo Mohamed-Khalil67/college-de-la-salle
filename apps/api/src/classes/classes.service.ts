@@ -24,6 +24,7 @@ const classInclude = {
 
 type ClassRow = Prisma.SchoolClassGetPayload<{ include: typeof classInclude }>;
 
+const CLASS_HAS_SLOTS = 'Cette classe a des séances dans l’emploi du temps : supprimez-les d’abord.';
 const CLASS_HAS_STUDENTS =
   'Cette classe a encore des élèves inscrits : retirez-les avant de la supprimer.';
 
@@ -102,6 +103,8 @@ export class ClassesService {
         tx.attendance.count({ where: { event: { classId: id } } }),
       ]);
       if (enrollments) throw new ConflictException(CLASS_HAS_STUDENTS);
+      if (await tx.timetableSlot.count({ where: { classSubject: { classId: id } } }))
+        throw new ConflictException(CLASS_HAS_SLOTS);
       if (reportCards || grades || attendance)
         throw new ConflictException(
           'Cette classe a déjà des notes, des absences ou des bulletins : elle ne peut pas être supprimée.',

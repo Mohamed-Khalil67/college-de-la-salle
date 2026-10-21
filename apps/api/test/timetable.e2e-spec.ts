@@ -1118,6 +1118,40 @@ describe('Timetable (e2e)', () => {
     });
   });
 
+  describe('deleting what the timetable uses', () => {
+    it('refuses to delete a room, a subject of a class or a class that has sessions (409, not a database error)', async () => {
+      const p = t.prisma;
+      const bac = await p.section.findFirstOrThrow({ where: { code: 'bac' } });
+      const klass = await p.schoolClass.create({
+        data: { schoolYearId: base.yearId, sectionId: bac.id, code: 'tt-del', label: 'Classe tt-del' },
+      });
+      const room = await p.room.create({ data: { name: 'TT Salle à garder', capacity: 20, kind: 'classroom' } });
+      const classSubject = await p.classSubject.create({
+        data: { classId: klass.id, subjectId: 'mathematiques' },
+      });
+      await p.timetableSlot.create({
+        data: {
+          classSubjectId: classSubject.id,
+          teacherId: base.hany,
+          roomId: room.id,
+          activityTypeId: base.cours,
+          weekday: 4,
+          startTime: '19:00',
+          endTime: '20:00',
+          validFrom: new Date(`${addDays(TODAY, -10)}T00:00:00Z`),
+          validTo: new Date(`${addDays(TODAY, 100)}T00:00:00Z`),
+        },
+      });
+      await t.http().delete(`/api/rooms/${room.id}`).set(bearer(admin)).expect(409);
+      await t.http().delete(`/api/class-subjects/${classSubject.id}`).set(bearer(admin)).expect(409);
+      await t.http().delete(`/api/classes/${klass.id}`).set(bearer(admin)).expect(409);
+      await p.timetableSlot.deleteMany({ where: { classSubjectId: classSubject.id } });
+      await t.http().delete(`/api/class-subjects/${classSubject.id}`).set(bearer(admin)).expect(204);
+      await t.http().delete(`/api/classes/${klass.id}`).set(bearer(admin)).expect(204);
+      await t.http().delete(`/api/rooms/${room.id}`).set(bearer(admin)).expect(204);
+    });
+  });
+
   describe('the seeded timetable', () => {
     it('has no hard conflict: the index agrees with the slots and holds one row per standing session', async () => {
       const [dup] = await t.prisma.$queryRaw<{ n: bigint }[]>`

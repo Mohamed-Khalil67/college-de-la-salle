@@ -35,6 +35,7 @@ describe('RoomsService', () => {
   const prisma = {
     room: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() },
     event: { count: vi.fn() },
+    timetableSlot: { count: vi.fn() },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
   let rooms: RoomsService;
@@ -42,6 +43,7 @@ describe('RoomsService', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     prisma.$transaction.mockImplementation((fn: (t: typeof tx) => Promise<unknown>) => fn(tx));
+    prisma.timetableSlot.count.mockResolvedValue(0);
     const moduleRef = await Test.createTestingModule({
       providers: [RoomsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
@@ -111,5 +113,14 @@ describe('RoomsService', () => {
     prisma.event.count.mockResolvedValue(0);
     tx.room.delete.mockRejectedValue({ code: 'P2003' });
     await expect(rooms.remove('r1', ADMIN)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('refuses to delete a room a timetable slot or a room change uses', async () => {
+    prisma.room.findUnique.mockResolvedValue(room());
+    prisma.event.count.mockResolvedValue(0);
+    prisma.timetableSlot.count.mockResolvedValue(1);
+    await expect(rooms.remove('r1', ADMIN)).rejects.toThrow(/séances/);
+    expect(prisma.timetableSlot.count.mock.calls[0]![0].where.OR).toHaveLength(2);
+    expect(tx.room.delete).not.toHaveBeenCalled();
   });
 });

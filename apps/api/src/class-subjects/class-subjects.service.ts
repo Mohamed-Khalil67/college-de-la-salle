@@ -27,6 +27,7 @@ const WEIGHTS_LOCKED =
 const OWN_SUBJECT =
   'Seul un administrateur peut modifier le coefficient d’une matière que vous enseignez dans cette classe.';
 
+const HAS_SLOTS = 'Des séances de l’emploi du temps utilisent cette matière dans la classe : supprimez-les d’abord.';
 const HAS_TEACHERS = 'Cette matière a encore des enseignants dans la classe : retirez-les d’abord.';
 
 /**
@@ -123,6 +124,7 @@ export class ClassSubjectsService {
       const current = await tx.classSubject.findUnique({ where: { id }, include });
       if (!current) throw notFound('Matière de la classe');
       if (current.assignments.length) throw new ConflictException(HAS_TEACHERS);
+      if (await tx.timetableSlot.count({ where: { classSubjectId: id } })) throw new ConflictException(HAS_SLOTS);
       const grades = await tx.grade.count({
         where: { event: { classId: current.classId, subjectId: current.subjectId } },
       });

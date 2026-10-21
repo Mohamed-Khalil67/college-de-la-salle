@@ -53,6 +53,7 @@ describe('ClassSubjectsService', () => {
     reportCard: { count: vi.fn() },
     grade: { count: vi.fn() },
     event: { count: vi.fn() },
+    timetableSlot: { count: vi.fn() },
     auditLog: { createMany: vi.fn() },
   };
   const prisma = {
@@ -72,6 +73,7 @@ describe('ClassSubjectsService', () => {
     tx.schoolClass.findUniqueOrThrow.mockResolvedValue({ schoolYearId: 'y1', sectionId: 'sec' });
     tx.$queryRaw.mockResolvedValue([{ id: 'p1', closed_at: null }]);
     tx.reportCard.count.mockResolvedValue(0);
+    tx.timetableSlot.count.mockResolvedValue(0);
     const moduleRef = await Test.createTestingModule({
       providers: [ClassSubjectsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
@@ -158,6 +160,12 @@ describe('ClassSubjectsService', () => {
         subjectId: 'maths',
         activityType: { gradable: true },
       });
+      expect(tx.classSubject.delete).not.toHaveBeenCalled();
+    });
+
+    it('refuses while timetable sessions use the subject', async () => {
+      tx.timetableSlot.count.mockResolvedValue(3);
+      await expect(service.remove('cs1', ADMIN)).rejects.toThrow(/emploi du temps/);
       expect(tx.classSubject.delete).not.toHaveBeenCalled();
     });
 
