@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import type { Period, Prisma, SchoolYear } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { fromDay, toDay } from '../common/dates.js';
+import { fromDay, toDay, toIso } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
 import { toPeriodDto } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -109,8 +109,12 @@ export class SchoolYearsService {
 
   /** Makes this the current year (exactly one is current). */
   async makeCurrent(id: string, user: AuthUser): Promise<SchoolYearDto> {
-    await this.find(id);
+    if ((await this.find(id)).archivedAt)
+      throw new ConflictException('Cette année est archivée : elle ne peut plus devenir l’année en cours.');
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${id}::uuid FOR UPDATE`;
+      if ((await tx.schoolYear.findUniqueOrThrow({ where: { id } })).archivedAt)
+        throw new ConflictException('Cette année est archivée : elle ne peut plus devenir l’année en cours.');
       await tx.schoolYear.updateMany({
         where: { isCurrent: true, NOT: { id } },
         data: { isCurrent: false },
@@ -176,6 +180,8 @@ function toSchoolYearDto(y: SchoolYear & { periods: Period[] }): SchoolYearDto {
     startsOn: toDay(y.startsOn),
     endsOn: toDay(y.endsOn),
     isCurrent: y.isCurrent,
+    status: y.archivedAt ? 'archived' : y.isCurrent ? 'current' : 'upcoming',
+    archivedAt: toIso(y.archivedAt),
     periods: y.periods.map(toPeriodDto),
   };
 }

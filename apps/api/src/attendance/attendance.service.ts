@@ -15,6 +15,7 @@ import {
 } from '../events/event.mapper.js';
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   AttendanceRecordDto,
   AttendanceSheetDto,
@@ -50,6 +51,7 @@ export class AttendanceService {
   /** Saves the roll call of one day (upsert per student). */
   async save(eventId: string, dto: SaveAttendanceDto, user: AuthUser): Promise<AttendanceSheetDto> {
     const event = await this.classEvent(eventId, dto.date, user);
+    await assertClassWritable(this.prisma, event.classId);
     const roster = new Set((await this.classes.roster(event.classId!)).map((s) => s.id));
     for (const r of dto.records) {
       if (!roster.has(r.studentId))
@@ -59,9 +61,11 @@ export class AttendanceService {
     }
     const recordedById = user.teacherId ?? event.authorId;
     const date = fromDay(dto.date);
-    await this.prisma.$transaction(
-      dto.records.map((r) =>
-        this.prisma.attendance.upsert({
+    await this.prisma.$transaction(async (tx) => {
+      // Shared lock on the school year: archiving it waits for this roll call, and a later one is refused.
+      await assertClassWritable(tx, event.classId);
+      for (const r of dto.records)
+        await tx.attendance.upsert({
           where: { eventId_studentId_date: { eventId, studentId: r.studentId, date } },
           create: {
             eventId,
@@ -78,9 +82,8 @@ export class AttendanceService {
             note: r.note ?? '',
             recordedById,
           },
-        }),
-      ),
-    );
+        });
+    });
     return this.sheet(eventId, dto.date, user);
   }
 

@@ -10,6 +10,7 @@ import { forbidden, notFound } from '../common/errors.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   CreateEventDto,
   EventDto,
@@ -78,6 +79,7 @@ export class EventsService {
       this.prisma.$transaction(async (tx) => {
         // The type's flags are read after taking its shared lock and stay put until this event commits.
         await this.types.lockForEvent(tx, input.activityTypeId);
+        await assertClassWritable(tx, input.classId);
         const fields = await this.check(input, user, null);
         const created = await tx.event.create({
           data: { ...toData(fields), authorId: user.teacherId! },
@@ -97,6 +99,7 @@ export class EventsService {
    */
   async update(id: string, dto: UpdateEventDto, user: AuthUser): Promise<EventDto> {
     const current = await this.editable(id, user);
+    await assertClassWritable(this.prisma, current.classId);
     await this.periods.assertOpen(this.prisma, current.periodId);
     const patch = definedOnly(dto);
     // A new date or class re-derives the period, unless the caller names one or the stored period (a
@@ -125,6 +128,8 @@ export class EventsService {
     const row = await this.occupancy.guard(
       this.prisma.$transaction(async (tx) => {
         await this.types.lockForEvent(tx, merged.activityTypeId);
+        await assertClassWritable(tx, current.classId);
+        await assertClassWritable(tx, merged.classId);
         const fields = await this.check(merged, user, current);
         if (hasGrades && fields.periodId !== current.periodId) {
           throw new ConflictException(
@@ -146,11 +151,15 @@ export class EventsService {
   /** The author or an admin; refused while the event still has grades. */
   async remove(id: string, user: AuthUser): Promise<void> {
     const current = await this.editable(id, user);
+    await assertClassWritable(this.prisma, current.classId);
     await this.periods.assertOpen(this.prisma, current.periodId);
     if (await this.prisma.grade.count({ where: { eventId: id } })) {
       throw new ConflictException('Supprimez d’abord les notes de cet événement.');
     }
-    await this.prisma.event.delete({ where: { id } });
+    await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, current.classId);
+      await tx.event.delete({ where: { id } });
+    });
   }
 
   /** An event the user may see (students: only their audience), or 404. */

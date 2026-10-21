@@ -7,6 +7,9 @@ import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GradesService } from './grades.service.js';
 
+// The archived-year guard reads the database (raw SQL); its own behaviour is covered by the e2e tests.
+vi.mock('../school-years/year-guard.js', () => ({ assertClassWritable: vi.fn(), assertYearWritable: vi.fn() }));
+
 const TEACHER: AuthUser = {
   id: 'u-t',
   email: 't@x.y',
@@ -90,7 +93,7 @@ describe('GradesService', () => {
     grade: { findMany: vi.fn().mockResolvedValue([]) },
     student: { findUnique: vi.fn() },
     period: { findUnique: vi.fn() },
-    enrollment: { findFirst: vi.fn() },
+    enrollment: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     classSubject: { findMany: vi.fn() },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
@@ -228,7 +231,7 @@ describe('GradesService', () => {
         published('dessin', 12),
       ]);
       prisma.classSubject.findMany.mockResolvedValue([
-        { subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
+        { classId: 'c1', subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
       ]);
     });
 
@@ -237,7 +240,7 @@ describe('GradesService', () => {
       const result = await grades.forStudent('s1', {}, STUDENT);
       expect(access.assertCanReadStudent).toHaveBeenCalledWith(STUDENT, 's1');
       expect(prisma.classSubject.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { classId: 'c1' } }),
+        expect.objectContaining({ where: { classId: { in: ['c1'] } } }),
       );
       expect(result.subjects.map((s) => [s.subjectId, s.average, s.coefficient])).toEqual([
         ['dessin', 12, null],
@@ -252,21 +255,28 @@ describe('GradesService', () => {
         startsOn: new Date('2025-09-01T00:00:00Z'),
         endsOn: new Date('2025-12-20T00:00:00Z'),
       });
-      prisma.enrollment.findFirst.mockResolvedValue({ classId: 'c-old' });
+      prisma.enrollment.findMany.mockResolvedValue([
+        { classId: 'c-old', enrolledOn: new Date('2025-09-01T00:00:00Z'), leftOn: null },
+      ]);
+      prisma.classSubject.findMany.mockResolvedValue([
+        { classId: 'c-old', subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
+      ]);
       await grades.forStudent('s1', { periodId: 'p0' }, STUDENT);
       // By periodId, never by the period's dates (editing them must not move grades).
       expect(prisma.grade.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ event: expect.objectContaining({ periodId: 'p0' }) }),
+          where: expect.objectContaining({
+            event: expect.objectContaining({ OR: [{ periodId: 'p0' }] }),
+          }),
         }),
       );
-      expect(prisma.enrollment.findFirst).toHaveBeenCalledWith(
+      expect(prisma.enrollment.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ studentId: 's1', schoolYearId: 'y0' }),
         }),
       );
       expect(prisma.classSubject.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { classId: 'c-old' } }),
+        expect.objectContaining({ where: { classId: { in: ['c-old'] } } }),
       );
       expect(access.placement).not.toHaveBeenCalled();
     });

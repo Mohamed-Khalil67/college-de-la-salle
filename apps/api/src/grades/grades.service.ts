@@ -11,7 +11,8 @@ import { notFound } from '../common/errors.js';
 import { eventInclude, type EventRow, toEventDto } from '../events/event.mapper.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { subjectWeights } from '../report-cards/compute.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
+import { type ClassStint, subjectsOfStudent, subjectWeights } from '../report-cards/compute.js';
 import type {
   GradeDto,
   GradeSheetDto,
@@ -51,6 +52,7 @@ export class GradesService {
   /** Creates, corrects or removes (score null) grades; one audit row per change. */
   async save(eventId: string, dto: SaveGradesDto, user: AuthUser): Promise<GradeSheetDto> {
     const event = await this.gradableEvent(eventId, user);
+    await assertClassWritable(this.prisma, event.classId);
     await this.periods.assertOpen(this.prisma, event.periodId);
     const roster = new Set((await this.classes.roster(event.classId!)).map((s) => s.id));
     const seen = new Set<string>();
@@ -64,6 +66,7 @@ export class GradesService {
     const graderId = user.teacherId ?? event.authorId;
 
     await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, event.classId);
       await this.periods.lockOpen(tx, event.periodId);
       const existing = await tx.grade.findMany({ where: { eventId } });
       const byStudent = new Map(existing.map((g) => [g.studentId, g]));
@@ -137,8 +140,10 @@ export class GradesService {
   /** Shows (or hides again) all the grades of an event to the students. */
   async publish(eventId: string, dto: PublishGradesDto, user: AuthUser): Promise<GradeSheetDto> {
     const event = await this.gradableEvent(eventId, user);
+    await assertClassWritable(this.prisma, event.classId);
     await this.periods.assertOpen(this.prisma, event.periodId);
     await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, event.classId);
       await this.periods.lockOpen(tx, event.periodId);
       const { count } = await tx.grade.updateMany({
         where: { eventId },
@@ -177,9 +182,19 @@ export class GradesService {
       // By the events' stored period, never by dates: editing a period's dates moves no grade.
       const period = await this.prisma.period.findUnique({ where: { id: query.periodId } });
       if (!period) throw notFound('Période');
-      eventWhere.periodId = period.id;
       schoolYearId = period.schoolYearId;
       window = { from: period.startsOn, to: period.endsOn };
+      // A student who changed class or section inside the period keeps the grades of the earlier class:
+      // another section has its own periods, so those events are told apart by date.
+      const earlier = (await this.stintsOf(studentId, schoolYearId, window))
+        .map((e) => e.classId)
+        .filter((id, i, all) => all.indexOf(id) === i);
+      eventWhere.OR = [
+        { periodId: period.id },
+        ...(earlier.length > 1
+          ? [{ classId: { in: earlier }, date: { gte: period.startsOn, lte: period.endsOn } }]
+          : []),
+      ];
     } else if (query.from || query.to) {
       eventWhere.date = {
         ...(query.from ? { gte: fromDay(query.from) } : {}),
@@ -207,7 +222,7 @@ export class GradesService {
       const key = g.event.subjectId ?? '';
       bySubject.set(key, [...(bySubject.get(key) ?? []), g]);
     }
-    const coefficients = await this.subjectCoefficients(studentId, schoolYearId, window);
+    const coefficients = await this.subjectCoefficients(studentId, schoolYearId, window, grades);
     return {
       studentId,
       subjects: [...bySubject]
@@ -238,42 +253,74 @@ export class GradesService {
     };
   }
 
+  /** The student's enrolments of a school year that overlap a period's dates (oldest first). */
+  private stintsOf(studentId: string, schoolYearId: string, window: { from: Date; to: Date }) {
+    return this.prisma.enrollment.findMany({
+      where: {
+        studentId,
+        schoolYearId,
+        enrolledOn: { lte: window.to },
+        OR: [{ leftOn: null }, { leftOn: { gte: window.from } }],
+      },
+      orderBy: [{ enrolledOn: 'asc' }, { leftOn: { sort: 'asc', nulls: 'last' } }],
+      select: { classId: true, enrolledOn: true, leftOn: true },
+    });
+  }
+
   /**
-   * Subject coefficients of the student's class, as the report card weighs them: the class of the given
-   * school year (the term's), or the current class. Empty when the student is not enrolled.
+   * Subject coefficients as the report card weighs them: the class the student was in during the term (the
+   * current class without a term). A student who changed class or section inside the term gets the
+   * blend described at `subjectsOfStudent` (the coefficient of the class each grade belongs to).
    */
   private async subjectCoefficients(
     studentId: string,
     schoolYearId: string | null,
     window: { from: Date; to: Date } | null,
+    grades: readonly {
+      score: unknown;
+      outOf: unknown;
+      event: { subjectId: string | null; coefficient: unknown; classId: string | null };
+    }[],
   ): Promise<Map<string, number>> {
-    const classId = schoolYearId
-      ? (
-          // The class the student was in during the term (a section change closes the first enrolment
-          // and opens another), the latest one when they moved within the term.
-          await this.prisma.enrollment.findFirst({
-            where: {
-              studentId,
-              schoolYearId,
-              ...(window
-                ? {
-                    enrolledOn: { lte: window.to },
-                    OR: [{ leftOn: null }, { leftOn: { gte: window.from } }],
-                  }
-                : {}),
-            },
-            orderBy: { enrolledOn: 'desc' },
-            select: { classId: true },
-          })
-        )?.classId
-      : (await this.access.placement(studentId))?.classId;
-    if (!classId) return new Map();
+    const enrolments =
+      schoolYearId && window
+        ? await this.stintsOf(studentId, schoolYearId, window)
+        : await this.currentStint(studentId);
+    if (!enrolments.length) return new Map();
+    const classIds = [...new Set(enrolments.map((e) => e.classId))];
     const rows = await this.prisma.classSubject.findMany({
-      where: { classId },
+      where: { classId: { in: classIds } },
       include: { subject: true },
     });
-    const weights = subjectWeights(rows.map((r) => ({ ...r, coefficient: Number(r.coefficient) })));
+    const stints: ClassStint[] = enrolments.map((e) => ({
+      classId: e.classId,
+      enrolledOn: toDay(e.enrolledOn),
+      leftOn: e.leftOn ? toDay(e.leftOn) : null,
+      subjects: subjectWeights(
+        rows
+          .filter((r) => r.classId === e.classId)
+          .map((r) => ({ ...r, coefficient: Number(r.coefficient) })),
+      ),
+    }));
+    const weights = subjectsOfStudent(
+      stints,
+      grades.map((g) => ({
+        studentId,
+        subjectId: g.event.subjectId ?? '',
+        score: Number(g.score),
+        outOf: Number(g.outOf),
+        coefficient: Number(g.event.coefficient),
+        classId: g.event.classId ?? undefined,
+      })),
+    );
     return new Map(weights.map((w) => [w.subjectId, w.coefficient]));
+  }
+
+  private async currentStint(studentId: string) {
+    const placement = await this.access.placement(studentId);
+    return placement
+      ? [{ classId: placement.classId, enrolledOn: new Date(0), leftOn: null as Date | null }]
+      : [];
   }
 
   /** A gradable class event that this user may grade (a teacher of that class and subject, or an admin). */

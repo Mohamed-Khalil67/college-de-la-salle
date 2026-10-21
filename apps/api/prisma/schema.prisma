@@ -188,13 +188,16 @@ model RefreshToken {
 // ---------------------------------------------------------------------------------------------------
 
 model SchoolYear {
-  id        String   @id @default(uuid(7)) @db.Uuid
+  id         String    @id @default(uuid(7)) @db.Uuid
   /// « 2026-2027 »
-  label     String   @unique @db.VarChar(20)
-  startsOn  DateTime @map("starts_on") @db.Date
-  endsOn    DateTime @map("ends_on") @db.Date
+  label      String    @unique @db.VarChar(20)
+  startsOn   DateTime  @map("starts_on") @db.Date
+  endsOn     DateTime  @map("ends_on") @db.Date
   /// Exactly one year is current (enforced by the service).
-  isCurrent Boolean  @default(false) @map("is_current")
+  isCurrent  Boolean   @default(false) @map("is_current")
+  /// Set by the rollover (or an admin) when the year is over: the year is then read-only (no grades, events,
+  /// attendance or timetable edits). An archived year is never the current one (CHECK in the migration SQL).
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
 
   periods      Period[]
   calendarDays CalendarDay[]
@@ -289,13 +292,18 @@ model Section {
 
 /// A class of one section for one school year, e.g. Bac français — Première, 2026-2027.
 model SchoolClass {
-  id           String @id @default(uuid(7)) @db.Uuid
-  schoolYearId String @map("school_year_id") @db.Uuid
-  sectionId    String @map("section_id") @db.Uuid
+  id           String  @id @default(uuid(7)) @db.Uuid
+  schoolYearId String  @map("school_year_id") @db.Uuid
+  sectionId    String  @map("section_id") @db.Uuid
   /// Matches CLASSES[section][].value in packages/shared (`premiere`, `secondaire-1`…).
-  code         String @db.VarChar(40)
-  label        String @db.VarChar(80)
+  code         String  @db.VarChar(40)
+  label        String  @db.VarChar(80)
+  /// The class of the NEXT level in the same school year (1re secondaire → 2e secondaire). The rollover promotes
+  /// the students through it; a class without one is terminal: its students graduate.
+  nextClassId  String? @map("next_class_id") @db.Uuid
 
+  nextClass          SchoolClass?           @relation("ClassNext", fields: [nextClassId], references: [id], onDelete: SetNull)
+  previousClasses    SchoolClass[]          @relation("ClassNext")
   schoolYear         SchoolYear             @relation(fields: [schoolYearId], references: [id], onDelete: Restrict)
   section            Section                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   enrollments        Enrollment[]
@@ -309,6 +317,7 @@ model SchoolClass {
 
   @@unique([schoolYearId, sectionId, code])
   @@index([sectionId])
+  @@index([nextClassId])
   @@map("school_classes")
 }
 

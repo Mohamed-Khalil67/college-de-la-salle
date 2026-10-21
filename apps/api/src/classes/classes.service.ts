@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { type SectionId, todayIso } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
@@ -7,6 +7,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   ClassDto,
   CreateClassDto,
@@ -73,15 +74,53 @@ export class ClassesService {
     return toClassDto(row);
   }
 
-  async update(id: string, dto: UpdateClassDto): Promise<ClassDto> {
-    await this.get(id);
-    return toClassDto(
-      await this.prisma.schoolClass.update({
+  /** Renames the class and/or sets the class of the next level (null: terminal class). */
+  async update(id: string, dto: UpdateClassDto, user: AuthUser): Promise<ClassDto> {
+    const current = await this.prisma.schoolClass.findUnique({ where: { id } });
+    if (!current) throw notFound('Classe');
+    if (dto.nextClassId) {
+      if (dto.nextClassId === id)
+        throw new BadRequestException('Une classe ne peut pas être sa propre classe suivante.');
+      const next = await this.prisma.schoolClass.findUnique({ where: { id: dto.nextClassId } });
+      if (!next) throw notFound('Classe suivante');
+      if (next.schoolYearId !== current.schoolYearId || next.sectionId !== current.sectionId)
+        throw new BadRequestException(
+          'La classe suivante doit être de la même année et de la même section.',
+        );
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, id);
+      if (dto.nextClassId) {
+        // Walk the chain: a class cannot lead back to itself (promotion would never end).
+        let cursor: string | null = dto.nextClassId;
+        for (let hops = 0; cursor && hops < 50; hops++) {
+          if (cursor === id) throw new BadRequestException('Cette classe suivante ferait une boucle.');
+          cursor = (
+            await tx.schoolClass.findUnique({ where: { id: cursor }, select: { nextClassId: true } })
+          )?.nextClassId ?? null;
+        }
+      }
+      const row = await tx.schoolClass.update({
         where: { id },
-        data: { label: dto.label },
+        data: {
+          ...(dto.label !== undefined ? { label: dto.label } : {}),
+          ...(dto.nextClassId !== undefined ? { nextClassId: dto.nextClassId } : {}),
+        },
         include: classInclude,
-      }),
-    );
+      });
+      if (dto.nextClassId !== undefined && dto.nextClassId !== current.nextClassId)
+        await audit(tx, [
+          {
+            actorId: user.id,
+            action: 'class.next_class',
+            entity: 'school_class',
+            entityId: id,
+            before: { nextClassId: current.nextClassId },
+            after: { nextClassId: dto.nextClassId },
+          },
+        ]);
+      return toClassDto(row);
+    });
   }
 
   /**
@@ -260,6 +299,7 @@ function toClassDto(c: ClassRow): ClassDto {
     code: c.code,
     label: c.label,
     studentCount: c._count.enrollments,
+    nextClassId: c.nextClassId,
   };
 }
 
