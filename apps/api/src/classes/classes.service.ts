@@ -24,7 +24,8 @@ const classInclude = {
 
 type ClassRow = Prisma.SchoolClassGetPayload<{ include: typeof classInclude }>;
 
-const CLASS_HAS_SLOTS = 'Cette classe a des séances dans l’emploi du temps : supprimez-les d’abord.';
+const CLASS_HAS_SLOTS =
+  'Cette classe a des séances dans l’emploi du temps : supprimez-les d’abord.';
 const CLASS_HAS_STUDENTS =
   'Cette classe a encore des élèves inscrits : retirez-les avant de la supprimer.';
 
@@ -182,7 +183,10 @@ export class ClassesService {
       if (current.sectionId && current.sectionId !== schoolClass.sectionId)
         throw new ConflictException('La section de l’élève a changé : actualisez la page.');
       if (!current.sectionId)
-        await tx.student.update({ where: { id: studentId }, data: { sectionId: schoolClass.sectionId } });
+        await tx.student.update({
+          where: { id: studentId },
+          data: { sectionId: schoolClass.sectionId },
+        });
       const open = await tx.enrollment.findFirst({
         where: { studentId, schoolYearId: schoolClass.schoolYearId, leftOn: null },
       });

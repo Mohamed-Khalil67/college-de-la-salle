@@ -27,7 +27,8 @@ const WEIGHTS_LOCKED =
 const OWN_SUBJECT =
   'Seul un administrateur peut modifier le coefficient d’une matière que vous enseignez dans cette classe.';
 
-const HAS_SLOTS = 'Des séances de l’emploi du temps utilisent cette matière dans la classe : supprimez-les d’abord.';
+const HAS_SLOTS =
+  'Des séances de l’emploi du temps utilisent cette matière dans la classe : supprimez-les d’abord.';
 const HAS_TEACHERS = 'Cette matière a encore des enseignants dans la classe : retirez-les d’abord.';
 
 /**
@@ -93,7 +94,10 @@ export class ClassSubjectsService {
     const current = await this.find(id);
     return this.prisma.$transaction(async (tx) => {
       if (dto.coefficient !== undefined && dto.coefficient !== Number(current.coefficient)) {
-        if (user.role !== 'admin' && current.assignments.some((a) => a.teacherId === user.teacherId))
+        if (
+          user.role !== 'admin' &&
+          current.assignments.some((a) => a.teacherId === user.teacherId)
+        )
           throw new ForbiddenException(OWN_SUBJECT);
         await this.assertWeightsEditable(tx, current.classId);
       }
@@ -124,7 +128,6 @@ export class ClassSubjectsService {
       const current = await tx.classSubject.findUnique({ where: { id }, include });
       if (!current) throw notFound('Matière de la classe');
       if (current.assignments.length) throw new ConflictException(HAS_TEACHERS);
-      if (await tx.timetableSlot.count({ where: { classSubjectId: id } })) throw new ConflictException(HAS_SLOTS);
       const grades = await tx.grade.count({
         where: { event: { classId: current.classId, subjectId: current.subjectId } },
       });
@@ -144,6 +147,8 @@ export class ClassSubjectsService {
         throw new ConflictException(
           'Des événements notés existent pour cette matière dans la classe : supprimez-les d’abord.',
         );
+      if (await tx.timetableSlot.count({ where: { classSubjectId: id } }))
+        throw new ConflictException(HAS_SLOTS);
       await tx.classSubject.delete({ where: { id } });
       await audit(tx, [
         {
@@ -216,7 +221,10 @@ export class ClassSubjectsService {
    * 409 when a period of the class's section and year is closed or has report cards for the class. Takes a
    * share lock on those periods, so closing one (exclusive lock) cannot slip in before the write commits.
    */
-  private async assertWeightsEditable(tx: Prisma.TransactionClient, classId: string): Promise<void> {
+  private async assertWeightsEditable(
+    tx: Prisma.TransactionClient,
+    classId: string,
+  ): Promise<void> {
     const schoolClass = await tx.schoolClass.findUniqueOrThrow({ where: { id: classId } });
     const periods = await tx.$queryRaw<{ id: string; closed_at: Date | null }[]>`
       SELECT id, closed_at FROM periods

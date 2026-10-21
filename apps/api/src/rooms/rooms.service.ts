@@ -75,7 +75,9 @@ export class RoomsService {
     const current = await this.find(id);
     if (
       (await this.prisma.event.count({ where: { roomId: id } })) ||
-      (await this.prisma.timetableSlot.count({ where: { OR: [{ roomId: id }, { exceptions: { some: { newRoomId: id } } }] } }))
+      (await this.prisma.timetableSlot.count({
+        where: { OR: [{ roomId: id }, { exceptions: { some: { newRoomId: id } } }] },
+      }))
     )
       throw new ConflictException(IN_USE);
     const work = this.prisma.$transaction(async (tx) => {
