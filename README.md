@@ -44,12 +44,21 @@ a password of your choice, and put that password in `DATABASE_URL`; `db:dev` the
 Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
 health: `/api/health` (process) and `/api/health/db` (database).
 
+Migrations: `npm run db:migrate` (`prisma migrate dev`) on a development database; `npx prisma migrate deploy`
+(from `apps/api`) applies the committed ones to any other database, from empty or as an upgrade (it never resets
+anything). After pulling a branch that adds migrations, run `deploy` (or `db:migrate`) and, for the demo data,
+`npm run db:seed`. To run a second stack beside the first one (another worktree, say), give it its own database
+(`CREATE DATABASE cdls_other`, `DATABASE_URL` in its `apps/api/.env`), its own `PORT` and `CORS_ORIGIN`, build and start
+it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node apps/api/dist/main`, and serve the site with
+`npx ng serve --port 4340 --proxy-config <a proxy file that points /api at that PORT>` from `apps/web`
+(keep the proxy file out of git).
+
 | Command | What it does |
 | --- | --- |
 | `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
-| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe) against the running `npm run dev`; needs the seeded demo accounts and `LOGIN_THROTTLE_LIMIT=100` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default) |
+| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe at 390 and 1440 px on every screen of every space) against the running stack (`E2E_BASE_URL` for another port); needs the seeded demo accounts, a high `THROTTLE_LIMIT` (say 100000) and `LOGIN_THROTTLE_LIMIT=1000` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default) |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
 | `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
@@ -72,12 +81,12 @@ Sign-in returns a 15-minute access token (send it as
 | Structure (admin or coordinator) | `/school-years` (create, `PATCH`), `/school-years/:id/periods` and `/periods/:id` (trimesters or semesters, per section, no overlap, closed = locked), `/calendar-days` (holidays, exam weeks, days without classes), `/subjects` (create, rename, archive), `/classes/:id/subjects` (+ `/copy`) and `/class-subjects/:id` (coefficient, hours), `/rooms` |
 | Activity types | `GET/POST /activity-types`, `PATCH/DELETE /activity-types/:id`: school-wide types (cours, TD, TP, examen…) and teachers' private types, with the flags gradable / repeatable / homework |
 | Timetable | `/timetable/slots` (weekly slots, admin or coordinator; `PATCH` takes the scope `this`, `following` or `all`), `/timetable/slots/:id/exceptions` and `/timetable/exceptions/:id` (cancel, move, other room, replacement; a teacher for their own sessions), `POST /timetable/check` (conflicts and warnings without saving), `/timetable/free-rooms`, `/timetable/occurrences?classId|teacherId|roomId&from&to`, `/timetable/warnings`. A clash of room, teacher or class is a 409; a warning needs `acknowledgedWarnings` with a reason (audit log) |
-| Groups | `/groups?classId=` (CRUD, `/:id/members`, `/:id/members/:studentId`; `GET /groups/mine` for a student): groups of a class by division, one group per division and student; an event's `target` (« Assigner à ») limits grade sheets, attendance, homework and the student's calendar |
+| Groups | `/groups?classId=` (admin, coordinator, or the teacher of the class: CRUD, `POST /groups/:id/members`, `DELETE /groups/:id/members/:studentId`; `GET /groups/mine` for a student): groups of a class by division, one group per division and student, a group with sessions or assigned work keeps its division; a timetable slot's `groupId` and an event's `target` (« Assigner à ») limit the sessions, grade sheets, attendance, homework and the student's calendar and averages |
 | Calendar | `/events` (range, `/occurrences` with weekly repeats minus holidays, `/:id/ics` with EXDATE for the cancelled sessions), `/homework` (done ticks), `/posts` |
 | Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
 | Report cards | `/periods/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
-| Next year (admin only) | `POST /rollover/preview` (what would be created, skipped or flagged; writes nothing) and `POST /rollover/apply` (the same plan in one transaction, 409 `ROLLOVER_PREVIEW_STALE` when the data changed since the preview, the old year archived). `PATCH /classes/:id` sets `nextClassId`. An archived year answers 409 `YEAR_ARCHIVED` to writes |
+| Next year (admin only) | `POST /rollover/preview` (what would be created, skipped or flagged; writes nothing) and `POST /rollover/apply` (the same plan in one transaction, 409 `ROLLOVER_PREVIEW_STALE` when the data changed since the preview, the old year archived). The plan copies the classes, periods, calendar, subjects, assignments, the timetable, promotes the students and copies the groups (empty, plus the promoted students who find a group of the same name, and the sessions of groups); each step is reported as created / already there / left out. `PATCH /classes/:id` sets `nextClassId`. An archived year answers 409 `YEAR_ARCHIVED` to every write: grades, attendance, events and their « Assigner à », timetable, enrolments, groups and members, subjects, periods, calendar |
 | Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
 
 Who may do what mirrors the old Firestore rules (`docs/legacy/firestore.rules`): students only see their own records and what is addressed
