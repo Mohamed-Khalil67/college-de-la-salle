@@ -351,6 +351,28 @@ describe('Rollover (e2e)', () => {
       expect(Number((await t.prisma.classSubject.findUniqueOrThrow({ where: { id: maths.id } })).coefficient)).toBe(4);
     });
 
+    it('also locks groups, their members and the « Assigner à » of an event', async () => {
+      const classId = source.classes['bac/seconde']!;
+      const studentId = source.students['bac/seconde']![1]!.id;
+      const group = await t.prisma.group.create({ data: { classId, division: 'TP', label: 'Archivé' } });
+      await t.prisma.groupMember.create({ data: { groupId: group.id, studentId, classId, division: 'TP' } });
+      const type = await t.prisma.activityType.findUniqueOrThrow({ where: { code: 'controle' } });
+      const test = await t.prisma.event.create({
+        data: { activityTypeId: type.id, title: 'Contrôle ciblé', subjectId: 'mathematiques', classId, date: day('2039-10-06'), authorId: source.teacherIds.maths },
+      });
+      archived(await t.http().post('/api/groups').set(bearer(admin)).send({ classId, division: 'TP', label: 'Nouveau' }).expect(409));
+      archived(await t.http().patch(`/api/groups/${group.id}`).set(bearer(admin)).send({ label: 'Autre' }).expect(409));
+      archived(await t.http().post(`/api/groups/${group.id}/members`).set(bearer(admin)).send({ studentIds: [source.students['bac/seconde']![0]!.id] }).expect(409));
+      archived(await t.http().delete(`/api/groups/${group.id}/members/${studentId}`).set(bearer(admin)).expect(409));
+      archived(await t.http().delete(`/api/groups/${group.id}`).set(bearer(admin)).expect(409));
+      archived(await t.http().patch(`/api/events/${test.id}`).set(bearer(teacher)).send({ target: { groupIds: [group.id], studentIds: [] } }).expect(409));
+      expect(await t.prisma.assessmentTarget.count({ where: { eventId: test.id } })).toBe(0);
+      expect(await t.prisma.group.findUniqueOrThrow({ where: { id: group.id } })).toMatchObject({ label: 'Archivé' });
+      expect(await t.prisma.groupMember.count({ where: { groupId: group.id, leftOn: null } })).toBe(1);
+      await t.prisma.event.delete({ where: { id: test.id } });
+      await t.prisma.group.delete({ where: { id: group.id } });
+    });
+
     it('also locks the class and its next-class link', async () => {
       await t.http().patch(`/api/classes/${source.classes['bac/seconde']!}`).set(bearer(admin)).send({ nextClassId: null }).expect(409);
     });
@@ -425,6 +447,11 @@ describe('Rollover (e2e)', () => {
     });
     expect(p.issues.filter((i) => i.level === 'conflict')).toEqual([]);
     expect(p.steps.find((s) => s.id === 'timetable')!.create).toBeGreaterThan(100);
+    // The demo year's groups (and their sessions, if any) come along without a clash.
+    const demoGroups = await t.prisma.group.count({ where: { schoolClass: { schoolYearId: demo.id } } });
+    expect(demoGroups).toBeGreaterThan(0);
+    expect(p.steps.find((s) => s.id === 'groups')).toMatchObject({ create: demoGroups, existing: 0 });
+    expect(p.steps.find((s) => s.id === 'group_slots')!.skipped).toBe(0);
     expect(p.makesNewYearCurrent).toBe(true);
     // The students of a class without a next class graduate, the others are promoted.
     const terminal = await t.prisma.enrollment.count({

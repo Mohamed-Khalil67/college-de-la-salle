@@ -15,6 +15,7 @@ import {
 } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   AddGroupMembersDto,
   CreateGroupDto,
@@ -76,6 +77,8 @@ export class GroupsService {
     await this.authorize(user, dto.classId);
     const row = await conflictOnUnique(
       this.prisma.$transaction(async (tx) => {
+        // An archived year is read-only: its groups are history.
+        await assertClassWritable(tx, dto.classId);
         const made = await tx.group.create({
           data: { classId: dto.classId, division: dto.division, label: dto.label },
           include: groupInclude,
@@ -105,6 +108,7 @@ export class GroupsService {
       return this.detail(this.prisma, current);
     try {
       await this.prisma.$transaction(async (tx) => {
+        await assertClassWritable(tx, current.classId);
         if (division !== current.division) {
           // The group row is locked first: a session being added to it (which reads the group FOR SHARE)
           // waits, so no session keeps the old division.
@@ -149,6 +153,7 @@ export class GroupsService {
     const current = await this.load(id);
     await this.authorize(user, current.classId);
     const work = this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, current.classId);
       if (await tx.timetableSlot.count({ where: { groupId: id } }))
         throw new ConflictException(HAS_SLOTS);
       if (await tx.assessmentTarget.count({ where: { groupId: id } }))
@@ -178,6 +183,7 @@ export class GroupsService {
     const today = fromDay(schoolToday());
     try {
       await this.prisma.$transaction(async (tx) => {
+        await assertClassWritable(tx, group.classId);
         // Lock the enrolments: a student leaving the class at the same moment waits for this commit and
         // then leaves the group with the rest of their memberships.
         const enrolled = await tx.$queryRaw<{ student_id: string }[]>`
@@ -251,6 +257,7 @@ export class GroupsService {
     await this.authorize(user, group.classId);
     const today = fromDay(schoolToday());
     await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, group.classId);
       const closed = await tx.$executeRaw`
         UPDATE group_members SET left_on = GREATEST(joined_on, ${today}::date)
          WHERE group_id = ${id}::uuid AND student_id = ${studentId}::uuid AND left_on IS NULL`;
