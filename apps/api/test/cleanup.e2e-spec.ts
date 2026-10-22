@@ -1,9 +1,9 @@
-import type { ApiError, ClassDto, SchoolYearDto, SectionDto, TermDto } from '@cdls/shared';
+import type { ApiError, ClassDto, PeriodDto, SchoolYearDto, SectionDto } from '@cdls/shared';
 import { ADMIN, bearer, createTestApp, MATHS_TEACHER, studentOf, type TestApp } from './helpers.js';
 
 const message = (body: unknown) => String((body as ApiError).message);
 
-/** Admin clean-up: deleting a class, a school year or a term created by mistake, never one in use. */
+/** Admin clean-up: deleting a class, a school year or a period created by mistake, never one in use. */
 describe('Clean-up deletions (e2e)', () => {
   let t: TestApp;
   let admin: string;
@@ -17,7 +17,7 @@ describe('Clean-up deletions (e2e)', () => {
 
   afterAll(() => t.close());
 
-  /** A new, empty school year with one term. */
+  /** A new, empty school year with one period. */
   async function spareYear(label: string) {
     const year = (
       await t
@@ -27,10 +27,10 @@ describe('Clean-up deletions (e2e)', () => {
         .send({ label, startsOn: `${label.slice(0, 4)}-09-01`, endsOn: `${label.slice(5)}-06-30` })
         .expect(201)
     ).body as SchoolYearDto;
-    const term = (
+    const period = (
       await t
         .http()
-        .post(`/api/school-years/${year.id}/terms`)
+        .post(`/api/school-years/${year.id}/periods`)
         .set(bearer(admin))
         .send({
           number: 1,
@@ -39,8 +39,8 @@ describe('Clean-up deletions (e2e)', () => {
           endsOn: `${label.slice(0, 4)}-12-20`,
         })
         .expect(201)
-    ).body as TermDto;
-    return { year, term };
+    ).body as PeriodDto;
+    return { year, period };
   }
 
   it('deletes an empty class, refuses one with students', async () => {
@@ -106,7 +106,10 @@ describe('Clean-up deletions (e2e)', () => {
     const student = await studentOf(t.prisma, 'bac', 'premiere');
     const event = await t.prisma.event.create({
       data: {
-        kind: 'examen',
+        activityTypeId: (
+          await t.prisma.activityType.findUniqueOrThrow({ where: { code: 'examen' } })
+        ).id,
+        periodId: (await t.prisma.period.findFirstOrThrow({ where: { schoolYearId: year.id } })).id,
         title: 'Examen',
         classId: schoolClass.id,
         date: new Date('2031-10-10T00:00:00Z'),
@@ -123,23 +126,27 @@ describe('Clean-up deletions (e2e)', () => {
       .expect(409);
     expect(message(res.body)).toMatch(/notes/);
 
-    // The year has a class: it stays too, and its graded term as well.
+    // The year has a class: it stays too, and its graded period as well.
     const yearRes = await t
       .http()
       .delete(`/api/school-years/${year.id}`)
       .set(bearer(admin))
       .expect(409);
     expect(message(yearRes.body)).toMatch(/classes/);
-    const term = await t.prisma.term.findFirstOrThrow({ where: { schoolYearId: year.id } });
-    const termRes = await t.http().delete(`/api/terms/${term.id}`).set(bearer(admin)).expect(409);
-    expect(message(termRes.body)).toMatch(/notes/);
+    const period = await t.prisma.period.findFirstOrThrow({ where: { schoolYearId: year.id } });
+    const periodRes = await t
+      .http()
+      .delete(`/api/periods/${period.id}`)
+      .set(bearer(admin))
+      .expect(409);
+    expect(message(periodRes.body)).toMatch(/notes/);
   });
 
-  it('deletes an empty school year with its terms, never the current one', async () => {
-    const { year, term } = await spareYear('2032-2033');
+  it('deletes an empty school year with its periods, never the current one', async () => {
+    const { year, period } = await spareYear('2032-2033');
     await t.http().delete(`/api/school-years/${year.id}`).set(bearer(teacher)).expect(403);
     await t.http().delete(`/api/school-years/${year.id}`).set(bearer(admin)).expect(204);
-    expect(await t.prisma.term.findUnique({ where: { id: term.id } })).toBeNull();
+    expect(await t.prisma.period.findUnique({ where: { id: period.id } })).toBeNull();
 
     const current = await t.prisma.schoolYear.findFirstOrThrow({ where: { isCurrent: true } });
     const res = await t
@@ -150,17 +157,17 @@ describe('Clean-up deletions (e2e)', () => {
     expect(message(res.body)).toMatch(/année en cours/);
   });
 
-  it('deletes a term without grades, refuses one with grades', async () => {
-    const { term } = await spareYear('2033-2034');
-    await t.http().delete(`/api/terms/${term.id}`).set(bearer(teacher)).expect(403);
-    await t.http().delete(`/api/terms/${term.id}`).set(bearer(admin)).expect(204);
-    await t.http().delete(`/api/terms/${term.id}`).set(bearer(admin)).expect(404);
+  it('deletes a period without grades, refuses one with grades', async () => {
+    const { period } = await spareYear('2033-2034');
+    await t.http().delete(`/api/periods/${period.id}`).set(bearer(teacher)).expect(403);
+    await t.http().delete(`/api/periods/${period.id}`).set(bearer(admin)).expect(204);
+    await t.http().delete(`/api/periods/${period.id}`).set(bearer(admin)).expect(404);
 
-    // The seed grades the first term of the current year.
-    const graded = await t.prisma.term.findFirstOrThrow({
+    // The seed grades the first period of the current year.
+    const graded = await t.prisma.period.findFirstOrThrow({
       where: { number: 1, schoolYear: { isCurrent: true } },
     });
-    const res = await t.http().delete(`/api/terms/${graded.id}`).set(bearer(admin)).expect(409);
+    const res = await t.http().delete(`/api/periods/${graded.id}`).set(bearer(admin)).expect(409);
     expect(message(res.body)).toMatch(/notes|bulletins/);
   });
 });

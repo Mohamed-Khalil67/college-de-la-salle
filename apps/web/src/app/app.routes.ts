@@ -1,8 +1,6 @@
 import type { Routes } from '@angular/router';
-import { ADMIN_NAV } from './admin/admin.routes';
-import { anonymousGuard, roleGuard } from './core/auth/auth.guards';
-import { ELEVE_NAV } from './eleve/eleve.routes';
-import { ENSEIGNANT_NAV } from './enseignant/enseignant.routes';
+import { anonymousGuard, firstAccessGuard, roleGuard, structureGuard } from './core/auth/auth.guards';
+import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from './layout/space-navs';
 
 const spaceLayout = () => import('./layout/space-layout').then((m) => m.SpaceLayout);
 
@@ -17,6 +15,12 @@ export const routes: Routes = [
     title: 'Connexion',
     canMatch: [anonymousGuard],
     loadComponent: () => import('./auth/login-page').then((m) => m.LoginPage),
+  },
+  {
+    path: 'premier-acces',
+    title: 'Premier accès',
+    canMatch: [firstAccessGuard],
+    loadComponent: () => import('./auth/first-access-page').then((m) => m.FirstAccessPage),
   },
   {
     path: 'eleve',
@@ -34,8 +38,8 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    canMatch: [roleGuard('admin')],
-    data: { areaLabel: 'Administration', nav: ADMIN_NAV },
+    canMatch: [structureGuard],
+    data: { areaLabel: 'Administration', coordinatorAreaLabel: 'Coordination', nav: ADMIN_NAV },
     loadComponent: spaceLayout,
     loadChildren: () => import('./admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },

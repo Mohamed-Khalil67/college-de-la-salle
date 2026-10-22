@@ -20,7 +20,7 @@ export class ReportCardDto implements ReportCardContract {
   id: string;
   studentId: string;
   studentName: string;
-  termId: string;
+  periodId: string;
   classId: string;
   @ApiProperty({ type: Number, nullable: true })
   average: number | null;
@@ -34,7 +34,7 @@ export class ReportCardDto implements ReportCardContract {
 }
 
 export class ReportCardBatchDto implements ReportCardBatchRequest {
-  /** Omit for every class of the term's school year. */
+  /** Omit for every class of the period's school year (and section). */
   @IsOptional()
   @IsUUID()
   classId?: string;

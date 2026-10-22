@@ -6,6 +6,7 @@ import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Button, EmptyState, Field, FieldControl, Icon, Pagination, Tabs } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { fullName, isRole, plural, ROLE_LABELS, ROLE_TABS } from '../shared/admin-format';
+import { ArchiveModal, type ArchiveTarget } from './archive-modal';
 import { UserCreateModal } from './user-create-modal';
 import { UserEditModal } from './user-edit-modal';
 import { UsersImportModal } from './users-import-modal';
@@ -27,6 +28,7 @@ const PAGE_SIZE = 20;
     Pagination,
     Tabs,
     ConfirmModal,
+    ArchiveModal,
     UserCreateModal,
     UserEditModal,
     UsersImportModal,
@@ -37,6 +39,11 @@ const PAGE_SIZE = 20;
       <div class="page__header-text">
         <h1 class="t-h1">Utilisateurs</h1>
         <p class="t-muted">{{ subtitle() }}</p>
+        @if (role() === 'teacher') {
+          <p class="t-body-s t-muted">
+            Un coordinateur modifie les matières, les salles, les périodes, les vacances et les semaines d’examens, comme l’administration.
+          </p>
+        }
       </div>
       <div class="page__actions">
         <button cdlsButton variant="secondary" type="button" (click)="importOpen.set(true)"><cdls-icon name="upload" />Importer un CSV</button>
@@ -46,6 +53,9 @@ const PAGE_SIZE = 20;
 
     @if (notice()) {
       <cdls-alert tone="success">{{ notice() }}</cdls-alert>
+    }
+    @if (pageError()) {
+      <cdls-alert tone="danger">{{ pageError() }}</cdls-alert>
     }
 
     <cdls-tabs [tabs]="tabs()" label="Type de compte" [(value)]="tab">
@@ -70,8 +80,12 @@ const PAGE_SIZE = 20;
               [classes]="classById()"
               [now]="now"
               [selfId]="selfId()"
+              [busyId]="coordinatorBusyId()"
+              [revision]="revision()"
+              (coordinator)="setCoordinator($event)"
               (edit)="startEdit($event)"
               (deactivate)="startDeactivate($event)"
+              (archive)="startArchive($event)"
             />
           </div>
           <cdls-pagination [total]="list.total" [pageSize]="pageSize" [noun]="labels().noun" [label]="'Pagination des ' + labels().noun" [(page)]="page" />
@@ -95,6 +109,7 @@ const PAGE_SIZE = 20;
     <app-user-create-modal [(open)]="createOpen" [classes]="classList()" [defaultRole]="role()" (created)="onChanged()" />
     <app-users-import-modal [(open)]="importOpen" (imported)="onChanged()" />
     <app-user-edit-modal [(open)]="editOpen" [user]="editing()" [selfId]="selfId()" (saved)="onSaved($event)" />
+    <app-archive-modal [(open)]="archiveOpen" [target]="archiveTarget()" (archived)="onArchived($event)" />
     <app-confirm-modal
       title="Désactiver ce compte ?"
       confirmLabel="Désactiver le compte"
@@ -170,6 +185,8 @@ export class UsersPage {
   protected readonly importOpen = signal(false);
   protected readonly editOpen = signal(false);
   protected readonly editing = signal<UserDto | null>(null);
+  protected readonly archiveOpen = signal(false);
+  protected readonly archiveTarget = signal<ArchiveTarget | null>(null);
   protected readonly deactivateOpen = signal(false);
   protected readonly deactivating = signal<UserDto | null>(null);
   protected readonly deactivatingName = computed(() => {
@@ -179,6 +196,30 @@ export class UsersPage {
   protected readonly busy = signal(false);
   protected readonly actionError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+  protected readonly pageError = signal<string | null>(null);
+  protected readonly coordinatorBusyId = signal<string | null>(null);
+  protected readonly revision = signal(0);
+
+  protected async setCoordinator(change: { readonly user: UserDto; readonly value: boolean }): Promise<void> {
+    if (this.coordinatorBusyId()) return;
+    this.coordinatorBusyId.set(change.user.id);
+    this.pageError.set(null);
+    try {
+      await this.#api.users.update(change.user.id, { isCoordinator: change.value });
+      this.notice.set(
+        change.value
+          ? `${fullName(change.user)} est maintenant coordinateur : ${change.user.firstName} modifie la structure de l’année.`
+          : `${fullName(change.user)} n’est plus coordinateur.`,
+      );
+      this.users.reload();
+    } catch (error) {
+      this.notice.set(null);
+      this.pageError.set(apiMessage(error));
+      this.revision.update((n) => n + 1);
+    } finally {
+      this.coordinatorBusyId.set(null);
+    }
+  }
 
   protected errorText(error: unknown): string {
     return apiMessage(error, 'Impossible de charger les comptes. Réessayez dans un instant.');
@@ -201,6 +242,17 @@ export class UsersPage {
   protected startEdit(user: UserDto): void {
     this.editing.set(user);
     this.editOpen.set(true);
+  }
+
+  protected startArchive(user: UserDto): void {
+    if (!user.studentId) return;
+    this.archiveTarget.set({ kind: 'student', studentId: user.studentId, name: fullName(user) });
+    this.archiveOpen.set(true);
+  }
+
+  protected onArchived(count: number): void {
+    this.notice.set(`${plural(count, 'compte archivé', 'comptes archivés')}.`);
+    this.onChanged();
   }
 
   protected startDeactivate(user: UserDto): void {

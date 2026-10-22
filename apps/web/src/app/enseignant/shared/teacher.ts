@@ -1,11 +1,11 @@
 import {
+  type AssessmentTargetInput,
   type AttendanceStatus,
   averageOnTwenty,
   type ClassDto,
   type EventDto,
   type EventInput,
-  type EventKind,
-  kindInfo,
+  type ActivityTypeSummary,
   type PostDto,
   round1,
   type SectionDto,
@@ -70,7 +70,8 @@ export function sortAssignments(list: readonly TeachingAssignmentDto[]): Teachin
  * ---------------------------------------------------------------------------------------------- */
 
 export interface EventFormModel {
-  kind: EventKind;
+  /** An activity type id (GET /activity-types). */
+  activityTypeId: string;
   title: string;
   /** A teaching assignment id: the class and the subject together. */
   assignmentId: string;
@@ -84,9 +85,9 @@ export interface EventFormModel {
   coefficient: number;
 }
 
-export function emptyEventModel(date: string, assignmentId = ''): EventFormModel {
+export function emptyEventModel(date: string, assignmentId = '', activityTypeId = ''): EventFormModel {
   return {
-    kind: 'cours',
+    activityTypeId,
     title: '',
     assignmentId,
     date,
@@ -104,7 +105,7 @@ export function emptyEventModel(date: string, assignmentId = ''): EventFormModel
 export function modelFromEvent(e: EventDto, assignments: readonly TeachingAssignmentDto[]): EventFormModel {
   const assignment = assignments.find((a) => a.classId === e.classId && a.subjectId === e.subjectId);
   return {
-    kind: e.kind,
+    activityTypeId: e.activityTypeId,
     title: e.title,
     assignmentId: assignment?.id ?? '',
     date: e.date,
@@ -118,12 +119,23 @@ export function modelFromEvent(e: EventDto, assignments: readonly TeachingAssign
   };
 }
 
-/** What the API expects. Fields that don't apply to the kind (repeat, coefficient) are reset. */
-export function toEventInput(m: EventFormModel, assignments: readonly TeachingAssignmentDto[]): EventInput {
-  const info = kindInfo(m.kind);
+/** The type to start a new event with: the first plain weekly type (repeatable, ungraded, not homework). */
+export function defaultActivityType(types: readonly ActivityTypeSummary[]): ActivityTypeSummary | undefined {
+  return types.find((t) => t.repeatable && !t.gradable && !t.homework) ?? types[0];
+}
+
+/** What the API expects. Fields that don't apply to the type (repeat, coefficient) are reset. */
+export function toEventInput(
+  m: EventFormModel,
+  assignments: readonly TeachingAssignmentDto[],
+  types: readonly Pick<ActivityTypeSummary, 'id' | 'repeatable' | 'gradable'>[],
+  /** « Assigner à », for assessments and homework of a class; left out for other events. */
+  target?: AssessmentTargetInput,
+): EventInput {
+  const info = types.find((t) => t.id === m.activityTypeId) ?? { repeatable: false, gradable: false };
   const assignment = assignments.find((a) => a.id === m.assignmentId);
   return {
-    kind: m.kind,
+    activityTypeId: m.activityTypeId,
     title: m.title.trim(),
     classId: assignment?.classId ?? null,
     subjectId: assignment?.subjectId ?? null,
@@ -135,6 +147,7 @@ export function toEventInput(m: EventFormModel, assignments: readonly TeachingAs
     place: m.place.trim(),
     description: m.description.trim(),
     coefficient: info.gradable ? m.coefficient : 1,
+    ...(target ? { target } : {}),
   };
 }
 

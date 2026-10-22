@@ -3,11 +3,12 @@ import {
   type DueState,
   dueState,
   FORMAT_MARK,
-  kindInfo,
-  type EventKind,
+  type ActivityTypeSummary,
+  type EventDto,
+  isAssessment,
   longDay,
   matiereName,
-  type TermDto,
+  type PeriodDto,
   type SchoolYearDto,
 } from '@cdls/shared';
 import type { BadgeTone } from '../../ui';
@@ -69,13 +70,16 @@ export function subjectName(id: string | null | undefined): string {
   return id ? matiereName(id) : '';
 }
 
-export function kindLabel(kind: EventKind): string {
-  return kindInfo(kind).label;
+export function kindLabel(type: Pick<ActivityTypeSummary, 'label'>): string {
+  return type.label;
 }
 
-/** Exams and tests stand out in the week view. */
-export function isAssessment(kind: EventKind): boolean {
-  return kind === 'examen' || kind === 'controle';
+/** Exams and tests stand out in the week view (the shared flag rule: graded, not homework, not weekly). */
+export { isAssessment };
+
+/** Where an event takes place: its room of the school, else the free-text place. */
+export function whereOf(event: Pick<EventDto, 'roomName' | 'place'>): string {
+  return event.roomName ?? event.place;
 }
 
 export interface DueBadge {
@@ -125,7 +129,7 @@ export function currentYear(years: readonly SchoolYearDto[]): SchoolYearDto | nu
 }
 
 /** The term containing `day`, else the last term that started before it, else the first one. */
-export function termOf(terms: readonly TermDto[], day: string): TermDto | null {
+export function termOf(terms: readonly PeriodDto[], day: string): PeriodDto | null {
   const sorted = [...terms].sort((a, b) => a.startsOn.localeCompare(b.startsOn));
   return (
     sorted.find((t) => t.startsOn <= day && day <= t.endsOn) ??

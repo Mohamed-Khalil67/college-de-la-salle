@@ -45,15 +45,18 @@ export class TeachingAssignmentsController {
   @Roles('admin')
   @Post()
   @ApiCreatedResponse({ type: TeachingAssignmentDto })
-  create(@Body() body: CreateTeachingAssignmentDto): Promise<TeachingAssignmentDto> {
-    return this.assignments.create(body);
+  create(
+    @Body() body: CreateTeachingAssignmentDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<TeachingAssignmentDto> {
+    return this.assignments.create(body, user);
   }
 
   @Roles('admin')
   @Delete(':id')
   @HttpCode(204)
   @ApiNoContentResponse()
-  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.assignments.remove(id);
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    return this.assignments.remove(id, user);
   }
 }

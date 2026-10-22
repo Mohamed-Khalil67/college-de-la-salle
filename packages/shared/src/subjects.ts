@@ -2,9 +2,10 @@
  * The subjects (matières) of the college's two tracks: the list teachers choose from when they
  * publish homework or enter grades, and what the track pages show.
  *
- * This is a catalogue of subjects a teacher *can* use. Trim or extend it here: one entry per subject,
- * plus its illustration in apps/web/public/images/matieres/ (see apps/web/scripts/subject-images.mjs). Which subjects
- * each class actually follows is decided by the teachers' posts, not by this list.
+ * For the school space this list is only seed data: the `subjects` table is the catalogue (the admin and
+ * coordinators create, rename and archive subjects there), and each class's subjects and coefficients are
+ * its class subjects. The public site still reads the blurbs and illustrations below
+ * (apps/web/public/images/matieres/, see apps/web/scripts/subject-images.mjs).
  */
 
 export type MatiereGroup = 'Langues' | 'Sciences' | 'Lettres et sciences humaines' | 'Éducation et culture';

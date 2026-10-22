@@ -1,13 +1,4 @@
 import type { Routes } from '@angular/router';
-import type { SpaceNavItem } from '../layout/space-layout';
-
-export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
-  { label: 'Mes classes', path: '', icon: 'users', short: 'Classes' },
-  { label: 'Agenda', path: 'agenda', icon: 'calendar' },
-  { label: 'Saisie des notes', path: 'notes', icon: 'edit', short: 'Notes' },
-  { label: 'Appel', path: 'appel', icon: 'check' },
-  { label: 'Annonces', path: 'annonces', icon: 'bell' },
-];
 
 /** The teacher space (/enseignant). Pages are ported from design/prototypes/enseignant-*.html. */
 export const ENSEIGNANT_ROUTES: Routes = [
@@ -15,6 +6,12 @@ export const ENSEIGNANT_ROUTES: Routes = [
     path: '',
     title: 'Mes classes',
     loadComponent: () => import('./mes-classes/classes-page').then((m) => m.ClassesPage),
+  },
+  {
+    path: 'emploi-du-temps',
+    title: 'Mon emploi du temps',
+    loadComponent: () =>
+      import('./emploi-du-temps/my-timetable-page').then((m) => m.MyTimetablePage),
   },
   {
     path: 'agenda',
@@ -32,8 +29,18 @@ export const ENSEIGNANT_ROUTES: Routes = [
     loadComponent: () => import('./appel/attendance-page').then((m) => m.AttendancePage),
   },
   {
+    path: 'groupes',
+    title: 'Groupes',
+    loadComponent: () => import('../groupes/groups-page').then((m) => m.GroupsPage),
+  },
+  {
     path: 'annonces',
     title: 'Annonces',
     loadComponent: () => import('./annonces/posts-page').then((m) => m.PostsPage),
+  },
+  {
+    path: 'menu',
+    title: 'Toutes les pages',
+    loadComponent: () => import('../layout/menu-page').then((m) => m.MenuPage),
   },
 ];

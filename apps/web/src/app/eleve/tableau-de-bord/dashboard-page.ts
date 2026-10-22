@@ -53,7 +53,7 @@ export class DashboardPage {
   readonly #years = resource({ loader: () => this.#api.school.years() });
   protected readonly term = computed(() => {
     const year = this.#years.hasValue() ? currentYear(this.#years.value()) : null;
-    return year ? termOf(year.terms, this.today) : null;
+    return year ? termOf(year.periods, this.today) : null;
   });
   protected readonly subtitle = computed(() => {
     const term = this.term();
@@ -66,8 +66,8 @@ export class DashboardPage {
       const studentId = this.studentId();
       // Without the terms (still loading, or failed), wait; then fall back to the whole year.
       if (!studentId || this.#years.isLoading()) return undefined;
-      return { studentId, termId: this.term()?.id };
+      return { studentId, periodId: this.term()?.id };
     },
-    loader: ({ params }) => this.#api.grades.ofStudent(params.studentId, { termId: params.termId }),
+    loader: ({ params }) => this.#api.grades.ofStudent(params.studentId, { periodId: params.periodId }),
   });
 }

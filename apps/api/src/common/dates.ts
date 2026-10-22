@@ -26,3 +26,6 @@ export function IsDay(options?: ValidationOptions): PropertyDecorator {
       },
     });
 }
+
+/** The school's « today » (Cairo), shared with the web: sessions already held are never rewritten. */
+export { SCHOOL_TIME_ZONE, schoolToday } from '@cdls/shared';

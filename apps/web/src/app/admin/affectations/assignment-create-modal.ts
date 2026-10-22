@@ -51,7 +51,7 @@ interface AssignmentModel {
             }
           </select>
         </cdls-field>
-        <cdls-field label="Coefficient" helper="De 0 à 20, par exemple 2 ou 1,5. Il pondère la matière dans la moyenne du bulletin." [error]="coefficientError()">
+        <cdls-field label="Coefficient" helper="De 0 à 20, par exemple 2 ou 1,5. Il pondère la matière dans la moyenne du bulletin. Si la classe a déjà cette matière, son coefficient actuel est conservé." [error]="coefficientError()">
           <input cdlsControl type="number" inputmode="decimal" step="0.5" [formField]="assignmentForm.coefficient" />
         </cdls-field>
         @if (failure()) {
@@ -122,11 +122,14 @@ export class AssignmentCreateModal {
       this.busy.set(true);
       this.failure.set(null);
       try {
+        // A teacher teaches a subject of the class: make sure the class has it (the typed coefficient is for a new subject).
+        const coefficient = Math.round((value.coefficient ?? 1) * 100) / 100;
+        // A subject the class already has keeps its coefficient (a second teacher must not reset it).
+        const existing = (await this.#api.school.classSubjects(value.classId)).find((s) => s.subjectId === value.subjectId);
+        const classSubject = existing ?? (await this.#api.school.addClassSubject(value.classId, { subjectId: value.subjectId, coefficient }));
         const created = await this.#api.school.createAssignment({
           teacherId: value.teacherId,
-          classId: value.classId,
-          subjectId: value.subjectId,
-          coefficient: Math.round((value.coefficient ?? 1) * 100) / 100,
+          classSubjectId: classSubject.id,
         });
         this.created.emit(created);
         this.open.set(false);

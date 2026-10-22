@@ -1,7 +1,8 @@
-import { Component, computed, inject, resource, signal } from '@angular/core';
+import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { ClassDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
+import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Button, EmptyState, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { groupBySection, plural } from '../shared/admin-format';
@@ -17,9 +18,11 @@ import { ClassFormModal } from './class-form-modal';
         <h1 class="t-h1">Classes</h1>
         <p class="t-muted">{{ subtitle() }}</p>
       </div>
-      <div class="page__actions">
-        <button cdlsButton type="button" [disabled]="!currentYear()" (click)="startCreate()"><cdls-icon name="plus" />Créer une classe</button>
-      </div>
+      @if (isAdmin()) {
+        <div class="page__actions">
+          <button cdlsButton type="button" [disabled]="!currentYear()" (click)="startCreate()"><cdls-icon name="plus" />Créer une classe</button>
+        </div>
+      }
     </div>
 
     @if (notice()) {
@@ -31,11 +34,13 @@ import { ClassFormModal } from './class-form-modal';
     } @else if (classes.hasValue() && years.hasValue()) {
       @if (!currentYear()) {
         <cdls-empty-state icon="calendar" title="Aucune année scolaire en cours" description="Créez une année et définissez-la comme année en cours.">
-          <a cdlsButton variant="secondary" routerLink="../annees">Années et trimestres</a>
+          <a cdlsButton variant="secondary" routerLink="../annees">Année scolaire</a>
         </cdls-empty-state>
       } @else if (!groups().length) {
         <cdls-empty-state icon="book" title="Aucune classe pour cette année" description="Créez la première classe de l’année.">
-          <button cdlsButton variant="secondary" type="button" (click)="startCreate()">Créer une classe</button>
+          @if (isAdmin()) {
+            <button cdlsButton variant="secondary" type="button" (click)="startCreate()">Créer une classe</button>
+          }
         </cdls-empty-state>
       } @else {
         <div class="stack sections">
@@ -63,14 +68,16 @@ import { ClassFormModal } from './class-form-modal';
                         <td class="num">
                           <span class="row-actions">
                             <a cdlsButton variant="tertiary" size="sm" [routerLink]="[item.id]">
-                              Voir les élèves<span class="visually-hidden"> de {{ item.label }}</span>
+                              {{ isAdmin() ? 'Élèves et matières' : 'Matières' }}<span class="visually-hidden"> de {{ item.label }}</span>
                             </a>
-                            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startRename(item)">
-                              Renommer<span class="visually-hidden"> {{ item.label }}</span>
-                            </button>
-                            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDelete(item)">
-                              Supprimer<span class="visually-hidden"> {{ item.label }}</span>
-                            </button>
+                            @if (isAdmin()) {
+                              <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startRename(item)">
+                                Renommer<span class="visually-hidden"> {{ item.label }}</span>
+                              </button>
+                              <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startDelete(item)">
+                                Supprimer<span class="visually-hidden"> {{ item.label }}</span>
+                              </button>
+                            }
                           </span>
                         </td>
                       </tr>
@@ -126,19 +133,32 @@ import { ClassFormModal } from './class-form-modal';
 })
 export class ClassesPage {
   readonly #api = inject(ApiClient);
+  readonly #auth = inject(AuthStore);
+  /** Creating, renaming and deleting classes is the admin's; a coordinator opens a class for its subjects. */
+  protected readonly isAdmin = computed(() => this.#auth.role() === 'admin');
 
   protected readonly years = resource({ loader: () => this.#api.school.years() });
-  protected readonly classes = resource({ loader: () => this.#api.school.classes() });
+  /** `?annee=<id>`: a year being prepared (the school year checklist links here); by default the current year. */
+  readonly annee = input<string | undefined>(undefined);
+  protected readonly classes = resource({
+    params: () => ({ schoolYearId: this.annee() }),
+    loader: ({ params }) => this.#api.school.classes(params),
+  });
   protected readonly sections = resource({ loader: () => this.#api.school.sections() });
 
-  protected readonly currentYear = computed(() => (this.years.hasValue() ? this.years.value().find((y) => y.isCurrent) : undefined));
+  /** The year shown: the one asked for in the address, else the current year. */
+  protected readonly currentYear = computed(() => {
+    if (!this.years.hasValue()) return undefined;
+    const list = this.years.value();
+    return list.find((y) => y.id === this.annee()) ?? list.find((y) => y.isCurrent);
+  });
   protected readonly groups = computed(() => (this.classes.hasValue() ? groupBySection(this.classes.value()) : []));
   protected readonly subtitle = computed(() => {
     const year = this.currentYear();
-    if (!year || !this.classes.hasValue()) return 'Classes de l’année en cours';
+    if (!year || !this.classes.hasValue()) return 'Classes de l’année';
     const list = this.classes.value();
     const students = list.reduce((sum, c) => sum + c.studentCount, 0);
-    return `Année ${year.label} : ${plural(list.length, 'classe', 'classes')}, ${plural(students, 'élève inscrit', 'élèves inscrits')}`;
+    return `Année ${year.label}${year.isCurrent ? '' : ' (en préparation)'} : ${plural(list.length, 'classe', 'classes')}, ${plural(students, 'élève inscrit', 'élèves inscrits')}`;
   });
 
   protected readonly formOpen = signal(false);

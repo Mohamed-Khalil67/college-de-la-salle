@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import type { EventDto, OccurrenceDto, StudentGradesDto, TermDto } from '@cdls/shared';
-import { average, clock, dayTitle, dueBadge, plural, termOf, timeSpan } from './format';
+import type { ActivityTypeSummary, EventDto, OccurrenceDto, PeriodDto, StudentGradesDto } from '@cdls/shared';
+import { average, clock, dayTitle, dueBadge, isAssessment, plural, termOf, timeSpan, whereOf } from './format';
 import { attendanceCounts, isRecent, latestGrades, meterWidth, overallAverage, subjectsByName } from './grades';
 import { eventIcs, fileName, shiftWeek, weekColumns, weekLabel, weekRange } from './week';
 
+const type = (code: string, flags: Partial<ActivityTypeSummary> = {}): ActivityTypeSummary => ({
+  id: `type-${code}`,
+  code,
+  label: code,
+  colour: 'navy',
+  icon: 'book',
+  gradable: false,
+  repeatable: false,
+  homework: false,
+  ...flags,
+});
+const COURS = type('cours', { repeatable: true });
+const CONTROLE = type('controle', { gradable: true });
+
 const event = (over: Partial<EventDto> = {}): EventDto => ({
   id: 'e1',
-  kind: 'cours',
+  activityTypeId: COURS.id,
+  type: COURS,
   title: 'Mathématiques',
   subjectId: 'mathematiques',
   classId: 'c1',
@@ -15,10 +30,14 @@ const event = (over: Partial<EventDto> = {}): EventDto => ({
   startTime: '08:30',
   endTime: '10:00',
   repeatUntil: null,
+  roomId: null,
+  roomName: null,
   place: 'Salle 12',
+  periodId: null,
   description: '',
   attachments: [],
   coefficient: 1,
+  target: { whole: true, groups: [], studentIds: [], concerned: null },
   authorId: 't1',
   authorName: 'Hany Mansour',
   createdAt: '2026-10-01T08:00:00.000Z',
@@ -50,14 +69,27 @@ describe('format', () => {
     expect(dueBadge('2026-11-23', '2026-10-20', false)).toBeNull();
     expect(dueBadge('2026-10-19', '2026-10-20', true)).toBeNull();
   });
+  it('stands out exams and tests by their flags, not by their code', () => {
+    expect(isAssessment(CONTROLE)).toBe(true);
+    expect(isAssessment(type('teacher-quiz', { gradable: true }))).toBe(true);
+    expect(isAssessment(COURS)).toBe(false);
+    expect(isAssessment(type('devoir', { gradable: true, homework: true }))).toBe(false);
+    expect(isAssessment(type('tp', { gradable: true, repeatable: true }))).toBe(false);
+  });
+  it('shows the room of the school before the free-text place', () => {
+    expect(whereOf({ roomName: 'Laboratoire', place: 'Salle 12' })).toBe('Laboratoire');
+    expect(whereOf({ roomName: null, place: 'Stade municipal' })).toBe('Stade municipal');
+  });
   it('pluralises', () => {
     expect(plural(1, 'absence')).toBe('1 absence');
     expect(plural(2, 'absence')).toBe('2 absences');
   });
   it('finds the term of a day', () => {
-    const t = (n: number, startsOn: string, endsOn: string): TermDto => ({
+    const t = (n: number, startsOn: string, endsOn: string): PeriodDto => ({
       id: `t${n}`,
       schoolYearId: 'y',
+      kind: 'trimester',
+      sectionId: null,
       number: n,
       label: `${n}e trimestre`,
       startsOn,
@@ -104,7 +136,7 @@ describe('week', () => {
 describe('grades', () => {
   const g = (id: string, subjectId: string, date: string, score: number) => ({
     grade: { id, eventId: id, studentId: 's', score, outOf: 20, comment: '', published: true, updatedAt: `${date}T10:00:00Z` },
-    event: { id, kind: 'controle' as const, title: id, date, subjectId, coefficient: 1 },
+    event: { id, type: CONTROLE, title: id, date, subjectId, coefficient: 1, periodId: null },
   });
   const data: StudentGradesDto = {
     studentId: 's',
@@ -139,7 +171,7 @@ describe('grades', () => {
   it('counts attendance records', () => {
     const rec = (status: 'absent' | 'late' | 'excused') => ({
       record: { id: status, eventId: 'e', studentId: 's', date: '2026-10-01', status, minutesLate: null, note: '' },
-      event: { id: 'e', kind: 'cours' as const, title: 'Maths', subjectId: null, startTime: null, endTime: null },
+      event: { id: 'e', type: COURS, title: 'Maths', subjectId: null, startTime: null, endTime: null },
     });
     expect(attendanceCounts([rec('absent'), rec('absent'), rec('late')])).toEqual({ absent: 2, late: 1, excused: 0 });
   });

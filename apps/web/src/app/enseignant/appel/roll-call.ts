@@ -3,6 +3,7 @@ import type { AttendanceSheetDto, AttendanceStatus } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button } from '../../ui';
 import { LoadState } from '../../eleve/shared/load-state';
+import { eventTargetLine } from '../../groupes/groups-logic';
 import { rollCounts, rollSentence } from '../shared/teacher';
 import { RollItem } from './roll-item';
 
@@ -20,6 +21,12 @@ const PRESENT: Entry = { status: 'present', note: '' };
   template: `
     <app-load-state [ref]="sheet" label="Chargement de la liste des élèves…" />
     @if (sheet.hasValue()) {
+      <p class="t-body-s roll__target">
+        <b>Séance pour :</b> {{ targetLine() }}.
+        @if (!sheet.value().event.target.whole) {
+          Les autres élèves de la classe ne sont pas concernés et n’apparaissent pas.
+        }
+      </p>
       <form aria-labelledby="roll-title" (submit)="save($event)">
         <div class="toolbar">
           <h2 id="roll-title" class="visually-hidden">Liste des élèves</h2>
@@ -46,6 +53,7 @@ const PRESENT: Entry = { status: 'present', note: '' };
             <li
               app-roll-item
               [student]="row.student"
+              [former]="!row.targeted"
               [status]="entries()[row.student.id]?.status ?? 'present'"
               (statusChange)="set(row.student.id, { status: $event })"
               [note]="entries()[row.student.id]?.note ?? ''"
@@ -54,6 +62,11 @@ const PRESENT: Entry = { status: 'present', note: '' };
           }
         </ol>
       </form>
+    }
+  `,
+  styles: `
+    .roll__target {
+      margin-bottom: var(--space-3);
     }
   `,
 })
@@ -76,6 +89,7 @@ export class RollCall {
       ]),
     ),
   );
+  protected readonly targetLine = computed(() => eventTargetLine(this.sheet.hasValue() ? this.sheet.value().event.target : null));
   protected readonly counts = computed(() => rollCounts(Object.values(this.entries()).map((e) => e?.status ?? 'present')));
 
   protected readonly busy = signal(false);

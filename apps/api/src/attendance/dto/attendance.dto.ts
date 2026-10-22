@@ -23,6 +23,7 @@ import {
 } from '@cdls/shared';
 import { StudentSummaryDto } from '../../classes/dto/class.dto.js';
 import { IsDay } from '../../common/dates.js';
+import { ActivityTypeSummaryDto } from '../../activity-types/dto/activity-type.dto.js';
 import { EventDto } from '../../events/dto/event.dto.js';
 
 export class AttendanceRecordDto implements AttendanceRecordContract {
@@ -40,6 +41,8 @@ class AttendanceRowDto {
   student: StudentSummaryDto;
   @ApiProperty({ type: AttendanceRecordDto, nullable: true })
   record: AttendanceRecordDto | null;
+  /** False: recorded that day, but no longer concerned (left the group). */
+  targeted: boolean;
 }
 
 export class AttendanceSheetDto implements AttendanceSheetContract {
@@ -89,7 +92,7 @@ export class SaveAttendanceDto implements SaveAttendanceRequest {
 
 class AttendanceEventDto {
   id: string;
-  kind: EventDto['kind'];
+  type: ActivityTypeSummaryDto;
   title: string;
   subjectId: string | null;
   startTime: string | null;

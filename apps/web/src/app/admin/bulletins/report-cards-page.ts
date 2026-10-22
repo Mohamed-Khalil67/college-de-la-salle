@@ -1,6 +1,6 @@
 import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
-import type { ReportCardDto, TermDto } from '@cdls/shared';
+import type { ReportCardDto, PeriodDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Badge, Button, EmptyState, Field, FieldControl, Icon } from '../../ui';
 import { ConfirmModal } from '../shared/confirm-modal';
@@ -25,8 +25,8 @@ interface ClassCards {
         <p class="t-muted">Calculés à partir des notes publiées d’un trimestre clôturé.</p>
       </div>
       <div class="page__actions">
-        <button cdlsButton variant="secondary" type="button" [disabled]="!termId()" (click)="startBatch('generate')">Générer les bulletins</button>
-        <button cdlsButton type="button" [disabled]="!termId()" (click)="startBatch('publish')">Publier les bulletins</button>
+        <button cdlsButton variant="secondary" type="button" [disabled]="!periodId()" (click)="startBatch('generate')">Générer les bulletins</button>
+        <button cdlsButton type="button" [disabled]="!periodId()" (click)="startBatch('publish')">Publier les bulletins</button>
       </div>
     </div>
 
@@ -40,10 +40,10 @@ interface ClassCards {
       @if (closedTerms().length) {
         <form class="filters filters--two" aria-label="Choisir le trimestre et la classe" (submit)="$event.preventDefault()">
           <cdls-field label="Trimestre clôturé">
-            <select cdlsControl [formField]="pickForm.termId">
+            <select cdlsControl [formField]="pickForm.periodId">
               @for (group of closedTerms(); track group.year) {
                 <optgroup [label]="group.year">
-                  @for (term of group.terms; track term.id) {
+                  @for (term of group.periods; track term.id) {
                     <option [value]="term.id">{{ term.label }} {{ group.year }}</option>
                   }
                 </optgroup>
@@ -134,7 +134,7 @@ interface ClassCards {
         <cdls-empty-state
           icon="calendar"
           title="Aucun trimestre clôturé"
-          description="Les bulletins se calculent sur un trimestre clôturé. Clôturez-le dans « Années et trimestres »."
+          description="Les bulletins se calculent sur un trimestre clôturé. Clôturez-le dans « Année scolaire »."
         />
       }
     } @else {
@@ -186,27 +186,27 @@ export class ReportCardsPage {
     if (!this.years.hasValue()) return [];
     return this.years
       .value()
-      .map((year) => ({ year: year.label, yearId: year.id, terms: year.terms.filter((t) => t.closedAt) }))
-      .filter((group) => group.terms.length);
+      .map((year) => ({ year: year.label, yearId: year.id, periods: year.periods.filter((t) => t.closedAt) }))
+      .filter((group) => group.periods.length);
   });
   readonly #termsById = computed(() => {
-    const map = new Map<string, TermDto>();
-    for (const group of this.closedTerms()) for (const term of group.terms) map.set(term.id, term);
+    const map = new Map<string, PeriodDto>();
+    for (const group of this.closedTerms()) for (const term of group.periods) map.set(term.id, term);
     return map;
   });
 
   /** Defaults to the latest closed term; the class resets when the term changes year. */
-  protected readonly pick = linkedSignal<string | undefined, { termId: string; classId: string }>({
-    source: () => this.closedTerms()[0]?.terms.at(-1)?.id,
+  protected readonly pick = linkedSignal<string | undefined, { periodId: string; classId: string }>({
+    source: () => this.closedTerms()[0]?.periods.at(-1)?.id,
     computation: (latest, previous) => {
-      const kept = previous?.value.termId;
-      return kept && this.#termsById().has(kept) ? previous.value : { termId: latest ?? '', classId: '' };
+      const kept = previous?.value.periodId;
+      return kept && this.#termsById().has(kept) ? previous.value : { periodId: latest ?? '', classId: '' };
     },
   });
   protected readonly pickForm = form(this.pick);
-  protected readonly termId = computed(() => this.pick().termId);
+  protected readonly periodId = computed(() => this.pick().periodId);
   protected readonly classId = computed(() => this.pick().classId);
-  readonly #yearId = computed(() => this.#termsById().get(this.termId())?.schoolYearId);
+  readonly #yearId = computed(() => this.#termsById().get(this.periodId())?.schoolYearId);
 
   protected readonly classes = resource({
     params: () => this.#yearId(),
@@ -216,8 +216,8 @@ export class ReportCardsPage {
   readonly #classLabels = computed(() => new Map((this.classes.hasValue() ? this.classes.value() : []).map((c) => [c.id, c.label])));
 
   protected readonly cards = resource({
-    params: () => (this.termId() ? { termId: this.termId(), classId: this.classId() } : undefined),
-    loader: ({ params }) => this.#api.reportCards.ofTerm(params.termId, params.classId ? { classId: params.classId } : {}),
+    params: () => (this.periodId() ? { periodId: this.periodId(), classId: this.classId() } : undefined),
+    loader: ({ params }) => this.#api.reportCards.ofTerm(params.periodId, params.classId ? { classId: params.classId } : {}),
   });
   protected readonly byClass = computed<ClassCards[]>(() => {
     if (!this.cards.hasValue()) return [];
@@ -235,7 +235,7 @@ export class ReportCardsPage {
     return `${plural(list.length, 'bulletin', 'bulletins')}, dont ${published} publié${published > 1 ? 's' : ''}.`;
   });
   protected readonly scopeLabel = computed(() => {
-    const term = this.#termsById().get(this.termId());
+    const term = this.#termsById().get(this.periodId());
     const year = this.closedTerms().find((g) => g.yearId === term?.schoolYearId)?.year ?? '';
     const classLabel = this.classId() ? this.#classLabels().get(this.classId()) : null;
     return `${term?.label ?? ''} ${year}${classLabel ? `, classe ${classLabel}` : ', toutes les classes'}`;
@@ -264,15 +264,15 @@ export class ReportCardsPage {
   }
 
   protected async runBatch(): Promise<void> {
-    const termId = this.termId();
-    if (!termId) return;
+    const periodId = this.periodId();
+    if (!periodId) return;
     const body = this.classId() ? { classId: this.classId() } : {};
     const kind = this.batch();
     this.busy.set(true);
     this.actionError.set(null);
     try {
       const { count } =
-        kind === 'generate' ? await this.#api.reportCards.generate(termId, body) : await this.#api.reportCards.publish(termId, body);
+        kind === 'generate' ? await this.#api.reportCards.generate(periodId, body) : await this.#api.reportCards.publish(periodId, body);
       this.batchOpen.set(false);
       this.notice.set(
         kind === 'generate'

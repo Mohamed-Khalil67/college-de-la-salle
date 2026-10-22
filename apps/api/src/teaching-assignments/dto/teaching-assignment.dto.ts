@@ -1,5 +1,4 @@
-import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 import type {
   CreateTeachingAssignmentRequest,
   TeachingAssignmentDto as TeachingAssignmentContract,
@@ -9,10 +8,12 @@ export class TeachingAssignmentDto implements TeachingAssignmentContract {
   id: string;
   teacherId: string;
   teacherName: string;
+  classSubjectId: string;
   classId: string;
   classLabel: string;
   subjectId: string;
   subjectName: string;
+  /** The class subject's coefficient. */
   coefficient: number;
 }
 
@@ -30,18 +31,7 @@ export class CreateTeachingAssignmentDto implements CreateTeachingAssignmentRequ
   @IsUUID()
   teacherId: string;
 
+  /** A subject of the class (POST /classes/:id/subjects first). */
   @IsUUID()
-  classId: string;
-
-  @IsString()
-  @MaxLength(40)
-  subjectId: string;
-
-  /** Weight of the subject in the class's general average. */
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(20)
-  coefficient?: number;
+  classSubjectId: string;
 }

@@ -21,3 +21,34 @@ function expandIPv6(ip: string): string[] {
   const fill = tail === undefined ? [] : Array<string>(8 - left.length - right.length).fill('0');
   return [...left, ...fill, ...right].map((group) => group.replace(/^0+(?=.)/, ''));
 }
+
+type RequestLike = Record<string, unknown>;
+
+/**
+ * Sign-in limit key: client address plus the e-mail tried. A class signing in for the first time behind
+ * the school's one address no longer shares a single counter, while guessing one account stays limited.
+ */
+export function loginTracker(req: RequestLike): string {
+  const body = req['body'] as { email?: unknown } | undefined;
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
+  return `${clientKey(req['ip'] as string | undefined)}|${email}`;
+}
+
+/**
+ * Password-change limit key: client address plus the account named by the access token. The token is only
+ * read for this key (the authentication guard checks it right after), so a forged one gains nothing.
+ */
+export function passwordTracker(req: RequestLike): string {
+  const header = (req['headers'] as Record<string, unknown> | undefined)?.['authorization'];
+  let sub = '';
+  if (typeof header === 'string' && header.startsWith('Bearer ')) {
+    try {
+      const payload = header.split('.')[1] ?? '';
+      const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { sub?: unknown };
+      if (typeof parsed.sub === 'string') sub = parsed.sub.slice(0, 64);
+    } catch {
+      // Not a token: counted by address alone.
+    }
+  }
+  return `${clientKey(req['ip'] as string | undefined)}|${sub}`;
+}

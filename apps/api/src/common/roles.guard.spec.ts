@@ -1,9 +1,8 @@
 import { type ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
-import type { Role } from '@cdls/shared';
 import type { AuthUser } from './auth-user.js';
-import { IS_PUBLIC, ROLES } from './decorators.js';
+import { type Grant, IS_PUBLIC, ROLES } from './decorators.js';
 import { RolesGuard } from './roles.guard.js';
 
 const context = (user?: Partial<AuthUser>) =>
@@ -25,7 +24,7 @@ describe('RolesGuard', () => {
     reflector = moduleRef.get(Reflector);
   });
 
-  const metadata = (values: { roles?: Role[]; isPublic?: boolean }) =>
+  const metadata = (values: { roles?: Grant[]; isPublic?: boolean }) =>
     vi
       .spyOn(reflector, 'getAllAndOverride')
       .mockImplementation((key: unknown) =>
@@ -51,5 +50,26 @@ describe('RolesGuard', () => {
     metadata({ roles: ['admin'] });
     expect(() => guard.canActivate(context({ role: 'student' }))).toThrow(ForbiddenException);
     expect(() => guard.canActivate(context())).toThrow(ForbiddenException);
+  });
+
+  it('lets a coordinator through where the route names the coordinator grant', () => {
+    metadata({ roles: ['admin', 'coordinator'] });
+    expect(
+      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isCoordinator: true })),
+    ).toBe(true);
+    expect(guard.canActivate(context({ role: 'admin' }))).toBe(true);
+    expect(() =>
+      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isCoordinator: false })),
+    ).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(context({ role: 'student', isCoordinator: true }))).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('does not let a coordinator through an admin-only route', () => {
+    metadata({ roles: ['admin'] });
+    expect(() =>
+      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isCoordinator: true })),
+    ).toThrow(ForbiddenException);
   });
 });

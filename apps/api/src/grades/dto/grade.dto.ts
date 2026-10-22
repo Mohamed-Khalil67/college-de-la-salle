@@ -22,9 +22,11 @@ import {
   type SaveGradesRequest,
   type StudentGradeDto as StudentGradeContract,
   type StudentGradesDto as StudentGradesContract,
+  type StudentGradesQuery,
 } from '@cdls/shared';
 import { StudentSummaryDto } from '../../classes/dto/class.dto.js';
 import { IsDay } from '../../common/dates.js';
+import { ActivityTypeSummaryDto } from '../../activity-types/dto/activity-type.dto.js';
 import { EventDto } from '../../events/dto/event.dto.js';
 
 export class GradeDto implements GradeContract {
@@ -42,6 +44,8 @@ class GradeSheetRowDto {
   student: StudentSummaryDto;
   @ApiProperty({ type: GradeDto, nullable: true })
   grade: GradeDto | null;
+  /** False: graded, but no longer concerned (left the group); only removing the grade is allowed. */
+  targeted: boolean;
 }
 
 export class GradeSheetDto implements GradeSheetContract {
@@ -92,11 +96,13 @@ export class PublishGradesDto implements PublishGradesRequest {
 
 class GradedEventDto {
   id: string;
-  kind: EventDto['kind'];
+  type: ActivityTypeSummaryDto;
   title: string;
   date: string;
   subjectId: string | null;
   coefficient: number;
+  @ApiProperty({ type: String, nullable: true })
+  periodId: string | null;
 }
 
 export class StudentGradeDto implements StudentGradeContract {
@@ -121,11 +127,11 @@ export class StudentGradesDto implements StudentGradesContract {
   subjects: SubjectGradesDto[];
 }
 
-export class StudentGradesQueryDto {
-  /** Only grades of events in this term. */
+export class StudentGradesQueryDto implements StudentGradesQuery {
+  /** Only the grades of events counted in this period (also picks the school year's class subjects). */
   @IsOptional()
   @IsUUID()
-  termId?: string;
+  periodId?: string;
 
   @IsOptional()
   @IsDay()

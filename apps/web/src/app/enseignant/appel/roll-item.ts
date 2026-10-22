@@ -11,7 +11,7 @@ const OPTIONS: readonly SegmentOption[] = ATTENDANCE_STATUSES.map((s) => ({ valu
   imports: [Avatar, Segmented],
   host: { class: 'roll__item' },
   template: `
-    <span class="person"><cdls-avatar [name]="name()" />{{ name() }}</span>
+    <span class="person"><cdls-avatar [name]="name()" />{{ name() }}@if (former()) { <span class="t-muted">(ne fait plus partie du groupe : appel conservé)</span> }</span>
     <cdls-segmented class="roll__status" [legend]="'Présence de ' + name()" [options]="options" [value]="status()" (valueChange)="setStatus($event)" />
     <div class="roll__note">
       <label class="visually-hidden" [for]="'remarque-' + student().id">Remarque pour {{ name() }}</label>
@@ -28,6 +28,8 @@ const OPTIONS: readonly SegmentOption[] = ATTENDANCE_STATUSES.map((s) => ({ valu
 })
 export class RollItem {
   readonly student = input.required<StudentSummaryDto>();
+  /** Recorded that day, but no longer in the group: the record stays correctable. */
+  readonly former = input(false);
   readonly status = model<AttendanceStatus>('present');
   readonly note = model('');
 

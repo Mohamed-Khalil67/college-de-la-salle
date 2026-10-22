@@ -93,7 +93,7 @@ export class AttendancePage {
   });
   /** Timed sessions of this class (homework deadlines and all-day events are not roll calls). */
   protected readonly sessions = computed(() =>
-    (this.day.hasValue() ? this.day.value() : []).filter((o) => o.event.classId === this.classId() && o.event.kind !== 'devoir' && !!o.event.startTime),
+    (this.day.hasValue() ? this.day.value() : []).filter((o) => o.event.classId === this.classId() && !o.event.type.homework && !!o.event.startTime),
   );
   protected readonly sessionKey = linkedSignal(() => this.sessions()[0]?.key ?? '');
   protected readonly session = computed(() => this.sessions().find((s) => s.key === this.sessionKey()) ?? null);
@@ -109,6 +109,7 @@ export class AttendancePage {
     if (isCalendarDay(value)) this.date.set(value);
   }
   protected sessionLabel(s: OccurrenceDto): string {
-    return `${timeSpan(s.event.startTime, s.event.endTime)}, ${s.event.title}${s.event.kind === 'cours' ? '' : ` (${kindLabel(s.event.kind)})`}`;
+    const who = s.event.target.whole ? '' : `, ${s.event.target.groups.map((g) => g.label).join(', ') || 'élèves nommés'}`;
+    return `${timeSpan(s.event.startTime, s.event.endTime)}, ${s.event.title} (${kindLabel(s.event.type)}${who})`;
   }
 }

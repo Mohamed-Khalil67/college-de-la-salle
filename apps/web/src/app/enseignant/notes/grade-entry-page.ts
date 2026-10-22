@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, linkedSignal, resource } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { addDays, type EventDto, kindInfo, todayIso } from '@cdls/shared';
+import { addDays, type EventDto, todayIso } from '@cdls/shared';
 import { ApiClient } from '../../core/api/api-client';
 import { Button, EmptyState } from '../../ui';
 import { dayTitle, kindLabel, mark } from '../../eleve/shared/format';
@@ -105,7 +105,7 @@ export class GradeEntryPage {
   /** Gradable events of this class in the teacher's subjects, newest first. */
   protected readonly evaluations = computed(() =>
     (this.events.hasValue() ? this.events.value() : [])
-      .filter((e) => kindInfo(e.kind).gradable && e.classId === this.classId() && !!e.subjectId && this.#subjects().has(e.subjectId))
+      .filter((e) => e.type.gradable && e.classId === this.classId() && !!e.subjectId && this.#subjects().has(e.subjectId))
       .sort((a, b) => b.date.localeCompare(a.date)),
   );
   protected readonly eventId = linkedSignal(() => {
@@ -126,13 +126,14 @@ export class GradeEntryPage {
   });
 
   protected readonly subtitle = computed(() =>
-    this.selected() ? `${this.className()}, ${kindLabel(this.selected()!.kind).toLowerCase()}` : 'Choisissez une classe puis une évaluation.',
+    this.selected() ? `${this.className()}, ${kindLabel(this.selected()!.type).toLowerCase()}` : 'Choisissez une classe puis une évaluation.',
   );
 
   protected optionLabel(e: EventDto): string {
-    return `${dayTitle(e.date)} : ${e.title}`;
+    const who = e.target.whole ? '' : ` (${e.target.groups.map((g) => g.label).join(', ') || 'élèves nommés'})`;
+    return `${dayTitle(e.date)} : ${e.title}${who}`;
   }
   protected meta(e: EventDto): string {
-    return `${kindLabel(e.kind)} du ${dayTitle(e.date).toLowerCase()}, coefficient ${mark(e.coefficient)}`;
+    return `${kindLabel(e.type)} du ${dayTitle(e.date).toLowerCase()}, coefficient ${mark(e.coefficient)}`;
   }
 }

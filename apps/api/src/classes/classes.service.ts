@@ -1,12 +1,15 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import type { SectionId } from '@cdls/shared';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { type SectionId, todayIso } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
+import { canEditStructure } from '../access/grants.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { toDay } from '../common/dates.js';
+import { fromDay, toDay } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
+import { closeGroupMemberships } from '../groups/memberships.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   ClassDto,
   CreateClassDto,
@@ -24,6 +27,8 @@ const classInclude = {
 
 type ClassRow = Prisma.SchoolClassGetPayload<{ include: typeof classInclude }>;
 
+const CLASS_HAS_SLOTS =
+  'Cette classe a des séances dans l’emploi du temps : supprimez-les d’abord.';
 const CLASS_HAS_STUDENTS =
   'Cette classe a encore des élèves inscrits : retirez-les avant de la supprimer.';
 
@@ -71,15 +76,55 @@ export class ClassesService {
     return toClassDto(row);
   }
 
-  async update(id: string, dto: UpdateClassDto): Promise<ClassDto> {
-    await this.get(id);
-    return toClassDto(
-      await this.prisma.schoolClass.update({
+  /** Renames the class and/or sets the class of the next level (null: terminal class). */
+  async update(id: string, dto: UpdateClassDto, user: AuthUser): Promise<ClassDto> {
+    const current = await this.prisma.schoolClass.findUnique({ where: { id } });
+    if (!current) throw notFound('Classe');
+    if (dto.nextClassId) {
+      if (dto.nextClassId === id)
+        throw new BadRequestException('Une classe ne peut pas être sa propre classe suivante.');
+      const next = await this.prisma.schoolClass.findUnique({ where: { id: dto.nextClassId } });
+      if (!next) throw notFound('Classe suivante');
+      if (next.schoolYearId !== current.schoolYearId || next.sectionId !== current.sectionId)
+        throw new BadRequestException(
+          'La classe suivante doit être de la même année et de la même section.',
+        );
+    }
+    return this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, id);
+      // One change of the class links at a time: two admins cannot each close half of a loop.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('class-next-links', 0))`;
+      if (dto.nextClassId) {
+        // Walk the chain: a class cannot lead back to itself (promotion would never end).
+        let cursor: string | null = dto.nextClassId;
+        for (let hops = 0; cursor && hops < 50; hops++) {
+          if (cursor === id) throw new BadRequestException('Cette classe suivante ferait une boucle.');
+          cursor = (
+            await tx.schoolClass.findUnique({ where: { id: cursor }, select: { nextClassId: true } })
+          )?.nextClassId ?? null;
+        }
+      }
+      const row = await tx.schoolClass.update({
         where: { id },
-        data: { label: dto.label },
+        data: {
+          ...(dto.label !== undefined ? { label: dto.label } : {}),
+          ...(dto.nextClassId !== undefined ? { nextClassId: dto.nextClassId } : {}),
+        },
         include: classInclude,
-      }),
-    );
+      });
+      if (dto.nextClassId !== undefined && dto.nextClassId !== current.nextClassId)
+        await audit(tx, [
+          {
+            actorId: user.id,
+            action: 'class.next_class',
+            entity: 'school_class',
+            entityId: id,
+            before: { nextClassId: current.nextClassId },
+            after: { nextClassId: dto.nextClassId },
+          },
+        ]);
+      return toClassDto(row);
+    });
   }
 
   /**
@@ -102,6 +147,8 @@ export class ClassesService {
         tx.attendance.count({ where: { event: { classId: id } } }),
       ]);
       if (enrollments) throw new ConflictException(CLASS_HAS_STUDENTS);
+      if (await tx.timetableSlot.count({ where: { classSubject: { classId: id } } }))
+        throw new ConflictException(CLASS_HAS_SLOTS);
       if (reportCards || grades || attendance)
         throw new ConflictException(
           'Cette classe a déjà des notes, des absences ou des bulletins : elle ne peut pas être supprimée.',
@@ -128,7 +175,8 @@ export class ClassesService {
   /** The class list: admins and the class's teachers. */
   async students(classId: string, user: AuthUser): Promise<ClassStudentDto[]> {
     await this.get(classId);
-    await this.access.assertTeachesClass(user, classId);
+    // Admins and coordinators read any class list (they manage every group); a teacher, the classes they teach.
+    if (!canEditStructure(user)) await this.access.assertTeachesClass(user, classId);
     const enrollments = await this.#enrollments(classId);
     return enrollments.map((e) =>
       Object.assign(toStudentSummary(e.student), { enrollmentId: e.id }),
@@ -152,25 +200,88 @@ export class ClassesService {
     });
   }
 
-  /** Enrols a student; moves them if they were in another class of the same year. */
+  /**
+   * Enrols a student in a class of their section; moves them if they were in another class of the same
+   * year (the old enrolment is closed today, or corrected when it started today). Changing section goes
+   * through a section-change request, and archived students are read-only.
+   */
   async enroll(classId: string, studentId: string): Promise<EnrollmentDto> {
     const schoolClass = await this.prisma.schoolClass.findUnique({ where: { id: classId } });
     if (!schoolClass) throw notFound('Classe');
-    if (!(await this.prisma.student.findUnique({ where: { id: studentId } })))
-      throw notFound('Élève');
-    const enrollment = await this.prisma.enrollment.upsert({
-      where: { studentId_schoolYearId: { studentId, schoolYearId: schoolClass.schoolYearId } },
-      create: { studentId, classId, schoolYearId: schoolClass.schoolYearId },
-      update: { classId, leftOn: null },
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      include: { user: { select: { status: true } } },
+    });
+    if (!student) throw notFound('Élève');
+    if (student.user.status === 'archived')
+      throw new ConflictException('Ce compte est archivé : restaurez-le avant de l’inscrire.');
+    if (student.sectionId && student.sectionId !== schoolClass.sectionId)
+      throw new ConflictException(
+        'Cette classe est dans une autre section : changez de section par une demande (Validations).',
+      );
+
+    const today = fromDay(todayIso());
+    const enrollment = await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, classId);
+      // Read again inside the transaction: a section change may have been approved meanwhile.
+      const current = await tx.student.findUniqueOrThrow({ where: { id: studentId } });
+      if (current.sectionId && current.sectionId !== schoolClass.sectionId)
+        throw new ConflictException('La section de l’élève a changé : actualisez la page.');
+      if (!current.sectionId)
+        await tx.student.update({
+          where: { id: studentId },
+          data: { sectionId: schoolClass.sectionId },
+        });
+      const open = await tx.enrollment.findFirst({
+        where: { studentId, schoolYearId: schoolClass.schoolYearId, leftOn: null },
+      });
+      if (open?.classId === classId) return open;
+      // Leaving a class means leaving its groups, in the same transaction.
+      if (open) await closeGroupMemberships(tx, [studentId], today, open.classId);
+      if (open && open.enrolledOn.getTime() >= today.getTime())
+        return tx.enrollment.update({ where: { id: open.id }, data: { classId } });
+      if (open) await tx.enrollment.update({ where: { id: open.id }, data: { leftOn: today } });
+      return tx.enrollment.create({
+        data: { studentId, classId, schoolYearId: schoolClass.schoolYearId, enrolledOn: today },
+      });
     });
     return toEnrollmentDto(enrollment);
   }
 
-  /** Removes a student from a class (the enrollment row is deleted). */
-  async unenroll(enrollmentId: string): Promise<void> {
-    const enrollment = await this.prisma.enrollment.findUnique({ where: { id: enrollmentId } });
+  /**
+   * Takes a student off a class roster. The enrolment is closed today (`leftOn`), not deleted: it stays as
+   * history, and the grades and attendance of that class keep their place. Closing a closed one is a no-op.
+   */
+  async unenroll(enrollmentId: string, actor: AuthUser): Promise<void> {
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: { student: { include: { user: { select: { status: true } } } } },
+    });
     if (!enrollment) throw notFound('Inscription');
-    await this.prisma.enrollment.delete({ where: { id: enrollmentId } });
+    // An archived account is read-only, and its enrolments are history.
+    if (enrollment.student.user.status === 'archived')
+      throw new ConflictException('Ce compte est archivé : son inscription est conservée.');
+    if (enrollment.leftOn) return;
+    const today = fromDay(todayIso());
+    await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, enrollment.classId);
+      const closed = await tx.enrollment.updateMany({
+        where: { id: enrollmentId, leftOn: null },
+        data: { leftOn: today },
+      });
+      if (closed.count) await closeGroupMemberships(tx, [enrollment.studentId], today, enrollment.classId);
+      if (closed.count)
+        await audit(tx, [
+          {
+            actorId: actor.id,
+            action: 'enrollment.close',
+            entity: 'enrollment',
+            entityId: enrollmentId,
+            before: { classId: enrollment.classId, leftOn: null },
+            after: { leftOn: toDay(today) },
+          },
+        ]);
+    });
   }
 }
 
@@ -198,6 +309,7 @@ function toClassDto(c: ClassRow): ClassDto {
     code: c.code,
     label: c.label,
     studentCount: c._count.enrollments,
+    nextClassId: c.nextClassId,
   };
 }
 

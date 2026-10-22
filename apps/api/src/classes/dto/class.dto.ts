@@ -4,6 +4,7 @@ import { IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'cla
 import type {
   ClassDto as ClassContract,
   CreateClassRequest,
+  UpdateClassRequest,
   EnrollmentDto as EnrollmentContract,
   SectionDto as SectionContract,
   SectionId,
@@ -26,6 +27,7 @@ export class ClassDto implements ClassContract {
   code: string;
   label: string;
   studentCount: number;
+  nextClassId: string | null;
 }
 
 export class StudentSummaryDto implements StudentSummaryContract {
@@ -76,12 +78,19 @@ export class CreateClassDto implements CreateClassRequest {
   label: string;
 }
 
-export class UpdateClassDto {
+export class UpdateClassDto implements UpdateClassRequest {
+  @IsOptional()
   @Transform(trim)
   @IsString()
   @MinLength(1)
   @MaxLength(80)
-  label: string;
+  label?: string;
+
+  /** The class of the next level in the same year; null makes this a terminal class. */
+  @ApiPropertyOptional({ type: String, nullable: true })
+  @IsOptional()
+  @IsUUID()
+  nextClassId?: string | null;
 }
 
 export class EnrollStudentDto {

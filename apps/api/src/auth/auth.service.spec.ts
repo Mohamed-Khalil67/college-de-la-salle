@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -16,8 +16,9 @@ const ROW_ID = '0190d5b4-1c2a-7000-8000-000000000001';
 
 describe('AuthService', () => {
   const prisma = {
-    user: { findUnique: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
     refreshToken: { create: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+    $transaction: vi.fn(),
   };
   const jwt = { signAsync: vi.fn().mockResolvedValue('access-token'), verifyAsync: vi.fn() };
   let auth: AuthService;
@@ -28,7 +29,9 @@ describe('AuthService', () => {
     role: 'teacher' as const,
     firstName: 'P',
     lastName: 'R',
-    isActive: true,
+    status: 'active' as const,
+    mustChangePassword: false,
+    passwordChangedAt: null as Date | null,
     passwordHash: await hash('correct horse'),
     student: null,
     teacher: { id: 't1' },
@@ -88,7 +91,7 @@ describe('AuthService', () => {
     expect(unenrolled.session.user.classId).toBeNull();
   });
 
-  it('refuses a wrong password, an unknown e-mail and an inactive account', async () => {
+  it('refuses a wrong password, an unknown e-mail, a disabled and an archived account', async () => {
     prisma.user.findUnique.mockResolvedValue(await user());
     await expect(auth.login('prof@demo.cdls.test', 'wrong')).rejects.toBeInstanceOf(
       UnauthorizedException,
@@ -97,10 +100,122 @@ describe('AuthService', () => {
     await expect(auth.login('nobody@demo.cdls.test', 'x')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
-    prisma.user.findUnique.mockResolvedValue(await user({ isActive: false }));
-    await expect(auth.login('prof@demo.cdls.test', 'correct horse')).rejects.toBeInstanceOf(
-      UnauthorizedException,
+    for (const status of ['disabled', 'archived']) {
+      prisma.user.findUnique.mockResolvedValue(await user({ status }));
+      await expect(auth.login('prof@demo.cdls.test', 'correct horse')).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    }
+  });
+
+  it('puts the first-sign-in flag, section and class in the session', async () => {
+    prisma.user.findUnique.mockResolvedValue(
+      await user({
+        role: 'student',
+        teacher: null,
+        mustChangePassword: true,
+        student: {
+          id: 's1',
+          section: { code: 'bac' },
+          enrollments: [{ classId: 'c1', schoolClass: { label: 'Première' } }],
+        },
+      }),
     );
+    const issued = await auth.login('eleve@demo.cdls.test', 'correct horse');
+    expect(issued.session.user).toMatchObject({
+      mustChangePassword: true,
+      sectionCode: 'bac',
+      classLabel: 'Première',
+    });
+  });
+
+  describe('changePassword', () => {
+    beforeEach(() => {
+      prisma.$transaction.mockImplementation((work: (tx: typeof prisma) => unknown) => work(prisma));
+      prisma.user.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.findUniqueOrThrow.mockImplementation(async () => ({
+        ...(await user()),
+        passwordChangedAt: new Date(),
+        mustChangePassword: false,
+      }));
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 2 });
+    });
+
+    it('checks the current password', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
+      await expect(auth.changePassword('u1', 'wrong', 'a-new-long-password')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('applies the rules: 10 characters, not the e-mail, not the current password', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
+      for (const weak of ['short', 'prof@demo.cdls.test', 'PROF', 'correct horse']) {
+        await expect(auth.changePassword('u1', 'correct horse', weak)).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+      }
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the password changed in between (a reset or another change won)', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
+      prisma.user.updateMany.mockResolvedValue({ count: 0 });
+      await expect(
+        auth.changePassword('u1', 'correct horse', 'Cedre-du-Liban-2026'),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
+    });
+
+    it('stores the new password, clears the flag, revokes every session and issues a new one', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
+      const issued = await auth.changePassword('u1', 'correct horse', 'Cedre-du-Liban-2026');
+      const { where, data } = prisma.user.updateMany.mock.calls[0]![0];
+      // Only while the password is still the one that was checked.
+      expect(where).toMatchObject({ id: 'u1', status: 'active' });
+      expect(where.passwordHash).toMatch(/^\$argon2/);
+      expect(data).toMatchObject({ mustChangePassword: false, passwordChangedAt: expect.any(Date) });
+      expect(data.passwordHash).toMatch(/^\$argon2/);
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'u1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+      expect(issued.session.user.mustChangePassword).toBe(false);
+      // The new token carries the new password version.
+      expect(jwt.signAsync).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pv: expect.any(Number) }),
+        expect.anything(),
+      );
+      expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('userFromAccessToken', () => {
+    it('refuses tokens issued before the last password change', async () => {
+      const changedAt = new Date('2026-10-20T10:00:00.250Z');
+      prisma.user.findUnique.mockResolvedValue(await user({ passwordChangedAt: changedAt }));
+      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher' });
+      expect(await auth.userFromAccessToken('before any version')).toBeNull();
+      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher', pv: changedAt.getTime() - 1 });
+      expect(await auth.userFromAccessToken('old')).toBeNull();
+      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher', pv: changedAt.getTime() });
+      expect(await auth.userFromAccessToken('new')).toMatchObject({ id: 'u1' });
+    });
+
+    it('accepts tokens without a version for accounts that never changed their password', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user());
+      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher' });
+      expect(await auth.userFromAccessToken('t')).toMatchObject({ id: 'u1' });
+    });
+
+    it('refuses archived and disabled accounts', async () => {
+      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher' });
+      prisma.user.findUnique.mockResolvedValue(await user({ status: 'archived' }));
+      expect(await auth.userFromAccessToken('t')).toBeNull();
+      prisma.user.findUnique.mockResolvedValue(await user({ status: 'disabled' }));
+      expect(await auth.userFromAccessToken('t')).toBeNull();
+    });
   });
 
   it('rotates a valid refresh token', async () => {

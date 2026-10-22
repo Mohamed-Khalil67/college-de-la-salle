@@ -67,8 +67,12 @@ export class ClassesController {
   @Roles('admin')
   @Patch('classes/:id')
   @ApiOkResponse({ type: ClassDto })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateClassDto): Promise<ClassDto> {
-    return this.classes.update(id, body);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateClassDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<ClassDto> {
+    return this.classes.update(id, body, user);
   }
 
   /** Deletes an empty class (no student, grade, attendance or report card); 409 otherwise. */
@@ -109,7 +113,7 @@ export class ClassesController {
   @Delete('enrollments/:id')
   @HttpCode(204)
   @ApiNoContentResponse()
-  unenroll(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
-    return this.classes.unenroll(id);
+  unenroll(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() actor: AuthUser): Promise<void> {
+    return this.classes.unenroll(id, actor);
   }
 }

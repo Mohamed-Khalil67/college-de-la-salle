@@ -4,6 +4,8 @@ import type { Prisma } from '../generated/prisma/client.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { forbidden } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { concernsStudentNow } from '../targets/target-filters.js';
+import { canEditStructure } from './grants.js';
 
 export interface StudentPlacement {
   readonly classId: string;
@@ -19,6 +21,7 @@ export interface StudentPlacement {
  *   events and posts addressed to the whole school, their section or their class;
  * - a teacher reads every event and post, but writes grades, attendance and class events only for the
  *   classes (and subjects) of their teaching assignments, and edits only what they authored;
+ * - a coordinator (a teacher marked so by the admin) also edits the year's structure;
  * - an admin may do everything.
  */
 @Injectable()
@@ -55,9 +58,31 @@ export class AccessService {
     return { OR: [wholeSchool, { classId: null, sectionId: p.sectionId }, { classId: p.classId }] };
   }
 
+  /**
+   * Events addressed to a student: the whole school, their section, or their class; and, for the
+   * assessments and homework of their class, only those that concern them (the whole class by default,
+   * or a group they are in, or them by name). Events and posts share `audienceFor`; only events have targets.
+   */
+  eventAudienceFor(p: StudentPlacement | null, studentId: string): Prisma.EventWhereInput {
+    const wholeSchool = { classId: null, sectionId: null };
+    if (!p) return wholeSchool;
+    return {
+      OR: [
+        wholeSchool,
+        { classId: null, sectionId: p.sectionId },
+        { AND: [{ classId: p.classId }, concernsStudentNow(studentId)] },
+      ],
+    };
+  }
+
+  /** The admin or a coordinator; everyone else is refused (structure writes reached from other routes). */
+  assertCanEditStructure(user: AuthUser): void {
+    if (!canEditStructure(user)) throw forbidden();
+  }
+
   async teaches(teacherId: string, classId: string, subjectId?: string | null): Promise<boolean> {
     const count = await this.prisma.teachingAssignment.count({
-      where: { teacherId, classId, ...(subjectId ? { subjectId } : {}) },
+      where: { teacherId, classSubject: { classId, ...(subjectId ? { subjectId } : {}) } },
     });
     return count > 0;
   }
@@ -94,9 +119,9 @@ export class AccessService {
   /** Subjects this teacher teaches in this class (to scope what they see of a student's grades). */
   async subjectsTaught(teacherId: string, classId: string): Promise<string[]> {
     const rows = await this.prisma.teachingAssignment.findMany({
-      where: { teacherId, classId },
-      select: { subjectId: true },
+      where: { teacherId, classSubject: { classId } },
+      select: { classSubject: { select: { subjectId: true } } },
     });
-    return rows.map((r) => r.subjectId);
+    return rows.map((r) => r.classSubject.subjectId);
   }
 }

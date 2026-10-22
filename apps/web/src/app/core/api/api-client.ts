@@ -2,47 +2,96 @@ import { HttpClient, type HttpErrorResponse, HttpParams } from '@angular/common/
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
+  RolloverApplyRequest,
+  RolloverPreview,
+  RolloverRequest,
+  RolloverResult,
+  UpdateClassRequest,
+  ActivityTypeDto,
+  AddGroupMembersRequest,
   ApiError,
+  CalendarDayDto,
+  CalendarDayQuery,
+  CopyClassSubjectsRequest,
+  CreateActivityTypeRequest,
+  CreateCalendarDayRequest,
+  CreateGroupRequest,
+  CreateRoomRequest,
+  CreateSubjectRequest,
+  RoomDto,
+  UpdateActivityTypeRequest,
+  UpdateCalendarDayRequest,
+  UpdatePeriodRequest,
+  UpdateRoomRequest,
+  UpdateSchoolYearRequest,
+  UpdateSubjectRequest,
+  ApproveSectionChangeRequest,
+  ArchiveStudentsRequest,
+  ArchiveStudentsResponse,
   AttendanceSheetDto,
   ClassStudentDto,
   ClassDto,
+  ClassSubjectDto,
   ContactMessageDto,
   ContactMessageListQuery,
   ContactMessageRequest,
   CreateClassRequest,
+  CreateClassSubjectRequest,
   CreatedUserResponse,
   CreatePostRequest,
+  CreateSectionChangeRequest,
   CreateSchoolYearRequest,
   CreateTeachingAssignmentRequest,
-  CreateTermRequest,
+  CreatePeriodRequest,
   CreateUserRequest,
   EnrollmentDto,
   EventDto,
   EventInput,
   EventRangeQuery,
   GradeSheetDto,
+  GroupDetailDto,
+  GroupWithMembersDto,
   HomeworkCompletionDto,
   HomeworkDto,
+  ImportPreviewResponse,
+  ImportRole,
   ImportUsersResponse,
+  MyGroupDto,
   OccurrenceDto,
   Paginated,
   PostDto,
   ReportCardBatchRequest,
   ReportCardBatchResponse,
   ReportCardDto,
+  RejectSectionChangeRequest,
   SaveAttendanceRequest,
   SaveGradesRequest,
   SchoolYearDto,
+  SectionChangeListQuery,
+  SectionChangeRequestDto,
   SectionDto,
   StudentAttendanceDto,
   StudentGradesDto,
   SubjectDto,
   TeachingAssignmentDto,
-  TermDto,
+  PeriodDto,
+  UpdateClassSubjectRequest,
+  UpdateGroupRequest,
   UpdateUserRequest,
   UserDto,
   UserListQuery,
 } from '@cdls/shared';
+
+function csvForm(file: File): FormData {
+  const form = new FormData();
+  form.append('file', file);
+  return form;
+}
+
+/** `&createAnyway=3,7`: the file lines the administration chose to create although the person already exists. */
+function anyway(lines: readonly number[]): string {
+  return lines.length ? `&createAnyway=${lines.join(',')}` : '';
+}
 
 type Query = Readonly<Record<string, string | number | boolean | null | undefined>>;
 
@@ -89,6 +138,14 @@ export class ApiClient {
   }
 
   /* School structure */
+  /** The next-year wizard (admin only). */
+  readonly rollover = {
+    /** What the rollover would create and flag; writes nothing. */
+    preview: (body: RolloverRequest) => this.#post<RolloverPreview>('/rollover/preview', body),
+    /** Runs the previewed plan; 409 ROLLOVER_PREVIEW_STALE when the data changed since. */
+    apply: (body: RolloverApplyRequest) => this.#post<RolloverResult>('/rollover/apply', body),
+  };
+
   readonly school = {
     sections: () => this.#get<SectionDto[]>('/sections'),
     years: () => this.#get<SchoolYearDto[]>('/school-years'),
@@ -96,21 +153,50 @@ export class ApiClient {
     setCurrentYear: (id: string) => this.#post<SchoolYearDto>(`/school-years/${id}/current`),
     /** A year that is not the current one and has no classes (409 otherwise). */
     deleteYear: (id: string) => this.#delete(`/school-years/${id}`),
-    createTerm: (yearId: string, body: CreateTermRequest) => this.#post<TermDto>(`/school-years/${yearId}/terms`, body),
+    createTerm: (yearId: string, body: CreatePeriodRequest) => this.#post<PeriodDto>(`/school-years/${yearId}/periods`, body),
     /** A term without grades or report cards (409 otherwise). */
-    deleteTerm: (termId: string) => this.#delete(`/terms/${termId}`),
-    closeTerm: (termId: string) => this.#post<TermDto>(`/terms/${termId}/close`),
-    reopenTerm: (termId: string) => this.#post<TermDto>(`/terms/${termId}/close?closed=false`),
+    updateYear: (id: string, body: UpdateSchoolYearRequest) => this.#patch<SchoolYearDto>(`/school-years/${id}`, body),
+    updatePeriod: (periodId: string, body: UpdatePeriodRequest) => this.#patch<PeriodDto>(`/periods/${periodId}`, body),
+    deleteTerm: (periodId: string) => this.#delete(`/periods/${periodId}`),
+    closeTerm: (periodId: string) => this.#post<PeriodDto>(`/periods/${periodId}/close`),
+    reopenTerm: (periodId: string) => this.#post<PeriodDto>(`/periods/${periodId}/close?closed=false`),
     classes: (query: { schoolYearId?: string } = {}) => this.#get<ClassDto[]>('/classes', query),
     class: (id: string) => this.#get<ClassDto>(`/classes/${id}`),
     createClass: (body: CreateClassRequest) => this.#post<ClassDto>('/classes', body),
-    updateClass: (id: string, body: Partial<Pick<CreateClassRequest, 'code' | 'label'>>) => this.#patch<ClassDto>(`/classes/${id}`, body),
+    updateClass: (id: string, body: UpdateClassRequest) => this.#patch<ClassDto>(`/classes/${id}`, body),
     /** An empty class: no student, grade, attendance or report card (409 otherwise). */
     deleteClass: (id: string) => this.#delete(`/classes/${id}`),
     classStudents: (id: string) => this.#get<ClassStudentDto[]>(`/classes/${id}/students`),
     enroll: (classId: string, studentId: string) => this.#post<EnrollmentDto>(`/classes/${classId}/enrollments`, { studentId }),
     unenroll: (enrollmentId: string) => this.#delete(`/enrollments/${enrollmentId}`),
-    subjects: () => this.#get<SubjectDto[]>('/subjects'),
+    subjects: (includeArchived = false) => this.#get<SubjectDto[]>('/subjects', includeArchived ? { includeArchived } : {}),
+    createSubject: (body: CreateSubjectRequest) => this.#post<SubjectDto>('/subjects', body),
+    updateSubject: (id: string, body: UpdateSubjectRequest) => this.#patch<SubjectDto>(`/subjects/${id}`, body),
+    /** School-wide types plus the teacher's own; `includeArchived` also lists the archived ones (an old event may still have one). */
+    activityTypes: (includeArchived = false) => this.#get<ActivityTypeDto[]>('/activity-types', includeArchived ? { includeArchived } : {}),
+    classSubjects: (classId: string) => this.#get<ClassSubjectDto[]>(`/classes/${classId}/subjects`),
+    addClassSubject: (classId: string, body: CreateClassSubjectRequest) => this.#post<ClassSubjectDto>(`/classes/${classId}/subjects`, body),
+    updateClassSubject: (id: string, body: UpdateClassSubjectRequest) => this.#patch<ClassSubjectDto>(`/class-subjects/${id}`, body),
+    /** 409 while the subject has teachers, grades or graded events. */
+    removeClassSubject: (id: string) => this.#delete(`/class-subjects/${id}`),
+    /** Adds the subjects the class lacks and aligns coefficient and hours of those it has; returns the class's subjects. */
+    copyClassSubjects: (classId: string, body: CopyClassSubjectsRequest) =>
+      this.#post<ClassSubjectDto[]>(`/classes/${classId}/subjects/copy`, body),
+    rooms: () => this.#get<RoomDto[]>('/rooms'),
+    createRoom: (body: CreateRoomRequest) => this.#post<RoomDto>('/rooms', body),
+    updateRoom: (id: string, body: UpdateRoomRequest) => this.#patch<RoomDto>(`/rooms/${id}`, body),
+    /** 409 while events use the room. */
+    deleteRoom: (id: string) => this.#delete(`/rooms/${id}`),
+    createActivityType: (body: CreateActivityTypeRequest) => this.#post<ActivityTypeDto>('/activity-types', body),
+    updateActivityType: (id: string, body: UpdateActivityTypeRequest) => this.#patch<ActivityTypeDto>(`/activity-types/${id}`, body),
+    /** 409 while events use the type. */
+    deleteActivityType: (id: string) => this.#delete(`/activity-types/${id}`),
+    /** Admin: makes a teacher's private type school-wide. */
+    promoteActivityType: (id: string) => this.#post<ActivityTypeDto>(`/activity-types/${id}/promote`),
+    calendarDays: (query: CalendarDayQuery) => this.#get<CalendarDayDto[]>('/calendar-days', { ...query }),
+    createCalendarDay: (body: CreateCalendarDayRequest) => this.#post<CalendarDayDto>('/calendar-days', body),
+    updateCalendarDay: (id: string, body: UpdateCalendarDayRequest) => this.#patch<CalendarDayDto>(`/calendar-days/${id}`, body),
+    deleteCalendarDay: (id: string) => this.#delete(`/calendar-days/${id}`),
     assignments: (query: { teacherId?: string; classId?: string } = {}) => this.#get<TeachingAssignmentDto[]>('/teaching-assignments', query),
     createAssignment: (body: CreateTeachingAssignmentRequest) => this.#post<TeachingAssignmentDto>('/teaching-assignments', body),
     deleteAssignment: (id: string) => this.#delete(`/teaching-assignments/${id}`),
@@ -123,11 +209,23 @@ export class ApiClient {
     create: (body: CreateUserRequest) => this.#post<CreatedUserResponse>('/users', body),
     update: (id: string, body: UpdateUserRequest) => this.#patch<UserDto>(`/users/${id}`, body),
     remove: (id: string) => this.#delete(`/users/${id}`),
-    import: (file: File) => {
-      const form = new FormData();
-      form.append('file', file);
-      return this.#post<ImportUsersResponse>('/users/import', form);
-    },
+    /** Checks a roster CSV: the accounts it would create (generated e-mails) and the line errors. */
+    previewImport: (file: File, role: ImportRole, createAnyway: readonly number[] = []) =>
+      this.#post<ImportPreviewResponse>(`/users/import/preview?role=${role}${anyway(createAnyway)}`, csvForm(file)),
+    /** All or nothing (400 with `errors`); returns the temporary passwords, once. */
+    import: (file: File, role: ImportRole, createAnyway: readonly number[] = []) =>
+      this.#post<ImportUsersResponse>(`/users/import?role=${role}${anyway(createAnyway)}`, csvForm(file)),
+    /** Students who graduated or left: archived accounts, closed enrolments. */
+    archive: (body: ArchiveStudentsRequest) => this.#post<ArchiveStudentsResponse>('/users/archive', body),
+  };
+
+  /* Section changes: the student asks, the administration decides */
+  readonly sectionChanges = {
+    list: (query: SectionChangeListQuery = {}) => this.#get<Paginated<SectionChangeRequestDto>>('/section-changes', { ...query }),
+    mine: () => this.#get<SectionChangeRequestDto[]>('/section-changes/mine'),
+    create: (body: CreateSectionChangeRequest) => this.#post<SectionChangeRequestDto>('/section-changes', body),
+    approve: (id: string, body: ApproveSectionChangeRequest) => this.#post<SectionChangeRequestDto>(`/section-changes/${id}/approve`, body),
+    reject: (id: string, body: RejectSectionChangeRequest) => this.#post<SectionChangeRequestDto>(`/section-changes/${id}/reject`, body),
   };
 
   /* Calendar, homework, announcements */
@@ -154,7 +252,7 @@ export class ApiClient {
     sheet: (eventId: string) => this.#get<GradeSheetDto>(`/events/${eventId}/grades`),
     save: (eventId: string, body: SaveGradesRequest) => this.#put<GradeSheetDto>(`/events/${eventId}/grades`, body),
     publish: (eventId: string, published: boolean) => this.#post<GradeSheetDto>(`/events/${eventId}/grades/publish`, { published }),
-    ofStudent: (studentId: string, query: { termId?: string; from?: string; to?: string } = {}) =>
+    ofStudent: (studentId: string, query: { periodId?: string; from?: string; to?: string } = {}) =>
       this.#get<StudentGradesDto>(`/students/${studentId}/grades`, query),
   };
 
@@ -166,6 +264,21 @@ export class ApiClient {
       this.#get<StudentAttendanceDto[]>(`/students/${studentId}/attendance`, query),
   };
 
+  /* Groups of a class (TP A, LV2 Allemand): staff manage them, a student reads only their own memberships */
+  readonly groups = {
+    /** The groups of a class with their members' ids. */
+    list: (classId: string) => this.#get<GroupWithMembersDto[]>('/groups', { classId }),
+    get: (id: string) => this.#get<GroupDetailDto>(`/groups/${id}`),
+    create: (body: CreateGroupRequest) => this.#post<GroupDetailDto>('/groups', body),
+    update: (id: string, body: UpdateGroupRequest) => this.#patch<GroupDetailDto>(`/groups/${id}`, body),
+    /** 409 while timetable sessions or assigned work use the group. */
+    remove: (id: string) => this.#delete(`/groups/${id}`),
+    /** 409 when a student is already in another group of the division, unless `move`. */
+    addMembers: (id: string, body: AddGroupMembersRequest) => this.#post<GroupDetailDto>(`/groups/${id}/members`, body),
+    removeMember: (id: string, studentId: string) => this.#delete<GroupDetailDto>(`/groups/${id}/members/${studentId}`),
+    mine: () => this.#get<MyGroupDto[]>('/groups/mine'),
+  };
+
   /* Contact form (public) and its messages (admin) */
   readonly contact = {
     send: (body: ContactMessageRequest) => this.#post<void>('/contact', body),
@@ -175,9 +288,9 @@ export class ApiClient {
 
   /* Report cards */
   readonly reportCards = {
-    generate: (termId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/terms/${termId}/report-cards/generate`, body),
-    publish: (termId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/terms/${termId}/report-cards/publish`, body),
-    ofTerm: (termId: string, query: { classId?: string } = {}) => this.#get<ReportCardDto[]>(`/terms/${termId}/report-cards`, query),
+    generate: (periodId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/periods/${periodId}/report-cards/generate`, body),
+    publish: (periodId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/periods/${periodId}/report-cards/publish`, body),
+    ofTerm: (periodId: string, query: { classId?: string } = {}) => this.#get<ReportCardDto[]>(`/periods/${periodId}/report-cards`, query),
     ofStudent: (studentId: string) => this.#get<ReportCardDto[]>(`/students/${studentId}/report-cards`),
     update: (id: string, appreciation: string) => this.#patch<ReportCardDto>(`/report-cards/${id}`, { appreciation }),
     /** The PDF needs the access token, so it is fetched as a blob rather than linked. */

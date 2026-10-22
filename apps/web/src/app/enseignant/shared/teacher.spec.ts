@@ -22,6 +22,7 @@ const assignment = (id: string, classId: string, classLabel: string, subjectId: 
   id,
   teacherId: 't',
   teacherName: 'Hany Mansour',
+  classSubjectId: `cs-${id}`,
   classId,
   classLabel,
   subjectId,
@@ -36,6 +37,7 @@ const klass = (id: string, label: string, sectionId: string, sectionCode: 'bac' 
   code: id,
   label,
   studentCount: 10,
+  nextClassId: null,
 });
 const sections: SectionDto[] = [
   { id: 's-nat', code: 'nationale', label: 'Bac nationale' },
@@ -59,10 +61,14 @@ describe('classes', () => {
 });
 
 describe('event form', () => {
-  it('maps the form to the API input and drops what the kind does not allow', () => {
-    const model = { ...emptyEventModel('2026-10-20', 'a1'), title: ' Contrôle ', kind: 'controle' as const, weekly: true, repeatUntil: '2026-12-01', coefficient: 2, startTime: '08:30' };
-    expect(toEventInput(model, assignments)).toMatchObject({
-      kind: 'controle',
+  it('maps the form to the API input and drops what the type does not allow', () => {
+    const types = [
+      { id: 'ty-controle', repeatable: false, gradable: true },
+      { id: 'ty-cours', repeatable: true, gradable: false },
+    ];
+    const model = { ...emptyEventModel('2026-10-20', 'a1', 'ty-controle'), title: ' Contrôle ', weekly: true, repeatUntil: '2026-12-01', coefficient: 2, startTime: '08:30' };
+    expect(toEventInput(model, assignments, types)).toMatchObject({
+      activityTypeId: 'ty-controle',
       title: 'Contrôle',
       classId: 'c1',
       subjectId: 'mathematiques',
@@ -71,11 +77,11 @@ describe('event form', () => {
       startTime: '08:30',
       endTime: null,
     });
-    const course = { ...model, kind: 'cours' as const, coefficient: 3 };
-    expect(toEventInput(course, assignments)).toMatchObject({ repeatUntil: '2026-12-01', coefficient: 1 });
+    const course = { ...model, activityTypeId: 'ty-cours', coefficient: 3 };
+    expect(toEventInput(course, assignments, types)).toMatchObject({ repeatUntil: '2026-12-01', coefficient: 1 });
   });
   it('reads an event back into the form', () => {
-    const e = { kind: 'tp', title: 'TP', classId: 'c1', subjectId: 'informatique', date: '2026-10-20', startTime: null, endTime: null, repeatUntil: '2026-11-20', place: '', description: '', coefficient: 1 } as unknown as EventDto;
+    const e = { activityTypeId: 'ty-tp', title: 'TP', classId: 'c1', subjectId: 'informatique', date: '2026-10-20', startTime: null, endTime: null, repeatUntil: '2026-11-20', place: '', description: '', coefficient: 1 } as unknown as EventDto;
     expect(modelFromEvent(e, assignments)).toMatchObject({ assignmentId: 'a2', weekly: true, startTime: '' });
   });
   it('checks times', () => {

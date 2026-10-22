@@ -52,7 +52,7 @@ describe('Auth (e2e)', () => {
 
   it('refuses deactivated accounts', async () => {
     const user = await t.prisma.user.findFirstOrThrow({ where: { role: 'student' } });
-    await t.prisma.user.update({ where: { id: user.id }, data: { isActive: false } });
+    await t.prisma.user.update({ where: { id: user.id }, data: { status: 'disabled' } });
     try {
       await t
         .http()
@@ -60,7 +60,7 @@ describe('Auth (e2e)', () => {
         .send({ email: user.email, password: inject('password') })
         .expect(401);
     } finally {
-      await t.prisma.user.update({ where: { id: user.id }, data: { isActive: true } });
+      await t.prisma.user.update({ where: { id: user.id }, data: { status: 'active' } });
     }
   });
 

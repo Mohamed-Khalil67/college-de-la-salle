@@ -14,7 +14,7 @@ import { shiftWeek, weekLabel, weekRange } from '../shared/week';
   template: `
     <div class="page__header">
       <div class="page__header-text">
-        <h1 class="t-h1">Emploi du temps</h1>
+        <h1 class="t-h1">Examens et devoirs</h1>
         <p class="t-muted" aria-live="polite">{{ label() }}</p>
       </div>
       <div class="page__actions">

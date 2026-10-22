@@ -1,10 +1,15 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AccessService } from '../access/access.service.js';
 import { ClassesService } from '../classes/classes.service.js';
+import { TargetsService } from '../targets/targets.service.js';
+import { PeriodsService } from '../periods/periods.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GradesService } from './grades.service.js';
+
+// The archived-year guard reads the database (raw SQL); its own behaviour is covered by the e2e tests.
+vi.mock('../school-years/year-guard.js', () => ({ assertClassWritable: vi.fn(), assertYearWritable: vi.fn() }));
 
 const TEACHER: AuthUser = {
   id: 'u-t',
@@ -15,11 +20,30 @@ const TEACHER: AuthUser = {
   studentId: null,
   teacherId: 't1',
   classId: null,
+  isCoordinator: false,
+  classLabel: null,
+  sectionCode: null,
+  mustChangePassword: false,
+};
+
+const EXAM_TYPE = {
+  id: 'type-examen',
+  code: 'examen',
+  label: 'Examen',
+  colour: 'red',
+  icon: 'file-text',
+  gradable: true,
+  repeatable: false,
+  homework: false,
 };
 
 const event = (overrides = {}) => ({
   id: 'e1',
-  kind: 'examen',
+  activityTypeId: 'type-examen',
+  activityType: EXAM_TYPE,
+  periodId: 'p1',
+  roomId: null,
+  room: null,
   title: 'Examen',
   subjectId: 'mathematiques',
   classId: 'c1',
@@ -38,6 +62,7 @@ const event = (overrides = {}) => ({
   author: { user: { firstName: 'T', lastName: 'T' } },
   schoolClass: null,
   section: null,
+  targets: [],
   ...overrides,
 });
 
@@ -64,14 +89,16 @@ describe('GradesService', () => {
       updateMany: vi.fn(),
     },
     auditLog: { createMany: vi.fn() },
+    $queryRaw: vi.fn(),
   };
   const prisma = {
     event: { findUnique: vi.fn() },
     grade: { findMany: vi.fn().mockResolvedValue([]) },
-    student: { findUnique: vi.fn() },
-    term: { findUnique: vi.fn() },
-    enrollment: { findUnique: vi.fn() },
-    teachingAssignment: { findMany: vi.fn() },
+    period: { findUnique: vi.fn() },
+    enrollment: { findFirst: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    classSubject: { findMany: vi.fn() },
+    groupMember: { findMany: vi.fn().mockResolvedValue([]) },
+    student: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
   const access = { assertTeachesClass: vi.fn(), assertCanReadStudent: vi.fn(), placement: vi.fn() };
@@ -81,19 +108,33 @@ describe('GradesService', () => {
       { id: 's2', userId: 'u2', firstName: 'B', lastName: 'B', studentNumber: null },
     ]),
   };
+  const periods = { assertOpen: vi.fn(), lockOpen: vi.fn() };
+  const rosterOf = () => classes.roster() as Promise<{ id: string }[]>;
+  const targets = {
+    concerned: vi.fn(),
+    concernedIds: vi.fn(),
+    annotate: vi.fn((list: unknown[]) => Promise.resolve(list)),
+  };
   let grades: GradesService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     prisma.event.findUnique.mockResolvedValue(event());
     access.assertTeachesClass.mockResolvedValue(undefined);
+    periods.assertOpen.mockResolvedValue(undefined);
+    periods.lockOpen.mockResolvedValue(undefined);
     tx.grade.findMany.mockResolvedValue([]);
+    targets.concerned.mockImplementation(async () => ({ students: await rosterOf(), entries: [] }));
+    targets.concernedIds.mockImplementation(async () => (await rosterOf()).map((s) => s.id));
+    targets.annotate.mockImplementation((list: unknown[]) => Promise.resolve(list));
     const moduleRef = await Test.createTestingModule({
       providers: [
         GradesService,
         { provide: PrismaService, useValue: prisma },
         { provide: AccessService, useValue: access },
         { provide: ClassesService, useValue: classes },
+        { provide: PeriodsService, useValue: periods },
+        { provide: TargetsService, useValue: targets },
       ],
     }).compile();
     grades = moduleRef.get(GradesService);
@@ -108,7 +149,9 @@ describe('GradesService', () => {
   });
 
   it('refuses events that are not graded, students outside the class and marks above the scale', async () => {
-    prisma.event.findUnique.mockResolvedValueOnce(event({ kind: 'cours' }));
+    prisma.event.findUnique.mockResolvedValueOnce(
+      event({ activityType: { ...EXAM_TYPE, gradable: false } }),
+    );
     await expect(grades.save('e1', { entries: [] }, TEACHER)).rejects.toBeInstanceOf(
       BadRequestException,
     );
@@ -118,6 +161,31 @@ describe('GradesService', () => {
     await expect(
       grades.save('e1', { entries: [{ studentId: 's1', score: 21 }] }, TEACHER),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses grade changes once the event period is closed', async () => {
+    periods.assertOpen.mockRejectedValue(new ConflictException('clôturée'));
+    await expect(
+      grades.save('e1', { entries: [{ studentId: 's1', score: 10 }] }, TEACHER),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(grades.publish('e1', { published: true }, TEACHER)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(periods.assertOpen).toHaveBeenCalledWith(prisma, 'p1');
+    expect(tx.grade.create).not.toHaveBeenCalled();
+  });
+
+  it('re-checks the period under a lock inside the write, so a concurrent close wins', async () => {
+    periods.lockOpen.mockRejectedValue(new ConflictException('clôturée'));
+    await expect(
+      grades.save('e1', { entries: [{ studentId: 's1', score: 10 }] }, TEACHER),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(periods.lockOpen).toHaveBeenCalledWith(tx, 'p1');
+    expect(tx.grade.create).not.toHaveBeenCalled();
+    await expect(grades.publish('e1', { published: true }, TEACHER)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(tx.grade.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates, corrects and removes grades, with one audit row each', async () => {
@@ -176,9 +244,8 @@ describe('GradesService', () => {
         published('mathematiques', 14),
         published('dessin', 12),
       ]);
-      prisma.teachingAssignment.findMany.mockResolvedValue([
-        { subjectId: 'mathematiques', coefficient: 3, subject: { name: 'Mathématiques' } },
-        { subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
+      prisma.classSubject.findMany.mockResolvedValue([
+        { classId: 'c1', subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
       ]);
     });
 
@@ -186,8 +253,8 @@ describe('GradesService', () => {
       access.placement.mockResolvedValue({ classId: 'c1' });
       const result = await grades.forStudent('s1', {}, STUDENT);
       expect(access.assertCanReadStudent).toHaveBeenCalledWith(STUDENT, 's1');
-      expect(prisma.teachingAssignment.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { classId: 'c1' } }),
+      expect(prisma.classSubject.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { classId: { in: ['c1'] } } }),
       );
       expect(result.subjects.map((s) => [s.subjectId, s.average, s.coefficient])).toEqual([
         ['dessin', 12, null],
@@ -195,22 +262,35 @@ describe('GradesService', () => {
       ]);
     });
 
-    it("uses the class of the term's school year", async () => {
-      prisma.term.findUnique.mockResolvedValue({
-        id: 'tm1',
+    it("uses the class of the period's school year, and the events' stored period", async () => {
+      prisma.period.findUnique.mockResolvedValue({
+        id: 'p0',
         schoolYearId: 'y0',
         startsOn: new Date('2025-09-01T00:00:00Z'),
         endsOn: new Date('2025-12-20T00:00:00Z'),
       });
-      prisma.enrollment.findUnique.mockResolvedValue({ classId: 'c-old' });
-      await grades.forStudent('s1', { termId: 'tm1' }, STUDENT);
-      expect(prisma.enrollment.findUnique).toHaveBeenCalledWith(
+      prisma.enrollment.findMany.mockResolvedValue([
+        { classId: 'c-old', enrolledOn: new Date('2025-09-01T00:00:00Z'), leftOn: null },
+      ]);
+      prisma.classSubject.findMany.mockResolvedValue([
+        { classId: 'c-old', subjectId: 'mathematiques', coefficient: 4, subject: { name: 'Mathématiques' } },
+      ]);
+      await grades.forStudent('s1', { periodId: 'p0' }, STUDENT);
+      // By periodId, never by the period's dates (editing them must not move grades).
+      expect(prisma.grade.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { studentId_schoolYearId: { studentId: 's1', schoolYearId: 'y0' } },
+          where: expect.objectContaining({
+            event: expect.objectContaining({ OR: [{ periodId: 'p0' }] }),
+          }),
         }),
       );
-      expect(prisma.teachingAssignment.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { classId: 'c-old' } }),
+      expect(prisma.enrollment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ studentId: 's1', schoolYearId: 'y0' }),
+        }),
+      );
+      expect(prisma.classSubject.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { classId: { in: ['c-old'] } } }),
       );
       expect(access.placement).not.toHaveBeenCalled();
     });
@@ -219,7 +299,7 @@ describe('GradesService', () => {
       access.placement.mockResolvedValue(null);
       const result = await grades.forStudent('s1', {}, STUDENT);
       expect(result.subjects.every((s) => s.coefficient === null)).toBe(true);
-      expect(prisma.teachingAssignment.findMany).not.toHaveBeenCalled();
+      expect(prisma.classSubject.findMany).not.toHaveBeenCalled();
     });
   });
 });

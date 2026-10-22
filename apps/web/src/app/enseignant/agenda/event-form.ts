@@ -1,9 +1,11 @@
-import { Component, computed, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal, output, resource, signal, untracked } from '@angular/core';
 import { form, FormField, maxLength, required, submit, validate } from '@angular/forms/signals';
-import { daysBetween, EVENT_KINDS, EVENT_LIMITS, type EventDto, kindInfo, type TeachingAssignmentDto } from '@cdls/shared';
+import { daysBetween, EVENT_LIMITS, type EventDto, type TeachingAssignmentDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, Field, FieldControl } from '../../ui';
-import { assignmentLabel, emptyEventModel, type EventFormModel, modelFromEvent, sortAssignments, timeProblem, toEventInput } from '../shared/teacher';
+import { TargetPicker } from './target-picker';
+import { isWhole, targetValueOf, toTargetInput, WHOLE_CLASS } from '../../groupes/groups-logic';
+import { assignmentLabel, defaultActivityType, emptyEventModel, type EventFormModel, modelFromEvent, sortAssignments, timeProblem, toEventInput } from '../shared/teacher';
 
 /** First error of a field once it was touched (or a submit was tried). */
 function shownError(state: { touched(): boolean; errors(): readonly { message?: string }[] }): string | null {
@@ -13,15 +15,15 @@ function shownError(state: { touched(): boolean; errors(): readonly { message?: 
 /** Create or edit a calendar event (Signal Forms). Used inside the agenda's modal. */
 @Component({
   selector: 'app-event-form',
-  imports: [FormField, Alert, Button, Field, FieldControl],
+  imports: [FormField, Alert, Button, Field, FieldControl, TargetPicker],
   template: `
     <form class="stack stack--sm" novalidate (submit)="onSubmit($event)">
       @if (failure()) {
         <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
       }
       <cdls-field label="Type">
-        <select cdlsControl [formField]="eventForm.kind">
-          @for (k of kinds; track k.id) {
+        <select cdlsControl [formField]="eventForm.activityTypeId">
+          @for (k of choices(); track k.id) {
             <option [value]="k.id">{{ k.label }}</option>
           }
         </select>
@@ -64,6 +66,12 @@ function shownError(state: { touched(): boolean; errors(): readonly { message?: 
           <input cdlsControl type="number" inputmode="decimal" [formField]="eventForm.coefficient" />
         </cdls-field>
       }
+      @if (targetable()) {
+        <app-target-picker [classId]="classId()" [(value)]="target" [(custom)]="custom" [graded]="event() ? graded() : null" />
+        @if (targetError()) {
+          <p class="field__error" role="alert">{{ targetError() }}</p>
+        }
+      }
       <cdls-field label="Lieu" helper="Facultatif, par exemple « Salle 12 »." [error]="err().place">
         <input cdlsControl type="text" [formField]="eventForm.place" />
       </cdls-field>
@@ -86,7 +94,11 @@ export class EventForm {
   readonly cancelled = output<void>();
 
   readonly #api = inject(ApiClient);
-  protected readonly kinds = EVENT_KINDS;
+  /** The school's activity types plus the teacher's own. */
+  readonly #types = resource({ loader: () => this.#api.school.activityTypes(true) });
+  protected readonly types = computed(() => (this.#types.hasValue() ? this.#types.value() : []));
+  /** What the select offers: active types, plus the archived one the edited event still has. */
+  protected readonly choices = computed(() => this.types().filter((t) => !t.archived || t.id === this.event()?.activityTypeId));
   protected readonly sorted = computed(() => sortAssignments(this.assignments()));
 
   protected readonly model = linkedSignal<EventFormModel>(() => {
@@ -104,7 +116,7 @@ export class EventForm {
       return message ? { kind: 'time', message } : undefined;
     });
     validate(p.repeatUntil, ({ value, valueOf }) => {
-      if (!valueOf(p.weekly) || !kindInfo(valueOf(p.kind)).repeatable) return undefined;
+      if (!valueOf(p.weekly) || !this.#flags(valueOf(p.activityTypeId)).repeatable) return undefined;
       const until = value();
       if (!until) return { kind: 'required', message: 'Indiquez jusqu’à quand l’événement se répète.' };
       if (until < valueOf(p.date)) return { kind: 'order', message: 'La répétition doit finir après le premier jour.' };
@@ -112,7 +124,7 @@ export class EventForm {
       return undefined;
     });
     validate(p.coefficient, ({ value, valueOf }) => {
-      if (!kindInfo(valueOf(p.kind)).gradable) return undefined;
+      if (!this.#flags(valueOf(p.activityTypeId)).gradable) return undefined;
       const c = value();
       return Number.isFinite(c) && c > 0 && c <= 20 ? undefined : { kind: 'range', message: 'Saisissez un coefficient entre 0,5 et 20.' };
     });
@@ -122,8 +134,19 @@ export class EventForm {
     });
   });
 
-  protected readonly repeatable = computed(() => kindInfo(this.model().kind).repeatable);
-  protected readonly gradable = computed(() => kindInfo(this.model().kind).gradable);
+  protected readonly repeatable = computed(() => this.#flags(this.model().activityTypeId).repeatable);
+  protected readonly classId = computed(() => this.assignments().find((a) => a.id === this.model().assignmentId)?.classId ?? '');
+  /** « Assigner à » only exists for the evaluations and the homework of a class. */
+  protected readonly targetable = computed(() => {
+    const f = this.#flags(this.model().activityTypeId);
+    return (f.gradable || f.homework) && !!this.classId();
+  });
+  protected readonly target = linkedSignal(() => targetValueOf(this.event()?.target));
+  protected readonly custom = linkedSignal(() => !isWhole(this.target()));
+  protected readonly targetError = signal<string | null>(null);
+  /** Marks already given for the evaluation being edited: what changing the audience would do to them. */
+  protected readonly graded = signal<number | null>(null);
+  protected readonly gradable = computed(() => this.#flags(this.model().activityTypeId).gradable);
   protected readonly err = computed(() => ({
     title: shownError(this.eventForm.title()),
     assignment: shownError(this.eventForm.assignmentId()),
@@ -135,8 +158,37 @@ export class EventForm {
     description: shownError(this.eventForm.description()),
   }));
 
+  constructor() {
+    // Editing a graded evaluation: count its marks, to say what changing the audience does to them.
+    effect(() => {
+      const e = this.event();
+      untracked(() => {
+        this.graded.set(null);
+        if (!e || !e.type.gradable) {
+          if (e) this.graded.set(0);
+          return;
+        }
+        void this.#api.grades.sheet(e.id).then(
+          (sheet) => this.graded.set(sheet.rows.filter((r) => r.grade).length),
+          () => this.graded.set(null),
+        );
+      });
+    });
+    // A new event starts with the plain weekly type, once the types have arrived (without resetting what was typed).
+    effect(() => {
+      const fallback = defaultActivityType(this.choices())?.id;
+      untracked(() => {
+        if (fallback && !this.event() && !this.model().activityTypeId) this.model.update((m) => ({ ...m, activityTypeId: fallback }));
+      });
+    });
+  }
+
   protected readonly busy = signal(false);
   protected readonly failure = signal<string | null>(null);
+
+  #flags(id: string): { repeatable: boolean; gradable: boolean; homework: boolean } {
+    return this.types().find((t) => t.id === id) ?? { repeatable: false, gradable: false, homework: false };
+  }
 
   protected label(a: TeachingAssignmentDto): string {
     return assignmentLabel(a);
@@ -146,10 +198,20 @@ export class EventForm {
     event.preventDefault();
     if (this.busy()) return;
     void submit(this.eventForm, async () => {
+      this.targetError.set(null);
+      if (this.targetable() && this.custom() && isWhole(this.target())) {
+        this.targetError.set('Choisissez au moins un groupe ou un élève dans « Assigner à », ou revenez à « Toute la classe ».');
+        return undefined;
+      }
       this.busy.set(true);
       this.failure.set(null);
       try {
-        const body = toEventInput(this.model(), this.assignments());
+        const body = toEventInput(
+          this.model(),
+          this.assignments(),
+          this.types(),
+          this.targetable() ? toTargetInput(this.custom() ? this.target() : WHOLE_CLASS) : undefined,
+        );
         const current = this.event();
         this.saved.emit(current ? await this.#api.calendar.update(current.id, body) : await this.#api.calendar.create(body));
       } catch (error) {

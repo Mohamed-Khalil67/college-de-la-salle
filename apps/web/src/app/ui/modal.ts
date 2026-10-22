@@ -11,12 +11,14 @@ let nextId = 0;
   selector: 'cdls-modal',
   imports: [Icon],
   template: `
-    <dialog #dialog class="modal" [attr.aria-labelledby]="titleId" (close)="onClose()">
+    <dialog #dialog class="modal" [attr.aria-labelledby]="titleId" (close)="onClose()" (cancel)="onCancel($event)">
       <div class="modal__header">
         <h2 class="t-h2" [id]="titleId">{{ title() }}</h2>
-        <button class="modal__close" type="button" (click)="open.set(false)">
-          <cdls-icon name="close" /><span class="visually-hidden">Fermer</span>
-        </button>
+        @if (dismissible()) {
+          <button class="modal__close" type="button" (click)="open.set(false)">
+            <cdls-icon name="close" /><span class="visually-hidden">Fermer</span>
+          </button>
+        }
       </div>
       <ng-content />
     </dialog>
@@ -25,6 +27,16 @@ let nextId = 0;
 export class Modal {
   readonly title = input.required<string>();
   readonly open = model(false);
+  /**
+   * False while closing would lose something that is shown only once (temporary passwords) or while a
+   * request is running: Escape and the close button are then off, and the dialog's own button ends it.
+   */
+  readonly dismissible = input(true);
+  /**
+   * Focus goes back to the element that opened the dialog. Turn it off when that element is about to
+   * disappear (a deleted row): the page then moves focus to a stable place from `closed`.
+   */
+  readonly restoreFocus = input(true);
   readonly closed = output<void>();
 
   protected readonly titleId = `cdls-modal-${++nextId}`;
@@ -43,10 +55,14 @@ export class Modal {
     });
   }
 
+  protected onCancel(event: Event): void {
+    if (!this.dismissible()) event.preventDefault();
+  }
+
   protected onClose(): void {
     this.open.set(false);
     this.closed.emit();
-    this.#opener?.focus();
+    if (this.restoreFocus()) this.#opener?.focus();
     this.#opener = null;
   }
 }

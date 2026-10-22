@@ -1,19 +1,33 @@
 /**
- * Demo data for the school (and the sales demo): one school year with three terms, both sections and
- * every class from CLASSES, the subject catalogue, an admin, nine teachers, ten students per class,
- * a timetable, an exam with published grades, a draft test, homework, attendance and announcements.
+ * Demo data for the school (and the sales demo): one school year with three trimesters and a holiday, both
+ * sections and every class from CLASSES, the subject catalogue and each class's subjects, rooms, the system
+ * activity types, an admin, ten teachers (one coordinator), ten students per class, a timetable, an exam
+ * with published grades, a draft test, homework, attendance and announcements.
  *
  * Run with `npm run db:seed` (also runs after `prisma migrate reset`). It wipes the tables first.
  * Passwords are random on every run and written only to apps/api/demo-credentials.local.md (gitignored).
+ * Demo accounts are marked as not needing a password change, so they sign in straight to their space;
+ * accounts created from the administration (or by the e2e tests) go through the first sign-in instead.
  */
 import 'dotenv/config';
 import { randomBytes } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { CLASSES, MATIERES, matieresFor, SECTION_LABELS, type SectionId } from '@cdls/shared';
+import {
+  assignSchoolEmails,
+  CLASSES,
+  MATIERES,
+  matieresFor,
+  schoolEmailLocalPart,
+  SECTION_LABELS,
+  type SectionId,
+  SYSTEM_ACTIVITY_TYPES,
+} from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role, type Prisma } from '../src/generated/prisma/client.js';
+import { seedGroups } from './seed-groups.js';
+import { hoursPerWeek, seedTimetable, type TimetableClassSubject } from './seed-timetable.js';
 
 // The e2e tests seed their own database with a known password and a temporary credentials file.
 const CREDENTIALS_FILE =
@@ -42,13 +56,6 @@ const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.lengt
 
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const password = () => randomBytes(12).toString('base64url');
-const slug = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z]+/g, '-')
-    .replace(/^-|-$/g, '');
 
 /** `sections` limits a teacher to one track (French is taught by a different teacher in each). */
 const TEACHERS: readonly {
@@ -132,6 +139,24 @@ const LAST_NAMES = [
 ];
 
 const YEAR = { label: '2026-2027', startsOn: '2026-09-06', endsOn: '2027-06-17' };
+const ROOMS = [
+  { name: 'Salle 8', capacity: 30, kind: 'classroom' },
+  { name: 'Salle 12', capacity: 30, kind: 'classroom' },
+  { name: 'Salle 14', capacity: 28, kind: 'classroom' },
+  { name: 'Salle 16', capacity: 30, kind: 'classroom' },
+  { name: 'Salle 18', capacity: 30, kind: 'classroom' },
+  { name: 'Salle 20', capacity: 28, kind: 'classroom' },
+  { name: 'Laboratoire de sciences', capacity: 24, kind: 'lab' },
+  { name: 'Salle informatique', capacity: 24, kind: 'lab' },
+  { name: 'Gymnase', capacity: 80, kind: 'gym' },
+  { name: 'Grande salle', capacity: 200, kind: 'hall' },
+] as const;
+
+/** Days without classes: a holiday for the whole school, in the middle of the winter break. */
+const CALENDAR_DAYS = [
+  { type: 'holiday', label: 'Vacances d’hiver', startsOn: '2026-12-20', endsOn: '2027-01-02' },
+] as const;
+
 const TERMS = [
   { number: 1, label: '1er trimestre', startsOn: '2026-09-06', endsOn: '2026-12-17' },
   { number: 2, label: '2e trimestre', startsOn: '2027-01-03', endsOn: '2027-03-25' },
@@ -141,22 +166,33 @@ const TERMS = [
 async function wipe(): Promise<void> {
   // Children before parents.
   await prisma.auditLog.deleteMany();
+  await prisma.assessmentTarget.deleteMany();
+  await prisma.groupMember.deleteMany();
+  await prisma.occupancy.deleteMany();
+  await prisma.slotException.deleteMany();
+  await prisma.timetableSlot.deleteMany();
+  await prisma.sectionChangeRequest.deleteMany();
   await prisma.reportCard.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.homeworkCompletion.deleteMany();
   await prisma.grade.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.group.deleteMany();
   await prisma.post.deleteMany();
   await prisma.teachingAssignment.deleteMany();
+  await prisma.classSubject.deleteMany();
   await prisma.enrollment.deleteMany();
+  await prisma.calendarDay.deleteMany();
   await prisma.schoolClass.deleteMany();
-  await prisma.term.deleteMany();
+  await prisma.period.deleteMany();
   await prisma.schoolYear.deleteMany();
-  await prisma.section.deleteMany();
+  await prisma.room.deleteMany();
+  await prisma.activityType.deleteMany();
   await prisma.subject.deleteMany();
   await prisma.student.deleteMany();
   await prisma.teacher.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.section.deleteMany();
 }
 
 async function main(): Promise<void> {
@@ -171,12 +207,18 @@ async function main(): Promise<void> {
       startsOn: day(YEAR.startsOn),
       endsOn: day(YEAR.endsOn),
       isCurrent: true,
-      terms: {
+      periods: {
         create: TERMS.map((t) => ({ ...t, startsOn: day(t.startsOn), endsOn: day(t.endsOn) })),
       },
     },
   });
   const term1 = TERMS[0]!;
+  const periodByNumber = new Map(
+    (await prisma.period.findMany({ where: { schoolYearId: year.id } })).map((p) => [
+      p.number,
+      p.id,
+    ]),
+  );
 
   const sections = new Map<SectionId, string>();
   for (const code of Object.keys(SECTION_LABELS) as SectionId[]) {
@@ -185,7 +227,41 @@ async function main(): Promise<void> {
   }
 
   await prisma.subject.createMany({
-    data: MATIERES.map((m) => ({ id: m.id, name: m.name, group: m.group })),
+    data: MATIERES.map((m) => ({
+      id: m.id,
+      name: m.name,
+      group: m.group,
+      sections: [...m.tracks],
+    })),
+  });
+
+  // The system activity types (one per old event kind), created by the migration and re-created here.
+  const typeIds = new Map<string, string>();
+  for (const [i, t] of SYSTEM_ACTIVITY_TYPES.entries()) {
+    const row = await prisma.activityType.create({
+      data: { ...t, isSystem: true, sortOrder: i + 1 },
+    });
+    typeIds.set(t.code, row.id);
+  }
+  const typeId = (code: string) => {
+    const id = typeIds.get(code);
+    if (!id) throw new Error(`Unknown activity type ${code}`);
+    return id;
+  };
+
+  await prisma.room.createMany({ data: [...ROOMS] });
+  const roomIds = new Map((await prisma.room.findMany()).map((r) => [r.name, r.id]));
+  const homeroomNames = ['Salle 8', 'Salle 12', 'Salle 14', 'Salle 16', 'Salle 18', 'Salle 20'];
+  const homerooms = new Map<string, string>();
+  const timetableEntries: TimetableClassSubject[] = [];
+  await prisma.calendarDay.createMany({
+    data: CALENDAR_DAYS.map((d) => ({
+      schoolYearId: year.id,
+      type: d.type,
+      label: d.label,
+      startsOn: day(d.startsOn),
+      endsOn: day(d.endsOn),
+    })),
   });
 
   // People ------------------------------------------------------------------------------------------
@@ -196,13 +272,14 @@ async function main(): Promise<void> {
       role: Role.admin,
       firstName: 'Nadia',
       lastName: 'Fahmy',
+      mustChangePassword: false,
     },
   });
 
   const teacherBySubject = new Map<string, { id: string; userId: string }>();
   const teacherEmails: string[] = [];
   for (const t of TEACHERS) {
-    const email = `${slug(t.first)}.${slug(t.last)}@${DOMAIN}`;
+    const email = `${schoolEmailLocalPart(t.first, t.last)!}@${DOMAIN}`;
     const user = await prisma.user.create({
       data: {
         email,
@@ -210,7 +287,9 @@ async function main(): Promise<void> {
         role: Role.teacher,
         firstName: t.first,
         lastName: t.last,
-        teacher: { create: {} },
+        mustChangePassword: false,
+        // Ingy Samir coordinates the year's structure (the demo shows both teacher kinds).
+        teacher: { create: { isCoordinator: t.last === 'Samir' } },
       },
       include: { teacher: true },
     });
@@ -241,22 +320,33 @@ async function main(): Promise<void> {
         data: { schoolYearId: year.id, sectionId, code: option.value, label: option.label },
       });
 
-      await prisma.teachingAssignment.createMany({
-        data: matieresFor(code).map((m) => ({
-          teacherId: teacherFor(m.id, code).id,
+      homerooms.set(schoolClass.id, roomIds.get(homeroomNames[homerooms.size]!)!);
+      for (const m of matieresFor(code)) {
+        const teacherId = teacherFor(m.id, code).id;
+        const classSubject = await prisma.classSubject.create({
+          data: {
+            classId: schoolClass.id,
+            subjectId: m.id,
+            coefficient: COEFFICIENTS[m.id] ?? 1,
+            hoursPerWeek: hoursPerWeek(m.id, code) || null,
+            assignments: { create: { teacherId } },
+          },
+        });
+        timetableEntries.push({
           classId: schoolClass.id,
+          section: code,
           subjectId: m.id,
-          coefficient: COEFFICIENTS[m.id] ?? 1,
-        })),
-      });
+          classSubjectId: classSubject.id,
+          teacherId,
+        });
+      }
 
       const students: string[] = [];
       for (let i = 0; i < STUDENTS_PER_CLASS; i++) {
         const first = pick(FIRST_NAMES);
         const last = pick(LAST_NAMES);
-        let email = `${slug(first)}.${slug(last)}@${DOMAIN}`;
-        for (let n = 2; usedEmails.has(email); n++)
-          email = `${slug(first)}.${slug(last)}${n}@${DOMAIN}`;
+        // The same school e-mail rule as the roster import (prenom.nom, numbered when taken).
+        const email = assignSchoolEmails([{ firstName: first, lastName: last }], DOMAIN, usedEmails)[0]!;
         usedEmails.add(email);
         studentNumber++;
         const user = await prisma.user.create({
@@ -266,8 +356,10 @@ async function main(): Promise<void> {
             role: Role.student,
             firstName: first,
             lastName: last,
+            mustChangePassword: false,
             student: {
               create: {
+                sectionId,
                 studentNumber: `CDLS-2026-${String(studentNumber).padStart(4, '0')}`,
                 enrollments: {
                   create: {
@@ -290,7 +382,7 @@ async function main(): Promise<void> {
       const second = code === 'bac' ? 'francais' : 'arabe';
       events.push(
         {
-          kind: 'cours',
+          activityTypeId: typeId('cours'),
           title: 'Mathématiques',
           subjectId: 'mathematiques',
           classId: schoolClass.id,
@@ -302,7 +394,7 @@ async function main(): Promise<void> {
           authorId: teacherFor('mathematiques').id,
         },
         {
-          kind: 'cours',
+          activityTypeId: typeId('cours'),
           title: second === 'francais' ? 'Français' : 'Langue arabe',
           subjectId: second,
           classId: schoolClass.id,
@@ -314,7 +406,8 @@ async function main(): Promise<void> {
           authorId: teacherFor(second, code).id,
         },
         {
-          kind: 'examen',
+          activityTypeId: typeId('examen'),
+          periodId: periodByNumber.get(1),
           title: 'Examen de mathématiques n° 1',
           subjectId: 'mathematiques',
           classId: schoolClass.id,
@@ -327,7 +420,8 @@ async function main(): Promise<void> {
           authorId: teacherFor('mathematiques').id,
         },
         {
-          kind: 'controle',
+          activityTypeId: typeId('controle'),
+          periodId: periodByNumber.get(1),
           title: second === 'francais' ? 'Contrôle de français' : "Contrôle d'arabe",
           subjectId: second,
           classId: schoolClass.id,
@@ -337,7 +431,8 @@ async function main(): Promise<void> {
           authorId: teacherFor(second, code).id,
         },
         {
-          kind: 'devoir',
+          activityTypeId: typeId('devoir'),
+          periodId: periodByNumber.get(1),
           title: 'Exercices 4 à 9 page 52',
           subjectId: 'physique-chimie',
           classId: schoolClass.id,
@@ -349,9 +444,28 @@ async function main(): Promise<void> {
     }
   }
 
+  // The levels: each class points at the class of the next level (the last of a track has none: its students
+  // graduate). The rollover promotes the students through these links.
+  for (const [code, sectionId] of sections) {
+    const levels = CLASSES[code];
+    const ids = new Map(
+      (
+        await prisma.schoolClass.findMany({ where: { schoolYearId: year.id, sectionId } })
+      ).map((c) => [c.code, c.id]),
+    );
+    for (const [i, level] of levels.entries()) {
+      const next = levels[i + 1];
+      if (next)
+        await prisma.schoolClass.update({
+          where: { id: ids.get(level.value)! },
+          data: { nextClassId: ids.get(next.value)! },
+        });
+    }
+  }
+
   events.push(
     {
-      kind: 'reunion',
+      activityTypeId: typeId('reunion'),
       title: "Réunion d'information sur le Bac français",
       sectionId: sections.get('bac')!,
       date: day('2026-11-02'),
@@ -361,7 +475,7 @@ async function main(): Promise<void> {
       authorId: teacherFor('francais', 'bac').id,
     },
     {
-      kind: 'activite',
+      activityTypeId: typeId('activite'),
       title: 'Journée sportive',
       date: day('2026-11-05'),
       place: 'Terrain de sport',
@@ -371,6 +485,31 @@ async function main(): Promise<void> {
     },
   );
   const createdEvents = await prisma.event.createManyAndReturn({ data: events });
+  // Every assessment and homework of a class is addressed to the whole class unless a group is named.
+  const targeted = new Set([typeId('examen'), typeId('controle'), typeId('devoir')]);
+  await prisma.assessmentTarget.createMany({
+    data: createdEvents
+      .filter((e) => e.classId && targeted.has(e.activityTypeId))
+      .map((e) => ({ eventId: e.id, scope: 'class' as const })),
+  });
+
+  // The weekly timetable (no conflicts: the scheduler and the database both refuse them).
+  const timetable = await seedTimetable(prisma, {
+    entries: timetableEntries,
+    rooms: roomIds,
+    homerooms,
+    activityTypes: typeIds,
+    validFrom: YEAR.startsOn,
+    validTo: YEAR.endsOn,
+    substituteTeacherId: teacherFor('informatique').id,
+  });
+
+  // Groups ---------------------------------------------------------------------------------------------
+  const groupsDemo = await seedGroups(prisma, {
+    rosters: classRosters,
+    typeId,
+    teacherId: teacherFor('physique-chimie').id,
+  });
 
   // Grades, homework, attendance ----------------------------------------------------------------------
   const grades: Prisma.GradeCreateManyInput[] = [];
@@ -380,10 +519,12 @@ async function main(): Promise<void> {
 
   for (const roster of classRosters) {
     const ofClass = createdEvents.filter((e) => e.classId === roster.classId);
-    const exam = ofClass.find((e) => e.kind === 'examen')!;
-    const test = ofClass.find((e) => e.kind === 'controle')!;
-    const homework = ofClass.find((e) => e.kind === 'devoir')!;
-    const mathsCourse = ofClass.find((e) => e.kind === 'cours' && e.subjectId === 'mathematiques')!;
+    const exam = ofClass.find((e) => e.activityTypeId === typeId('examen'))!;
+    const test = ofClass.find((e) => e.activityTypeId === typeId('controle'))!;
+    const homework = ofClass.find((e) => e.activityTypeId === typeId('devoir'))!;
+    const mathsCourse = ofClass.find(
+      (e) => e.activityTypeId === typeId('cours') && e.subjectId === 'mathematiques',
+    )!;
 
     roster.students.forEach((studentId, i) => {
       grades.push(
@@ -479,7 +620,7 @@ async function main(): Promise<void> {
 
   console.log(
     `Seeded ${YEAR.label}: ${classRosters.length} classes, ${TEACHERS.length} teachers, ${studentNumber} students, ` +
-      `${createdEvents.length} events, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
+      `${createdEvents.length} events, ${timetable.slots} timetable slots, ${groupsDemo.groups} groups, ${grades.length} grades. Demo credentials written to ${CREDENTIALS_FILE}`,
   );
 }
 
