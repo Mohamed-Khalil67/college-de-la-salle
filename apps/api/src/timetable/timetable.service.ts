@@ -698,9 +698,11 @@ export class TimetableService {
       throw new BadRequestException(`Un « ${type.label} » ne se répète pas chaque semaine.`);
     if (!input.groupId) return { ...input, groupId: null };
     // A session for a group: the group is one of this class, and its division is the slot's division.
-    const group = await tx.group.findUnique({ where: { id: input.groupId } });
+    // Read under a shared lock: a change of the group's division waits for this save (or the reverse).
+    const [group] = await tx.$queryRaw<{ id: string; class_id: string; division: string }[]>`
+      SELECT id, class_id, division FROM groups WHERE id = ${input.groupId}::uuid FOR SHARE`;
     if (!group) throw notFound('Groupe');
-    if (group.classId !== classSubject.classId)
+    if (group.class_id !== classSubject.classId)
       throw new BadRequestException('Ce groupe n’est pas un groupe de la classe de cette séance.');
     if (input.division && input.division !== group.division)
       throw new BadRequestException(

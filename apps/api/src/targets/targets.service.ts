@@ -152,9 +152,10 @@ export class TargetsService {
     const wanted = entriesOf(input ?? { groupIds: [], studentIds: [] });
     await this.validate(tx, classId, wanted);
 
-    if (current.length && !options.classChanged) {
+    if (!options.classChanged) {
       const roster = await this.roster(tx, classId);
-      const before = toEntries(current);
+      // No row at all means the whole class: narrowing it must respect the marks already given too.
+      const before: TargetEntry[] = current.length ? toEntries(current) : [{ scope: 'class' }];
       const context = await this.context(tx, roster, [...before, ...wanted]);
       const keep = new Set(targetedStudentIds(wanted, context));
       const removed = targetedStudentIds(before, context).filter((id) => !keep.has(id));

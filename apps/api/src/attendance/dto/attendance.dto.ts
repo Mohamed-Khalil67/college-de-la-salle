@@ -41,6 +41,8 @@ class AttendanceRowDto {
   student: StudentSummaryDto;
   @ApiProperty({ type: AttendanceRecordDto, nullable: true })
   record: AttendanceRecordDto | null;
+  /** False: recorded that day, but no longer concerned (left the group). */
+  targeted: boolean;
 }
 
 export class AttendanceSheetDto implements AttendanceSheetContract {

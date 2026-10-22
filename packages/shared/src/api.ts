@@ -1252,6 +1252,8 @@ export interface AttendanceSheetDto {
   readonly rows: readonly {
     readonly student: StudentSummaryDto;
     readonly record: AttendanceRecordDto | null;
+    /** False for a student with a record that day who is no longer concerned (left the group): the record is kept and can be corrected. */
+    readonly targeted: boolean;
   }[];
 }
 

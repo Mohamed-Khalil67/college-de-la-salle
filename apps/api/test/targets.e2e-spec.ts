@@ -324,6 +324,19 @@ describe('Targets (e2e)', () => {
       expect((back.body as EventDto).target).toMatchObject({ whole: true, concerned: 10 });
     });
 
+    it('treats an event with no target row as the whole class when narrowing it', async () => {
+      const exam = (await make('examen')).body as EventDto;
+      await put(maths, `events/${exam.id}/grades`, {
+        entries: [{ studentId: B()[0]!.id, score: 11 }],
+      }).expect(200);
+      // An event made before the backfill has no row: it still means the whole class.
+      await t.prisma.assessmentTarget.deleteMany({ where: { eventId: exam.id } });
+      const res = await patch(maths, `events/${exam.id}`, { target: target([groupA]) });
+      expect(res.status).toBe(409);
+      expect(message(res.body)).toContain(B()[0]!.name);
+      expect(await t.prisma.grade.count({ where: { eventId: exam.id } })).toBe(1);
+    });
+
     it('leaves the target alone when a patch does not mention it, and follows a change of type', async () => {
       const hw = (await make('devoir', { target: target([groupA]) })).body as EventDto;
       const renamed = await patch(maths, `events/${hw.id}`, { title: 'E2E renommé' }).expect(200);
@@ -355,6 +368,15 @@ describe('Targets (e2e)', () => {
       }).expect(200);
       const after = (await get(maths, `events/${exam.id}/attendance?date=${day}`).expect(200)).body as AttendanceSheetDto;
       expect(after.rows.find((r) => r.student.id === B()[0]!.id)!.record).toMatchObject({ status: 'late', minutesLate: 5 });
+      // A student recorded that day who leaves the group stays on the sheet and the record can be corrected.
+      await t.http().delete(`/api/groups/${groupB.id}/members/${B()[0]!.id}`).set(bearer(admin)).expect(200);
+      const kept = (await get(maths, `events/${exam.id}/attendance?date=${day}`).expect(200)).body as AttendanceSheetDto;
+      const row = kept.rows.find((r) => r.student.id === B()[0]!.id)!;
+      expect(row).toMatchObject({ targeted: false, record: { status: 'late' } });
+      await put(maths, `events/${exam.id}/attendance`, {
+        date: day,
+        records: [{ studentId: B()[0]!.id, status: 'excused' }],
+      }).expect(200);
       // A class event with no target still rolls the whole class.
       const whole = (await make('examen', { date: friday(1), startTime: '09:00', endTime: '10:00' })).body as EventDto;
       const all = (await get(maths, `events/${whole.id}/attendance?date=${friday(1)}`).expect(200)).body as AttendanceSheetDto;

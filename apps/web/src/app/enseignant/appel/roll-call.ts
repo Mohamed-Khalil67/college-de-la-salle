@@ -53,6 +53,7 @@ const PRESENT: Entry = { status: 'present', note: '' };
             <li
               app-roll-item
               [student]="row.student"
+              [former]="!row.targeted"
               [status]="entries()[row.student.id]?.status ?? 'present'"
               (statusChange)="set(row.student.id, { status: $event })"
               [note]="entries()[row.student.id]?.note ?? ''"

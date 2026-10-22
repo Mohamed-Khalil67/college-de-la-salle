@@ -3,7 +3,7 @@ import { occurrences } from '@cdls/shared';
 import type { Attendance } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
-import { ClassesService } from '../classes/classes.service.js';
+import { ClassesService, toStudentSummary } from '../classes/classes.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
@@ -43,12 +43,29 @@ export class AttendanceService {
       this.prisma.attendance.findMany({ where: { eventId, date: fromDay(date) } }),
     ]);
     const byStudent = new Map(records.map((r) => [r.studentId, toRecordDto(r)]));
+    // A student recorded that day who has since left the group stays on the sheet, so the record can still be corrected.
+    const concerned = new Set(students.map((s) => s.id));
+    const former = records.filter((r) => !concerned.has(r.studentId));
+    const formerStudents = former.length
+      ? (
+          await this.prisma.student.findMany({
+            where: { id: { in: former.map((r) => r.studentId) } },
+            include: { user: true },
+          })
+        ).map(toStudentSummary)
+      : [];
     const [eventDto] = await this.targets.annotate([toEventDto(event)], user);
-    return {
-      event: eventDto!,
-      date,
-      rows: students.map((student) => ({ student, record: byStudent.get(student.id) ?? null })),
-    };
+    const rows = [
+      ...students.map((student) => ({ student, targeted: true })),
+      ...formerStudents.map((student) => ({ student, targeted: false })),
+    ]
+      .sort(
+        (a, b) =>
+          a.student.lastName.localeCompare(b.student.lastName, 'fr') ||
+          a.student.firstName.localeCompare(b.student.firstName, 'fr'),
+      )
+      .map((r) => ({ ...r, record: byStudent.get(r.student.id) ?? null }));
+    return { event: eventDto!, date, rows };
   }
 
   /** Saves the roll call of one day (upsert per student). */
@@ -68,6 +85,12 @@ export class AttendanceService {
       // Lock the event, then check who it concerns: a change of « Assigner à » at the same moment waits.
       await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId}::uuid FOR UPDATE`;
       const concerned = new Set(await this.targets.concernedIds(tx, event));
+      // A record already taken that day can still be corrected for a student who left the group.
+      const taken = await tx.attendance.findMany({
+        where: { eventId, date, studentId: { in: dto.records.map((r) => r.studentId) } },
+        select: { studentId: true },
+      });
+      for (const t of taken) concerned.add(t.studentId);
       const outside = dto.records.find((r) => !concerned.has(r.studentId));
       if (outside) {
         const s = rosterRows.find((x) => x.id === outside.studentId);

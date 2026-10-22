@@ -103,15 +103,21 @@ export class GroupsService {
     const label = dto.label ?? current.label;
     if (division === current.division && label === current.label)
       return this.detail(this.prisma, current);
-    if (
-      division !== current.division &&
-      (await this.prisma.timetableSlot.count({ where: { groupId: id } }))
-    )
-      throw new ConflictException(
-        `${HAS_SLOTS} (Changer la division d’un groupe change la façon dont ses séances se chevauchent.)`,
-      );
     try {
       await this.prisma.$transaction(async (tx) => {
+        if (division !== current.division) {
+          // The group row is locked first: a session being added to it (which reads the group FOR SHARE)
+          // waits, so no session keeps the old division.
+          await tx.$queryRaw`SELECT id FROM groups WHERE id = ${id}::uuid FOR UPDATE`;
+          if (await tx.timetableSlot.count({ where: { groupId: id } }))
+            throw new ConflictException(
+              `${HAS_SLOTS} (Changer la division d’un groupe change la façon dont ses séances se chevauchent.)`,
+            );
+        }
+        if (await tx.group.findFirst({ where: { classId: current.classId, division, label, id: { not: id } } }))
+          throw new ConflictException(
+            `Un groupe « ${label} » existe déjà dans la division « ${division} » de cette classe.`,
+          );
         await tx.group.update({ where: { id }, data: { division, label } });
         if (division !== current.division)
           await tx.groupMember.updateMany({ where: { groupId: id }, data: { division } });

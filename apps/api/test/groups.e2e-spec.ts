@@ -321,6 +321,19 @@ describe('Groups (e2e)', () => {
       await t.http().delete(`/api/groups/${g.id}`).set(bearer(maths)).expect(204);
     });
 
+    it('says which rule a change of division breaks', async () => {
+      const a = await group(maths, 'E2E A', 'TP');
+      await group(maths, 'E2E A', 'E2E LV2');
+      const res = await t.http().patch(`/api/groups/${a.id}`).set(bearer(maths)).send({ division: 'E2E LV2' }).expect(409);
+      expect(message(res.body)).toContain('existe déjà');
+      const b = await group(maths, 'E2E B', 'TP');
+      const other = await group(maths, 'E2E C', 'E2E LV2');
+      await post(maths, `groups/${b.id}/members`, { studentIds: [students[0]] }).expect(201);
+      await post(maths, `groups/${other.id}/members`, { studentIds: [students[0]] }).expect(201);
+      const clash = await t.http().patch(`/api/groups/${b.id}`).set(bearer(maths)).send({ division: 'E2E LV2' }).expect(409);
+      expect(message(clash.body)).toContain('un groupe par division');
+    });
+
     it('renames a group and lists the groups by division', async () => {
       await group(maths, 'E2E B', 'TP');
       const a = await group(maths, 'E2E A', 'TP');

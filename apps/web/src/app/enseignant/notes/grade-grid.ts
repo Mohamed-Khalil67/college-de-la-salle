@@ -80,6 +80,11 @@ type Marks = Readonly<Record<string, number | null>>;
                   } @else {
                     <span class="tabular">{{ scoreIn(sheet, row.student.id) }}</span>
                     <cdls-badge tone="warning">N’est plus concerné : note conservée</cdls-badge>
+                    @if (row.grade) {
+                      <button cdlsButton variant="tertiary" size="sm" type="button" [disabled]="removed().has(row.student.id)" (click)="removeFormer(row.student.id)">
+                        {{ removed().has(row.student.id) ? 'Note retirée à l’enregistrement' : 'Retirer la note' }}<span class="visually-hidden"> de {{ name(row.student) }}</span>
+                      </button>
+                    }
                   }
                 </td>
                 <td class="num"><b>{{ avg(studentAverage(row.student.id)) }}</b></td>
@@ -164,7 +169,7 @@ export class GradeGrid {
   protected readonly dirty = computed(() => {
     const saved = this.#saved();
     const marks = this.marks();
-    return Object.keys(saved).some((id) => !same(saved[id] ?? null, marks[id] ?? null));
+    return this.removed().size > 0 || Object.keys(saved).some((id) => !same(saved[id] ?? null, marks[id] ?? null));
   });
   /** The students the work concerns today (a graded student who left the group is shown, read-only). */
   protected readonly targetedRows = computed(() => (this.main()?.rows ?? []).filter((r) => r.targeted));
@@ -173,13 +178,21 @@ export class GradeGrid {
     gradeIssues(this.targetedRows().map((r) => ({ name: this.name(r.student), score: this.marks()[r.student.id] ?? null })), this.outOf()),
   );
   protected readonly issuesText = computed(() => issuesSentence(this.issues()));
-  protected readonly classAverage = computed(() => columnAverage(Object.values(this.marks()), this.outOf()));
+  protected readonly classAverage = computed(() => columnAverage(this.targetedRows().map((r) => this.marks()[r.student.id] ?? null), this.outOf()));
   protected readonly countText = computed(() => {
     const total = this.targetedRows().length;
-    const given = Object.values(this.marks()).filter((m) => m !== null && isValidScore(m, this.outOf())).length;
+    const given = this.targetedRows().filter((r) => {
+      const m = this.marks()[r.student.id] ?? null;
+      return m !== null && isValidScore(m, this.outOf());
+    }).length;
     return `${plural(given, 'note')} sur ${total}`;
   });
 
+  /** Graded students who left the group whose mark the teacher chose to remove (sent as an empty mark on save). */
+  protected readonly removed = signal<ReadonlySet<string>>(new Set());
+  protected removeFormer(id: string): void {
+    this.removed.update((s) => new Set([...s, id]));
+  }
   protected readonly busy = signal(false);
   protected readonly savedAt = signal<Date | null>(null);
   protected readonly failure = signal<string | null>(null);
@@ -245,12 +258,16 @@ export class GradeGrid {
     this.busy.set(true);
     this.failure.set(null);
     try {
-      const entries = this.targetedRows().map((r) => ({
-        studentId: r.student.id,
-        score: this.marks()[r.student.id] ?? null,
-        comment: r.grade?.comment ?? '',
-      }));
+      const entries = [
+        ...this.targetedRows().map((r) => ({
+          studentId: r.student.id,
+          score: this.marks()[r.student.id] ?? null,
+          comment: r.grade?.comment ?? '',
+        })),
+        ...[...this.removed()].map((studentId) => ({ studentId, score: null, comment: '' })),
+      ];
       this.#replace(await this.#api.grades.save(sheet.event.id, { outOf: this.outOf(), entries }));
+      this.removed.set(new Set());
       this.savedAt.set(new Date());
       return true;
     } catch (error) {

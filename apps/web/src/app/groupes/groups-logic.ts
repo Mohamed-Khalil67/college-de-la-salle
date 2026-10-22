@@ -133,7 +133,9 @@ export function eventTargetLine(target: AssessmentTargetDto | null | undefined):
     ...target.groups.map((g) => g.label),
     ...(target.studentIds.length ? [target.studentIds.length === 1 ? '1 élève nommé' : `${target.studentIds.length} élèves nommés`] : []),
   ];
-  return `${parts.join(', ')}${count === null ? '' : ` : ${concernedLabel(count)}`}`;
+  // A student is never told who else was named: the line then says only that it is a part of the class.
+  const who = parts.length ? parts.join(', ') : 'Une partie de la classe';
+  return `${who}${count === null ? '' : ` : ${concernedLabel(count)}`}`;
 }
 
 /**
