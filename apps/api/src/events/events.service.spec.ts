@@ -10,6 +10,9 @@ import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EventsService } from './events.service.js';
 
+// The archived-year guard reads the database (raw SQL); its own behaviour is covered by the e2e tests.
+vi.mock('../school-years/year-guard.js', () => ({ assertClassWritable: vi.fn(), assertYearWritable: vi.fn() }));
+
 const TEACHER: AuthUser = {
   id: 'u-t',
   email: 't@x.y',

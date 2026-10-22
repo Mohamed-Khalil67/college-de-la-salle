@@ -15,6 +15,7 @@ import {
 } from '../events/event.mapper.js';
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import { TargetsService } from '../targets/targets.service.js';
 import type {
   AttendanceRecordDto,
@@ -71,6 +72,7 @@ export class AttendanceService {
   /** Saves the roll call of one day (upsert per student). */
   async save(eventId: string, dto: SaveAttendanceDto, user: AuthUser): Promise<AttendanceSheetDto> {
     const event = await this.classEvent(eventId, dto.date, user);
+    await assertClassWritable(this.prisma, event.classId);
     const rosterRows = await this.classes.roster(event.classId!);
     const roster = new Set(rosterRows.map((s) => s.id));
     for (const r of dto.records) {
@@ -82,6 +84,8 @@ export class AttendanceService {
     const recordedById = user.teacherId ?? event.authorId;
     const date = fromDay(dto.date);
     await this.prisma.$transaction(async (tx) => {
+      // Shared lock on the school year: archiving it waits for this roll call, and a later one is refused.
+      await assertClassWritable(tx, event.classId);
       // Lock the event, then check who it concerns: a change of « Assigner à » at the same moment waits.
       await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId}::uuid FOR UPDATE`;
       const concerned = new Set(await this.targets.concernedIds(tx, event));

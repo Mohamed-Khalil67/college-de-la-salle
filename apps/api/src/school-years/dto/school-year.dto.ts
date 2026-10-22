@@ -4,6 +4,7 @@ import { IsOptional } from 'class-validator';
 import type {
   CreateSchoolYearRequest,
   SchoolYearDto as SchoolYearContract,
+  SchoolYearStatus,
   UpdateSchoolYearRequest,
 } from '@cdls/shared';
 import { IsDay } from '../../common/dates.js';
@@ -15,6 +16,9 @@ export class SchoolYearDto implements SchoolYearContract {
   startsOn: string;
   endsOn: string;
   isCurrent: boolean;
+  @ApiProperty({ enum: ['upcoming', 'current', 'archived'] })
+  status: SchoolYearStatus;
+  archivedAt: string | null;
   @ApiProperty({ type: [PeriodDto] })
   periods: PeriodDto[];
 }

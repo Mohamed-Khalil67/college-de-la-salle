@@ -1,10 +1,11 @@
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { type SchoolYearDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Badge, Button, EmptyState, Field, FieldControl, Icon } from '../../ui';
+import { ArchivedBanner } from '../shared/archived-banner';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { formatDay, formatRange } from '../shared/admin-format';
 import { focusPageHeading } from '../shared/focus';
@@ -24,7 +25,7 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
  */
 @Component({
   selector: 'app-school-year-page',
-  imports: [Alert, Badge, Button, EmptyState, Field, FieldControl, Icon, ConfirmModal, YearChecklist, YearCreateModal, YearDatesModal, YearEntryPanel, YearTimeline],
+  imports: [ArchivedBanner, Alert, Badge, Button, EmptyState, Field, FieldControl, Icon, ConfirmModal, RouterLink, YearChecklist, YearCreateModal, YearDatesModal, YearEntryPanel, YearTimeline],
   template: `
     <div class="page__header">
       <div class="page__header-text">
@@ -33,6 +34,7 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
       </div>
       @if (isAdmin()) {
         <div class="page__actions">
+          <a cdlsButton routerLink="/admin/nouvelle-annee"><cdls-icon name="calendar" />Passer à l’année suivante</a>
           <button cdlsButton variant="secondary" type="button" (click)="yearOpen.set(true)"><cdls-icon name="plus" />Nouvelle année</button>
         </div>
       }
@@ -61,19 +63,27 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
             {{ range(current) }}
             @if (current.isCurrent) {
               <cdls-badge tone="success">En cours</cdls-badge>
+            } @else if (current.status === 'archived') {
+              <cdls-badge tone="neutral">Archivée</cdls-badge>
             }
           </p>
           <div class="page__actions">
             @if (isAdmin() && !current.isCurrent) {
-              <button cdlsButton variant="secondary" size="sm" type="button" (click)="startPending({ kind: 'current' })">
-                Définir comme année en cours
-              </button>
+              @if (current.status !== 'archived') {
+                <button cdlsButton variant="secondary" size="sm" type="button" (click)="startPending({ kind: 'current' })">
+                  Définir comme année en cours
+                </button>
+              }
               <button cdlsButton variant="tertiary" size="sm" type="button" (click)="startPending({ kind: 'delete-year' })">
                 Supprimer l’année<span class="visually-hidden"> {{ current.label }}</span>
               </button>
             }
           </div>
         </div>
+
+        @if (current.status === 'archived') {
+          <div class="block"><app-archived-banner [label]="current.label" /></div>
+        }
 
         <section class="stack stack--sm block" aria-labelledby="checklist-title">
           <h2 class="t-h2" id="checklist-title">Étapes de l’année</h2>

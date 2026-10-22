@@ -51,6 +51,7 @@ export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Salles', path: 'salles', secondary: true },
   { label: 'Types d’activité', path: 'types-activite', short: 'Types', secondary: true },
   { label: 'Année scolaire', path: 'annees', icon: 'calendar', short: 'Année' },
+  { label: 'Nouvelle année', path: 'nouvelle-annee', access: 'admin', secondary: true },
   { label: 'Affectations', path: 'affectations', access: 'admin' },
   { label: 'Validations', path: 'validations', access: 'admin' },
   { label: 'Bulletins', path: 'bulletins', access: 'admin' },

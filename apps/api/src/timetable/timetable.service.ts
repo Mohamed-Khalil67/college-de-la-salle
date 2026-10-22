@@ -27,6 +27,7 @@ import { conflictBlocked, warningsBlocked } from '../occupancy/blocked.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { expandSlots, slotInclude, type SlotRow, toSlotData } from '../occupancy/slot-data.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   CreateSlotExceptionDto,
   CreateTimetableSlotDto,
@@ -624,6 +625,8 @@ export class TimetableService {
   private async load(tx: Db, id: string): Promise<SlotRow> {
     const row = await tx.timetableSlot.findUnique({ where: { id }, include: slotInclude });
     if (!row) throw notFound('Séance');
+    // An archived school year is read-only (every slot and exception write loads its slot here first).
+    await assertClassWritable(tx, row.classSubject.classId);
     return row;
   }
 
@@ -673,6 +676,7 @@ export class TimetableService {
       include: { schoolClass: { include: { schoolYear: true } } },
     });
     if (!classSubject) throw notFound('Matière de la classe');
+    await assertClassWritable(tx, classSubject.classId);
     const year = classSubject.schoolClass.schoolYear;
     if (input.validFrom < toDay(year.startsOn) || input.validTo > toDay(year.endsOn))
       throw new BadRequestException(`Les dates doivent être comprises dans l’année ${year.label}.`);

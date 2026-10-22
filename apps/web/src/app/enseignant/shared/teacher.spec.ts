@@ -37,6 +37,7 @@ const klass = (id: string, label: string, sectionId: string, sectionCode: 'bac' 
   code: id,
   label,
   studentCount: 10,
+  nextClassId: null,
 });
 const sections: SectionDto[] = [
   { id: 's-nat', code: 'nationale', label: 'Bac nationale' },

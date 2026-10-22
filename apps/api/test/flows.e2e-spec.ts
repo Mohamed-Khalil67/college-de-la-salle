@@ -247,7 +247,20 @@ describe('School flows (e2e)', () => {
       .set(bearer(admin))
       .send({})
       .expect(200);
-    expect((generated.body as { count: number }).count).toBe(60);
+    // Everyone enrolled until the end of the period: the 60 demo students, and the accounts other specs
+    // graduated at the end of the year (they keep their final card).
+    const untilTheEnd = await t.prisma.student.count({
+      where: {
+        enrollments: {
+          some: {
+            schoolYearId: period.schoolYearId,
+            OR: [{ leftOn: null }, { leftOn: { gte: new Date(`${period.endsOn}T00:00:00Z`) } }],
+          },
+        },
+      },
+    });
+    expect(untilTheEnd).toBeGreaterThanOrEqual(60);
+    expect((generated.body as { count: number }).count).toBe(untilTheEnd);
 
     const before = await t
       .http()

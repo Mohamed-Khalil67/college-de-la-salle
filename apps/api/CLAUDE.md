@@ -55,6 +55,10 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 - `groups/` (CRUD, members, `GET /groups/mine`) and `targets/` (`TargetsService`, the ONE place that says which students a piece of work concerns, from `targetedStudentIds` in `@cdls/shared`). Every group route loads the group and authorises on ITS class (`GroupsService.authorize`); never trust a class id the caller sends for a group id. Memberships are soft (`leftOn`); take a student out of a class only through code that also calls `closeGroupMemberships` in the same transaction.
 - Events with a class and a gradable or homework type carry `AssessmentTarget` rows (no row = whole class). Grade and attendance writes lock the event row (`FOR UPDATE`) and re-resolve the targets inside the transaction. Lists for students use `AccessService.eventAudienceFor` (`concernsStudentNow`), not `audienceFor`. Grades are never deleted by an audience change (409).
 - A timetable slot with `groupId` takes its `division` from the group; the occupancy index carries `group_id` (`occupancy_group_no_overlap`).
+## Rollover and archived years
+
+- `rollover/`: `plan.ts` is pure (snapshot + request → plan, hash); `RolloverService` runs the plan in one transaction, a preview rolls it back, an apply compares the hash (409 `ROLLOVER_PREVIEW_STALE`). Match natural keys so re-runs create nothing; write the new year through `tx` (not the services that open their own transactions). Other modules plug steps in through `ROLLOVER_EXTRA_STEPS` (`rollover-step.ts`).
+- An archived year (`school_years.archived_at`) is read-only: call `assertClassWritable(tx, classId)` or `assertYearIdWritable(tx, yearId)` (`school-years/year-guard.ts`) at the start of every write into a year's classes, enrolments, subjects, periods, calendar, grades, attendance, events or timetable. They take a SHARE lock that the archive's exclusive lock waits for.
 
 ## Config
 

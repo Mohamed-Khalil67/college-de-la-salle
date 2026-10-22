@@ -444,6 +444,25 @@ async function main(): Promise<void> {
     }
   }
 
+  // The levels: each class points at the class of the next level (the last of a track has none: its students
+  // graduate). The rollover promotes the students through these links.
+  for (const [code, sectionId] of sections) {
+    const levels = CLASSES[code];
+    const ids = new Map(
+      (
+        await prisma.schoolClass.findMany({ where: { schoolYearId: year.id, sectionId } })
+      ).map((c) => [c.code, c.id]),
+    );
+    for (const [i, level] of levels.entries()) {
+      const next = levels[i + 1];
+      if (next)
+        await prisma.schoolClass.update({
+          where: { id: ids.get(level.value)! },
+          data: { nextClassId: ids.get(next.value)! },
+        });
+    }
+  }
+
   events.push(
     {
       activityTypeId: typeId('reunion'),

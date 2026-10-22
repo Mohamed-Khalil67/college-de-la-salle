@@ -356,12 +356,18 @@ export interface PeriodDto {
   readonly closedAt: string | null;
 }
 
+/** `archived`: over and read-only (no grades, events, attendance or timetable edits). */
+export type SchoolYearStatus = 'upcoming' | 'current' | 'archived';
+
 export interface SchoolYearDto {
   readonly id: string;
   readonly label: string;
   readonly startsOn: string;
   readonly endsOn: string;
   readonly isCurrent: boolean;
+  readonly status: SchoolYearStatus;
+  /** When the year was archived (the rollover does it); null otherwise. */
+  readonly archivedAt: string | null;
   /** By start day. */
   readonly periods: readonly PeriodDto[];
 }
@@ -404,6 +410,14 @@ export interface ClassDto {
   readonly code: string;
   readonly label: string;
   readonly studentCount: number;
+  /** The class of the next level in the same year (the rollover promotes through it); null: terminal class. */
+  readonly nextClassId: string | null;
+}
+
+/** PATCH /classes/:id (admin). `nextClassId` null makes it a terminal class: its students graduate. */
+export interface UpdateClassRequest {
+  readonly label?: string;
+  readonly nextClassId?: string | null;
 }
 
 export interface CreateClassRequest {
@@ -1388,3 +1402,159 @@ export interface ContactMessageListQuery extends PageQuery {
 export interface UpdateContactMessageRequest {
   readonly handled: boolean;
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Next school year (rollover): /api/rollover, admin only. A preview that writes nothing, then an apply that
+ * runs the same plan in one transaction and refuses when the plan changed since the preview.
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * What happens to a student: `promote` to the next class, `repeat` (redoublement: the same level),
+ * `leave` (départ: archived account), `graduate` (terminal class: archived, graduatedOn set) or
+ * `section_change` (promoted, and a section-change request is opened for the admin to approve).
+ */
+export type RolloverStudentAction = 'promote' | 'repeat' | 'leave' | 'graduate' | 'section_change';
+export const ROLLOVER_STUDENT_ACTIONS: readonly RolloverStudentAction[] = [
+  'promote',
+  'repeat',
+  'leave',
+  'graduate',
+  'section_change',
+];
+export const ROLLOVER_ACTION_LABELS: Readonly<Record<RolloverStudentAction, string>> = {
+  promote: 'Promu',
+  repeat: 'Redoublement',
+  leave: 'Départ',
+  graduate: 'Diplômé',
+  section_change: 'Changement de section',
+};
+
+export const ROLLOVER_LIMITS = { overrides: 5000 } as const;
+
+export interface RolloverStudentOverride {
+  readonly studentId: string;
+  readonly action: RolloverStudentAction;
+}
+
+/** POST /rollover/preview */
+export interface RolloverRequest {
+  readonly sourceYearId: string;
+  /** Default: the source label one year on (« 2027-2028 »). */
+  readonly label?: string;
+  /** Default: the source dates one year on (29 February moves to 28 February). */
+  readonly startsOn?: string;
+  readonly endsOn?: string;
+  /** Teaching assignments are copied (needed by the timetable). */
+  readonly copyAssignments: boolean;
+  /** The weekly timetable is copied for the whole new year; clashes are reported, not fatal. Needs the assignments. */
+  readonly copyTimetable: boolean;
+  /** Only the students that differ from the default (promoted, or graduating in a terminal class). */
+  readonly overrides?: readonly RolloverStudentOverride[];
+  /** The day graduations and departures take effect. Default: the end of the source year. */
+  readonly leavesOn?: string;
+}
+
+/** POST /rollover/apply: the same request plus the hash the preview returned. */
+export interface RolloverApplyRequest extends RolloverRequest {
+  readonly planHash: string;
+}
+
+export type RolloverStepId =
+  | 'year'
+  | 'periods'
+  | 'calendar_days'
+  | 'classes'
+  | 'class_subjects'
+  | 'assignments'
+  | 'timetable'
+  | 'students'
+  | 'groups'
+  | 'archive';
+
+/** Counts of one step: what is created, what already exists (a re-run keeps it) and what is left out. */
+export interface RolloverStepSummary {
+  readonly id: RolloverStepId;
+  readonly label: string;
+  readonly create: number;
+  readonly existing: number;
+  readonly skipped: number;
+}
+
+/** `conflict`: a timetable slot that could not be placed (left out, the rest goes on); `warning`: to check. */
+export interface RolloverIssue {
+  readonly step: RolloverStepId;
+  readonly level: 'warning' | 'conflict';
+  readonly message: string;
+}
+
+export interface RolloverClassPlan {
+  readonly sourceClassId: string;
+  readonly sectionCode: SectionId;
+  readonly code: string;
+  readonly label: string;
+  /** Label of the class the students are promoted to; null: terminal (graduation). */
+  readonly nextLabel: string | null;
+  readonly studentCount: number;
+  readonly action: 'create' | 'exists';
+  /** The class in the new year: set once applied (null in a preview). */
+  readonly targetClassId: string | null;
+}
+
+export type RolloverSkipReason = 'already_enrolled';
+
+export interface RolloverStudentPlan {
+  readonly studentId: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly studentNumber: string | null;
+  readonly sectionCode: SectionId;
+  readonly sourceClassId: string;
+  readonly sourceClassLabel: string;
+  /** What the rules give (promote, or graduate in a terminal class). */
+  readonly defaultAction: RolloverStudentAction;
+  /** What will happen: the default, or the override. */
+  readonly action: RolloverStudentAction;
+  /** Label of the class in the new year; null when the student leaves or graduates. */
+  readonly targetClassLabel: string | null;
+  /** Set when nothing is done for this student (already placed by a previous run). */
+  readonly skipped: RolloverSkipReason | null;
+}
+
+export interface RolloverPreview {
+  /** Send it back to /rollover/apply: it changes when anything the plan reads changes. */
+  readonly planHash: string;
+  readonly sourceYear: { readonly id: string; readonly label: string; readonly archived: boolean };
+  readonly newYear: {
+    readonly label: string;
+    readonly startsOn: string;
+    readonly endsOn: string;
+    /** The year already exists (a re-run): only what is missing is created. */
+    readonly exists: boolean;
+  };
+  readonly steps: readonly RolloverStepSummary[];
+  readonly issues: readonly RolloverIssue[];
+  readonly classes: readonly RolloverClassPlan[];
+  /** Every student of the source year with their proposed outcome (the web pages it). */
+  readonly students: readonly RolloverStudentPlan[];
+  /** The source year is archived and, when it was the current one, the new year becomes current. */
+  readonly archivesSourceYear: boolean;
+  readonly makesNewYearCurrent: boolean;
+}
+
+/** POST /rollover/apply */
+export interface RolloverResult {
+  readonly schoolYearId: string;
+  readonly schoolYearLabel: string;
+  readonly steps: readonly RolloverStepSummary[];
+  readonly issues: readonly RolloverIssue[];
+  /** Each class of the new year with its id (the web links to them). */
+  readonly classes: readonly RolloverClassPlan[];
+  readonly studentCounts: Readonly<Record<RolloverStudentAction, number>>;
+  /** Nothing was created or changed: a previous run had already done it all. */
+  readonly nothingToDo: boolean;
+}
+
+/** The 409 code of a preview that no longer matches the data. */
+export const ROLLOVER_PREVIEW_STALE = 'ROLLOVER_PREVIEW_STALE';
+/** The 409 code of a write refused because its school year is archived. */
+export const YEAR_ARCHIVED = 'YEAR_ARCHIVED';

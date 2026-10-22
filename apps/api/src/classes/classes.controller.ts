@@ -67,8 +67,12 @@ export class ClassesController {
   @Roles('admin')
   @Patch('classes/:id')
   @ApiOkResponse({ type: ClassDto })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateClassDto): Promise<ClassDto> {
-    return this.classes.update(id, body);
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateClassDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<ClassDto> {
+    return this.classes.update(id, body, user);
   }
 
   /** Deletes an empty class (no student, grade, attendance or report card); 409 otherwise. */

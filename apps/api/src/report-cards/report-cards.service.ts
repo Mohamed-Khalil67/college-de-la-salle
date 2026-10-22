@@ -1,15 +1,22 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import type { Period, Prisma, ReportCard } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
-import { ClassesService } from '../classes/classes.service.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { toIso } from '../common/dates.js';
+import { toDay, toIso } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
 import { wasTargeted } from '@cdls/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toEntries } from '../targets/target.mapper.js';
-import { computeReportCards, type SubjectWeight, subjectWeights } from './compute.js';
+import {
+  type ClassStint,
+  computeCards,
+  type PeriodGrade,
+  primaryClassId,
+  type SubjectWeight,
+  subjectsOfStudent,
+  subjectWeights,
+} from './compute.js';
 import type {
   ReportCardBatchResultDto,
   ReportCardDto,
@@ -28,7 +35,6 @@ export class ReportCardsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
-    private readonly classes: ClassesService,
   ) {}
 
   /** (Re)computes the unpublished report cards of a closed period; published ones are left as they are. */
@@ -38,60 +44,136 @@ export class ReportCardsService {
     user: AuthUser,
   ): Promise<ReportCardBatchResultDto> {
     const period = await this.closedPeriod(periodId);
+    const inScope = new Set((await this.classesOf(period, classId)).map((c) => c.id));
+
+    // Who was enrolled during the period, and in which classes: a student who changed class or section
+    // inside the period has two enrolments, and their card belongs to the class they ended it in.
+    const overlapping = {
+      schoolYearId: period.schoolYearId,
+      enrolledOn: { lte: period.endsOn },
+      OR: [{ leftOn: null }, { leftOn: { gte: period.startsOn } }],
+    };
+    // Only the students of the classes asked for (and all their classes of the period), not the whole school.
+    const scoped = await this.prisma.enrollment.findMany({
+      where: { ...overlapping, classId: { in: [...inScope] } },
+      select: { studentId: true },
+      distinct: ['studentId'],
+    });
+    const enrolments = await this.prisma.enrollment.findMany({
+      where: { ...overlapping, studentId: { in: scoped.map((e) => e.studentId) } },
+      select: { studentId: true, classId: true, enrolledOn: true, leftOn: true },
+    });
+    const classIds = [...new Set(enrolments.map((e) => e.classId))];
+    const subjectsByClass = await this.subjectWeightsByClass(classIds);
+    const byStudent = new Map<string, ClassStint[]>();
+    for (const e of enrolments) {
+      byStudent.set(e.studentId, [
+        ...(byStudent.get(e.studentId) ?? []),
+        {
+          classId: e.classId,
+          enrolledOn: toDay(e.enrolledOn),
+          leftOn: e.leftOn ? toDay(e.leftOn) : null,
+          subjects: subjectsByClass.get(e.classId) ?? [],
+        },
+      ]);
+    }
+    const primary = new Map(
+      [...byStudent].map(([studentId, stints]) => [studentId, primaryClassId(stints)!]),
+    );
+    // Students enrolled until the end of the period (still enrolled, or leaving when the year ends, as the
+    // graduates do): a student who left in the middle of the period gets no card. Earlier classes of the
+    // period still count for the ones who moved.
+    const endsOn = toDay(period.endsOn);
+    const cardStudents = [...byStudent]
+      .filter(
+        ([id, stints]) =>
+          inScope.has(primary.get(id)!) &&
+          stints.some((st) => st.classId === primary.get(id) && ((st.leftOn ?? null) === null || (st.leftOn ?? "") >= endsOn)),
+      )
+      .map(([id]) => id);
+
+    // The grades: the events of the period in the class of the card (by the events' stored period, never their
+    // dates), and the earlier class's events of the same stretch of the year (another section keeps its own
+    // periods, so those are told apart by date).
+    const grades = await this.prisma.grade.findMany({
+      where: {
+        published: true,
+        studentId: { in: cardStudents },
+        event: {
+          classId: { in: classIds },
+          OR: [
+            { periodId },
+            { date: { gte: period.startsOn, lte: period.endsOn } },
+          ],
+        },
+      },
+      include: {
+        event: {
+          select: {
+            subjectId: true,
+            coefficient: true,
+            classId: true,
+            periodId: true,
+            date: true,
+            targets: true,
+          },
+        },
+      },
+    });
+    // Only graded work the student was targeted for counts (a group's test is not in the others' average);
+    // a student who moved to another group of the same division keeps the marks earned in the first one.
+    const memberships = await this.prisma.groupMember.findMany({
+      where: { studentId: { in: cardStudents } },
+      select: { studentId: true, groupId: true },
+    });
+    const groupsOf = new Map<string, Set<string>>();
+    for (const m of memberships)
+      groupsOf.set(m.studentId, (groupsOf.get(m.studentId) ?? new Set()).add(m.groupId));
+    const periodGrades: PeriodGrade[] = grades
+      .filter((g) => {
+        if (!wasTargeted(toEntries(g.event.targets), g.studentId, groupsOf.get(g.studentId) ?? new Set()))
+          return false;
+        // Only classes the student was enrolled in during the period.
+        if (!byStudent.get(g.studentId)?.some((st) => st.classId === g.event.classId)) return false;
+        const own = g.event.classId === primary.get(g.studentId);
+        return own ? g.event.periodId === periodId : true;
+      })
+      .map((g) => ({
+        studentId: g.studentId,
+        subjectId: g.event.subjectId ?? '',
+        score: Number(g.score),
+        outOf: Number(g.outOf),
+        coefficient: Number(g.event.coefficient),
+        classId: g.event.classId ?? undefined,
+      }));
+
+    const published = new Set(
+      (
+        await this.prisma.reportCard.findMany({
+          where: { periodId, studentId: { in: cardStudents }, publishedAt: { not: null } },
+          select: { studentId: true },
+        })
+      ).map((c) => c.studentId),
+    );
+    const gradesOf = new Map<string, PeriodGrade[]>();
+    for (const g of periodGrades) gradesOf.set(g.studentId, [...(gradesOf.get(g.studentId) ?? []), g]);
     let count = 0;
-    for (const schoolClass of await this.classesOf(period, classId)) {
-      const roster = await this.classes.roster(schoolClass.id);
-      const subjects = await this.subjectWeights(schoolClass.id);
-      const grades = await this.prisma.grade.findMany({
-        where: {
-          published: true,
-          studentId: { in: roster.map((s) => s.id) },
-          // The events' stored period, never their dates: editing a period's dates moves no grade.
-          event: { classId: schoolClass.id, periodId },
-        },
-        include: {
-          event: { select: { subjectId: true, coefficient: true, targets: true } },
-        },
-      });
-      // Only graded work the student was targeted for counts (a group's test is not in the others' average).
-      const memberships = await this.prisma.groupMember.findMany({
-        where: { studentId: { in: roster.map((s) => s.id) }, classId: schoolClass.id },
-        select: { studentId: true, groupId: true },
-      });
-      const groupsOf = new Map<string, Set<string>>();
-      for (const m of memberships)
-        groupsOf.set(m.studentId, (groupsOf.get(m.studentId) ?? new Set()).add(m.groupId));
-      const targeted = grades.filter((g) =>
-        wasTargeted(toEntries(g.event.targets), g.studentId, groupsOf.get(g.studentId) ?? new Set()),
-      );
-      const cards = computeReportCards(
-        roster.map((s) => s.id),
-        subjects,
-        targeted.map((g) => ({
-          studentId: g.studentId,
-          subjectId: g.event.subjectId ?? '',
-          score: Number(g.score),
-          outOf: Number(g.outOf),
-          coefficient: Number(g.event.coefficient),
+    // Ranks are per class: the students whose card belongs to the same class.
+    for (const cid of inScope) {
+      const students = cardStudents.filter((id) => primary.get(id) === cid);
+      if (!students.length) continue;
+      const cards = computeCards(
+        students.map((studentId) => ({
+          studentId,
+          subjects: subjectsOfStudent(byStudent.get(studentId)!, gradesOf.get(studentId) ?? []),
         })),
-      );
-      const published = new Set(
-        (
-          await this.prisma.reportCard.findMany({
-            where: {
-              periodId,
-              studentId: { in: roster.map((s) => s.id) },
-              publishedAt: { not: null },
-            },
-            select: { studentId: true },
-          })
-        ).map((c) => c.studentId),
+        periodGrades,
       );
       const writes = cards
         .filter((c) => !published.has(c.studentId))
         .map((c) => {
           const data = {
-            classId: schoolClass.id,
+            classId: cid,
             average: c.average,
             rank: c.rank,
             subjects: c.subjects.map((s) => ({ ...s })),
@@ -241,14 +323,20 @@ export class ReportCardsService {
     return classes;
   }
 
-  /** The class's subjects and their coefficients (its class subjects). */
-  private async subjectWeights(classId: string): Promise<SubjectWeight[]> {
+  /** The subjects and coefficients of each class (its class subjects), by subject name. */
+  private async subjectWeightsByClass(classIds: readonly string[]): Promise<Map<string, SubjectWeight[]>> {
     const rows = await this.prisma.classSubject.findMany({
-      where: { classId },
+      where: { classId: { in: [...classIds] } },
       include: { subject: true },
       orderBy: { subject: { name: 'asc' } },
     });
-    return subjectWeights(rows.map((r) => ({ ...r, coefficient: Number(r.coefficient) })));
+    const out = new Map<string, SubjectWeight[]>();
+    for (const r of rows)
+      out.set(r.classId, [
+        ...(out.get(r.classId) ?? []),
+        ...subjectWeights([{ ...r, coefficient: Number(r.coefficient) }]),
+      ]);
+    return out;
   }
 }
 

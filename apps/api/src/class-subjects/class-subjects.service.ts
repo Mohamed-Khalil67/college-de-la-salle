@@ -9,6 +9,7 @@ import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { conflictOnUnique, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   ClassSubjectDto,
   CreateClassSubjectDto,
@@ -63,6 +64,7 @@ export class ClassSubjectsService {
     )
       throw new ConflictException(`La classe a déjà « ${subject.name} ».`);
     const work = this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, classId);
       const row = await tx.classSubject.create({
         data: {
           classId,
@@ -93,6 +95,7 @@ export class ClassSubjectsService {
   async update(id: string, dto: UpdateClassSubjectDto, user: AuthUser): Promise<ClassSubjectDto> {
     const current = await this.find(id);
     return this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, current.classId);
       if (dto.coefficient !== undefined && dto.coefficient !== Number(current.coefficient)) {
         if (
           user.role !== 'admin' &&
@@ -127,6 +130,7 @@ export class ClassSubjectsService {
       await tx.$queryRaw`SELECT id FROM class_subjects WHERE id = ${id}::uuid FOR UPDATE`;
       const current = await tx.classSubject.findUnique({ where: { id }, include });
       if (!current) throw notFound('Matière de la classe');
+      await assertClassWritable(tx, current.classId);
       if (current.assignments.length) throw new ConflictException(HAS_TEACHERS);
       const grades = await tx.grade.count({
         where: { event: { classId: current.classId, subjectId: current.subjectId } },
@@ -180,6 +184,7 @@ export class ClassSubjectsService {
       (s) => !s.subject.archivedAt && s.subject.sections.includes(target.section.code),
     );
     await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, classId);
       const existing = await tx.classSubject.findMany({
         where: { classId },
         include: { assignments: true },
