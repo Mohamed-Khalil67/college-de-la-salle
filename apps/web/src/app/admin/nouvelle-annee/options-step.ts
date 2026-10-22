@@ -12,6 +12,7 @@ import { Component, model } from '@angular/core';
           <li>Les classes, avec le lien vers la classe suivante.</li>
           <li>Les matières de chaque classe, avec leurs coefficients et leurs heures.</li>
           <li>Les élèves, promus d’une classe à la suivante : vous réglez les redoublements, les départs et les diplômes à l’étape suivante.</li>
+          <li>Les groupes de chaque classe (TP, LV2…) : vides, sauf les élèves promus qui retrouvent le groupe de même nom dans leur nouvelle classe. Les séances de groupe suivent l’emploi du temps.</li>
         </ul>
       </section>
 
@@ -44,7 +45,7 @@ import { Component, model } from '@angular/core';
       </fieldset>
 
       <p class="t-body-s t-muted">
-        Les groupes (phase suivante) ne sont pas encore copiés. Les notes, les absences et les événements restent dans l’ancienne année, qui sera archivée.
+        Les notes, les absences et les événements, avec leur « Assigner à », restent dans l’ancienne année, qui sera archivée.
       </p>
     </div>
   `,

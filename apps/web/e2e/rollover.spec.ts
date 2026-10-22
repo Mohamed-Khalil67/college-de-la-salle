@@ -58,6 +58,15 @@ async function createCopyYear(request: APIRequestContext): Promise<Created> {
       await json(await request.post('/api/users', { headers, data: { role: 'student', firstName, lastName: 'Playwright', classId } }));
       names[key].push(`${firstName} Playwright`);
     }
+  // A group « LV2 / Allemand » in each class, with the two students of the class in it: the rollover copies the
+  // groups, and puts only the promoted student in the new première's group.
+  for (const classId of [seconde.id, premiere.id]) {
+    const group = await json<{ id: string }>(
+      await request.post('/api/groups', { headers, data: { classId, division: 'LV2', label: 'Allemand' } }),
+    );
+    const roster = await json<{ id: string }[]>(await request.get(`/api/classes/${classId}/students`, { headers }));
+    await json(await request.post(`/api/groups/${group.id}/members`, { headers, data: { studentIds: roster.map((r) => r.id) } }));
+  }
   return { yearId: year.id, label, nextLabel: `${start + 1}-${start + 2}`, secondeId: seconde.id, premiereId: premiere.id, names };
 }
 
@@ -108,6 +117,14 @@ test('runs the wizard on a copy year, promotes the students and leaves the old y
   await expect(students.getByRole('row')).toHaveCount(5);
   await expect(page.getByLabel(`Décision pour ${premiereA}`)).toHaveValue('graduate');
   await expect(page.getByLabel(`Décision pour ${secondeA}`)).toHaveValue('promote');
+  // The groups are part of the preview: two groups to copy, one student promoted into a group (the repeater's
+  // membership is left out), and no group session in this small year.
+  const stepRow = (name: string) =>
+    page.getByRole('table', { name: /Éléments créés/ }).getByRole('row').filter({ hasText: name }).locator('td');
+  await expect(stepRow('Groupes des classes').first()).toHaveText('2');
+  await expect(stepRow('Élèves promus dans leur groupe').nth(0)).toHaveText('1');
+  await expect(stepRow('Élèves promus dans leur groupe').nth(2)).toHaveText('1');
+  await expect(stepRow('Séances par groupe').first()).toHaveText('0');
   const earlier = await json<{ label: string }[]>(await request.get('/api/school-years', { headers: await tokenOf(request, ACCOUNTS.admin) }));
   expect(earlier.some((y) => y.label === copy.nextLabel)).toBe(false);
 
@@ -184,6 +201,9 @@ test('runs the wizard on a copy year, promotes the students and leaves the old y
   await expect(stepHeading('Résultat')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(`L’année ${copy.nextLabel} est prête.`)).toBeVisible();
   await expect(page.getByRole('link', { name: /^Seconde/ })).toBeVisible();
+  // The result says what the groups did too.
+  await expect(stepRow('Groupes des classes').first()).toHaveText('2');
+  await expect(stepRow('Élèves promus dans leur groupe').nth(0)).toHaveText('1');
   await axeAtBothWidths(page);
 
   // The promoted classes.
@@ -201,6 +221,14 @@ test('runs the wizard on a copy year, promotes the students and leaves the old y
   // Seconde: the repeater; première: the promoted seconde student; the first première student graduated, the second left.
   expect(await rosterOf('seconde')).toEqual([secondeA!.split(' ')[0]]);
   expect(await rosterOf('premiere')).toEqual([secondeB!.split(' ')[0]]);
+
+  // The groups: copied onto both new classes, and only the promoted student is in the new première's group.
+  const groupsOf = async (code: string) => {
+    const id = nextClasses.find((c) => c.code === code)!.id;
+    return json<{ label: string; division: string; memberCount: number }[]>(await request.get(`/api/groups?classId=${id}`, { headers }));
+  };
+  expect(await groupsOf('seconde')).toMatchObject([{ division: 'LV2', label: 'Allemand', memberCount: 0 }]);
+  expect(await groupsOf('premiere')).toMatchObject([{ division: 'LV2', label: 'Allemand', memberCount: 1 }]);
 
   // The link opens the new class.
   await page.getByRole('link', { name: /^Première/ }).click();

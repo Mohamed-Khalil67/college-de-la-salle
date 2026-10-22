@@ -2,6 +2,7 @@ import {
   nextYearLabel,
   ROLLOVER_STUDENT_ACTIONS,
   type RolloverRequest,
+  type RolloverStepSummary,
   type RolloverStudentAction,
   type RolloverStudentOverride,
   type RolloverStudentPlan,
@@ -200,6 +201,19 @@ export function parseDraft(text: string | null): Draft | null {
   } catch {
     return null;
   }
+}
+
+/** The line of the confirmation about the groups (empty when the school has none to copy). */
+export function groupsLine(steps: readonly Pick<RolloverStepSummary, 'id' | 'create'>[]): string | null {
+  const created = (id: string) => steps.find((s) => s.id === id)?.create ?? 0;
+  const groups = created('groups');
+  if (!groups) return null;
+  const members = created('group_members');
+  const sessions = created('group_slots');
+  const n = (count: number, one: string, many: string) => `${count} ${count > 1 ? many : one}`;
+  const parts = [members === 1 ? '1 élève promu retrouve son groupe' : `${members} élèves promus retrouvent leur groupe`];
+  if (sessions) parts.push(n(sessions, 'séance de groupe est copiée', 'séances de groupe sont copiées'));
+  return `${n(groups, 'groupe est copié', 'groupes sont copiés')} dans les nouvelles classes : ${parts.join(', ')}.`;
 }
 
 /** The French summary of what the confirmation dialog restates. */

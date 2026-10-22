@@ -2,7 +2,7 @@ import { Component, computed, input, output } from '@angular/core';
 import type { RolloverPreview, RolloverStudentAction } from '@cdls/shared';
 import { Alert, Button } from '../../ui';
 import { formatRange } from '../shared/admin-format';
-import { consequences } from './rollover-logic';
+import { consequences, groupsLine } from './rollover-logic';
 
 /** Step 4: the last look. The button opens a dialog that restates the consequences before anything is written. */
 @Component({
@@ -18,6 +18,9 @@ import { consequences } from './rollover-logic';
         </li>
         @if (placed()) {
           <li>{{ placed() }} élèves inscrits dans leur nouvelle classe.</li>
+        }
+        @if (groups()) {
+          <li>{{ groups() }}</li>
         }
         @for (line of lines(); track line) {
           <li>{{ line }}</li>
@@ -61,6 +64,7 @@ export class ConfirmStep {
   readonly launch = output<void>();
 
   protected readonly range = computed(() => formatRange(this.preview().newYear.startsOn, this.preview().newYear.endsOn));
+  protected readonly groups = computed(() => groupsLine(this.preview().steps));
   protected readonly lines = computed(() => consequences(this.counts()));
   protected readonly placed = computed(() => {
     const c = this.counts();

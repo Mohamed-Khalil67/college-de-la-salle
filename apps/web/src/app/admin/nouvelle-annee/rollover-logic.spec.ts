@@ -4,6 +4,7 @@ import {
   actionsFor,
   applyToStudents,
   consequences,
+  groupsLine,
   countActions,
   effectiveAction,
   filterStudents,
@@ -162,5 +163,17 @@ describe('the saved draft', () => {
     expect(parseDraft(JSON.stringify({ ...draft, step: 'elsewhere' }))).toBeNull();
     expect(parseDraft(JSON.stringify({ ...draft, copyTimetable: 'yes' }))).toBeNull();
     expect(parseDraft(JSON.stringify({ ...draft, choices: [['s', 'fly'], ['t', 'repeat'], 7] }))!.choices).toEqual([['t', 'repeat']]);
+  });
+});
+
+describe('groupsLine', () => {
+  it('says what the groups do, and nothing when there are none', () => {
+    expect(groupsLine([{ id: 'groups', create: 0 }])).toBeNull();
+    expect(groupsLine([{ id: 'groups', create: 1 }, { id: 'group_members', create: 1 }, { id: 'group_slots', create: 0 }])).toBe(
+      '1 groupe est copié dans les nouvelles classes : 1 élève promu retrouve son groupe.',
+    );
+    expect(groupsLine([{ id: 'groups', create: 4 }, { id: 'group_members', create: 12 }, { id: 'group_slots', create: 3 }])).toBe(
+      '4 groupes sont copiés dans les nouvelles classes : 12 élèves promus retrouvent leur groupe, 3 séances de groupe sont copiées.',
+    );
   });
 });
