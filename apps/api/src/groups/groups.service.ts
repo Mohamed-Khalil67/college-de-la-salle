@@ -117,6 +117,11 @@ export class GroupsService {
             throw new ConflictException(
               `${HAS_SLOTS} (Changer la division d’un groupe change la façon dont ses séances se chevauchent.)`,
             );
+          // A timed test for the group holds its division in the occupancy index.
+          if (await tx.assessmentTarget.count({ where: { groupId: id } }))
+            throw new ConflictException(
+              `${HAS_TARGETS} (Changer la division d’un groupe change la façon dont ses évaluations se chevauchent avec les séances.)`,
+            );
         }
         if (await tx.group.findFirst({ where: { classId: current.classId, division, label, id: { not: id } } }))
           throw new ConflictException(

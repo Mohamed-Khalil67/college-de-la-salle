@@ -81,12 +81,12 @@ export function membershipsToCreate(
   enrolments: ReadonlyMap<string, NewEnrolment>,
   classMap: ReadonlyMap<string, string>,
   targetGroupIds: ReadonlyMap<string, string>,
-  openInTarget: ReadonlySet<string>,
+  inTarget: ReadonlySet<string>,
 ): MembershipPlan {
   const create: NewMembership[] = [];
   let existing = 0;
   let skipped = 0;
-  const taken = new Set(openInTarget);
+  const taken = new Set(inTarget);
   for (const m of memberships) {
     const enrolment = enrolments.get(m.studentId);
     if (!enrolment) continue; // graduated or left: nothing in the new year

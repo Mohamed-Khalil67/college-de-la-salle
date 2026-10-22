@@ -117,14 +117,6 @@ test('runs the wizard on a copy year, promotes the students and leaves the old y
   await expect(students.getByRole('row')).toHaveCount(5);
   await expect(page.getByLabel(`Décision pour ${premiereA}`)).toHaveValue('graduate');
   await expect(page.getByLabel(`Décision pour ${secondeA}`)).toHaveValue('promote');
-  // The groups are part of the preview: two groups to copy, one student promoted into a group (the repeater's
-  // membership is left out), and no group session in this small year.
-  const stepRow = (name: string) =>
-    page.getByRole('table', { name: /Éléments créés/ }).getByRole('row').filter({ hasText: name }).locator('td');
-  await expect(stepRow('Groupes des classes').first()).toHaveText('2');
-  await expect(stepRow('Élèves promus dans leur groupe').nth(0)).toHaveText('1');
-  await expect(stepRow('Élèves promus dans leur groupe').nth(2)).toHaveText('1');
-  await expect(stepRow('Séances par groupe').first()).toHaveText('0');
   const earlier = await json<{ label: string }[]>(await request.get('/api/school-years', { headers: await tokenOf(request, ACCOUNTS.admin) }));
   expect(earlier.some((y) => y.label === copy.nextLabel)).toBe(false);
 
@@ -176,6 +168,14 @@ test('runs the wizard on a copy year, promotes the students and leaves the old y
   await page.keyboard.press('Enter');
   await expect(stepHeading('Aperçu et élèves')).toBeFocused();
   await expect(page.getByLabel(`Décision pour ${secondeA}`)).toHaveValue('repeat');
+  // The groups are part of the preview, with the final choices: two groups to copy, one student promoted into a
+  // group (the repeater's membership is left out), and no group session in this small year.
+  const stepRow = (name: string) =>
+    page.getByRole('table', { name: /Éléments créés/ }).getByRole('row').filter({ hasText: name }).locator('td');
+  await expect(stepRow('Groupes des classes').first()).toHaveText('2');
+  await expect(stepRow('Élèves promus dans leur groupe').nth(0)).toHaveText('1');
+  await expect(stepRow('Élèves promus dans leur groupe').nth(2)).toHaveText('1');
+  await expect(stepRow('Séances par groupe').first()).toHaveText('0');
 
   // Step 4: the confirmation, and the dialog that restates the consequences.
   await page.getByRole('button', { name: 'Passer à la confirmation' }).click();

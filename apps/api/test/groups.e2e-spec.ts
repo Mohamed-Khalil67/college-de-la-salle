@@ -321,6 +321,26 @@ describe('Groups (e2e)', () => {
       await t.http().delete(`/api/groups/${g.id}`).set(bearer(maths)).expect(204);
     });
 
+    it('keeps the division of a group that work is assigned to', async () => {
+      const g = await group(maths, 'E2E TP A');
+      const type = await t.prisma.activityType.findUniqueOrThrow({ where: { code: 'controle' } });
+      const ev = await t.http().post('/api/events').set(bearer(maths)).send({
+        activityTypeId: type.id,
+        title: 'E2E contrôle de groupe',
+        subjectId: 'mathematiques',
+        classId,
+        date: '2027-04-16',
+        startTime: '15:00',
+        endTime: '16:00',
+        target: { groupIds: [g.id], studentIds: [] },
+      });
+      expect(ev.status).toBe(201);
+      const res = await t.http().patch(`/api/groups/${g.id}`).set(bearer(maths)).send({ division: 'E2E LV2' }).expect(409);
+      expect(message(res.body)).toContain('assignés à ce groupe');
+      await t.http().delete(`/api/events/${(ev.body as { id: string }).id}`).set(bearer(maths)).expect(204);
+      await t.http().delete(`/api/groups/${g.id}`).set(bearer(maths)).expect(204);
+    });
+
     it('says which rule a change of division breaks', async () => {
       const a = await group(maths, 'E2E A', 'TP');
       await group(maths, 'E2E A', 'E2E LV2');

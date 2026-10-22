@@ -68,8 +68,10 @@ export class GroupsRolloverStep implements RolloverExtraStep {
         })
       ).map((e) => [e.studentId, { classId: e.classId, enrolledOn: toDay(e.enrolledOn) }] as const),
     );
-    const openInTarget = new Set(
-      (await tx.groupMember.findMany({ where: { leftOn: null, classId: { in: targetClassIds } } })).map(
+    // Any membership of the new classes counts, a closed one too: a student a teacher took out of a group
+    // of the new year is not put back by a second run.
+    const inTarget = new Set(
+      (await tx.groupMember.findMany({ where: { classId: { in: targetClassIds } } })).map(
         (m) => `${m.studentId}|${m.classId}|${m.division}`,
       ),
     );
@@ -83,7 +85,7 @@ export class GroupsRolloverStep implements RolloverExtraStep {
       enrolments,
       ctx.classMap,
       targetGroupIds,
-      openInTarget,
+      inTarget,
     );
     if (members.create.length)
       await tx.groupMember.createMany({

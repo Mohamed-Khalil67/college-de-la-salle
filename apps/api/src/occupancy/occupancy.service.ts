@@ -141,27 +141,21 @@ export class OccupancyService {
    */
   async detect(db: Db, rows: readonly IndexRow[]): Promise<TimetableConflictDto[]> {
     if (!rows.length) return [];
-    return this.describe(db, rows, await this.clashes(db, rows));
+    return (await this.describeBy(db, rows, await this.clashes(db, rows), () => '')).get('') ?? [];
   }
 
   /**
-   * For a batch of new slots checked at once: the first conflict message of each slot that clashes with the
-   * index or with another slot of the batch (the earlier one of two clashing slots is the one reported).
+   * For a batch of new slots checked at once: every conflict of each slot that clashes with the index (the
+   * holder is another slot, an exception or an event) or with another slot of the batch (`withSlotId` names
+   * it; the earlier-starting of two clashing slots carries it). The messages are built with one set of lookups.
    */
-  async detectBySlot(db: Db, rows: readonly IndexRow[]): Promise<Map<string, TimetableConflictDto>> {
-    const found = new Map<string, TimetableConflictDto>();
-    if (!rows.length) return found;
+  async detectBySlot(
+    db: Db,
+    rows: readonly IndexRow[],
+  ): Promise<Map<string, TimetableConflictDto[]>> {
+    if (!rows.length) return new Map();
     const clashes = await this.clashes(db, rows);
-    const bySlot = new Map<string, Clash[]>();
-    for (const c of clashes) {
-      const slotId = rows[c.i]!.slotId;
-      if (slotId) bySlot.set(slotId, [...(bySlot.get(slotId) ?? []), c]);
-    }
-    for (const [slotId, list] of bySlot) {
-      const [first] = await this.describe(db, rows, list);
-      if (first) found.set(slotId, first);
-    }
-    return found;
+    return this.describeBy(db, rows, clashes, (c) => rows[c.i]!.slotId ?? '');
   }
 
   private async clashes(db: Db, rows: readonly IndexRow[]): Promise<Clash[]> {
@@ -229,13 +223,17 @@ export class OccupancyService {
     return clashes;
   }
 
-  /** French messages, one per (kind, clashing item), earliest session first. */
-  private async describe(
+  /**
+   * French messages, one per (kind, clashing item), earliest session first, kept apart per `bucket` of the
+   * clash (one bucket for a single change, one per slot for a batch).
+   */
+  private async describeBy(
     db: Db,
     rows: readonly IndexRow[],
     clashes: readonly Clash[],
-  ): Promise<TimetableConflictDto[]> {
-    if (!clashes.length) return [];
+    bucket: (clash: Clash) => string,
+  ): Promise<Map<string, TimetableConflictDto[]>> {
+    if (!clashes.length) return new Map();
     const slotIds = [...new Set(clashes.flatMap((c) => (c.slotId ? [c.slotId] : [])))];
     const eventIds = [...new Set(clashes.flatMap((c) => (c.eventId ? [c.eventId] : [])))];
     // One query at a time: a transaction has a single connection.
@@ -279,21 +277,23 @@ export class OccupancyService {
       classes.map((c) => [c.id, `${c.label} (${c.section.label})`] as const),
     );
 
-    const groups = new Map<string, { clash: Clash; row: IndexRow; count: number }>();
+    const groups = new Map<string, { bucket: string; clash: Clash; row: IndexRow; count: number }>();
     for (const clash of clashes) {
       const row = rows[clash.i]!;
       const holder = clash.eventId ?? clash.slotId ?? 'self';
-      const key = `${clash.kind}|${clash.exceptionId ?? holder}|${clash.slotId ?? ''}`;
+      const key = `${bucket(clash)}#${clash.kind}|${clash.exceptionId ?? holder}|${clash.slotId ?? ''}`;
       const seen = groups.get(key);
-      if (!seen) groups.set(key, { clash, row, count: 1 });
+      if (!seen) groups.set(key, { bucket: bucket(clash), clash, row, count: 1 });
       else {
         seen.count++;
-        if (row.startsAt < seen.row.startsAt) groups.set(key, { clash, row, count: seen.count });
+        if (row.startsAt < seen.row.startsAt)
+          groups.set(key, { bucket: seen.bucket, clash, row, count: seen.count });
       }
     }
-    return [...groups.values()]
+    const out = new Map<string, TimetableConflictDto[]>();
+    [...groups.values()]
       .sort((a, b) => a.row.startsAt.localeCompare(b.row.startsAt))
-      .map(({ clash, row, count }) => {
+      .forEach(({ bucket: b, clash, row, count }) => {
         const date = row.startsAt.slice(0, 10);
         const startTime = row.startsAt.slice(11, 16);
         const endTime = row.endsAt.slice(11, 16);
@@ -314,7 +314,7 @@ export class OccupancyService {
             : clash.kind === 'teacher'
               ? row.teacherId
               : row.classId) ?? '';
-        return {
+        const dto = {
           kind: clash.kind,
           resourceId,
           date,
@@ -335,7 +335,9 @@ export class OccupancyService {
           withSlotId: clash.slotId,
           withLabel: holder,
         } satisfies TimetableConflictDto;
+        out.set(b, [...(out.get(b) ?? []), dto]);
       });
+    return out;
   }
 
   /** Rewrites the index rows of these slots; a hard conflict throws 409 (the caller's transaction rolls back). */

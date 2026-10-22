@@ -166,6 +166,14 @@ describe('Rollover and groups (e2e)', () => {
     expect(trail[0]!.after).toMatchObject({ groups: 5, members: 2, slots: 2, conflicts: 0 });
   });
 
+  it('a second run does not put back a student a teacher took out of the new group', async () => {
+    const promoted = fx.students['bac/seconde']![1]!.id;
+    const closed = await t.prisma.groupMember.updateMany({ where: { studentId: promoted, leftOn: null, group: { schoolClass: { schoolYear: { label: '2044-2045' } } } }, data: { leftOn: new Date('2044-10-01T00:00:00Z') } });
+    expect(closed.count).toBe(1);
+    const again = (await preview({ ...req }).expect(200)).body as RolloverPreview;
+    expect(stepOf(again, 'group_members')).toMatchObject({ create: 0 });
+  });
+
   it('a second run changes nothing', async () => {
     const again = (await preview({ ...req }).expect(200)).body as RolloverPreview;
     for (const id of ['groups', 'group_members', 'group_slots']) expect(stepOf(again, id).create).toBe(0);

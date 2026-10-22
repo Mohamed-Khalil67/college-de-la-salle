@@ -316,6 +316,8 @@ describe('Timetable and groups (e2e)', () => {
       expect((await test([groupA.id])).status).toBe(409);
       expect((await test([])).status).toBe(409);
       expect((await test([lv2.id])).status).toBe(409);
+      // Two groups of the division at once hold the whole class (the index keeps one group per row).
+      expect((await test([groupA.id, groupB.id])).status).toBe(409);
     } finally {
       await t.prisma.event.deleteMany({ where: { id: { in: made } } });
     }
