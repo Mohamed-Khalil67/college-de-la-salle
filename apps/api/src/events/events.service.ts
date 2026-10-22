@@ -7,6 +7,7 @@ import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
+import { groupHold } from '../occupancy/event-hold.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -332,6 +333,7 @@ function booking(row: EventRow) {
     roomId: row.roomId,
     classId: row.classId,
     homework: row.activityType.homework,
+    hold: groupHold(row.targets),
   };
 }
 

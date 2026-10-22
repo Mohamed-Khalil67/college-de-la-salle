@@ -284,6 +284,43 @@ describe('Timetable and groups (e2e)', () => {
     expect((whole.body as TimetableWriteResult).slot).toMatchObject({ groupId: null, division: null });
   });
 
+  it('lets a timed test for one group run beside the parallel group, and still clashes with its own', async () => {
+    // TP A has a lesson on Mondays 17:00. A test for TP B at that time only holds the TP division of the class.
+    await create({ groupId: groupA.id });
+    const teacher = await t.token(MATHS_TEACHER);
+    const controle = (await t.prisma.activityType.findUniqueOrThrow({ where: { code: 'controle' } })).id;
+    const made: string[] = [];
+    const test = async (groupIds: string[]) => {
+      const res = await t
+        .http()
+        .post('/api/events')
+        .set(bearer(teacher))
+        .send({
+          activityTypeId: controle,
+          title: 'E2E contrôle de groupe',
+          subjectId: 'mathematiques',
+          classId: base.classId,
+          date: '2027-03-08',
+          startTime: '17:00',
+          endTime: '18:00',
+          target: { groupIds, studentIds: [] },
+        });
+      if (res.status === 201) made.push((res.body as { id: string }).id);
+      return res;
+    };
+    try {
+      expect((await test([groupB.id])).status).toBe(201);
+      const rows = await t.prisma.occupancy.findMany({ where: { eventId: made[0] } });
+      expect(rows).toMatchObject([{ divisionKey: 'TP', groupId: groupB.id }]);
+      // The same group twice, the whole class, and another division all still clash with the lesson.
+      expect((await test([groupA.id])).status).toBe(409);
+      expect((await test([])).status).toBe(409);
+      expect((await test([lv2.id])).status).toBe(409);
+    } finally {
+      await t.prisma.event.deleteMany({ where: { id: { in: made } } });
+    }
+  });
+
   it('lets only the structure editors put a group on a session', async () => {
     for (const email of [MATHS_TEACHER, FRENCH_TEACHER]) {
       const token = await t.token(email);

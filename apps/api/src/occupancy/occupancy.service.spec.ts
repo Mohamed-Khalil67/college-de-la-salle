@@ -47,6 +47,13 @@ describe('OccupancyService', () => {
       expect(service.eventRows({ ...event, ...over })).toEqual([]);
     });
 
+    it('holds only the division of its class when it is addressed to groups of one division', () => {
+      const row = service.eventRows({ ...event, hold: { divisionKey: 'TP', groupId: 'g-b' } })[0];
+      expect(row).toMatchObject({ roomId: 'r1', classId: 'c1', divisionKey: 'TP', groupId: 'g-b' });
+      // Whole class: no division, no group.
+      expect(service.eventRows(event)[0]).toMatchObject({ divisionKey: null, groupId: null });
+    });
+
     it('holds only the room, or only the class, when that is all it has', () => {
       expect(service.eventRows({ ...event, classId: null })[0]).toMatchObject({
         roomId: 'r1',
