@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Paginated } from '@cdls/shared';
+import type { HandleContactMessagesResponse, Paginated } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
@@ -83,6 +83,76 @@ export class ContactService {
       return tx.contactMessage.findUniqueOrThrow({ where: { id }, include });
     });
     return toContactMessageDto(row);
+  }
+
+  /**
+   * Marks several waiting messages handled by this admin, in one statement and one transaction; audited
+   * per message. Unknown, deleted or already handled ids are skipped (another admin got there first).
+   */
+  async handleMany(ids: readonly string[], user: AuthUser): Promise<HandleContactMessagesResponse> {
+    const marked = await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.contactMessage.updateManyAndReturn({
+        where: { id: { in: [...ids] }, handledAt: null },
+        data: { handledAt: new Date(), handledById: user.id },
+        select: { id: true },
+      });
+      await audit(
+        tx,
+        rows.map((r) => ({
+          actorId: user.id,
+          action: 'contact_message.handle',
+          entity: 'contact_message',
+          entityId: r.id,
+        })),
+      );
+      return rows.length;
+    });
+    return { handled: marked };
+  }
+
+  /** Deletes a message (spam, duplicates); audited without the visitor's details. */
+  async remove(id: string, user: AuthUser): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const row = await tx.contactMessage.findUnique({
+        where: { id },
+        select: { createdAt: true, handledAt: true },
+      });
+      // deleteMany: a concurrent delete (another admin, the retention run) answers 404, not a 500.
+      const { count } = row ? await tx.contactMessage.deleteMany({ where: { id } }) : { count: 0 };
+      if (!row || !count) throw notFound('Message');
+      await audit(tx, [
+        {
+          actorId: user.id,
+          action: 'contact_message.delete',
+          entity: 'contact_message',
+          entityId: id,
+          before: { createdAt: row.createdAt.toISOString(), handledAt: toIso(row.handledAt) },
+        },
+      ]);
+    });
+  }
+
+  /**
+   * Retention: deletes the messages handled before `cutoff` (waiting ones are kept whatever their age).
+   * One system audit row per run that deleted something.
+   */
+  async purgeHandledBefore(cutoff: Date): Promise<number> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.contactMessage.deleteMany({
+        where: { handledAt: { lt: cutoff } },
+      });
+      if (count)
+        await audit(tx, [
+          {
+            actorId: null,
+            action: 'contact_message.purge',
+            entity: 'contact_message',
+            entityId: 'retention',
+            after: { handledBefore: cutoff.toISOString(), count },
+          },
+        ]);
+      return count;
+    });
   }
 }
 

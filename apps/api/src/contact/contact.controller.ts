@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -12,6 +13,7 @@ import {
 import {
   ApiBearerAuth,
   ApiNoContentResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -26,6 +28,8 @@ import {
   ContactMessageDto,
   ContactMessageListQueryDto,
   CreateContactMessageDto,
+  HandleContactMessagesDto,
+  HandleContactMessagesResponseDto,
   UpdateContactMessageDto,
 } from './dto/contact.dto.js';
 
@@ -57,6 +61,33 @@ export class ContactController {
   @ApiPaginatedResponse(ContactMessageDto)
   list(@Query() query: ContactMessageListQueryDto): Promise<Paginated<ContactMessageDto>> {
     return this.contact.list(query);
+  }
+
+  /**
+   * Marks up to 100 waiting messages handled at once (admins). Unknown or already handled ids are
+   * skipped; the answer says how many were marked.
+   */
+  @Roles('admin')
+  @ApiBearerAuth()
+  @Post('contact-messages/handle')
+  @HttpCode(200)
+  @ApiOkResponse({ type: HandleContactMessagesResponseDto })
+  handleMany(
+    @Body() body: HandleContactMessagesDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<HandleContactMessagesResponseDto> {
+    return this.contact.handleMany(body.ids, user);
+  }
+
+  /** Deletes a message, e.g. spam (admins). Audited. */
+  @Roles('admin')
+  @ApiBearerAuth()
+  @Delete('contact-messages/:id')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Message deleted.' })
+  @ApiNotFoundResponse({ description: 'No such message.' })
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    return this.contact.remove(id, user);
   }
 
   /** Marks a message handled, or waiting again (admins). */

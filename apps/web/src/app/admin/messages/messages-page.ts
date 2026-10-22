@@ -1,16 +1,23 @@
-import { Component, ElementRef, Injector, afterNextRender, computed, inject, linkedSignal, resource, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, Injector, afterNextRender, afterRenderEffect, computed, inject, linkedSignal, resource, signal, viewChild } from '@angular/core';
 import type { ContactMessageDto, Paginated } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Badge, Button, EmptyState, Icon, Pagination, Tabs, type TabItem } from '../../ui';
 import { plural } from '../shared/admin-format';
+import { ConfirmModal } from '../shared/confirm-modal';
 import {
+  bulkHandledNotice,
   formatReceived,
   handledQuery,
   isMessageFilter,
+  keepSelectable,
   mailtoAddress,
   MESSAGE_FILTERS,
   type MessageFilter,
+  pageAfterRemoval,
   replyMailto,
+  selectAllState,
+  selectableIds,
+  toggleSelected,
 } from './messages-format';
 
 const PAGE_SIZE = 20;
@@ -21,10 +28,13 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
   all: { title: 'Aucun message reçu', description: 'Les messages envoyés depuis la page Contact du site arrivent ici.' },
 };
 
-/** Messages sent from the public contact form: read them, answer by e-mail, mark them handled. */
+/**
+ * Messages sent from the public contact form: read them, answer by e-mail, mark them handled (one by one
+ * or a selection), delete the unwanted ones.
+ */
 @Component({
   selector: 'app-messages-page',
-  imports: [Alert, Badge, Button, EmptyState, Icon, Pagination, Tabs],
+  imports: [Alert, Badge, Button, ConfirmModal, EmptyState, Icon, Pagination, Tabs],
   template: `
     <div class="page__header">
       <div class="page__header-text">
@@ -47,12 +57,38 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
         <cdls-alert tone="danger">{{ errorText(messages.error()) }}</cdls-alert>
       } @else if (shown(); as list) {
         @if (list.items.length) {
+          @if (selectable().length) {
+            <div class="bulk" role="group" aria-label="Sélection des messages à traiter">
+              <label class="check">
+                <input type="checkbox" [checked]="allState() === 'all'" [indeterminate]="allState() === 'some'" (change)="selectAll($event)" />
+                <span>Tout sélectionner sur cette page</span>
+              </label>
+              <button cdlsButton size="sm" type="button" [disabled]="bulkBusy()" (click)="handleSelected()">
+                @if (bulkBusy()) {
+                  Un instant…
+                } @else {
+                  <cdls-icon name="check" />Marquer la sélection comme traitée
+                  @if (selected().size) {
+                    ({{ selected().size }})
+                  }
+                }
+              </button>
+            </div>
+          }
           <ul class="messages" role="list" [attr.aria-busy]="messages.isLoading()">
             @for (m of list.items; track m.id) {
               <li>
                 <article class="card card--panel message" [attr.aria-labelledby]="'message-' + m.id">
                   <header class="message__head">
-                    <h2 class="t-h3" [id]="'message-' + m.id">{{ m.subject }}</h2>
+                    <div class="message__title">
+                      @if (!m.handledAt) {
+                        <label class="check">
+                          <input type="checkbox" [checked]="selected().has(m.id)" (change)="select(m.id, $event)" />
+                          <span class="visually-hidden">Sélectionner le message de {{ m.name }} : {{ m.subject }}</span>
+                        </label>
+                      }
+                      <h2 class="t-h3" [id]="'message-' + m.id">{{ m.subject }}</h2>
+                    </div>
                     @if (m.handledAt) {
                       <cdls-badge tone="neutral">Traité</cdls-badge>
                     } @else {
@@ -108,6 +144,9 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
                         <cdls-icon name="check" />Marquer comme traité<span class="visually-hidden"> : {{ m.subject }}</span>
                       }
                     </button>
+                    <button cdlsButton variant="tertiary" size="sm" type="button" (click)="askDelete(m)">
+                      Supprimer<span class="visually-hidden"> le message : {{ m.subject }}</span>
+                    </button>
                   </div>
                 </article>
               </li>
@@ -121,6 +160,23 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
         <p class="loading-line" role="status">Chargement des messages…</p>
       }
     </cdls-tabs>
+
+    <app-confirm-modal
+      title="Supprimer ce message ?"
+      confirmLabel="Supprimer le message"
+      [danger]="true"
+      [busy]="deleting()"
+      [error]="deleteError()"
+      [(open)]="deleteOpen"
+      (confirmed)="remove()"
+    >
+      @if (toDelete(); as m) {
+        <p>
+          Le message de <strong>{{ m.name }}</strong> (« {{ m.subject }} ») sera supprimé définitivement. Cette action ne peut pas
+          être annulée.
+        </p>
+      }
+    </app-confirm-modal>
   `,
   styles: `
     .notice-box:focus {
@@ -128,6 +184,23 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
     }
     .notice-box:empty {
       display: none;
+    }
+    .bulk {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3) var(--space-4);
+      margin-block-end: var(--space-4);
+    }
+    .check input:indeterminate {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+    }
+    .check input:indeterminate::before {
+      height: 2px;
+      clip-path: none;
+      transform: scale(1);
     }
     .messages {
       display: grid;
@@ -144,6 +217,15 @@ const EMPTY: Readonly<Record<MessageFilter, { readonly title: string; readonly d
       align-items: center;
       justify-content: space-between;
       gap: var(--space-2) var(--space-4);
+    }
+    .message__title {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      min-width: 0;
+    }
+    .message__title .check input {
+      margin-block-start: 0.3rem;
     }
     .message__head h2 {
       overflow-wrap: anywhere;
@@ -214,9 +296,36 @@ export class MessagesPage {
   });
   protected readonly empty = computed(() => EMPTY[this.filter()]);
 
+  /** Waiting messages on screen: the only ones that can be selected. */
+  protected readonly selectable = computed(() => selectableIds(this.shown()?.items ?? []));
+  /** Selected for bulk handling; forgets the messages that leave the page or get handled. */
+  protected readonly selected = linkedSignal<readonly string[], ReadonlySet<string>>({
+    source: this.selectable,
+    computation: (ids, previous) => keepSelectable(previous?.value ?? new Set<string>(), ids),
+  });
+  protected readonly allState = computed(() => selectAllState(this.selected(), this.selectable()));
+  protected readonly bulkBusy = signal(false);
+
+  protected readonly deleteOpen = signal(false);
+  protected readonly toDelete = signal<ContactMessageDto | null>(null);
+  protected readonly deleting = signal(false);
+  protected readonly deleteError = signal<string | null>(null);
+
   protected readonly busyId = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
+
+  /** The list on screen when a deletion succeeded; once a newer one is rendered, the confirmation takes the focus. */
+  #focusNoticeAfter: Paginated<ContactMessageDto> | undefined | null = null;
+
+  constructor() {
+    afterRenderEffect(() => {
+      const shown = this.shown();
+      if (this.#focusNoticeAfter === null || shown === this.#focusNoticeAfter) return;
+      this.#focusNoticeAfter = null;
+      this.noticeBox().nativeElement.focus();
+    });
+  }
 
   protected received(iso: string): string {
     return formatReceived(iso);
@@ -243,6 +352,7 @@ export class MessagesPage {
       this.notice.set(
         handled ? `Message de ${message.name} marqué comme traité.` : `Message de ${message.name} remis à traiter.`,
       );
+      if (this.filter() !== 'all') this.#stepBackIfEmptied(1);
       this.messages.reload();
       this.waiting.reload();
       // The message leaves this tab: keep the focus on the page, on the confirmation.
@@ -252,5 +362,73 @@ export class MessagesPage {
     } finally {
       this.busyId.set(null);
     }
+  }
+
+  protected select(id: string, event: Event): void {
+    const on = (event.target as HTMLInputElement).checked;
+    this.selected.update((selected) => toggleSelected(selected, id, on));
+  }
+
+  protected selectAll(event: Event): void {
+    const on = (event.target as HTMLInputElement).checked;
+    this.selected.set(new Set(on ? this.selectable() : []));
+  }
+
+  protected async handleSelected(): Promise<void> {
+    const ids = [...this.selected()];
+    this.actionError.set(null);
+    if (!ids.length) {
+      this.actionError.set('Cochez d’abord les messages à marquer comme traités.');
+      return;
+    }
+    this.bulkBusy.set(true);
+    try {
+      const { handled } = await this.#api.contact.handleMany(ids);
+      this.notice.set(bulkHandledNotice(handled, ids.length));
+      if (this.filter() === 'waiting') this.#stepBackIfEmptied(ids.length);
+      this.messages.reload();
+      this.waiting.reload();
+      // The selection leaves this tab (and the bar with it when nothing waits): keep the focus on the page.
+      afterNextRender(() => this.noticeBox().nativeElement.focus(), { injector: this.#injector });
+    } catch (error) {
+      this.actionError.set(apiMessage(error));
+    } finally {
+      this.bulkBusy.set(false);
+    }
+  }
+
+  protected askDelete(message: ContactMessageDto): void {
+    this.toDelete.set(message);
+    this.deleteError.set(null);
+    this.deleteOpen.set(true);
+  }
+
+  protected async remove(): Promise<void> {
+    const message = this.toDelete();
+    if (!message) return;
+    this.deleting.set(true);
+    this.deleteError.set(null);
+    try {
+      await this.#api.contact.remove(message.id);
+      this.actionError.set(null);
+      this.notice.set(`Message de ${message.name} supprimé.`);
+      this.deleteOpen.set(false);
+      // The dialog gives the focus back to « Supprimer », which leaves with the message: once the list is
+      // refreshed, the confirmation takes the focus instead.
+      this.#focusNoticeAfter = this.shown();
+      this.#stepBackIfEmptied(1);
+      this.messages.reload();
+      this.waiting.reload();
+    } catch (error) {
+      this.deleteError.set(apiMessage(error));
+    } finally {
+      this.deleting.set(false);
+    }
+  }
+
+  /** Back to the previous page when the messages that left were the last ones of this page. */
+  #stepBackIfEmptied(removed: number): void {
+    const onPage = this.shown()?.items.length ?? 0;
+    this.page.update((page) => pageAfterRemoval(page, onPage, removed));
   }
 }

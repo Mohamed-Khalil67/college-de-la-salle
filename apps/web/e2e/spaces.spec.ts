@@ -125,3 +125,51 @@ test('a visitor writes to the secretariat; an admin reads the message and marks 
   await expect(page.getByRole('article').filter({ hasText: email })).toContainText('Traité le');
   await expectNoAxeViolations(page);
 });
+
+test('an admin marks a selection handled, then deletes the message, the focus staying on the page', async ({ page }, info) => {
+  // One message only: the contact form takes 5 a minute per client, and the test above sends one too.
+  const subject = `Promotion ${info.project.name} ${Date.now()}`;
+  const sent = await page.request.post('/api/contact', {
+    data: { name: 'Robot Promo', email: `promo.${Date.now()}@example.com`, subject, message: 'Achetez maintenant.' },
+  });
+  expect(sent.status()).toBe(204);
+
+  await signInTo(page, ACCOUNTS.admin, '/admin/messages');
+  const message = page.getByRole('article').filter({ hasText: subject });
+  await message.getByRole('checkbox', { name: /Sélectionner le message de Robot Promo/ }).check();
+  const bulk = page.getByRole('button', { name: /Marquer la sélection comme traitée/ });
+  await expect(bulk).toContainText('(1)');
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoAxeViolations(page);
+  }
+  await bulk.click();
+  await expect(page.getByRole('status').filter({ hasText: '1 message marqué comme traité.' })).toBeVisible();
+  await expect(message).toHaveCount(0);
+  // The selection left the tab: the focus is on the confirmation, not lost on the page.
+  await expect(page.locator('.notice-box')).toBeFocused();
+
+  await page.getByRole('tab', { name: 'Traités' }).click();
+  await expect(message).toContainText('Traité le');
+  await expect(message.getByRole('checkbox')).toHaveCount(0);
+
+  // Deleting asks first; Cancel keeps the message.
+  await message.getByRole('button', { name: /^Supprimer/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Supprimer ce message ?' });
+  await expect(dialog).toContainText('Robot Promo');
+  await expectNoAxeViolations(page);
+  await dialog.getByRole('button', { name: 'Annuler' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(message).toBeVisible();
+  await message.getByRole('button', { name: /^Supprimer/ }).click();
+  await dialog.getByRole('button', { name: 'Supprimer le message' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Message de Robot Promo supprimé.' })).toBeVisible();
+  await expect(message).toHaveCount(0);
+  // The button that opened the dialog left with the message: the focus is on the confirmation.
+  await expect(page.locator('.notice-box')).toBeFocused();
+  await expectNoAxeViolations(page);
+
+  await page.getByRole('tab', { name: 'Tous' }).click();
+  await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: subject })).toHaveCount(0);
+});

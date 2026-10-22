@@ -1560,3 +1560,17 @@ export interface RolloverResult {
 export const ROLLOVER_PREVIEW_STALE = 'ROLLOVER_PREVIEW_STALE';
 /** The 409 code of a write refused because its school year is archived. */
 export const YEAR_ARCHIVED = 'YEAR_ARCHIVED';
+
+/** Most ids POST /contact-messages/handle takes at once. */
+export const CONTACT_BULK_MAX = 100;
+
+/** POST /contact-messages/handle: marks several messages handled at once (admins). */
+export interface HandleContactMessagesRequest {
+  /** 1 to CONTACT_BULK_MAX message ids. Unknown or already handled ones are skipped. */
+  readonly ids: readonly string[];
+}
+
+export interface HandleContactMessagesResponse {
+  /** How many messages this request marked handled (already handled or deleted ones are not counted). */
+  readonly handled: number;
+}

@@ -58,7 +58,7 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 | `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
-| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe at 390 and 1440 px on every screen of every space) against the running stack (`E2E_BASE_URL` for another port); needs the seeded demo accounts, a high `THROTTLE_LIMIT` (say 100000) and `LOGIN_THROTTLE_LIMIT=1000` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default) |
+| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe at 390 and 1440 px on every screen of every space) against the running stack (`E2E_BASE_URL` for another port); needs the seeded demo accounts, a high `THROTTLE_LIMIT` (say 100000) and `LOGIN_THROTTLE_LIMIT=1000` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default)  ; the run sends 4 contact messages, so wait a minute between runs or raise `CONTACT_THROTTLE_LIMIT` |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
 | `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
@@ -87,7 +87,8 @@ Sign-in returns a 15-minute access token (send it as
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
 | Report cards | `/periods/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
 | Next year (admin only) | `POST /rollover/preview` (what would be created, skipped or flagged; writes nothing) and `POST /rollover/apply` (the same plan in one transaction, 409 `ROLLOVER_PREVIEW_STALE` when the data changed since the preview, the old year archived). The plan copies the classes, periods, calendar, subjects, assignments, the timetable, promotes the students and copies the groups (empty, plus the promoted students who find a group of the same name, and the sessions of groups); each step is reported as created / already there / left out. `PATCH /classes/:id` sets `nextClassId`. An archived year answers 409 `YEAR_ARCHIVED` to every write: grades, attendance, events and their « Assigner à », timetable, enrolments, groups and members, subjects, periods, calendar |
-| Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
+
+| Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages`, `PATCH` and `DELETE /contact-messages/:id`, `POST /contact-messages/handle` (up to 100 at once) (admins, audited); handled messages are deleted `CONTACT_RETENTION_DAYS` (365) days after handling, checked daily |
 
 Who may do what mirrors the old Firestore rules (`docs/legacy/firestore.rules`): students only see their own records and what is addressed
 to their class, section or the whole school; teachers only grade, take attendance and post for the classes
