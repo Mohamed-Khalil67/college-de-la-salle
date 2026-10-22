@@ -1469,6 +1469,8 @@ export type RolloverStepId =
   | 'timetable'
   | 'students'
   | 'groups'
+  | 'group_members'
+  | 'group_slots'
   | 'archive';
 
 /** Counts of one step: what is created, what already exists (a re-run keeps it) and what is left out. */
