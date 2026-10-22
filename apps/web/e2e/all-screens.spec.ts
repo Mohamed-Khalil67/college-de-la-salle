@@ -85,3 +85,21 @@ for (const who of ROLES) {
     await axeAtBothWidths(page);
   });
 }
+
+test('the sign-in family (login, forgot password, reset link) opens cleanly and passes Axe at 390 and 1440 px', async ({ page }) => {
+  const errors = await watchConsole(page);
+  const pages = [
+    { path: '/connexion', h1: 'Connexion à votre espace' },
+    { path: '/connexion/oubli', h1: 'Mot de passe oublié' },
+    { path: '/connexion/reinitialiser', h1: 'Lien incomplet' },
+    { path: '/connexion/reinitialiser?token=exemple', h1: 'Choisir un nouveau mot de passe' },
+  ];
+  for (const { path, h1 } of pages) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 }), path).toHaveCount(1);
+    await expect(page.getByRole('heading', { level: 1, name: h1 })).toBeVisible();
+    await axeAtBothWidths(page);
+  }
+  // The session check before sign-in answers 401 on /connexion: expected, not a defect.
+  expect(errors.filter((e) => !e.includes('401'))).toEqual([]);
+});

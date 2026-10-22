@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiNoContentResponse,
   ApiCookieAuth,
   ApiOkResponse,
   ApiTags,
@@ -13,10 +14,18 @@ import type { Request, Response } from 'express';
 import { API_PREFIX } from '../app.prefix.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { AllowDuringPasswordChange, CurrentUser, Public } from '../common/decorators.js';
-import { loginTracker, passwordTracker } from '../common/client-key.js';
+import { forgotPasswordTracker, loginTracker, passwordTracker } from '../common/client-key.js';
 import type { Env } from '../config/env.validation.js';
 import { AuthService, type IssuedSession, toSessionUser } from './auth.service.js';
-import { ChangePasswordDto, LoginDto, SessionDto, SessionUserDto } from './dto/auth.dto.js';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  LoginDto,
+  ResetPasswordDto,
+  SessionDto,
+  SessionUserDto,
+} from './dto/auth.dto.js';
+import { PasswordResetService } from './password-reset.service.js';
 
 export const REFRESH_COOKIE = 'cdls_refresh';
 
@@ -40,6 +49,7 @@ export class AuthController {
 
   constructor(
     private readonly auth: AuthService,
+    private readonly passwordReset: PasswordResetService,
     config: ConfigService<Env, true>,
   ) {
     this.secureCookie = config.get('NODE_ENV', { infer: true }) === 'production';
@@ -122,6 +132,36 @@ export class AuthController {
         req.get('user-agent'),
       ),
     );
+  }
+
+  /**
+   * Mails a reset link to the account with this e-mail. Always 204: nothing says whether the account
+   * exists or is active. Limited like the login, per address and e-mail.
+   */
+  @Public()
+  @Throttle({
+    default: { limit: loginLimit, ttl: 60_000, getTracker: forgotPasswordTracker },
+    ip: { limit: ipCeiling, ttl: 60_000 },
+  })
+  @Post('forgot-password')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Accepted (whether or not an account matches).' })
+  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<void> {
+    await this.passwordReset.request(body.identifier);
+  }
+
+  /**
+   * Chooses a new password with the token of the e-mailed link (single use, short lived). Signs out
+   * every session of the account; the user then signs in with the new password.
+   */
+  @Public()
+  @Throttle({ default: { limit: loginLimit, ttl: 60_000 } })
+  @Post('reset-password')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Password changed.' })
+  @ApiBadRequestResponse({ description: 'Invalid, expired or used link, or a password that breaks a rule.' })
+  async resetPassword(@Body() body: ResetPasswordDto): Promise<void> {
+    await this.passwordReset.reset(body.token, body.newPassword);
   }
 
   @AllowDuringPasswordChange()

@@ -118,6 +118,7 @@ model User {
   posts                   Post[]
   auditLogs               AuditLog[]
   refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
   /// Contact messages this admin marked handled.
   contactMessagesHandled  ContactMessage[]
   sectionChangesRequested SectionChangeRequest[] @relation("SectionChangeRequestedBy")
@@ -193,6 +194,23 @@ model RefreshToken {
   @@index([familyId])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+/// A « mot de passe oublié » link: only the HMAC of the token is stored. Single use (`usedAt`), short
+/// lived (`expiresAt`), and a new request deletes the user's earlier ones.
+model PasswordResetToken {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 // ---------------------------------------------------------------------------------------------------

@@ -2,7 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
-import type { ChangePasswordRequest, LoginRequest, Role, SessionResponse, SessionUser } from '@cdls/shared';
+import type {
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
+  LoginRequest,
+  ResetPasswordRequest,
+    Role,
+  SessionResponse,
+  SessionUser,
+} from '@cdls/shared';
 
 export type AuthStatus = 'unknown' | 'anonymous' | 'authenticated';
 
@@ -84,6 +92,16 @@ export class AuthStore {
     );
     this.#accept(session);
     return session.user;
+  }
+
+  /** Asks for a reset link by e-mail. The API answers 204 whatever the account. */
+  async forgotPassword(body: ForgotPasswordRequest): Promise<void> {
+    await firstValueFrom(this.#http.post<void>('/api/auth/forgot-password', body));
+  }
+
+  /** Chooses a new password with the token of the e-mailed link (no session: the user signs in afterwards). */
+  async resetPassword(body: ResetPasswordRequest): Promise<void> {
+    await firstValueFrom(this.#http.post<void>('/api/auth/reset-password', body));
   }
 
   async logout(): Promise<void> {

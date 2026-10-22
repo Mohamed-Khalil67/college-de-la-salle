@@ -74,3 +74,5 @@ apps/api/src/generated/
 # Demo account passwords written by the seed; never commit them.
 apps/api/demo-credentials.local.md
 apps/api/.dev-db/
+# Mails written by the dev `log` transport (they contain reset links).
+apps/api/.dev-mail/

@@ -1,7 +1,9 @@
 import {
   type ChangePasswordRequest,
+  type ForgotPasswordRequest,
   type LoginRequest,
   PASSWORD_MAX_LENGTH,
+  type ResetPasswordRequest,
   type Role,
   type SectionId,
   type SessionResponse,
@@ -60,4 +62,26 @@ export class SessionDto implements SessionResponse {
   /** Seconds until the access token expires. */
   expiresIn: number;
   user: SessionUserDto;
+}
+
+export class ForgotPasswordDto implements ForgotPasswordRequest {
+  /** The login e-mail. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(254)
+  identifier: string;
+}
+
+export class ResetPasswordDto implements ResetPasswordRequest {
+  /** The token of the e-mailed link. */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  token: string;
+
+  /** At least 10 characters, not the e-mail (checked by the service, with French messages). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(PASSWORD_MAX_LENGTH)
+  newPassword: string;
 }

@@ -9,7 +9,7 @@ and how to use what already exists.
 | Folder | What | Rendering |
 |---|---|---|
 | `src/app/public/` | Public site pages (home, histoire, bac pages, contact) | Prerendered |
-| `src/app/auth/` | `/connexion` login page | Client |
+| `src/app/auth/` | `/connexion` login page, `/connexion/oubli` and `/connexion/reinitialiser?token=` (forgotten password, framed by `auth-shell.ts`) | Client |
 | `src/app/eleve/` | Student space `/eleve` (routes + `ELEVE_NAV` in `eleve.routes.ts`) | Client |
 | `src/app/enseignant/` | Teacher space `/enseignant` | Client |
 | `src/app/admin/` | Administration `/admin` | Client |

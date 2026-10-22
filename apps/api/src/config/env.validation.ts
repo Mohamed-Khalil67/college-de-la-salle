@@ -2,6 +2,9 @@ import { plainToInstance, Transform } from 'class-transformer';
 import {
   IsIn,
   IsFQDN,
+  IsBoolean,
+  IsOptional,
+  IsUrl,
   IsInt,
   IsNotEmpty,
   IsString,
@@ -110,6 +113,54 @@ export class Env {
     { message: 'SCHOOL_EMAIL_DOMAIN must be a domain such as lasalle-daher.eg' },
   )
   SCHOOL_EMAIL_DOMAIN = DEMO_EMAIL_DOMAIN;
+
+  /** Minutes a « mot de passe oublié » link stays valid. */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(5)
+  @Max(1440)
+  PASSWORD_RESET_TTL_MINUTES = 60;
+
+  /** Public address of the website, without a trailing slash: the base of the links sent by e-mail. */
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().replace(/\/+$/, '') : value))
+  @IsUrl(
+    { require_tld: false, require_protocol: true, protocols: ['http', 'https'] },
+    { message: 'PUBLIC_WEB_URL must be an http(s) address such as https://www.lasalle-daher.eg' },
+  )
+  PUBLIC_WEB_URL = 'http://localhost:4200';
+
+  /** `log`: the mail is written to the API log and apps/api/.dev-mail (development); `smtp`: really sent. */
+  @IsIn(['log', 'smtp'], { message: 'MAIL_TRANSPORT must be log or smtp' })
+  MAIL_TRANSPORT: 'log' | 'smtp' = 'log';
+
+  /** Sender of every mail, e.g. `Collège de la Salle <no-reply@lasalle-daher.eg>`. */
+  @IsString()
+  @IsNotEmpty()
+  MAIL_FROM = `Collège de la Salle <no-reply@${DEMO_EMAIL_DOMAIN}>`;
+
+  /** SMTP server (required when MAIL_TRANSPORT=smtp). */
+  @IsOptional()
+  @IsString()
+  SMTP_HOST?: string;
+
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  SMTP_PORT = 587;
+
+  /** TLS from the first byte (port 465). Leave false for STARTTLS on port 587. */
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  SMTP_SECURE = false;
+
+  @IsOptional()
+  @IsString()
+  SMTP_USER?: string;
+
+  @IsOptional()
+  @IsString()
+  SMTP_PASSWORD?: string;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -130,6 +181,14 @@ export function validateEnv(raw: Record<string, unknown>): Env {
   if (env.NODE_ENV === 'production' && env.SCHOOL_EMAIL_DOMAIN === DEMO_EMAIL_DOMAIN) {
     throw new Error(
       'SCHOOL_EMAIL_DOMAIN is the demo domain; set the login domain of the school in production.',
+    );
+  }
+  if (env.MAIL_TRANSPORT === 'smtp' && !env.SMTP_HOST) {
+    throw new Error('MAIL_TRANSPORT=smtp needs SMTP_HOST (and usually SMTP_USER and SMTP_PASSWORD).');
+  }
+  if (env.NODE_ENV === 'production' && env.MAIL_TRANSPORT === 'log') {
+    throw new Error(
+      'MAIL_TRANSPORT=log writes reset links to the log; set MAIL_TRANSPORT=smtp in production.',
     );
   }
   return env;
