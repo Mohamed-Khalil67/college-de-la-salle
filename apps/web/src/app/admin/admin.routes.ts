@@ -78,6 +78,12 @@ export const ADMIN_ROUTES: Routes = [
     loadComponent: () => import('./validations/validations-page').then((m) => m.ValidationsPage),
   },
   {
+    path: 'nouvelle-annee',
+    title: 'Nouvelle année',
+    canMatch: [adminOnlyGuard],
+    loadComponent: () => import('./nouvelle-annee/new-year-page').then((m) => m.NewYearPage),
+  },
+  {
     path: 'messages',
     title: 'Messages',
     canMatch: [adminOnlyGuard],
