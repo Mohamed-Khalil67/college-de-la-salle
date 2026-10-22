@@ -19,12 +19,12 @@ Updated 2026-10-21, after the second integration (branch `integration-2`: `revie
   - Screens: admin week editor (ARIA grid, « Déplacer… », « Conflits (n) » panel), teacher « Mon emploi du temps », student week (the old events calendar of the student moved to `/eleve/agenda`, « Examens et devoirs »).
   - Decisions taken while building: a teacher only uses « Cette séance » (cancel, move, room) for their own sessions; « Toute la série » edits from today on (it splits the series at today once it has started, so past sessions are never rewritten); the TP-outside-a-lab warning applies to the system TP type only; one-off events with a room or a class and a time now hold the room and the class (hard conflict with a lesson).
   - **Legacy weekly events are not converted.** The weekly `cours` events created before this phase (the seed's two per class) still work in the calendar, attendance and the .ics export, but they are not in the occupancy index, so they never clash. Convert them to slots by hand, then delete them.
-  - The `division` of a slot is the key groups will plug into (`group_id` exists, always null, no foreign key yet).
+  - The `division` of a slot is the key groups plug into (phase 3 gave `group_id` its foreign key).
 - **Review fixes (branch `review-fixes`):** coefficients frozen with the period, audit trail of account changes, database trigger for every-section/section period overlaps, per-account sign-in throttle and 14-day temporary passwords, « déjà présent » detection in imports, soft-close of enrolments, bounded and filtered `GET /calendar-days`.
-- **Phases 3 (groups, « Assigner à ») and 5 (next year, rollover): not started.** Phase 3 plugs into `TimetableSlot.groupId` / `division` (the column exists, always null, no foreign key yet) and into the occupancy index's `division_key`; phase 5 must copy slots and rewrite the occupancy index through `OccupancyService`, and reuse the per-year advisory lock of `PeriodsService` for periods.
+- **Phase 3, groups and « Assigner à »: built** (branch `p3-groups`, see « Phase 3: groups and targets » below). **Phase 5 (next year, rollover): not started here** (another lane). Phase 5 must copy slots (with `groupId` mapped to the copied group) and rewrite the occupancy index through `OccupancyService`, copy groups as described below, and reuse the per-year advisory lock of `PeriodsService` for periods.
 - **Known leftovers:**
   - Legacy weekly events (the seed's two `cours` events per class, and anything created the same way before phase 2) are not converted to timetable slots: the demo calendar shows them next to the slots, and attendance still runs on them.
-  - Student group sizes for the room-capacity warning: it counts open enrolments of the class (`leftOn` null), not the members of a group, until phase 3.
+  - A timed one-off event addressed to one group still holds the whole class in the occupancy index (it can clash with a parallel session of another group of the class).
   - Section change report card gap (below): a student who changes section in the middle of a period.
 - **Integration notes (`integration-2`):**
   - Migrations: the timetable migration (`20261021055918`) sorts before the two review-fix ones (`20261022…`). They touch different tables, so `prisma migrate deploy` applies all of them from an empty database and as an upgrade from `20261021000500_calendar_days`; no reconciling migration was needed. A database that already ran the review-fix migrations but not the timetable one still takes the timetable migration with `migrate deploy` (`migrate dev` would call it out of order and ask for a reset).
@@ -38,6 +38,27 @@ Updated 2026-10-21, after the second integration (branch `integration-2`: `revie
     On wide screens the top bar shows everything up to eight entries; the admin has more, so Salles, Types d'activité and Messages move behind « Plus ».
   - A new timetable series starts today, so the first session of a series made on a Wednesday is next week: the Playwright flow looks at next week.
 - Known gap for phase 5: a student who changes section in the middle of a period keeps the grades of the old class, but the report card of that period is computed from the current class only.
+
+## Phase 3: groups and targets
+
+**Model** (migration `20261022000200_groups_targets`, applies after `20261022000100`):
+- `Group(id, classId, division, label, createdAt)`; unique `(classId, division, label)`; deleting the class deletes its groups; a group used by a timetable slot or an assessment target cannot be deleted (restrict, 409).
+- `GroupMember(id, groupId, studentId, classId, division, joinedOn, leftOn)`; `classId` and `division` repeat the group's so that the partial unique index `group_members_open_student_division_key` (`student_id, class_id, division WHERE left_on IS NULL`) holds: **a student is in at most one group per division of a class**. Leaving sets `leftOn` (history kept).
+- `AssessmentTarget(id, eventId, scope class|group|student, groupId?, studentId?)`: the TARGET is stored, never a copy of the students. No row, or one `class` row, means the whole class. Only events with a class and an activity type that is gradable or homework carry targets. The backfill gave every existing one a `class` row.
+- `TimetableSlot.groupId` has its foreign key; `division` is derived from the group (a different one sent with it is refused), so phase 2 clients that only send a division still work. `Occupancy.groupId` and the constraint `occupancy_group_no_overlap`: a group is never in two places at once, while groups of one division still overlap each other.
+
+**The target rule, in one place:** `targetedStudentIds` in `@cdls/shared` (`targets.ts`) and `TargetsService.concerned` in the API. Whole class: everyone with an open enrolment. Otherwise the union of the current members of the groups and the students named, only those still enrolled in the class. A student who joins a group later is included, one who leaves is not. The database form for lists (`concernsStudentNow`, used by `AccessService.eventAudienceFor`) is checked against the resolved list in `test/targets.e2e-spec.ts`.
+
+**Where it applies:** grade sheets and `PUT /events/:id/grades` (a grade for a non-targeted student: 400 « n’est pas concerné(e) »; a graded student who left the group stays on the sheet, `targeted: false`, only removable), attendance sheets and saves, homework lists, ticks and completions, the students' calendar, timetable (own groups' sessions plus whole-class ones; a slot without group is whole-class) and dashboard. Editing the audience of a published piece of work never deletes a grade: taking out a student who has one is refused (409, with the names). Averages and report cards count a grade only when the student was a target (`wasTargeted`, which keeps marks earned in a group the student has since left). Leaving a class (unenrol, move, section change, graduation) closes the memberships in the same transaction (`closeGroupMemberships`).
+
+**Permissions:** admins and coordinators manage any group; a teacher the groups of classes they teach (`AccessService.assertTeachesClass` on the group's own class, never an id sent by the caller); a student reads only `GET /groups/mine`. `GET /classes/:id/students` is also open to coordinators.
+
+**Group contract for the rollover (phase 5).** Copy, for each class copied to the new year:
+- `Group`: `division` and `label` (the new `classId` is the copied class; `id` and `createdAt` are new). Keep the unique `(classId, division, label)`.
+- `GroupMember`: do NOT copy memberships blindly. If the school wants the same split next year, create `GroupMember(groupId = new group, studentId, classId = new class, division, joinedOn = the enrolment date)` only for the students promoted into that class, and only for the groups whose label and division were copied (one open membership per student and division). The default should be to copy the groups empty and let the teachers refill them.
+- `TimetableSlot`: copy `groupId` mapped to the new group, `division` equal to the group's division (or the typed division when there is no group), then rebuild the occupancy rows through `OccupancyService` so `group_id` and `division_key` are written.
+- `AssessmentTarget`: never copied (events are not copied).
+- Archive: old groups and memberships stay as history; nothing is deleted.
 
 ## What the owner asked for
 

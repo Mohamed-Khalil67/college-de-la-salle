@@ -50,6 +50,12 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 - The weekly rule is the source of truth; never edit `occupancy` by hand. Calendar days (`CalendarDaysService`) and one-off events (`EventsService`) call `OccupancyService` in their own transactions. Legacy weekly events are not indexed.
 - « Aujourd'hui » is `schoolToday()` (Cairo, from `@cdls/shared`): sessions before it are never rewritten. Teachers change only `this` session of their own slots (cancel, move, room; no replacement); the series scopes are `@StructureEditors()` only.
 
+## Groups and targets
+
+- `groups/` (CRUD, members, `GET /groups/mine`) and `targets/` (`TargetsService`, the ONE place that says which students a piece of work concerns, from `targetedStudentIds` in `@cdls/shared`). Every group route loads the group and authorises on ITS class (`GroupsService.authorize`); never trust a class id the caller sends for a group id. Memberships are soft (`leftOn`); take a student out of a class only through code that also calls `closeGroupMemberships` in the same transaction.
+- Events with a class and a gradable or homework type carry `AssessmentTarget` rows (no row = whole class). Grade and attendance writes lock the event row (`FOR UPDATE`) and re-resolve the targets inside the transaction. Lists for students use `AccessService.eventAudienceFor` (`concernsStudentNow`), not `audienceFor`. Grades are never deleted by an audience change (409).
+- A timetable slot with `groupId` takes its `division` from the group; the occupancy index carries `group_id` (`occupancy_group_no_overlap`).
+
 ## Config
 
 - All environment variables are declared and validated in `src/config/env.validation.ts`; add new ones there and to `.env.example` (placeholders only, never real secrets). Read them with `ConfigService<Env, true>`.
