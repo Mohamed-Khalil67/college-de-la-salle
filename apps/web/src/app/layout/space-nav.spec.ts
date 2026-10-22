@@ -43,13 +43,14 @@ describe('« Plus » lists every screen of the area', () => {
     expect(menu(ENSEIGNANT_NAV, coordinator).map((i) => i.label)).toContain('Coordination');
     const adminPages = menu(ADMIN_NAV, admin).map((i) => i.label);
     expect(adminPages).toEqual(
-      expect.arrayContaining(['Matières', 'Salles', 'Types d’activité', 'Affectations', 'Validations', 'Bulletins', 'Messages']),
+      expect.arrayContaining(['Matières', 'Salles', 'Types d’activité', 'Nouvelle année', 'Affectations', 'Validations', 'Bulletins', 'Messages']),
     );
     const coordinatorPages = menu(ADMIN_NAV, coordinator).map((i) => i.label);
     expect(coordinatorPages).toEqual(
       expect.arrayContaining(['Matières', 'Salles', 'Types d’activité', 'Année scolaire', 'Mon espace enseignant']),
     );
     expect(coordinatorPages).not.toContain('Utilisateurs');
+    expect(coordinatorPages).not.toContain('Nouvelle année');
     expect(coordinatorPages).not.toContain('Bulletins');
   });
 
@@ -67,6 +68,8 @@ describe('the top navigation', () => {
     const adminTop = desktopNav(visibleNav(ADMIN_NAV, admin)).map((i) => i.label);
     expect(adminTop).toContain('Plus');
     expect(adminTop).not.toContain('Salles');
+    // The rollover is run once a year: it sits behind « Plus » in the top bar.
+    expect(adminTop).not.toContain('Nouvelle année');
     expect(adminTop.length).toBeLessThanOrEqual(9);
     const coordinatorTop = desktopNav(visibleNav(ADMIN_NAV, coordinator)).map((i) => i.label);
     expect(coordinatorTop).toEqual(expect.arrayContaining(['Salles', 'Types d’activité']));

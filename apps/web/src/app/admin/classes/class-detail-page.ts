@@ -4,6 +4,7 @@ import type { ClassStudentDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
 import { Alert, Avatar, Button, EmptyState, Icon, Tabs, type TabItem } from '../../ui';
+import { ArchivedBanner } from '../shared/archived-banner';
 import { ConfirmModal } from '../shared/confirm-modal';
 import { fullName, plural, sectionLabel } from '../shared/admin-format';
 import { ArchiveModal, type ArchiveTarget } from '../utilisateurs/archive-modal';
@@ -13,7 +14,7 @@ import { EnrollSearch } from './enroll-search';
 /** One class: its enrolled students, enrolment of existing students and removal. */
 @Component({
   selector: 'app-class-detail-page',
-  imports: [RouterLink, Alert, Avatar, Button, EmptyState, Icon, Tabs, ArchiveModal, ClassSubjectsTab, ConfirmModal, EnrollSearch],
+  imports: [RouterLink, ArchivedBanner, Alert, Avatar, Button, EmptyState, Icon, Tabs, ArchiveModal, ClassSubjectsTab, ConfirmModal, EnrollSearch],
   template: `
     <p class="back"><a routerLink=".."><cdls-icon name="chevron-left" />Toutes les classes</a></p>
 
@@ -36,6 +37,10 @@ import { EnrollSearch } from './enroll-search';
       </div>
     } @else {
       <div class="page__header"><div class="page__header-text"><h1 class="t-h1">Classe</h1></div></div>
+    }
+
+    @if (archivedYear(); as year) {
+      <app-archived-banner [label]="year.label" />
     }
 
     @if (notice()) {
@@ -161,6 +166,14 @@ export class ClassDetailPage {
   protected readonly roster = resource({
     params: () => (this.isAdmin() ? this.id() : undefined),
     loader: ({ params }) => this.#api.school.classStudents(params),
+  });
+  /** The school year of the class, to say so when it is archived (read-only). */
+  protected readonly years = resource({ loader: () => this.#api.school.years() });
+  protected readonly archivedYear = computed(() => {
+    if (!this.schoolClass.hasValue() || !this.years.hasValue()) return null;
+    const yearId = this.schoolClass.value().schoolYearId;
+    const year = this.years.value().find((y) => y.id === yearId);
+    return year?.status === 'archived' ? year : null;
   });
   protected readonly track = computed(() => (this.schoolClass.hasValue() ? sectionLabel(this.schoolClass.value().sectionCode) : ''));
   protected readonly enrolledIds = computed(() => new Set(this.roster.hasValue() ? this.roster.value().map((s) => s.id) : []));

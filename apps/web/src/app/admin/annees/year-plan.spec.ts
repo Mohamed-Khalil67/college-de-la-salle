@@ -48,11 +48,11 @@ function day(id: string, over: Partial<CalendarDayDto> = {}): CalendarDayDto {
 }
 
 function schoolClass(id: string, sectionId: string): ClassDto {
-  return { id, schoolYearId: 'y', sectionId, sectionCode: sectionId === 's1' ? 'nationale' : 'bac', code: id, label: id, studentCount: 0 };
+  return { id, schoolYearId: 'y', sectionId, sectionCode: sectionId === 's1' ? 'nationale' : 'bac', code: id, label: id, studentCount: 0, nextClassId: null };
 }
 
 function year(periods: PeriodDto[], isCurrent = true): SchoolYearDto {
-  return { id: 'y', label: '2026-2027', startsOn: '2026-09-01', endsOn: '2027-06-30', isCurrent, periods };
+  return { id: 'y', label: '2026-2027', startsOn: '2026-09-01', endsOn: '2027-06-30', isCurrent, status: isCurrent ? 'current' : 'upcoming', archivedAt: null, periods };
 }
 
 describe('toEntries', () => {

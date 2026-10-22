@@ -2,6 +2,11 @@ import { HttpClient, type HttpErrorResponse, HttpParams } from '@angular/common/
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
+  RolloverApplyRequest,
+  RolloverPreview,
+  RolloverRequest,
+  RolloverResult,
+  UpdateClassRequest,
   ActivityTypeDto,
   ApiError,
   CalendarDayDto,
@@ -127,6 +132,14 @@ export class ApiClient {
   }
 
   /* School structure */
+  /** The next-year wizard (admin only). */
+  readonly rollover = {
+    /** What the rollover would create and flag; writes nothing. */
+    preview: (body: RolloverRequest) => this.#post<RolloverPreview>('/rollover/preview', body),
+    /** Runs the previewed plan; 409 ROLLOVER_PREVIEW_STALE when the data changed since. */
+    apply: (body: RolloverApplyRequest) => this.#post<RolloverResult>('/rollover/apply', body),
+  };
+
   readonly school = {
     sections: () => this.#get<SectionDto[]>('/sections'),
     years: () => this.#get<SchoolYearDto[]>('/school-years'),
@@ -144,7 +157,7 @@ export class ApiClient {
     classes: (query: { schoolYearId?: string } = {}) => this.#get<ClassDto[]>('/classes', query),
     class: (id: string) => this.#get<ClassDto>(`/classes/${id}`),
     createClass: (body: CreateClassRequest) => this.#post<ClassDto>('/classes', body),
-    updateClass: (id: string, body: Partial<Pick<CreateClassRequest, 'code' | 'label'>>) => this.#patch<ClassDto>(`/classes/${id}`, body),
+    updateClass: (id: string, body: UpdateClassRequest) => this.#patch<ClassDto>(`/classes/${id}`, body),
     /** An empty class: no student, grade, attendance or report card (409 otherwise). */
     deleteClass: (id: string) => this.#delete(`/classes/${id}`),
     classStudents: (id: string) => this.#get<ClassStudentDto[]>(`/classes/${id}/students`),
