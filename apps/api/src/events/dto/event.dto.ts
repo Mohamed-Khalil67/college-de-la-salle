@@ -55,6 +55,7 @@ export class AssessmentTargetDto implements AssessmentTargetContract {
   whole: boolean;
   @ApiProperty({ type: [AssessmentTargetGroupDto] })
   groups: readonly AssessmentTargetGroupDto[];
+  @ApiProperty({ type: [String] })
   studentIds: readonly string[];
   @ApiProperty({ type: Number, nullable: true })
   concerned: number | null;
