@@ -324,9 +324,31 @@ describe('Rollover (e2e)', () => {
       // Nothing was written; the current year (the demo one) still works.
       expect(await t.prisma.grade.count({ where: { eventId: test.id } })).toBe(0);
       expect(await t.prisma.attendance.count({ where: { eventId: lesson.id } })).toBe(0);
-      const demo = await t.prisma.event.findFirstOrThrow({ where: { activityType: { code: 'examen' }, schoolClass: { schoolYear: { isCurrent: true } }, subjectId: 'mathematiques' } });
+      const demo = await t.prisma.event.findFirstOrThrow({ where: { activityType: { code: 'examen' }, schoolClass: { schoolYear: { isCurrent: true } }, subjectId: 'mathematiques', period: { closedAt: null } } });
       const demoStudent = await t.prisma.enrollment.findFirstOrThrow({ where: { classId: demo.classId!, leftOn: null } });
-      await t.http().put(`/api/events/${demo.id}/grades`).set(bearer(teacher)).send({ entries: [{ studentId: demoStudent.studentId, score: 14 }] }).expect(200);
+      await t.http().put(`/api/events/${demo.id}/grades`).set(bearer(teacher)).send({ entries: [{ studentId: demoStudent.studentId, score: 14 }] }).then((res) => { if (res.status !== 200) throw new Error(JSON.stringify(res.body)); });
+    });
+
+    it('also locks enrolments, the subjects and teachers of a class, periods and calendar days', async () => {
+      const classId = source.classes['bac/seconde']!;
+      const studentId = source.students['bac/seconde']![1]!.id;
+      const enrollment = await t.prisma.enrollment.findFirstOrThrow({ where: { classId, studentId } });
+      archived(await t.http().post(`/api/classes/${classId}/enrollments`).set(bearer(admin)).send({ studentId }).expect(409));
+      archived(await t.http().delete(`/api/enrollments/${enrollment.id}`).set(bearer(admin)).expect(409));
+      const maths = await t.prisma.classSubject.findFirstOrThrow({ where: { classId, subjectId: 'mathematiques' } });
+      archived(await t.http().patch(`/api/class-subjects/${maths.id}`).set(bearer(admin)).send({ coefficient: 9 }).expect(409));
+      archived(await t.http().delete(`/api/class-subjects/${maths.id}`).set(bearer(admin)).expect(409));
+      archived(await t.http().post(`/api/classes/${classId}/subjects`).set(bearer(admin)).send({ subjectId: 'arabe' }).expect(409));
+      const assignment = await t.prisma.teachingAssignment.findFirstOrThrow({ where: { classSubjectId: maths.id } });
+      archived(await t.http().delete(`/api/teaching-assignments/${assignment.id}`).set(bearer(admin)).expect(409));
+      archived(await t.http().post('/api/teaching-assignments').set(bearer(admin)).send({ teacherId: source.teacherIds.french, classSubjectId: maths.id }).expect(409));
+      const period = await t.prisma.period.findFirstOrThrow({ where: { schoolYearId: source.yearId, number: 1 } });
+      archived(await t.http().patch(`/api/periods/${period.id}`).set(bearer(admin)).send({ label: 'Autre' }).expect(409));
+      archived(await t.http().post(`/api/school-years/${source.yearId}/periods`).set(bearer(admin)).send({ number: 4, label: 'Quatrième', startsOn: '2040-06-01', endsOn: '2040-06-10' }).expect(409));
+      archived(await t.http().post('/api/calendar-days').set(bearer(admin)).send({ schoolYearId: source.yearId, type: 'holiday', label: 'Fête', startsOn: '2039-10-20', endsOn: '2039-10-20' }).expect(409));
+      archived(await t.http().patch(`/api/school-years/${source.yearId}`).set(bearer(admin)).send({ label: '2039-2041' }).expect(409));
+      expect(await t.prisma.enrollment.findUniqueOrThrow({ where: { id: enrollment.id } })).toMatchObject({ leftOn: null });
+      expect(Number((await t.prisma.classSubject.findUniqueOrThrow({ where: { id: maths.id } })).coefficient)).toBe(4);
     });
 
     it('also locks the class and its next-class link', async () => {

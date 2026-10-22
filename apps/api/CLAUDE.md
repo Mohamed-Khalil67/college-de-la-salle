@@ -50,6 +50,11 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 - The weekly rule is the source of truth; never edit `occupancy` by hand. Calendar days (`CalendarDaysService`) and one-off events (`EventsService`) call `OccupancyService` in their own transactions. Legacy weekly events are not indexed.
 - « Aujourd'hui » is `schoolToday()` (Cairo, from `@cdls/shared`): sessions before it are never rewritten. Teachers change only `this` session of their own slots (cancel, move, room; no replacement); the series scopes are `@StructureEditors()` only.
 
+## Rollover and archived years
+
+- `rollover/`: `plan.ts` is pure (snapshot + request → plan, hash); `RolloverService` runs the plan in one transaction, a preview rolls it back, an apply compares the hash (409 `ROLLOVER_PREVIEW_STALE`). Match natural keys so re-runs create nothing; write the new year through `tx` (not the services that open their own transactions). Other modules plug steps in through `ROLLOVER_EXTRA_STEPS` (`rollover-step.ts`).
+- An archived year (`school_years.archived_at`) is read-only: call `assertClassWritable(tx, classId)` or `assertYearIdWritable(tx, yearId)` (`school-years/year-guard.ts`) at the start of every write into a year's classes, enrolments, subjects, periods, calendar, grades, attendance, events or timetable. They take a SHARE lock that the archive's exclusive lock waits for.
+
 ## Config
 
 - All environment variables are declared and validated in `src/config/env.validation.ts`; add new ones there and to `.env.example` (placeholders only, never real secrets). Read them with `ConfigService<Env, true>`.

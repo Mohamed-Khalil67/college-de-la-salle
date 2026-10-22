@@ -90,6 +90,8 @@ export class ClassesService {
     }
     return this.prisma.$transaction(async (tx) => {
       await assertClassWritable(tx, id);
+      // One change of the class links at a time: two admins cannot each close half of a loop.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('class-next-links', 0))`;
       if (dto.nextClassId) {
         // Walk the chain: a class cannot lead back to itself (promotion would never end).
         let cursor: string | null = dto.nextClassId;
@@ -217,6 +219,7 @@ export class ClassesService {
 
     const today = fromDay(todayIso());
     const enrollment = await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, classId);
       // Read again inside the transaction: a section change may have been approved meanwhile.
       const current = await tx.student.findUniqueOrThrow({ where: { id: studentId } });
       if (current.sectionId && current.sectionId !== schoolClass.sectionId)
@@ -256,6 +259,7 @@ export class ClassesService {
     if (enrollment.leftOn) return;
     const today = fromDay(todayIso());
     await this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, enrollment.classId);
       const closed = await tx.enrollment.updateMany({
         where: { id: enrollmentId, leftOn: null },
         data: { leftOn: today },

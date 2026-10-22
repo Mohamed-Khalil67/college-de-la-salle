@@ -4,6 +4,7 @@ import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { conflictOnUnique, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertClassWritable } from '../school-years/year-guard.js';
 import type {
   CreateTeachingAssignmentDto,
   TeachingAssignmentDto,
@@ -57,6 +58,7 @@ export class TeachingAssignmentsService {
     if (!classSubject) throw notFound('Matière de la classe');
     // An assignment grants grade, attendance and event rights: it is a permission change, so it is audited.
     const work = this.prisma.$transaction(async (tx) => {
+      await assertClassWritable(tx, classSubject.classId);
       const row = await tx.teachingAssignment.create({ data: key, include });
       await audit(tx, [
         {
@@ -76,6 +78,8 @@ export class TeachingAssignmentsService {
     const current = await this.prisma.teachingAssignment.findUnique({ where: { id } });
     if (!current) throw notFound('Affectation');
     await this.prisma.$transaction(async (tx) => {
+      const subject = await tx.classSubject.findUnique({ where: { id: current.classSubjectId } });
+      await assertClassWritable(tx, subject?.classId);
       await tx.teachingAssignment.delete({ where: { id } });
       await audit(tx, [
         {

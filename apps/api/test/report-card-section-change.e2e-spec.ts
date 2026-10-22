@@ -86,6 +86,18 @@ describe('Report card of a student who changed section mid-period (e2e)', () => 
     return { f, natPeriod, bacPeriod, moving: moving!, stays: stays!, natMate, cards };
   }
 
+  it('still gives a card to a student who left when the year ended (graduates), not to one who left mid-period', async () => {
+    const s = await scenario('rc3', '2075-2076', false);
+    const endOfYear = day('2076-06-30');
+    // The mate (nationale) graduates on the last day of the year; the other Bac student left in October.
+    await t.prisma.enrollment.updateMany({ where: { studentId: s.natMate.id }, data: { leftOn: endOfYear } });
+    await t.prisma.enrollment.updateMany({ where: { studentId: s.stays.id }, data: { leftOn: day('2075-10-20') } });
+    const nat = await s.cards(s.natPeriod, s.f.classes['nationale/secondaire-1']!);
+    expect(nat.some((c) => c.studentId === s.natMate.id)).toBe(true);
+    const bac = await s.cards(s.natPeriod, s.f.classes['bac/seconde']!);
+    expect(bac.some((c) => c.studentId === s.stays.id)).toBe(false);
+  });
+
   for (const bySection of [false, true]) {
     describe(bySection ? 'with one period per section' : 'with a period for every section', () => {
       it('counts the grades of both classes with the coefficient of the class each belongs to', async () => {

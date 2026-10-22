@@ -46,12 +46,19 @@ export class ReportCardsService {
 
     // Who was enrolled during the period, and in which classes: a student who changed class or section
     // inside the period has two enrolments, and their card belongs to the class they ended it in.
+    const overlapping = {
+      schoolYearId: period.schoolYearId,
+      enrolledOn: { lte: period.endsOn },
+      OR: [{ leftOn: null }, { leftOn: { gte: period.startsOn } }],
+    };
+    // Only the students of the classes asked for (and all their classes of the period), not the whole school.
+    const scoped = await this.prisma.enrollment.findMany({
+      where: { ...overlapping, classId: { in: [...inScope] } },
+      select: { studentId: true },
+      distinct: ['studentId'],
+    });
     const enrolments = await this.prisma.enrollment.findMany({
-      where: {
-        schoolYearId: period.schoolYearId,
-        enrolledOn: { lte: period.endsOn },
-        OR: [{ leftOn: null }, { leftOn: { gte: period.startsOn } }],
-      },
+      where: { ...overlapping, studentId: { in: scoped.map((e) => e.studentId) } },
       select: { studentId: true, classId: true, enrolledOn: true, leftOn: true },
     });
     const classIds = [...new Set(enrolments.map((e) => e.classId))];
@@ -71,13 +78,15 @@ export class ReportCardsService {
     const primary = new Map(
       [...byStudent].map(([studentId, stints]) => [studentId, primaryClassId(stints)!]),
     );
-    // Only students still enrolled (an unenrolled or archived student gets no new card); earlier classes of the
+    // Students enrolled until the end of the period (still enrolled, or leaving when the year ends, as the
+    // graduates do): a student who left in the middle of the period gets no card. Earlier classes of the
     // period still count for the ones who moved.
+    const endsOn = toDay(period.endsOn);
     const cardStudents = [...byStudent]
       .filter(
         ([id, stints]) =>
           inScope.has(primary.get(id)!) &&
-          stints.some((st) => st.classId === primary.get(id) && st.leftOn === null),
+          stints.some((st) => st.classId === primary.get(id) && ((st.leftOn ?? null) === null || (st.leftOn ?? "") >= endsOn)),
       )
       .map(([id]) => id);
 
@@ -124,6 +133,8 @@ export class ReportCardsService {
         })
       ).map((c) => c.studentId),
     );
+    const gradesOf = new Map<string, PeriodGrade[]>();
+    for (const g of periodGrades) gradesOf.set(g.studentId, [...(gradesOf.get(g.studentId) ?? []), g]);
     let count = 0;
     // Ranks are per class: the students whose card belongs to the same class.
     for (const cid of inScope) {
@@ -132,10 +143,7 @@ export class ReportCardsService {
       const cards = computeCards(
         students.map((studentId) => ({
           studentId,
-          subjects: subjectsOfStudent(
-            byStudent.get(studentId)!,
-            periodGrades.filter((g) => g.studentId === studentId),
-          ),
+          subjects: subjectsOfStudent(byStudent.get(studentId)!, gradesOf.get(studentId) ?? []),
         })),
         periodGrades,
       );

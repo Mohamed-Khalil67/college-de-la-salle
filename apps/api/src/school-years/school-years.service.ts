@@ -6,6 +6,7 @@ import { fromDay, toDay, toIso } from '../common/dates.js';
 import { conflictOnReference, notFound } from '../common/errors.js';
 import { toPeriodDto } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertYearWritable } from './year-guard.js';
 import type {
   CreateSchoolYearDto,
   SchoolYearDto,
@@ -66,6 +67,7 @@ export class SchoolYearsService {
     }
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${id}::uuid FOR UPDATE`;
+      assertYearWritable(await tx.schoolYear.findUniqueOrThrow({ where: { id } }));
       const outside = await Promise.all([
         tx.period.count({
           where: {

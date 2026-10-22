@@ -105,8 +105,11 @@ export class RolloverService {
       async (tx) => {
         // One rollover at a time, and no write into the source year meanwhile: the grade, roll-call, event and
         // timetable writes take a share lock on the year row, the archive below takes this exclusive one.
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('rollover', 0))`;
-        await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${request.sourceYearId}::uuid FOR UPDATE`;
+        // Only an apply locks: a preview rolls back, and must not hold teachers' saves or another preview up.
+        if (expectedHash !== null) {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('rollover', 0))`;
+          await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${request.sourceYearId}::uuid FOR UPDATE`;
+        }
         const snapshot = await loadSnapshot(tx, request.sourceYearId, request.label);
         let plan: RolloverPlan;
         try {

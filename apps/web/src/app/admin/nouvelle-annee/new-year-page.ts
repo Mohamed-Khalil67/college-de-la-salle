@@ -271,6 +271,8 @@ export class NewYearPage {
         return;
       }
       case 'copy':
+        // The decisions are about the students of one source year: another source starts with none.
+        if (this.preview() && this.preview()!.sourceYear.id !== this.source().sourceYearId) this.choices.set(new Map());
         if (await this.runPreview()) this.#move('review');
         return;
       case 'review':

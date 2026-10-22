@@ -186,12 +186,14 @@ export class GradesService {
       window = { from: period.startsOn, to: period.endsOn };
       // A student who changed class or section inside the period keeps the grades of the earlier class:
       // another section has its own periods, so those events are told apart by date.
-      const earlier = (await this.stintsOf(studentId, schoolYearId, window))
-        .map((e) => e.classId)
-        .filter((id, i, all) => all.indexOf(id) === i);
+      const stints = await this.stintsOf(studentId, schoolYearId, window);
+      // The class the student ended the period in counts by its events' stored period (as the report card does);
+      // only the earlier classes are told apart by date.
+      const ended = stints.at(-1)?.classId;
+      const earlier = [...new Set(stints.map((e) => e.classId))].filter((id) => id !== ended);
       eventWhere.OR = [
         { periodId: period.id },
-        ...(earlier.length > 1
+        ...(earlier.length
           ? [{ classId: { in: earlier }, date: { gte: period.startsOn, lte: period.endsOn } }]
           : []),
       ];

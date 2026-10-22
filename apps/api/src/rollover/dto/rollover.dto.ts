@@ -30,7 +30,6 @@ import {
   type SectionId,
 } from '@cdls/shared';
 import { IsDay } from '../../common/dates.js';
-import { trim } from '../../common/transforms.js';
 
 export class RolloverOverrideDto implements RolloverStudentOverride {
   @IsUUID()
@@ -46,8 +45,11 @@ export class RolloverRequestDto implements RolloverRequest {
   sourceYearId: string;
 
   /** @example 2027-2028 */
+  /** Empty counts as not given: the label then defaults to the source year's next one. */
   @IsOptional()
-  @Transform(trim)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() || undefined : value,
+  )
   @Matches(/^\d{4}-\d{4}$/)
   label?: string;
 

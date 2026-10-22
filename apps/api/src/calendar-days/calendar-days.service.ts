@@ -8,6 +8,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertYearIdWritable } from '../school-years/year-guard.js';
 import type {
   CalendarDayDto,
   CalendarDayQueryDto,
@@ -89,6 +90,7 @@ export class CalendarDaysService {
     const classIds = dto.classIds ?? [];
     await this.check(dto.schoolYearId, dto.startsOn, dto.endsOn, dto.sectionId ?? null, classIds);
     return this.prisma.$transaction(async (tx) => {
+      await assertYearIdWritable(tx, dto.schoolYearId);
       const row = await tx.calendarDay.create({
         data: {
           schoolYearId: dto.schoolYearId,
@@ -131,6 +133,7 @@ export class CalendarDaysService {
       merged.classIds,
     );
     return this.prisma.$transaction(async (tx) => {
+      await assertYearIdWritable(tx, current.schoolYearId);
       const row = await tx.calendarDay.update({
         where: { id },
         data: {
@@ -163,6 +166,7 @@ export class CalendarDaysService {
   async remove(id: string, user: AuthUser): Promise<void> {
     const current = await this.find(id);
     await this.prisma.$transaction(async (tx) => {
+      await assertYearIdWritable(tx, current.schoolYearId);
       await tx.calendarDay.delete({ where: { id } });
       await audit(tx, [
         {

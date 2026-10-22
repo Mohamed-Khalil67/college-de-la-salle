@@ -11,13 +11,20 @@ export function yearArchived(label: string): ConflictException {
     statusCode: 409,
     error: 'Conflict',
     code: YEAR_ARCHIVED,
-    message: `L’année ${label} est archivée : elle est en lecture seule (plus de notes, d’événements, d’appel ni de modification de l’emploi du temps).`,
+    message: `L’année ${label} est archivée : elle est en lecture seule (plus de notes, d’événements, d’appel, d’inscriptions, de matières, de périodes ni de modification de l’emploi du temps).`,
   });
 }
 
 /** 409 when the school year is archived. */
 export function assertYearWritable(year: { label: string; archivedAt: Date | null }): void {
   if (year.archivedAt) throw yearArchived(year.label);
+}
+
+/** 409 when the school year is archived; takes the same SHARE lock as `assertClassWritable`. */
+export async function assertYearIdWritable(db: Db, schoolYearId: string): Promise<void> {
+  const rows = await db.$queryRaw<{ label: string; archived_at: Date | null }[]>`
+    SELECT label, archived_at FROM school_years WHERE id = ${schoolYearId}::uuid FOR SHARE`;
+  if (rows[0]) assertYearWritable({ label: rows[0].label, archivedAt: rows[0].archived_at });
 }
 
 /**

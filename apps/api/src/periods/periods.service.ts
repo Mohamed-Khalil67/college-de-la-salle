@@ -6,6 +6,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay, toIso } from '../common/dates.js';
 import { conflictOnReference, isExclusionViolation, notFound } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertYearIdWritable } from '../school-years/year-guard.js';
 import type { CreatePeriodDto, PeriodDto, UpdatePeriodDto } from './dto/period.dto.js';
 
 const OVERLAP =
@@ -114,6 +115,7 @@ export class PeriodsService {
         'Des bulletins publiés existent : la période ne peut plus être rouverte.',
       );
     return this.prisma.$transaction(async (tx) => {
+      await assertYearIdWritable(tx, current.schoolYearId);
       // Waits for the grade writes holding a share lock on the period (see lockOpen), then locks them out.
       await tx.$queryRaw`SELECT id FROM periods WHERE id = ${id}::uuid FOR UPDATE`;
       const row = await tx.period.update({
@@ -137,6 +139,7 @@ export class PeriodsService {
     const work = this.prisma.$transaction(async (tx) => {
       const period = await tx.period.findUnique({ where: { id } });
       if (!period) throw notFound('Période');
+      await assertYearIdWritable(tx, period.schoolYearId);
       if (await tx.reportCard.count({ where: { periodId: id } }))
         throw new ConflictException(HAS_CARDS);
       if (await tx.grade.count({ where: { event: { periodId: id } } }))
@@ -257,6 +260,7 @@ export class PeriodsService {
     try {
       const row = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`periods:${schoolYearId}`}, 0))`;
+        await assertYearIdWritable(tx, schoolYearId);
         const overlapping = await tx.period.count({
           where: {
             schoolYearId,

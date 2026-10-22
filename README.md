@@ -9,7 +9,7 @@ signed-in spaces run the school year:
 | **Public site** | Everyone | Home, history and heritage, the two tracks with their subjects, contact |
 | **Espace élève** `/eleve` | Students | Dashboard, timetable, homework (tick as done), grades with averages, absences, report cards (PDF) |
 | **Espace enseignant** `/enseignant` | Teachers | Their classes, the shared calendar, grade entry with a publish step, attendance, announcements |
-| **Administration** `/admin` | School staff | Accounts (one by one or roster CSV with generated school e-mails), section-change validations, graduation, classes and enrolments, teaching assignments, school years, periods and calendar days, subjects and the subjects of each class, rooms, activity types, report cards, messages from the contact form |
+| **Administration** `/admin` | School staff | Accounts (one by one or roster CSV with generated school e-mails), section-change validations, graduation, classes and enrolments, teaching assignments, school years, periods and calendar days, **the next-year wizard** (« Nouvelle année »: preview, promotions, archive), subjects and the subjects of each class, rooms, activity types, report cards, messages from the contact form |
 
 Accounts are created by the college; there is no open sign-up. Built with **Angular 22** (standalone, zoneless,
 signals, Signal Forms, prerendering with hydration), **Tailwind CSS v4**, **NestJS 12**, **Prisma 7** and
@@ -76,6 +76,7 @@ Sign-in returns a 15-minute access token (send it as
 | Grades | `/events/:id/grades` (grid, save, `/publish`), `/students/:id/grades` (averages by subject) |
 | Attendance | `/events/:id/attendance?date=`, `/students/:id/attendance` |
 | Report cards | `/periods/:id/report-cards/generate` and `/publish`, `/students/:id/report-cards`, `/report-cards/:id/pdf` |
+| Next year (admin only) | `POST /rollover/preview` (what would be created, skipped or flagged; writes nothing) and `POST /rollover/apply` (the same plan in one transaction, 409 `ROLLOVER_PREVIEW_STALE` when the data changed since the preview, the old year archived). `PATCH /classes/:id` sets `nextClassId`. An archived year answers 409 `YEAR_ARCHIVED` to writes |
 | Contact | `POST /contact` (public, `CONTACT_THROTTLE_LIMIT` messages a minute per IPv4 address or IPv6 /64, 5 by default; set `TRUST_PROXY` to the number of reverse proxies when deployed behind one), `GET /contact-messages` and `PATCH /contact-messages/:id` (admins) |
 
 Who may do what mirrors the old Firestore rules (`docs/legacy/firestore.rules`): students only see their own records and what is addressed
