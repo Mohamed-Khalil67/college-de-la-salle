@@ -27,6 +27,7 @@ import {
   type RolloverSnapshot,
 } from './plan.js';
 import { ROLLOVER_EXTRA_STEPS, type RolloverExtraStep } from './rollover-step.js';
+import { placeNewSlots } from './slot-placement.js';
 import { loadSnapshot } from './snapshot.js';
 
 type Tx = Prisma.TransactionClient;
@@ -312,51 +313,39 @@ export class RolloverService {
       skipped: plan.skipped.assignments,
     });
 
-    // Timetable: each slot is placed through the same index and conflict check as a manual one; a clash
-    // leaves that slot out and is reported, the others go on.
-    let placedSlots = 0;
-    let clashingSlots = 0;
-    for (const s of plan.slots.filter((x) => !x.exists)) {
-      const id = randomUUID();
-      await tx.timetableSlot.create({
-        data: {
-          id,
-          classSubjectId: classSubjectIds.get(`${targetIds.get(s.classKey)!}|${s.subjectId}`)!,
-          teacherId: s.teacherId,
-          roomId: s.roomId,
-          activityTypeId: s.activityTypeId,
-          weekday: s.weekday,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          weekParity: s.weekParity,
-          division: s.division,
-          validFrom: fromDay(plan.year.startsOn),
-          validTo: fromDay(plan.year.endsOn),
-          createdById: user.id,
-        },
-      });
-      const rows = await this.occupancy.entriesForSlots(tx, [id]);
-      const conflicts = await this.occupancy.detect(tx, rows);
-      if (conflicts.length) {
-        await tx.timetableSlot.delete({ where: { id } });
-        clashingSlots++;
-        issues.push({
-          step: 'timetable',
-          level: 'conflict',
-          message: `Séance non copiée : ${conflicts[0]!.message}`,
-        });
-        continue;
-      }
-      await this.occupancy.insert(tx, rows);
-      placedSlots++;
-      changed = true;
-    }
+    // Timetable: the new slots go through the same index and conflict check as a manual one, all at once
+    // (`placeNewSlots`); a clash leaves that slot out and is reported, the others go on. Slots of a group
+    // are copied by the groups step, once the groups exist.
+    const wanted = plan.slots.filter((x) => !x.exists);
+    const slotIds = new Map(wanted.map((s) => [randomUUID(), s] as const));
+    const { placed, clashes } = await placeNewSlots(
+      tx,
+      this.occupancy,
+      [...slotIds].map(([id, s]) => ({
+        id,
+        classSubjectId: classSubjectIds.get(`${targetIds.get(s.classKey)!}|${s.subjectId}`)!,
+        teacherId: s.teacherId,
+        roomId: s.roomId,
+        activityTypeId: s.activityTypeId,
+        weekday: s.weekday,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        weekParity: s.weekParity,
+        division: s.division,
+        validFrom: fromDay(plan.year.startsOn),
+        validTo: fromDay(plan.year.endsOn),
+        createdById: user.id,
+      })),
+    );
+    for (const c of clashes)
+      issues.push({ step: 'timetable', level: 'conflict', message: `Séance non copiée : ${c.message}` });
+    if (placed.length) changed = true;
     steps.push({
       id: 'timetable',
       label: 'Emploi du temps',
-      create: placedSlots,
+      create: placed.length,
       existing: plan.slots.filter((s) => s.exists).length,
-      skipped: plan.skipped.slots + clashingSlots,
+      skipped: plan.skipped.slots + clashes.length,
     });
 
     // Students.
@@ -452,7 +441,7 @@ export class RolloverService {
       skipped: 0,
     });
 
-    // Steps owned by other modules (groups, once phase 3 is merged).
+    // Steps owned by other modules (the groups): they run inside this transaction, after the students.
     for (const extra of this.extraSteps) {
       const done = await extra.apply(tx, {
         sourceYearId: snapshot.source.id,
@@ -460,9 +449,16 @@ export class RolloverService {
         classMap,
         placements,
         actor: user,
+        copyTimetable: plan.copyTimetable,
+        years: {
+          sourceEndsOn: snapshot.source.endsOn,
+          targetStartsOn: plan.year.startsOn,
+          targetEndsOn: plan.year.endsOn,
+        },
       });
-      steps.push({ id: extra.id, label: extra.label, ...done });
-      if (done.create) changed = true;
+      steps.push(...done.steps);
+      issues.push(...(done.issues ?? []));
+      if (done.steps.some((x) => x.create)) changed = true;
     }
 
     // The old year becomes read-only; the new one takes its place as the current year.

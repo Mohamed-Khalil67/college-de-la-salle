@@ -127,13 +127,14 @@ export async function loadSnapshot(
       })
     : [];
 
+  // Sessions of a group are copied by the groups step (they need the copied groups).
   const slots = await db.timetableSlot.findMany({
-    where: { classSubject: { schoolClass: { schoolYearId: sourceYearId } } },
+    where: { groupId: null, classSubject: { schoolClass: { schoolYearId: sourceYearId } } },
     include: { classSubject: { include: { subject: true } }, room: true, activityType: true },
   });
   const targetSlots = targetId
     ? await db.timetableSlot.findMany({
-        where: { classSubject: { schoolClass: { schoolYearId: targetId } } },
+        where: { groupId: null, classSubject: { schoolClass: { schoolYearId: targetId } } },
         include: { classSubject: true },
       })
     : [];

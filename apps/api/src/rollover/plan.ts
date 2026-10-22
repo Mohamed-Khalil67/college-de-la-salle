@@ -204,6 +204,8 @@ export interface RolloverPlan {
   readonly classSubjects: readonly PlannedClassSubject[];
   readonly assignments: readonly PlannedAssignment[];
   readonly slots: readonly PlannedSlot[];
+  /** The weekly timetable is copied (the groups step copies the sessions of groups when it is). */
+  readonly copyTimetable: boolean;
   readonly students: readonly PlannedStudent[];
   /** The source year is archived by the apply (a no-op when it already is). */
   readonly archiveSource: boolean;
@@ -541,6 +543,7 @@ export function buildPlan(snapshot: RolloverSnapshot, options: RolloverOptions):
     classSubjects,
     assignments,
     slots,
+    copyTimetable: options.copyTimetable,
     students,
     archiveSource: true,
     makeCurrent: source.isCurrent,

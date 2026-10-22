@@ -15,6 +15,7 @@ import { isExclusionViolation } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { conflictBlocked } from './blocked.js';
 import { conflictMessage } from './conflict-messages.js';
+import type { GroupHold } from './event-hold.js';
 import { expandSlots, slotInclude, toSlotData } from './slot-data.js';
 
 type Db = Prisma.TransactionClient;
@@ -36,6 +37,8 @@ export interface EventBooking {
   readonly classId: string | null;
   /** Homework deadlines and other types that are not a session in a room. */
   readonly homework: boolean;
+  /** Set when the event is for groups of one division: it then holds that division, not the whole class. */
+  readonly hold?: GroupHold | null;
 }
 
 const CONSTRAINTS = [
@@ -138,6 +141,30 @@ export class OccupancyService {
    */
   async detect(db: Db, rows: readonly IndexRow[]): Promise<TimetableConflictDto[]> {
     if (!rows.length) return [];
+    return this.describe(db, rows, await this.clashes(db, rows));
+  }
+
+  /**
+   * For a batch of new slots checked at once: the first conflict message of each slot that clashes with the
+   * index or with another slot of the batch (the earlier one of two clashing slots is the one reported).
+   */
+  async detectBySlot(db: Db, rows: readonly IndexRow[]): Promise<Map<string, TimetableConflictDto>> {
+    const found = new Map<string, TimetableConflictDto>();
+    if (!rows.length) return found;
+    const clashes = await this.clashes(db, rows);
+    const bySlot = new Map<string, Clash[]>();
+    for (const c of clashes) {
+      const slotId = rows[c.i]!.slotId;
+      if (slotId) bySlot.set(slotId, [...(bySlot.get(slotId) ?? []), c]);
+    }
+    for (const [slotId, list] of bySlot) {
+      const [first] = await this.describe(db, rows, list);
+      if (first) found.set(slotId, first);
+    }
+    return found;
+  }
+
+  private async clashes(db: Db, rows: readonly IndexRow[]): Promise<Clash[]> {
     const json = JSON.stringify(
       rows.map((r, i) => ({
         i,
@@ -190,11 +217,16 @@ export class OccupancyService {
       .sort((x, y) => rows[x]!.startsAt.localeCompare(rows[y]!.startsAt));
     order.forEach((i, at) => {
       const a = rows[i]!;
-      for (let k = at + 1; k < order.length && rows[order[k]!]!.startsAt < a.endsAt; k++)
-        for (const kind of entriesClash(a, rows[order[k]!]!))
-          clashes.push({ i, kind, slotId: null, exceptionId: null, eventId: null });
+      for (let k = at + 1; k < order.length && rows[order[k]!]!.startsAt < a.endsAt; k++) {
+        const other = rows[order[k]!]!;
+        // Another slot of the same batch (a rollover checks all its new slots at once) is named; the rows of one
+        // slot, a session moved onto another one of its series, stay « la même série ».
+        const slotId = other.slotId && other.slotId !== a.slotId ? other.slotId : null;
+        for (const kind of entriesClash(a, other))
+          clashes.push({ i, kind, slotId, exceptionId: null, eventId: null });
+      }
     });
-    return this.describe(db, rows, clashes);
+    return clashes;
   }
 
   /** French messages, one per (kind, clashing item), earliest session first. */
@@ -354,7 +386,8 @@ export class OccupancyService {
         roomId: event.roomId,
         teacherId: null,
         classId: event.classId,
-        divisionKey: null,
+        divisionKey: event.classId ? (event.hold?.divisionKey ?? null) : null,
+        groupId: event.classId ? (event.hold?.groupId ?? null) : null,
         startsAt: stamp(event.date, event.startTime),
         endsAt: stamp(event.date, event.endTime),
         exceptionId: null,
