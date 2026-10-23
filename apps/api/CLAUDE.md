@@ -67,6 +67,12 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 
 - All environment variables are declared and validated in `src/config/env.validation.ts`; add new ones there and to `.env.example` (placeholders only, never real secrets). Read them with `ConfigService<Env, true>`.
 
+## Deployment (Docker)
+
+- `Dockerfile` here, the stack in `deploy/` (`docs/deployment.md`). The image runs `prisma migrate deploy` in `docker-entrypoint.sh`, then `node dist/main.js`, as the non-root `node` user, with a healthcheck on `/api/health`. `prisma`, `tsx` and `dotenv` are regular dependencies because the image needs them (migrations, `seed:demo`).
+- A fresh production database has no admin and no sections or subjects: `src/cli/create-admin.ts` (`node dist/cli/create-admin.js --email … --first … --last … [--reset]`) creates the first admin (temporary password, change forced) and upserts the reference data. Never use `db:seed` on a real database: it wipes it.
+- `COOKIE_SECURE` (optional) overrides the refresh cookie's `Secure` flag, which defaults to `NODE_ENV === 'production'`. Behind the web container's nginx, `TRUST_PROXY=1`.
+
 ## Tests
 
 - Unit tests (`src/**/*.spec.ts`) use the Nest testing module (`Test.createTestingModule`) and mock `PrismaService` and other services with `vi.fn()`. Keep pure computations (e.g. `report-cards/compute.ts`) in plain functions and test them directly.

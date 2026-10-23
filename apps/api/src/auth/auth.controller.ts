@@ -52,7 +52,10 @@ export class AuthController {
     private readonly passwordReset: PasswordResetService,
     config: ConfigService<Env, true>,
   ) {
-    this.secureCookie = config.get('NODE_ENV', { infer: true }) === 'production';
+    // ConfigService can hand back the raw environment string, and Docker passes an unset variable as ''.
+    const override = String(config.get('COOKIE_SECURE', { infer: true }) ?? '').trim();
+    this.secureCookie =
+      override === '' ? config.get('NODE_ENV', { infer: true }) === 'production' : override === 'true';
   }
 
   /** Signs in; sets the refresh token as an httpOnly cookie. Limited to LOGIN_THROTTLE_LIMIT (5) attempts a minute per address and e-mail. */

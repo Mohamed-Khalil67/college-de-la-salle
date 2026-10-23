@@ -1,0 +1,23 @@
+# Keep the build context small and free of local secrets.
+**/node_modules
+**/dist
+**/.angular
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.claude
+.vscode
+design
+docs
+e2e
+deploy/.env
+deploy/backups
+apps/api/.dev-db
+apps/api/.dev-mail
+apps/api/demo-credentials.local.md
+apps/api/src/generated
+apps/web/e2e
+**/test-results
+**/playwright-report
+**/coverage

@@ -1,0 +1,6 @@
+# Automatic HTTPS (Let's Encrypt) for $DOMAIN. Ports 80 and 443 must reach this machine.
+{$DOMAIN} {
+	encode zstd gzip
+	# The web container adds the security headers and proxies /api; Caddy forwards the visitor's address.
+	reverse_proxy web:8080
+}
