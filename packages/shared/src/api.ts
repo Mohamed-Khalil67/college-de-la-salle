@@ -917,6 +917,53 @@ export interface TimetableConflictDto {
   readonly withLabel: string;
 }
 
+/** A way out of a hard conflict: another room at the same time, or another time (same room, teacher, class). */
+export type TimetableSuggestionKind = 'room' | 'time';
+export const TIMETABLE_SUGGESTION_KINDS: readonly TimetableSuggestionKind[] = ['room', 'time'];
+
+/**
+ * What a suggestion changes when the write is sent again: one session (an exception: `newRoomId`, or
+ * `newDate`/`newStart`/`newEnd`) or the weekly rule (`roomId`, or `weekday`/`startTime`/`endTime`).
+ */
+export type TimetableSuggestionTarget = 'session' | 'series';
+export const TIMETABLE_SUGGESTION_TARGETS: readonly TimetableSuggestionTarget[] = ['session', 'series'];
+
+/**
+ * A free active room of a compatible kind that seats the class (or the group) during every session of the
+ * write. Says nothing about who holds the other rooms.
+ */
+export interface TimetableRoomSuggestionDto {
+  readonly kind: 'room';
+  readonly target: TimetableSuggestionTarget;
+  readonly roomId: string;
+  readonly roomName: string;
+  readonly capacity: number | null;
+  readonly roomKind: RoomKind;
+  /** « Salle 14 (32 places) » */
+  readonly label: string;
+}
+
+/**
+ * A time when the teacher, the class (or the group, by its division) and the room asked for are all free:
+ * for a session, a day of the same week from today on; for a series, a weekday of the week grid. Times
+ * follow the periods the school year's timetable uses, inside the school day.
+ */
+export interface TimetableTimeSuggestionDto {
+  readonly kind: 'time';
+  readonly target: TimetableSuggestionTarget;
+  /** The session's new day; null for a series (it moves to `weekday`). */
+  readonly date: string | null;
+  /** 0 = Sunday … 6 = Saturday. */
+  readonly weekday: number;
+  /** HH:MM */
+  readonly startTime: string;
+  readonly endTime: string;
+  /** « mardi 3 novembre, 10:15 – 11:15 » or « le mardi, 10:15 – 11:15 » */
+  readonly label: string;
+}
+
+export type TimetableSuggestionDto = TimetableRoomSuggestionDto | TimetableTimeSuggestionDto;
+
 export interface SlotExceptionInput {
   readonly kind: SlotExceptionKind;
   /** moved: the new day (default: same day). */
@@ -1007,6 +1054,8 @@ export interface TimetableCheckResult {
   readonly warnings: readonly TimetableWarningDto[];
   /** No hard conflict (warnings still need a reason). */
   readonly canSave: boolean;
+  /** With conflicts: rooms first, then times, best first (at most `TIMETABLE_SUGGESTION_LIMITS` of each). */
+  readonly suggestions: readonly TimetableSuggestionDto[];
 }
 
 export const TIMETABLE_CONFLICT = 'TIMETABLE_CONFLICT';
@@ -1017,6 +1066,8 @@ export interface TimetableBlockedError extends ApiError {
   readonly code: typeof TIMETABLE_CONFLICT | typeof WARNINGS_NOT_ACKNOWLEDGED;
   readonly conflicts: readonly TimetableConflictDto[];
   readonly warnings: readonly TimetableWarningDto[];
+  /** `TIMETABLE_CONFLICT` only: ways out, as for POST /timetable/check (empty for warnings). */
+  readonly suggestions: readonly TimetableSuggestionDto[];
 }
 
 /** GET /timetable/slots: the weekly slots, filtered by class, teacher or room. */

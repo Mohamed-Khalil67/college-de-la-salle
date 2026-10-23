@@ -41,7 +41,7 @@ import { TimetableReadService } from './timetable-read.service.js';
 import { TimetableService } from './timetable.service.js';
 
 const CONFLICT_DOC =
-  '409 `TIMETABLE_CONFLICT` (room, teacher or class already taken) or `WARNINGS_NOT_ACKNOWLEDGED` (soft warnings need a reason each).';
+  '409 `TIMETABLE_CONFLICT` (room, teacher or class already taken; `conflicts` names what clashed and `suggestions` lists free rooms and times, as `POST /timetable/check` does) or `WARNINGS_NOT_ACKNOWLEDGED` (soft warnings need a reason each).';
 
 /**
  * The timetable. Admins and coordinators edit any slot; a teacher changes only their own sessions

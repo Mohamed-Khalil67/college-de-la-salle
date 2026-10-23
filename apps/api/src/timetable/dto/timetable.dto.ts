@@ -1,4 +1,10 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import {
+  ApiExtraModels,
+  ApiProperty,
+  ApiPropertyOptional,
+  getSchemaPath,
+  PartialType,
+} from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -35,6 +41,7 @@ import {
   type SlotExceptionKind,
   type SlotScope,
   TIMETABLE_LIMITS,
+  TIMETABLE_SUGGESTION_TARGETS,
   TIMETABLE_WARNING_CODES,
   type TimetableCheckRequest,
   type TimetableCheckResult as CheckResultContract,
@@ -42,7 +49,10 @@ import {
   type TimetableConflictKind,
   type TimetableOccurrenceDto as OccurrenceContract,
   type TimetableOccurrenceQuery,
+  type TimetableRoomSuggestionDto as RoomSuggestionContract,
   type TimetableSlotDto as SlotContract,
+  type TimetableSuggestionTarget,
+  type TimetableTimeSuggestionDto as TimeSuggestionContract,
   type TimetableSlotInput,
   type TimetableSlotListQuery,
   type TimetableWarningCode,
@@ -441,12 +451,50 @@ export class TimetableWriteResultDto implements WriteResultContract {
   warnings: readonly TimetableWarningDto[];
 }
 
+export class TimetableRoomSuggestionDto implements RoomSuggestionContract {
+  @ApiProperty({ enum: ['room'] })
+  kind: 'room';
+  @ApiProperty({ enum: TIMETABLE_SUGGESTION_TARGETS })
+  target: TimetableSuggestionTarget;
+  roomId: string;
+  roomName: string;
+  @ApiProperty({ type: Number, nullable: true })
+  capacity: number | null;
+  @ApiProperty({ enum: ROOM_KINDS })
+  roomKind: RoomKind;
+  label: string;
+}
+
+export class TimetableTimeSuggestionDto implements TimeSuggestionContract {
+  @ApiProperty({ enum: ['time'] })
+  kind: 'time';
+  @ApiProperty({ enum: TIMETABLE_SUGGESTION_TARGETS })
+  target: TimetableSuggestionTarget;
+  @ApiProperty({ type: String, nullable: true })
+  date: string | null;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  label: string;
+}
+
+@ApiExtraModels(TimetableRoomSuggestionDto, TimetableTimeSuggestionDto)
 export class TimetableCheckResultDto implements CheckResultContract {
   @ApiProperty({ type: () => [TimetableConflictDto] })
   conflicts: readonly TimetableConflictDto[];
   @ApiProperty({ type: () => [TimetableWarningDto] })
   warnings: readonly TimetableWarningDto[];
   canSave: boolean;
+  @ApiProperty({
+    type: 'array',
+    items: {
+      oneOf: [
+        { $ref: getSchemaPath(TimetableRoomSuggestionDto) },
+        { $ref: getSchemaPath(TimetableTimeSuggestionDto) },
+      ],
+    },
+  })
+  suggestions: readonly (TimetableRoomSuggestionDto | TimetableTimeSuggestionDto)[];
 }
 
 export class SessionValuesDto implements SessionValuesContract {

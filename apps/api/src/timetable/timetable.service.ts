@@ -40,6 +40,7 @@ import type {
   TimetableWriteResultDto,
   UpdateTimetableSlotDto,
 } from './dto/timetable.dto.js';
+import { type SuggestionAsk, TimetableSuggestionsService } from './suggestions.service.js';
 import { toExceptionDto, toSlotDto } from './timetable.mapper.js';
 import { WarningsService } from './warnings.service.js';
 
@@ -59,8 +60,13 @@ interface Applied {
   readonly endedSlotId: string | null;
   readonly exceptionId: string | null;
   readonly audit: readonly AuditEntry[];
+<<<<<<< HEAD
   /** Sessions whose students and teacher are notified once the write is saved (one-session changes). */
   readonly notices?: readonly SessionNotice[];
+=======
+  /** What to suggest when it clashes; null: nothing sensible (a restore, a cancellation, a substitute). */
+  readonly suggest: SuggestionAsk | null;
+>>>>>>> claude/conflict-suggestions-9ee479
 }
 
 type Mutation = (tx: Db) => Promise<Applied>;
@@ -91,7 +97,11 @@ export class TimetableService {
     private readonly access: AccessService,
     private readonly occupancy: OccupancyService,
     private readonly warnings: WarningsService,
+<<<<<<< HEAD
     private readonly notices: ChangeNoticesService,
+=======
+    private readonly suggestions: TimetableSuggestionsService,
+>>>>>>> claude/conflict-suggestions-9ee479
   ) {}
 
   /** Today in Cairo; the clock of « sessions already held ». */
@@ -163,6 +173,7 @@ export class TimetableService {
         slotId: row.id,
         endedSlotId: null,
         exceptionId: null,
+        suggest: null,
         audit: [
           this.entry(user, 'slot_exception.delete', 'slot_exception', id, {
             slotId: row.id,
@@ -245,9 +256,13 @@ export class TimetableService {
         const rows = await this.occupancy.entriesForSlots(tx, applied.touched);
         const conflicts = await this.occupancy.detect(tx, rows);
         const warnings = await this.sessionWarnings(tx, applied);
+        const suggestions =
+          conflicts.length && applied.suggest
+            ? await this.suggestions.forConflicts(tx, applied.suggest, rows, conflicts)
+            : [];
         if (acknowledged === null)
-          throw new DryRun({ conflicts, warnings, canSave: conflicts.length === 0 });
-        if (conflicts.length) throw conflictBlocked(conflicts, warnings);
+          throw new DryRun({ conflicts, warnings, canSave: conflicts.length === 0, suggestions });
+        if (conflicts.length) throw conflictBlocked(conflicts, warnings, suggestions);
         const accepted = new Map(acknowledged.map((a) => [a.code, a.reason]));
         if (warnings.some((w) => !accepted.has(w.code))) throw warningsBlocked(warnings);
         await this.occupancy.insert(tx, rows);
@@ -324,6 +339,7 @@ export class TimetableService {
         slotId: id,
         endedSlotId: null,
         exceptionId: null,
+        suggest: { target: 'series', slotId: id },
         audit: [this.entry(user, 'timetable_slot.create', 'timetable_slot', id, { ...valid })],
       };
     };
@@ -423,6 +439,7 @@ export class TimetableService {
         slotId: row.id,
         endedSlotId: null,
         exceptionId: null,
+        suggest: { target: 'series', slotId: row.id },
         audit: [
           this.entry(
             user,
@@ -462,6 +479,7 @@ export class TimetableService {
       slotId: newId,
       endedSlotId: row.id,
       exceptionId: null,
+      suggest: { target: 'series', slotId: newId },
       audit: [
         this.entry(
           user,
@@ -519,6 +537,7 @@ export class TimetableService {
           slotId: null,
           endedSlotId: null,
           exceptionId: null,
+          suggest: null,
           audit: [
             this.entry(user, 'timetable_slot.delete', 'timetable_slot', id, { scope }, before),
           ],
@@ -534,6 +553,7 @@ export class TimetableService {
         slotId: null,
         endedSlotId: id,
         exceptionId: null,
+        suggest: null,
         audit: [
           this.entry(
             user,
@@ -615,6 +635,10 @@ export class TimetableService {
       slotId: row.id,
       endedSlotId: null,
       exceptionId: saved.id,
+      suggest:
+        input.kind === 'moved' || input.kind === 'room_change'
+          ? { target: 'session', slotId: row.id, date, change: input.kind }
+          : null,
       audit: [
         this.entry(
           user,

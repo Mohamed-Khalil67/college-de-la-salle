@@ -50,6 +50,10 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 - `access: 'admin' | 'coordinator'` filters by role; `href` links to another space; `secondary` items move behind « Plus » in the top bar once there are more than eight entries.
 - A new screen goes in its space's list, in « Plus » at least, and in the spec.
 
+## Timetable conflicts
+
+`timetable/blocked-notice.ts` shows a refused save: the conflicts (alert), the free places as one-click buttons (`suggestions` input, `apply` output, focus moves to its heading) and the warnings. A dialog that owns a write fills the chosen place into its form with the pure `timetable/suggestions.ts` (`applyToSession`, `applyToSeries`) and saves again; keep that file free of Angular.
+
 ## Page checklist (before you commit)
 
 1. One `h1` per page (space pages start with `.page__header`); headings in order. Space pages never add a `<main>`

@@ -6,5 +6,9 @@ export * from './timetable.js';
 export * from './accounts.js';
 export * from './targets.js';
 export * from './rollover.js';
+<<<<<<< HEAD
 export * from './feed.js';
 export * from './notifications.js';
+=======
+export * from './suggestions.js';
+>>>>>>> claude/conflict-suggestions-9ee479
