@@ -51,13 +51,14 @@ function shownError(state: { touched(): boolean; errors(): readonly { message?: 
                 </button>
               </div>
             </cdls-field>
+            <p class="t-body-s"><a routerLink="/connexion/oubli">Mot de passe oublié ?</a></p>
             <button cdlsButton [block]="true" type="submit" [disabled]="busy()">
               {{ busy() ? 'Connexion…' : 'Se connecter' }}
             </button>
           </form>
 
           <div class="stack stack--sm t-body-s">
-            <p>Mot de passe oublié ? Contactez le secrétariat de votre cycle, qui le réinitialisera.</p>
+            <p>Pas d’e-mail reçu ? Le secrétariat de votre cycle peut réinitialiser votre mot de passe.</p>
             <p class="t-muted">Les comptes sont créés par le collège : il n’y a pas d’inscription en ligne.</p>
             <p><a routerLink="/">Retour au site du collège</a></p>
           </div>

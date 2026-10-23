@@ -105,6 +105,24 @@ export interface ChangePasswordRequest {
   readonly newPassword: string;
 }
 
+/**
+ * POST /auth/forgot-password (public): asks for a reset link by e-mail. `identifier` is the login e-mail.
+ * Always answers 204, whether or not an active account matches (nothing reveals which accounts exist).
+ */
+export interface ForgotPasswordRequest {
+  readonly identifier: string;
+}
+
+/**
+ * POST /auth/reset-password (public): chooses a new password with the single-use token from the e-mailed
+ * link (rules: `passwordProblems`). 204 on success: every session of the account is signed out and the
+ * user signs in again with the new password. 400 when the link is invalid, expired or already used.
+ */
+export interface ResetPasswordRequest {
+  readonly token: string;
+  readonly newPassword: string;
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Users: /api/users (admin)
  * ---------------------------------------------------------------------------------------------- */

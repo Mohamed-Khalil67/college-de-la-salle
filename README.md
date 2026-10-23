@@ -74,9 +74,17 @@ characters, not the e-mail) every other route answers 403 `PASSWORD_CHANGE_REQUI
 Sign-in returns a 15-minute access token (send it as
 `Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
 
+**Forgotten password.** `/connexion/oubli` asks for the login e-mail (`POST /auth/forgot-password`, always 204: nothing
+says whether the account exists; only `active` accounts get a mail). The mail holds a single-use link
+`<PUBLIC_WEB_URL>/connexion/reinitialiser?token=…`, valid `PASSWORD_RESET_TTL_MINUTES` (60); that page chooses the new
+password (`POST /auth/reset-password`), which ends every session of the account. Mail goes through a transport chosen by
+`MAIL_TRANSPORT`: `log` (default, development) writes each mail, link included, to the API log and to the gitignored
+`apps/api/.dev-mail/`; `smtp` (required in production) uses `MAIL_FROM` and `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
+`SMTP_USER`, `SMTP_PASSWORD`. See `apps/api/.env.example`.
+
 | Area | Endpoints |
 | --- | --- |
-| Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/password`, `GET /auth/me` |
+| Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/password`, `/auth/forgot-password`, `/auth/reset-password`, `GET /auth/me` |
 | Admin | `/users` (CRUD, `POST /users/import/preview` then `POST /users/import?role=student|teacher` roster CSV, `POST /users/archive`, `isCoordinator`), `/section-changes` (students ask, `GET /section-changes/mine`; admins list, `/:id/approve`, `/:id/reject`), `/classes`, `/enrollments`, `/teaching-assignments`, `/periods/:id/close`, `POST /activity-types/:id/promote`; `DELETE` an empty class, an unused school year (not the current one) or a period without grades (409 otherwise) |
 | Structure (admin or coordinator) | `/school-years` (create, `PATCH`), `/school-years/:id/periods` and `/periods/:id` (trimesters or semesters, per section, no overlap, closed = locked), `/calendar-days` (holidays, exam weeks, days without classes), `/subjects` (create, rename, archive), `/classes/:id/subjects` (+ `/copy`) and `/class-subjects/:id` (coefficient, hours), `/rooms` |
 | Activity types | `GET/POST /activity-types`, `PATCH/DELETE /activity-types/:id`: school-wide types (cours, TD, TP, examen…) and teachers' private types, with the flags gradable / repeatable / homework |

@@ -17,6 +17,18 @@ export const routes: Routes = [
     loadComponent: () => import('./auth/login-page').then((m) => m.LoginPage),
   },
   {
+    path: 'connexion/oubli',
+    title: 'Mot de passe oublié',
+    canMatch: [anonymousGuard],
+    loadComponent: () => import('./auth/forgot-password-page').then((m) => m.ForgotPasswordPage),
+  },
+  {
+    // Opened from the e-mailed link; no guard, so a signed-in user can still use it.
+    path: 'connexion/reinitialiser',
+    title: 'Nouveau mot de passe',
+    loadComponent: () => import('./auth/reset-password-page').then((m) => m.ResetPasswordPage),
+  },
+  {
     path: 'premier-acces',
     title: 'Premier accès',
     canMatch: [firstAccessGuard],

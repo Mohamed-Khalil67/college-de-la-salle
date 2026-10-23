@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { clientKey } from './common/client-key.js';
 import { RolesGuard } from './common/roles.guard.js';
 import { validateEnv, type Env } from './config/env.validation.js';
+import { MailModule } from './mail/mail.module.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
@@ -52,7 +53,9 @@ import { UsersModule } from './users/users.module.js';
             // Only the sign-in routes need it (they override its limit); elsewhere `default` already counts by address.
             skipIf: (context) => {
               const path = String(context.switchToHttp().getRequest<{ path?: string }>().path ?? '');
-              return !(path.endsWith('/auth/login') || path.endsWith('/auth/password'));
+              return !['/auth/login', '/auth/password', '/auth/forgot-password'].some((route) =>
+                path.endsWith(route),
+              );
             },
           },
         ],
@@ -61,6 +64,7 @@ import { UsersModule } from './users/users.module.js';
       }),
     }),
     PrismaModule,
+    MailModule,
     AccessModule,
     AuthModule,
     HealthModule,

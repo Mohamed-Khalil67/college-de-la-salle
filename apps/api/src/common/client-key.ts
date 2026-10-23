@@ -35,6 +35,17 @@ export function loginTracker(req: RequestLike): string {
 }
 
 /**
+ * « Mot de passe oublié » limit key: client address plus the identifier asked for, like the sign-in, so
+ * one account cannot be flooded with mails from one place while a shared school address stays usable.
+ */
+export function forgotPasswordTracker(req: RequestLike): string {
+  const body = req['body'] as { identifier?: unknown } | undefined;
+  const identifier =
+    typeof body?.identifier === 'string' ? body.identifier.trim().toLowerCase().slice(0, 254) : '';
+  return `${clientKey(req['ip'] as string | undefined)}|${identifier}`;
+}
+
+/**
  * Password-change limit key: client address plus the account named by the access token. The token is only
  * read for this key (the authentication guard checks it right after), so a forged one gains nothing.
  */

@@ -6,6 +6,7 @@ import type { App } from 'supertest/types.js';
 import { inject } from 'vitest';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
+import { MAIL_TRANSPORT, type MailMessage } from '../src/mail/mail-transport.js';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 
 export const DOMAIN = 'demo.cdls.test';
@@ -20,6 +21,8 @@ export const FRENCH_TEACHER = `claire.dubois@${DOMAIN}`;
 export interface TestApp {
   readonly app: INestApplication<App>;
   readonly prisma: PrismaService;
+  /** Every mail the app "sent" (the transport is replaced by this list). */
+  readonly mails: MailMessage[];
   readonly http: () => ReturnType<typeof request>;
   /** Logs in (once per e-mail and app; the login route allows 5 attempts a minute) and returns a bearer token. */
   readonly token: (email: string) => Promise<string>;
@@ -27,7 +30,16 @@ export interface TestApp {
 }
 
 export async function createTestApp(): Promise<TestApp> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  const mails: MailMessage[] = [];
+  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(MAIL_TRANSPORT)
+    .useValue({
+      send: (message: MailMessage) => {
+        mails.push(message);
+        return Promise.resolve();
+      },
+    })
+    .compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApp(app);
   await app.init();
@@ -36,6 +48,7 @@ export async function createTestApp(): Promise<TestApp> {
   return {
     app,
     prisma: app.get(PrismaService),
+    mails,
     http,
     token: async (email) => {
       const cached = tokens.get(email);
