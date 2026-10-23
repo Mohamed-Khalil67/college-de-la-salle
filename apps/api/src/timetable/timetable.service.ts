@@ -60,13 +60,10 @@ interface Applied {
   readonly endedSlotId: string | null;
   readonly exceptionId: string | null;
   readonly audit: readonly AuditEntry[];
-<<<<<<< HEAD
   /** Sessions whose students and teacher are notified once the write is saved (one-session changes). */
   readonly notices?: readonly SessionNotice[];
-=======
   /** What to suggest when it clashes; null: nothing sensible (a restore, a cancellation, a substitute). */
   readonly suggest: SuggestionAsk | null;
->>>>>>> claude/conflict-suggestions-9ee479
 }
 
 type Mutation = (tx: Db) => Promise<Applied>;
@@ -97,11 +94,8 @@ export class TimetableService {
     private readonly access: AccessService,
     private readonly occupancy: OccupancyService,
     private readonly warnings: WarningsService,
-<<<<<<< HEAD
     private readonly notices: ChangeNoticesService,
-=======
     private readonly suggestions: TimetableSuggestionsService,
->>>>>>> claude/conflict-suggestions-9ee479
   ) {}
 
   /** Today in Cairo; the clock of « sessions already held ». */

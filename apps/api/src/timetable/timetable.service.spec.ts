@@ -88,11 +88,8 @@ describe('TimetableService (rules checked before anything is written)', () => {
         { provide: AccessService, useValue: access },
         { provide: OccupancyService, useValue: occupancy },
         { provide: WarningsService, useValue: {} },
-<<<<<<< HEAD
         { provide: ChangeNoticesService, useValue: { sessions: vi.fn() } },
-=======
         { provide: TimetableSuggestionsService, useValue: {} },
->>>>>>> claude/conflict-suggestions-9ee479
       ],
     }).compile();
     service = moduleRef.get(TimetableService);
