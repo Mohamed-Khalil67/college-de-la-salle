@@ -3,14 +3,16 @@ import {
   TIMETABLE_CONFLICT,
   type TimetableBlockedError,
   type TimetableConflictDto,
+  type TimetableSuggestionDto,
   type TimetableWarningDto,
   WARNINGS_NOT_ACKNOWLEDGED,
 } from '@cdls/shared';
 
-/** 409: a hard conflict (room, teacher or class) refuses the write. */
+/** 409: a hard conflict (room, teacher or class) refuses the write; `suggestions` are the ways out. */
 export function conflictBlocked(
   conflicts: readonly TimetableConflictDto[],
   warnings: readonly TimetableWarningDto[] = [],
+  suggestions: readonly TimetableSuggestionDto[] = [],
 ): ConflictException {
   const body: TimetableBlockedError = {
     statusCode: 409,
@@ -21,6 +23,7 @@ export function conflictBlocked(
     code: TIMETABLE_CONFLICT,
     conflicts,
     warnings,
+    suggestions,
   };
   return new ConflictException(body);
 }
@@ -35,6 +38,7 @@ export function warningsBlocked(warnings: readonly TimetableWarningDto[]): Confl
     code: WARNINGS_NOT_ACKNOWLEDGED,
     conflicts: [],
     warnings,
+    suggestions: [],
   };
   return new ConflictException(body);
 }

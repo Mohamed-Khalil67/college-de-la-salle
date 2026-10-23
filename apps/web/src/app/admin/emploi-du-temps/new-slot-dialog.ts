@@ -10,6 +10,7 @@ import {
   schoolToday,
   slotProblems,
   type TimetableBlockedError,
+  type TimetableSuggestionDto,
   type TimetableWarningCode,
   type TimetableWriteResult,
   WEEK_PARITIES,
@@ -19,7 +20,7 @@ import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../ui';
 import { BlockedNotice } from '../../timetable/blocked-notice';
 import { GroupSelect } from '../../timetable/group-select';
-import { FreeRooms } from '../../timetable/free-rooms';
+import { applyToSeries } from '../../timetable/suggestions';
 import { blockedOf, TimetableApi } from '../../timetable/timetable-api';
 
 export interface NewSlotDefaults {
@@ -56,7 +57,7 @@ interface NewSlotModel {
 /** « Ajouter une séance »: a weekly slot for a class (subject, teacher, room, day and hours, rhythm). */
 @Component({
   selector: 'app-new-slot-dialog',
-  imports: [Alert, BlockedNotice, Button, Field, FieldControl, FormField, FreeRooms, GroupSelect, Modal],
+  imports: [Alert, BlockedNotice, Button, Field, FieldControl, FormField, GroupSelect, Modal],
   template: `
     <cdls-modal title="Ajouter une séance" [(open)]="open" [dismissible]="!busy()">
       <form class="stack stack--sm" novalidate (submit)="submit($event)">
@@ -138,17 +139,14 @@ interface NewSlotModel {
         @if (failure()) {
           <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
         }
-        <app-blocked-notice [conflicts]="conflicts()" [warnings]="warnings()" [(reasons)]="reasons" />
-        @if (roomClash()) {
-          <app-free-rooms
-            [date]="roomClash()!"
-            [startTime]="model().startTime"
-            [endTime]="model().endTime"
-            [classId]="model().classId || null"
-            [selected]="model().roomId || null"
-            (pick)="chooseRoom($event)"
-          />
-        }
+        <app-blocked-notice
+          [conflicts]="conflicts()"
+          [warnings]="warnings()"
+          [suggestions]="suggestions()"
+          [busy]="busy()"
+          [(reasons)]="reasons"
+          (apply)="applySuggestion($event)"
+        />
 
         <div class="modal__footer">
           <button cdlsButton variant="secondary" type="button" [disabled]="busy()" (click)="open.set(false)">Fermer</button>
@@ -179,8 +177,8 @@ export class NewSlotDialog {
   protected readonly conflicts = signal<TimetableBlockedError['conflicts']>([]);
   protected readonly warnings = signal<TimetableBlockedError['warnings']>([]);
   protected readonly reasons = signal<Partial<Record<TimetableWarningCode, string>>>({});
-  /** The first day of a room clash, to suggest free rooms for it. */
-  protected readonly roomClash = computed(() => this.conflicts().find((c) => c.kind === 'room')?.date ?? null);
+  /** Free rooms and times for the whole series, from the refused save. */
+  protected readonly suggestions = signal<readonly TimetableSuggestionDto[]>([]);
 
   readonly #classId = computed(() => this.model().classId);
   readonly #subjects = resource({
@@ -257,6 +255,7 @@ export class NewSlotDialog {
           this.failure.set(null);
           this.conflicts.set([]);
           this.warnings.set([]);
+          this.suggestions.set([]);
           this.reasons.set({});
         });
     });
@@ -275,12 +274,18 @@ export class NewSlotDialog {
     this.model.update((m) => ({ ...m, groupId: id }));
   }
 
-  protected chooseRoom(id: string): void {
-    this.model.update((m) => ({ ...m, roomId: id }));
+  /** A free place the API suggested for the series: fill it in and save again. */
+  protected async applySuggestion(suggestion: TimetableSuggestionDto): Promise<void> {
+    this.model.update((m) => applyToSeries(m, suggestion));
+    await this.save();
   }
 
   protected async submit(event: Event): Promise<void> {
     event.preventDefault();
+    await this.save();
+  }
+
+  private async save(): Promise<void> {
     if (this.busy()) return;
     const m = this.model();
     const request = this.requestOf(m);
@@ -313,8 +318,12 @@ export class NewSlotDialog {
       if (blocked) {
         this.conflicts.set(blocked.conflicts);
         this.warnings.set(blocked.warnings);
+        this.suggestions.set(blocked.suggestions);
         this.blocked.emit(blocked);
       } else {
+        // Not a clash: the places offered for the last form are no longer the answer.
+        this.conflicts.set([]);
+        this.suggestions.set([]);
         this.failure.set(apiMessage(error));
       }
     } finally {

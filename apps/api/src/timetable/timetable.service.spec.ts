@@ -4,6 +4,7 @@ import { AccessService } from '../access/access.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { TimetableSuggestionsService } from './suggestions.service.js';
 import { TimetableService } from './timetable.service.js';
 import { WarningsService } from './warnings.service.js';
 
@@ -86,6 +87,7 @@ describe('TimetableService (rules checked before anything is written)', () => {
         { provide: AccessService, useValue: access },
         { provide: OccupancyService, useValue: occupancy },
         { provide: WarningsService, useValue: {} },
+        { provide: TimetableSuggestionsService, useValue: {} },
       ],
     }).compile();
     service = moduleRef.get(TimetableService);

@@ -53,6 +53,17 @@ async function saveAccepting(page: Page, dialog: ReturnType<Page['getByRole']>, 
   }
 }
 
+/** After a one-click suggestion: it saved, or it asks for warnings to be accepted (then accept them). */
+async function afterSuggestion(page: Page, dialog: ReturnType<Page['getByRole']>, done: ReturnType<Page['locator']>): Promise<void> {
+  const accept = dialog.getByRole('button', { name: 'Enregistrer avec ces avertissements' });
+  await expect(accept.or(done)).toBeVisible();
+  if (await accept.isVisible()) {
+    const reasons = dialog.getByLabel(/^Motif : /);
+    for (let i = 0; i < (await reasons.count()); i++) await reasons.nth(i).fill('Accepté pour le test');
+    await accept.click();
+  }
+}
+
 const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 
 /** Removes the slots and exceptions the tests added (they all carry the 17:00 hour or the test reason). */
@@ -78,50 +89,58 @@ test.describe('timetable', () => {
     await cleanUp(request);
   });
 
-  test('the admin builds a timetable, hits a room conflict and fixes it with a suggested room', async ({ page, request }, info) => {
-    test.skip(info.project.name === 'phone', 'The week editor is a desktop screen.');
-    await cleanUp(request);
-    await signInTo(page, ACCOUNTS.admin, '/admin/emploi-du-temps');
-    await expect(page.getByRole('heading', { level: 1, name: 'Emploi du temps' })).toBeVisible();
-    await expect(page.getByRole('grid')).toBeVisible();
+  for (const width of [1440, 390]) {
+    test(`the admin builds a timetable, hits a room conflict and fixes it in one click (${width} px)`, async ({ page, request }, info) => {
+      test.skip(info.project.name === 'phone', 'Run from the desktop project at both widths.');
+      await page.setViewportSize({ width, height: 900 });
+      await cleanUp(request);
+      await signInTo(page, ACCOUNTS.admin, '/admin/emploi-du-temps');
+      await expect(page.getByRole('heading', { level: 1, name: 'Emploi du temps' })).toBeVisible();
+      await expect(page.getByRole('grid')).toBeVisible();
 
-    const addSlot = async (className: string, subject: string) => {
-      await page.getByLabel('Classe', { exact: true }).first().selectOption({ label: className });
-      await expect(page.getByRole('grid')).toHaveAttribute('aria-label', new RegExp(className.split(' (')[0]!));
-      await page.getByRole('button', { name: 'Ajouter une séance' }).first().click();
-      const dialog = page.getByRole('dialog', { name: 'Ajouter une séance' });
-      await expect(dialog).toBeVisible();
-      await dialog.getByLabel('Classe').selectOption({ label: className });
-      await dialog.getByLabel('Matière').selectOption({ label: subject });
-      await dialog.getByLabel('Salle').selectOption({ label: 'Salle 14' });
-      await dialog.getByLabel('Début').fill('17:00');
-      await dialog.getByLabel('Fin').fill('18:00');
-      return dialog;
-    };
+      const addSlot = async (className: string, subject: string) => {
+        await page.getByLabel('Classe', { exact: true }).first().selectOption({ label: className });
+        await expect(page.getByRole('grid')).toHaveAttribute('aria-label', new RegExp(className.split(' (')[0]!));
+        await page.getByRole('button', { name: 'Ajouter une séance' }).first().click();
+        const dialog = page.getByRole('dialog', { name: 'Ajouter une séance' });
+        await expect(dialog).toBeVisible();
+        await dialog.getByLabel('Classe').selectOption({ label: className });
+        await dialog.getByLabel('Matière').selectOption({ label: subject });
+        await dialog.getByLabel('Salle').selectOption({ label: 'Salle 14' });
+        await dialog.getByLabel('Début').fill('17:00');
+        await dialog.getByLabel('Fin').fill('18:00');
+        return dialog;
+      };
 
-    // First séance: Seconde (Bac français), Humanités, Sunday 17:00, Salle 14.
-    const first = await addSlot('Seconde (Bac français)', 'Humanités, littérature et philosophie');
-    await saveAccepting(page, first, 'Ajouter la séance');
-    await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
-    // A new series starts today, so its first Sunday may be next week: look there.
-    await page.getByRole('button', { name: 'Semaine suivante' }).click();
-    await expect(page.getByRole('grid')).toContainText('Humanités, littérature et philosophie');
+      // First séance: Seconde (Bac français), Humanités, Sunday 17:00, Salle 14.
+      const first = await addSlot('Seconde (Bac français)', 'Humanités, littérature et philosophie');
+      await saveAccepting(page, first, 'Ajouter la séance');
+      await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
+      // A new series starts today, so its first Sunday may be next week: look there.
+      await page.getByRole('button', { name: 'Semaine suivante' }).click();
+      await expect(page.getByRole('grid')).toContainText('Humanités, littérature et philosophie');
 
-    // Second: another class, another teacher, the same room and hour: refused, with the conflict named.
-    const second = await addSlot('1re secondaire (Bac nationale)', 'Psychologie et sociologie');
-    await second.getByRole('button', { name: 'Ajouter la séance' }).click();
-    await expect(second.getByRole('alert').filter({ hasText: 'Salle 14 est déjà occupée' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Conflits \(1\)/ })).toBeVisible();
-    await expectNoAxeViolations(page);
+      // Second: another class, another teacher, the same room and hour: refused, with the conflict named.
+      const second = await addSlot('1re secondaire (Bac nationale)', 'Psychologie et sociologie');
+      await second.getByRole('button', { name: 'Ajouter la séance' }).click();
+      await expect(second.getByRole('alert').filter({ hasText: 'Salle 14 est déjà occupée' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /Conflits \(1\)/ })).toBeVisible();
+      // The free places: focus lands on them; rooms free for every session of the series.
+      await expect(second.getByRole('heading', { name: 'Choisir une place libre' })).toBeFocused();
+      const suggestions = second.getByRole('list', { name: 'Une autre salle, au même moment' });
+      await expect(suggestions).toBeVisible();
+      await expect(suggestions.getByRole('button', { name: /^Salle 14/ })).toHaveCount(0);
+      await expectNoAxeViolations(page);
 
-    // The suggestion: a room that is free at that time.
-    const suggestions = second.getByRole('list', { name: 'Salles libres à ce moment-là' });
-    await expect(suggestions).toBeVisible();
-    await suggestions.getByRole('button').first().click();
-    await saveAccepting(page, second, 'Ajouter la séance');
-    await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Conflits \(\d+\)/ })).toBeVisible();
-  });
+      // One click saves with that room.
+      await suggestions.getByRole('button').first().click();
+      const done = page.locator('.alert--success').filter({ hasText: /nregistr/ });
+      await afterSuggestion(page, second, done);
+      await expect(done).toBeVisible();
+      await expect(second).toBeHidden();
+      await expect(page.getByRole('heading', { name: /Conflits \(\d+\)/ })).toBeVisible();
+    });
+  }
 
   test('the admin edits the grid with the keyboard: arrows, Enter opens the cell, Escape returns to it', async ({ page }, info) => {
     test.skip(info.project.name === 'phone', 'The week editor is a desktop screen.');
@@ -208,6 +227,44 @@ test.describe('timetable', () => {
     await page.getByRole('button', { name: /^Rétablir la séance/ }).first().click();
     await expect(page.locator('.alert--success').filter({ hasText: 'rétablie' })).toBeVisible();
   });
+
+  for (const width of [390, 1440]) {
+    test(`a teacher's room change into a taken room offers free rooms; one click saves (${width} px)`, async ({ page }, info) => {
+      test.skip(info.project.name === 'phone', 'Run from the desktop project at both widths.');
+      await page.setViewportSize({ width, height: 900 });
+      await signInTo(page, ACCOUNTS.teacher, '/enseignant/emploi-du-temps');
+      await page.getByRole('button', { name: 'Semaine suivante' }).click();
+      await page.getByRole('button', { name: /^Modifier la séance/ }).first().click();
+      const dialog = page.getByRole('dialog', { name: 'Modifier la séance' });
+      await dialog.getByRole('radio', { name: 'Changer de salle' }).check();
+      const free = dialog.getByRole('list', { name: 'Salles libres à ce moment-là' });
+      await expect(free.getByRole('button').first()).toBeVisible();
+      // A room someone else holds then: in the list of rooms, not among the free ones.
+      const freeNames = (await free.getByRole('button').allInnerTexts()).map((t) => t.split('\n')[0]!.trim());
+      const select = dialog.getByLabel('Nouvelle salle');
+      const options = (await select.locator('option').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'Choisir…');
+      const taken = options.find((name) => !freeNames.some((f) => f.startsWith(name)));
+      expect(taken, 'a room that is taken at that time').toBeTruthy();
+      await select.selectOption({ label: taken! });
+      await dialog.getByLabel('Motif').fill('Test Playwright');
+      await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+
+      await expect(dialog.getByRole('alert').filter({ hasText: 'est déjà occupée' })).toBeVisible();
+      await expect(dialog.getByRole('heading', { name: 'Choisir une place libre' })).toBeFocused();
+      const ways = dialog.getByRole('list', { name: 'Une autre salle, au même moment' });
+      await expect(ways.getByRole('button').first()).toBeVisible();
+      // A room change only needs another room: no other time is offered.
+      await expect(dialog.getByRole('list', { name: /Un autre moment/ })).toHaveCount(0);
+      await expectNoAxeViolations(page);
+      await page.keyboard.press('Tab');
+      await expect(ways.getByRole('button').first()).toBeFocused();
+      await page.keyboard.press('Enter');
+      const done = page.locator('.alert--success').filter({ hasText: 'La séance a été modifiée' });
+      await afterSuggestion(page, dialog, done);
+      await expect(done).toBeVisible();
+      await expect(page.getByText('Salle changée').first()).toBeVisible();
+    });
+  }
 
   for (const width of [390, 1440]) {
     test(`Axe finds nothing on the timetable screens at ${width} px`, async ({ page }, info) => {

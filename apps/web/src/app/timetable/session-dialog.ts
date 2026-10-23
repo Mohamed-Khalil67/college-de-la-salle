@@ -10,6 +10,7 @@ import {
   type TimetableBlockedError,
   type TimetableOccurrenceDto,
   type TimetableSlotInput,
+  type TimetableSuggestionDto,
   type TimetableWarningCode,
   type TimetableWriteResult,
   WEEK_PARITIES,
@@ -22,6 +23,7 @@ import { BlockedNotice } from './blocked-notice';
 import { GroupSelect } from './group-select';
 import { FreeRooms } from './free-rooms';
 import { blockedOf, TimetableApi } from './timetable-api';
+import { applyToSeries, applyToSession } from './suggestions';
 import { sessionSummary } from './timetable-format';
 
 export type SessionAction = 'cancel' | 'move' | 'room' | 'substitute' | 'edit' | 'end';
@@ -37,6 +39,8 @@ interface ChangeModel {
   newStart: string;
   newEnd: string;
   roomId: string;
+  /** The room a moved session goes to; '' keeps its own. */
+  moveRoomId: string;
   teacherId: string;
   reason: string;
   weekday: string;
@@ -115,6 +119,14 @@ let nextId = 0;
                 </cdls-field>
                 <cdls-field label="Fin">
                   <input cdlsControl type="time" [formField]="changeForm.newEnd" />
+                </cdls-field>
+                <cdls-field label="Salle">
+                  <select cdlsControl [formField]="changeForm.moveRoomId">
+                    <option value="">Sa salle habituelle</option>
+                    @for (room of rooms(); track room.id) {
+                      <option [value]="room.id">{{ room.name }}</option>
+                    }
+                  </select>
                 </cdls-field>
               </div>
             }
@@ -207,7 +219,14 @@ let nextId = 0;
             <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
           }
 
-          <app-blocked-notice [conflicts]="conflicts()" [warnings]="warnings()" [(reasons)]="reasons" />
+          <app-blocked-notice
+            [conflicts]="conflicts()"
+            [warnings]="warnings()"
+            [suggestions]="suggestions()"
+            [busy]="busy()"
+            [(reasons)]="reasons"
+            (apply)="applySuggestion($event)"
+          />
 
           <div class="modal__footer">
             <button cdlsButton variant="secondary" type="button" [disabled]="busy()" (click)="open.set(false)">Fermer</button>
@@ -275,6 +294,7 @@ export class SessionDialog {
   protected readonly failure = signal<string | null>(null);
   protected readonly conflicts = signal<TimetableBlockedError['conflicts']>([]);
   protected readonly warnings = signal<TimetableBlockedError['warnings']>([]);
+  protected readonly suggestions = signal<readonly TimetableSuggestionDto[]>([]);
   protected readonly reasons = signal<Partial<Record<TimetableWarningCode, string>>>({});
 
   protected readonly summary = computed(() => {
@@ -329,6 +349,7 @@ export class SessionDialog {
       newStart: pre?.startTime ?? s?.current.startTime ?? '',
       newEnd: pre?.endTime ?? s?.current.endTime ?? '',
       roomId: slot ? (slot.roomId ?? '') : '',
+      moveRoomId: '',
       teacherId: '',
       reason: '',
       weekday: String(slot?.weekday ?? 0),
@@ -362,7 +383,10 @@ export class SessionDialog {
         this.failure.set(null);
         this.conflicts.set([]);
         this.warnings.set([]);
+        this.suggestions.set([]);
         this.reasons.set({});
+        // A room picked for an earlier move must not follow the next one.
+        this.model.update((m) => ({ ...m, moveRoomId: '' }));
       });
     });
   }
@@ -387,10 +411,27 @@ export class SessionDialog {
     this.failure.set(null);
     this.conflicts.set([]);
     this.warnings.set([]);
+    this.suggestions.set([]);
   }
 
   protected async submit(event: Event): Promise<void> {
     event.preventDefault();
+    await this.save();
+  }
+
+  /** A free place the API suggested: fill it in and save again. */
+  protected async applySuggestion(suggestion: TimetableSuggestionDto): Promise<void> {
+    const action = this.action();
+    if (this.scope() === 'this') {
+      if (action !== 'move' && action !== 'room') return;
+      this.model.update((m) => applyToSession(m, action, suggestion));
+    } else {
+      this.model.update((m) => applyToSeries(m, suggestion));
+    }
+    await this.save();
+  }
+
+  private async save(): Promise<void> {
     const s = this.session();
     if (!s || this.busy()) return;
     this.failure.set(null);
@@ -407,6 +448,7 @@ export class SessionDialog {
       if (blocked) {
         this.conflicts.set(blocked.conflicts);
         this.warnings.set(blocked.warnings);
+        this.suggestions.set(blocked.suggestions);
         if (blocked.conflicts.length) this.failure.set(null);
         this.blocked.emit(blocked);
       } else {
@@ -475,6 +517,7 @@ export class SessionDialog {
           newDate: sameDay ? null : m.newDate,
           newStart: sameTime ? null : m.newStart || null,
           newEnd: sameTime ? null : m.newEnd || null,
+          newRoomId: m.moveRoomId || null,
           reason,
         };
       }

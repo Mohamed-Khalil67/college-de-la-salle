@@ -520,3 +520,13 @@ export const SCHOOL_TIME_ZONE = 'Africa/Cairo';
 export function schoolToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: SCHOOL_TIME_ZONE }).format(now);
 }
+
+/** The time now in Cairo as `HH:MM` (24 h). */
+export function schoolTimeNow(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: SCHOOL_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(now);
+}

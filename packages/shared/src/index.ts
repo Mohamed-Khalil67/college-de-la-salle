@@ -6,3 +6,4 @@ export * from './timetable.js';
 export * from './accounts.js';
 export * from './targets.js';
 export * from './rollover.js';
+export * from './suggestions.js';

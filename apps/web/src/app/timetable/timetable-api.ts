@@ -48,6 +48,7 @@ export function blockedOf(error: unknown): TimetableBlockedError | null {
     code: body.code,
     conflicts: body.conflicts ?? [],
     warnings: body.warnings ?? [],
+    suggestions: body.suggestions ?? [],
   };
 }
 

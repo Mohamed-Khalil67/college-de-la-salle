@@ -4,6 +4,8 @@ import {
   entriesClash,
   occupancyEntries,
   type OccupancyEntry,
+  type RoomCandidate,
+  type RoomKind,
   stamp,
   type TimetableConflictDto,
   type TimetableConflictKind,
@@ -277,7 +279,10 @@ export class OccupancyService {
       classes.map((c) => [c.id, `${c.label} (${c.section.label})`] as const),
     );
 
-    const groups = new Map<string, { bucket: string; clash: Clash; row: IndexRow; count: number }>();
+    const groups = new Map<
+      string,
+      { bucket: string; clash: Clash; row: IndexRow; count: number }
+    >();
     for (const clash of clashes) {
       const row = rows[clash.i]!;
       const holder = clash.eventId ?? clash.slotId ?? 'self';
@@ -428,6 +433,74 @@ export class OccupancyService {
             AND (${ignoreSlotId}::uuid IS NULL OR o.slot_id IS DISTINCT FROM ${ignoreSlotId}::uuid)
         )`;
     return rows.map((r) => r.id);
+  }
+
+  /**
+   * Which candidates would clash with the index: `rows[k]` belongs to candidate `candidate[k]`. One
+   * statement for all of them (the same four rules as `clashes`), not one query per candidate. Each row
+   * probes the GiST indexes of the exclusion constraints and stops at the first hit: `EXISTS … OR EXISTS`
+   * with the indexes' `IS NOT NULL` predicates spelled out, else the planner hash-joins the whole table
+   * (8 ms instead of 170 ms for 600 rows on the seed). Rows of the change itself must have been cleared.
+   */
+  async clashingCandidates(
+    db: Db,
+    rows: readonly IndexRow[],
+    candidate: readonly number[],
+  ): Promise<Set<number>> {
+    if (!rows.length) return new Set();
+    const json = JSON.stringify(
+      rows.map((r, k) => ({
+        c: candidate[k],
+        room_id: r.roomId,
+        teacher_id: r.teacherId,
+        class_id: r.classId,
+        division_key: r.divisionKey,
+        group_id: r.groupId ?? null,
+        starts_at: r.startsAt,
+        ends_at: r.endsAt,
+      })),
+    );
+    const found = await db.$queryRaw<{ c: number }[]>`
+      WITH c AS (
+        SELECT * FROM jsonb_to_recordset(${json}::jsonb) AS c(
+          c int, room_id uuid, teacher_id uuid, class_id uuid, division_key text, group_id uuid, starts_at timestamp, ends_at timestamp)
+      )
+      SELECT DISTINCT c.c FROM c
+      WHERE EXISTS (
+          SELECT 1 FROM occupancy o
+          WHERE o.room_id = c.room_id AND o.room_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at))
+        OR EXISTS (
+          SELECT 1 FROM occupancy o
+          WHERE o.teacher_id = c.teacher_id AND o.teacher_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at))
+        OR EXISTS (
+          SELECT 1 FROM occupancy o
+          WHERE o.class_id = c.class_id AND o.class_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at)
+            AND (c.division_key IS NULL OR o.division_key IS DISTINCT FROM c.division_key))
+        OR (c.group_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM occupancy o
+          WHERE o.group_id = c.group_id AND o.group_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at)))`;
+    return new Set(found.map((f) => f.c));
+  }
+
+  /** Active rooms of these kinds that nobody holds during any of the time ranges of `rows` (one statement). */
+  async roomsFreeDuring(
+    db: Db,
+    rows: readonly Pick<IndexRow, 'startsAt' | 'endsAt'>[],
+    kinds: readonly RoomKind[],
+  ): Promise<RoomCandidate[]> {
+    if (!rows.length || !kinds.length) return [];
+    const json = JSON.stringify(rows.map((r) => ({ starts_at: r.startsAt, ends_at: r.endsAt })));
+    return db.$queryRaw<RoomCandidate[]>`
+      WITH c AS (
+        SELECT * FROM jsonb_to_recordset(${json}::jsonb) AS c(starts_at timestamp, ends_at timestamp)
+      )
+      SELECT r.id, r.name, r.capacity::int AS capacity, r.kind::text AS kind FROM rooms r
+      WHERE r.active
+        AND r.kind::text = ANY(${[...kinds]}::text[])
+        AND NOT EXISTS (
+          SELECT 1 FROM c JOIN occupancy o
+            ON o.room_id = r.id AND o.room_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at)
+        )`;
   }
 
   /**
