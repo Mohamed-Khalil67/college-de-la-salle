@@ -108,6 +108,15 @@ describe('AuthService', () => {
     }
   });
 
+  it('answers 401, not 500, when the stored hash is not an argon2 hash', async () => {
+    for (const passwordHash of ['x', 'not-a-real-hash', '']) {
+      prisma.user.findUnique.mockResolvedValue(await user({ passwordHash }));
+      await expect(auth.login('prof@demo.cdls.test', 'correct horse')).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    }
+  });
+
   it('puts the first-sign-in flag, section and class in the session', async () => {
     prisma.user.findUnique.mockResolvedValue(
       await user({

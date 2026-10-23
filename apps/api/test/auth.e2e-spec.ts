@@ -51,7 +51,12 @@ describe('Auth (e2e)', () => {
   });
 
   it('refuses deactivated accounts', async () => {
-    const user = await t.prisma.user.findFirstOrThrow({ where: { role: 'student' } });
+    // A seeded demo student (they carry a CDLS- number), always the same one: other specs leave their own
+    // fixture accounts around, and an unordered findFirst may return any of them.
+    const user = await t.prisma.user.findFirstOrThrow({
+      where: { role: 'student', student: { studentNumber: { startsWith: 'CDLS-' } } },
+      orderBy: { email: 'asc' },
+    });
     await t.prisma.user.update({ where: { id: user.id }, data: { status: 'disabled' } });
     try {
       await t

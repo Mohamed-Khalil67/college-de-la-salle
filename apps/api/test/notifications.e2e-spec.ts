@@ -2,6 +2,7 @@ import {
   addDays,
   type EventDto,
   type NotificationDto,
+  type NotificationKind,
   type NotificationPreferencesDto,
   type NotificationSummaryDto,
   type Paginated,
@@ -9,7 +10,7 @@ import {
 } from '@cdls/shared';
 import { schoolToday } from '../src/common/dates.js';
 import { NotificationMailService } from '../src/notifications/notification-mail.service.js';
-import { createRolloverSource } from './rollover-fixture.js';
+import { createRolloverSource, removeRolloverSource } from './rollover-fixture.js';
 import { ADMIN, bearer, createTestApp, MATHS_TEACHER, studentOf, type TestApp } from './helpers.js';
 
 const TODAY = schoolToday();
@@ -40,9 +41,16 @@ describe('Notifications (e2e)', () => {
 
   const typeId = async (code: string) =>
     (await t.prisma.activityType.findUniqueOrThrow({ where: { code } })).id;
-  const of = (userId: string, kind?: string) =>
-    t.prisma.notification.findMany({ where: { userId, ...(kind ? { kind: kind as never } : {}) } });
-  const since = new Date();
+  /**
+   * Only what THIS spec's requests made: the specs before it have notified the same demo students about
+   * their own sessions, and those rows stay in the shared database.
+   */
+  let since: Date;
+  const of = (userId: string, kind?: NotificationKind) =>
+    t.prisma.notification.findMany({
+      where: { userId, createdAt: { gte: since }, ...(kind ? { kind } : {}) },
+      orderBy: { createdAt: 'asc' },
+    });
   const countFor = (userIds: string[], entityId: string) =>
     t.prisma.notification.count({
       where: {
@@ -51,6 +59,14 @@ describe('Notifications (e2e)', () => {
         createdAt: { gte: since },
       },
     });
+
+  /** Puts a session back to what the weekly rule says (through the API, so the index follows). */
+  async function restore(slotId: string, date: string): Promise<void> {
+    const ex = await t.prisma.slotException.findUniqueOrThrow({
+      where: { slotId_date: { slotId, date: day(date) } },
+    });
+    await t.http().delete(`/api/timetable/exceptions/${ex.id}`).set(bearer(admin)).expect(200);
+  }
 
   /** A day, at least `weeks` weeks ahead, on which the slot has a session (not a holiday). */
   async function sessionDay(slotId: string, weeks: number): Promise<string> {
@@ -69,6 +85,7 @@ describe('Notifications (e2e)', () => {
   }
 
   beforeAll(async () => {
+    since = new Date(Date.now() - 2000);
     t = await createTestApp();
     admin = await t.token(ADMIN);
     maths = await t.token(MATHS_TEACHER);
@@ -95,6 +112,8 @@ describe('Notifications (e2e)', () => {
 
   afterAll(async () => {
     for (const id of events) await t.http().delete(`/api/events/${id}`).set(bearer(admin));
+    // Leave the shared database as found: the notifications this spec caused go too.
+    await t.prisma.notification.deleteMany({ where: { createdAt: { gte: since } } });
     await t.close();
   });
 
@@ -135,14 +154,19 @@ describe('Notifications (e2e)', () => {
         .http()
         .post(`/api/timetable/slots/${slot.id}/exceptions`)
         .set(bearer(admin))
-        .send({ date, kind: 'moved', newStart: '16:00', newEnd: '17:00' })
+        .send({ date, kind: 'moved', newStart: '21:00', newEnd: '22:00' })
         .expect(201);
       const [teacherNotice] = await t.prisma.notification.findMany({
-        where: { userId: mathsUserId, kind: 'session_moved', entityId: entity },
+        where: {
+          userId: mathsUserId,
+          kind: 'session_moved',
+          entityId: entity,
+          createdAt: { gte: since },
+        },
       });
       expect(teacherNotice).toMatchObject({ link: '/enseignant/emploi-du-temps' });
       expect(teacherNotice!.body).toContain('(Première)');
-      expect(teacherNotice!.body).toContain('16:00 – 17:00');
+      expect(teacherNotice!.body).toContain('21:00 – 22:00');
 
       // Restored: everyone hears it is back.
       await t
@@ -155,6 +179,7 @@ describe('Notifications (e2e)', () => {
           where: {
             kind: 'session_restored',
             entityId: entity,
+            createdAt: { gte: since },
             userId: { in: classStudents.map((s) => s.userId) },
           },
         }),
@@ -191,6 +216,7 @@ describe('Notifications (e2e)', () => {
           entity,
         ),
       ).toBe(0);
+      await restore(slot.id, date);
     });
 
     it('tells the substitute teacher when their session is cancelled or changed', async () => {
@@ -218,8 +244,7 @@ describe('Notifications (e2e)', () => {
       await send({ kind: 'cancelled' }).expect(201);
       expect(await countFor([substitute.userId], entity)).toBe(1);
       expect(await countFor([mathsUserId], entity)).toBe(1);
-      const ex = await t.prisma.slotException.findFirstOrThrow({ where: { slotId: slot.id } });
-      await t.http().delete(`/api/timetable/exceptions/${ex.id}`).set(bearer(admin)).expect(200);
+      await restore(slot.id, date);
     });
 
     it('a dry run (« check ») notifies nobody', async () => {
@@ -245,23 +270,29 @@ describe('Notifications (e2e)', () => {
         startsOn: '2047-09-01',
         endsOn: '2048-06-30',
       });
-      await t.prisma.schoolYear.update({
-        where: { id: fixture.yearId },
-        data: { archivedAt: new Date() },
-      });
-      const slot = await t.prisma.timetableSlot.findFirstOrThrow({
-        where: { classSubject: { schoolClass: { schoolYearId: fixture.yearId } } },
-      });
-      let date = '2047-10-01';
-      while (weekday(date) !== slot.weekday) date = addDays(date, 1);
-      await t
-        .http()
-        .post(`/api/timetable/slots/${slot.id}/exceptions`)
-        .set(bearer(admin))
-        .send({ date, kind: 'cancelled' })
-        .expect(409);
-      const userIds = Object.values(fixture.students).flatMap((list) => list.map((s) => s.userId));
-      expect(await t.prisma.notification.count({ where: { userId: { in: userIds } } })).toBe(0);
+      try {
+        await t.prisma.schoolYear.update({
+          where: { id: fixture.yearId },
+          data: { archivedAt: new Date() },
+        });
+        const slot = await t.prisma.timetableSlot.findFirstOrThrow({
+          where: { classSubject: { schoolClass: { schoolYearId: fixture.yearId } } },
+        });
+        let date = '2047-10-01';
+        while (weekday(date) !== slot.weekday) date = addDays(date, 1);
+        await t
+          .http()
+          .post(`/api/timetable/slots/${slot.id}/exceptions`)
+          .set(bearer(admin))
+          .send({ date, kind: 'cancelled' })
+          .expect(409);
+        const userIds = Object.values(fixture.students).flatMap((list) =>
+          list.map((s) => s.userId),
+        );
+        expect(await t.prisma.notification.count({ where: { userId: { in: userIds } } })).toBe(0);
+      } finally {
+        await removeRolloverSource(t.prisma, fixture);
+      }
     });
   });
 
@@ -426,15 +457,43 @@ describe('Notifications (e2e)', () => {
       const me = classStudents[0]!;
       const token = await t.token(me.email);
       const outsiderToken = await t.token(outsider.email);
-      const list = (
-        await t.http().get('/api/notifications?pageSize=100').set(bearer(token)).expect(200)
-      ).body as Paginated<NotificationDto>;
-      expect(list.total).toBeGreaterThan(0);
-      const own = new Set((await of(me.userId)).map((n) => n.id));
-      for (const n of list.items) expect(own.has(n.id)).toBe(true);
+      // A clean slate, whatever the specs before left unread for this demo student.
+      await t.http().post('/api/notifications/read-all').set(bearer(token)).expect(200);
+      const made = await Promise.all(
+        [1, 2, 3].map((i) =>
+          t.prisma.notification.create({
+            data: {
+              userId: me.userId,
+              kind: 'grade_published',
+              title: `Lecture ${i}`,
+              body: `Note ${i}`,
+              entity: 'test',
+              entityId: `read-${i}`,
+            },
+          }),
+        ),
+      );
+      const unread = async (bearerToken: string) =>
+        (
+          await t
+            .http()
+            .get('/api/notifications?unread=true&pageSize=100')
+            .set(bearer(bearerToken))
+            .expect(200)
+        ).body as Paginated<NotificationDto>;
+      const count = async (bearerToken: string) =>
+        (
+          (await t.http().get('/api/notifications/summary').set(bearer(bearerToken)).expect(200))
+            .body as NotificationSummaryDto
+        ).unread;
 
-      const someone = list.items[0]!;
-      // Another student cannot read or mark it.
+      expect((await unread(token)).items.map((n) => n.id).sort()).toEqual(
+        made.map((n) => n.id).sort(),
+      );
+      expect(await count(token)).toBe(3);
+
+      // Another student sees none of them and cannot mark one.
+      const someone = made[0]!;
       await t
         .http()
         .post(`/api/notifications/${someone.id}/read`)
@@ -443,38 +502,21 @@ describe('Notifications (e2e)', () => {
       const theirs = (
         await t.http().get('/api/notifications?pageSize=100').set(bearer(outsiderToken)).expect(200)
       ).body as Paginated<NotificationDto>;
-      expect(theirs.items.some((n) => n.id === someone.id)).toBe(false);
+      for (const n of made) expect(theirs.items.some((x) => x.id === n.id)).toBe(false);
       await t.http().post('/api/notifications/not-a-uuid/read').set(bearer(token)).expect(400);
 
-      const before = (
-        await t.http().get('/api/notifications/summary').set(bearer(token)).expect(200)
-      ).body as NotificationSummaryDto;
-      expect(before.unread).toBe(list.items.filter((n) => !n.readAt).length);
       const read = (
         await t.http().post(`/api/notifications/${someone.id}/read`).set(bearer(token)).expect(200)
       ).body as NotificationDto;
       expect(read.readAt).not.toBeNull();
-      const unreadOnly = (
-        await t
-          .http()
-          .get('/api/notifications?unread=true&pageSize=100')
-          .set(bearer(token))
-          .expect(200)
-      ).body as Paginated<NotificationDto>;
-      expect(unreadOnly.items.some((n) => n.id === someone.id)).toBe(false);
+      expect((await unread(token)).items.some((n) => n.id === someone.id)).toBe(false);
+      expect(await count(token)).toBe(2);
 
       const all = (
         await t.http().post('/api/notifications/read-all').set(bearer(token)).expect(200)
-      ).body as {
-        updated: number;
-      };
-      expect(all.updated).toBe(before.unread - 1);
-      expect(
-        (
-          (await t.http().get('/api/notifications/summary').set(bearer(token)).expect(200))
-            .body as NotificationSummaryDto
-        ).unread,
-      ).toBe(0);
+      ).body as { updated: number };
+      expect(all.updated).toBe(2);
+      expect(await count(token)).toBe(0);
       await t.http().get('/api/notifications').expect(401);
     });
   });

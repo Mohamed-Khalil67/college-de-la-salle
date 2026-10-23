@@ -42,6 +42,18 @@ function temporaryPasswordExpired(user: {
   );
 }
 
+/**
+ * Does the password match the stored hash? A hash argon2 cannot read (a damaged or placeholder value)
+ * matches nothing: the sign-in answers 401 like for a wrong password, never 500.
+ */
+async function passwordMatches(storedHash: string, password: string): Promise<boolean> {
+  try {
+    return await verify(storedHash, password);
+  } catch {
+    return false;
+  }
+}
+
 /** A session plus the refresh cookie value the controller must set. */
 export interface IssuedSession {
   readonly session: SessionResponse;
@@ -96,7 +108,7 @@ export class AuthService {
       include: userInclude,
     });
     const ok = user
-      ? await verify(user.passwordHash, password)
+      ? await passwordMatches(user.passwordHash, password)
       : (await verify(await this.dummyHash, password), false);
     // Disabled and archived accounts get the same answer as a wrong password.
     if (!user || !ok || user.status !== 'active') throw new UnauthorizedException(INVALID_LOGIN);
@@ -162,11 +174,11 @@ export class AuthService {
   ): Promise<IssuedSession> {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, include: userInclude });
     if (!user || user.status !== 'active') throw new UnauthorizedException(INVALID_SESSION);
-    if (!(await verify(user.passwordHash, currentPassword)))
+    if (!(await passwordMatches(user.passwordHash, currentPassword)))
       throw new BadRequestException(WRONG_CURRENT_PASSWORD);
     const problems = passwordProblems(newPassword, user.email);
     if (problems.length) throw new BadRequestException(problems);
-    if (await verify(user.passwordHash, newPassword))
+    if (await passwordMatches(user.passwordHash, newPassword))
       throw new BadRequestException('Choisissez un mot de passe différent de l’actuel.');
 
     const newHash = await hash(newPassword);

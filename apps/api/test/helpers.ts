@@ -18,6 +18,14 @@ export const COORDINATOR = `ingy.samir@${DOMAIN}`;
 /** Teaches français and humanités: Bac français classes only. */
 export const FRENCH_TEACHER = `claire.dubois@${DOMAIN}`;
 
+/**
+ * A well-formed argon2id hash of a password nobody knows, for fixture accounts that must never sign in.
+ * Never a placeholder such as 'x': a stray fixture row would then break any test that logs in as « some
+ * student » (argon2 refuses to parse it).
+ */
+export const UNUSABLE_PASSWORD_HASH =
+  '$argon2id$v=19$m=65536,p=4,t=3$gOvorgrwiU4FIu8zIpsMAA$bQIcB5TLaGf3xLE5R3a7Nj3aiYhrwDmQhzRCa2307tU';
+
 export interface TestApp {
   readonly app: INestApplication<App>;
   readonly prisma: PrismaService;
@@ -67,10 +75,23 @@ export async function createTestApp(): Promise<TestApp> {
 
 export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-/** The first student (by name) of a class, with their login e-mail. */
+/** Deletes fixture accounts (their student or teacher profile, enrolments and notifications go with them). */
+export async function deleteUsers(prisma: PrismaService, userIds: readonly string[]): Promise<void> {
+  if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: [...userIds] } } });
+}
+
+/**
+ * The first SEEDED student (by e-mail) of a class, with their login e-mail.
+ * Seeded students carry a `CDLS-` number: accounts that other specs create (and may leave behind) have
+ * no known password, so they never qualify.
+ */
 export async function studentOf(prisma: PrismaService, section: string, classCode: string) {
   const enrollment = await prisma.enrollment.findFirstOrThrow({
-    where: { schoolClass: { code: classCode, section: { code: section } } },
+    where: {
+      leftOn: null,
+      schoolClass: { code: classCode, section: { code: section } },
+      student: { studentNumber: { startsWith: 'CDLS-' } },
+    },
     include: { student: { include: { user: true } }, schoolClass: true },
     orderBy: { student: { user: { email: 'asc' } } },
   });

@@ -13,6 +13,7 @@ import {
   MATHS_TEACHER,
   studentOf,
   type TestApp,
+  UNUSABLE_PASSWORD_HASH,
 } from './helpers.js';
 
 const message = (body: unknown) => String((body as ApiError).message);
@@ -232,7 +233,7 @@ describe('Groups (e2e)', () => {
       const user = await p.user.create({
         data: {
           email: `e2e-group-${Date.now()}-${Math.random().toString(16).slice(2)}@demo.cdls.test`,
-          passwordHash: 'x',
+          passwordHash: UNUSABLE_PASSWORD_HASH,
           role: 'student',
           firstName: 'Test',
           lastName: 'Groupe',
