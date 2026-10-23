@@ -9,7 +9,15 @@ import {
   weekday,
 } from '@cdls/shared';
 import { schoolToday } from '../src/common/dates.js';
-import { ADMIN, bearer, createTestApp, MATHS_TEACHER, studentOf, type TestApp } from './helpers.js';
+import {
+  ADMIN,
+  bearer,
+  createTestApp,
+  deleteUsers,
+  MATHS_TEACHER,
+  studentOf,
+  type TestApp,
+} from './helpers.js';
 
 const TODAY = schoolToday();
 /** The path of a feed address (the e2e app has no web origin in front of it). */
@@ -34,6 +42,9 @@ describe('Calendar feed (e2e)', () => {
   let student: { studentId: string; email: string; classId: string };
   let other: { studentId: string; email: string; classId: string };
   let studentToken: string;
+  /** Accounts these tests create: removed at the end, with everything that hangs on them. */
+  const createdUsers: string[] = [];
+  let startedAt: Date;
 
   const get = (path: string) => t.http().get(path).buffer(true);
   const create = async (token: string) =>
@@ -63,6 +74,7 @@ describe('Calendar feed (e2e)', () => {
       })
       .expect(201);
     const created = res.body as CreatedUserResponse;
+    createdUsers.push(created.user.id);
     const login = await t
       .http()
       .post('/api/auth/login')
@@ -84,6 +96,7 @@ describe('Calendar feed (e2e)', () => {
   }
 
   beforeAll(async () => {
+    startedAt = new Date(Date.now() - 2000);
     t = await createTestApp();
     admin = await t.token(ADMIN);
     maths = await t.token(MATHS_TEACHER);
@@ -94,6 +107,9 @@ describe('Calendar feed (e2e)', () => {
 
   afterAll(async () => {
     await t.prisma.calendarFeed.deleteMany({});
+    await deleteUsers(t.prisma, createdUsers);
+    // The notifications the sessions changed here sent to the demo students stay out of the next specs.
+    await t.prisma.notification.deleteMany({ where: { createdAt: { gte: startedAt } } });
     await t.close();
   });
 
@@ -179,6 +195,7 @@ describe('Calendar feed (e2e)', () => {
         groupId: null,
         weekParity: null,
       },
+      orderBy: { id: 'asc' },
     });
     // Two sessions of that slot a few weeks ahead that the rule really puts on the calendar.
     const text0 = await ics(made.url);
@@ -197,13 +214,24 @@ describe('Calendar feed (e2e)', () => {
       .set(bearer(maths))
       .send({ date: cancelDay, kind: 'cancelled', reason: 'Conseil de classe' })
       .expect(201);
-    const newDay = addDays(moveDay, weekday(moveDay) === 4 ? -1 : 1);
-    await t
-      .http()
-      .post(`/api/timetable/slots/${slot.id}/exceptions`)
-      .set(bearer(admin))
-      .send({ date: moveDay, kind: 'moved', newDate: newDay, newStart: '16:00', newEnd: '17:00' })
-      .expect(201);
+    // Moved to a Friday evening: the school week is Sunday to Thursday, so nothing of the class, the
+    // teacher or the room can clash with it (the first Friday that is not a holiday).
+    let newDay = addDays(moveDay, (5 - weekday(moveDay) + 7) % 7 || 7);
+    for (let tries = 0; ; tries++, newDay = addDays(newDay, 7)) {
+      const moved = await t
+        .http()
+        .post(`/api/timetable/slots/${slot.id}/exceptions`)
+        .set(bearer(admin))
+        .send({
+          date: moveDay,
+          kind: 'moved',
+          newDate: newDay,
+          newStart: '16:00',
+          newEnd: '17:00',
+        });
+      if (moved.status === 201) break;
+      expect(tries, `moving to a Friday: ${moved.status}`).toBeLessThan(3);
+    }
 
     const text = await ics(made.url);
     expect(uids(text)).not.toContain(`slot-${slot.id}-${cancelDay}`);
@@ -302,6 +330,7 @@ describe('Calendar feed (e2e)', () => {
       })
       .expect(201);
     const created = res.body as CreatedUserResponse;
+    createdUsers.push(created.user.id);
     const login = await t
       .http()
       .post('/api/auth/login')
@@ -337,8 +366,16 @@ describe('Calendar feed (e2e)', () => {
       ...new Set(uids(text).flatMap((u) => /^slot-([0-9a-f-]{36})-/.exec(u)?.[1] ?? [])),
     ];
     expect(slotIds.length).toBeGreaterThan(0);
-    const slots = await t.prisma.timetableSlot.findMany({ where: { id: { in: slotIds } } });
-    for (const s of slots) expect(s.teacherId).toBe(mathsTeacher.id);
+    const slots = await t.prisma.timetableSlot.findMany({
+      where: { id: { in: slotIds } },
+      include: { exceptions: true },
+    });
+    // Their own sessions, or sessions where they stand in for a colleague (other specs name them so).
+    for (const s of slots)
+      expect(
+        s.teacherId === mathsTeacher.id ||
+          s.exceptions.some((e) => e.kind === 'substitute' && e.newTeacherId === mathsTeacher.id),
+      ).toBe(true);
     // A homework of another teacher's subject in a class they teach is not theirs.
     const french = await t.prisma.event.findFirst({
       where: {

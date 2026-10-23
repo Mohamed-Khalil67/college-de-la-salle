@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaService } from '../src/prisma/prisma.service.js';
-import { DOMAIN, FRENCH_TEACHER, MATHS_TEACHER } from './helpers.js';
+import { DOMAIN, FRENCH_TEACHER, MATHS_TEACHER, UNUSABLE_PASSWORD_HASH } from './helpers.js';
 
 const day = (d: string) => new Date(`${d}T00:00:00Z`);
 
@@ -144,7 +144,7 @@ export async function createRolloverSource(
       const user = await prisma.user.create({
         data: {
           email: `roll${suffix}.eleve${n}@${DOMAIN}`,
-          passwordHash: 'not-a-real-hash',
+          passwordHash: UNUSABLE_PASSWORD_HASH,
           role: 'student',
           firstName: `Roll${suffix}${n}`,
           lastName: `Eleve${n}`,
@@ -170,4 +170,22 @@ export async function createRolloverSource(
     teacherIds: { maths: maths.id, french: french.id },
     roomIds: rooms.map((r) => r.id),
   };
+}
+
+/**
+ * Removes what `createRolloverSource` made, so the specs that follow find only the demo school: the
+ * students (with their enrolments), the sessions and their index rows, the class subjects, the classes
+ * and the year itself (its periods and calendar days go with it).
+ */
+export async function removeRolloverSource(
+  prisma: PrismaService,
+  fixture: RolloverFixture,
+): Promise<void> {
+  const classIds = Object.values(fixture.classes);
+  const userIds = Object.values(fixture.students).flatMap((list) => list.map((s) => s.userId));
+  await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+  await prisma.timetableSlot.deleteMany({ where: { classSubject: { classId: { in: classIds } } } });
+  await prisma.classSubject.deleteMany({ where: { classId: { in: classIds } } });
+  await prisma.schoolClass.deleteMany({ where: { id: { in: classIds } } });
+  await prisma.schoolYear.deleteMany({ where: { id: fixture.yearId } });
 }

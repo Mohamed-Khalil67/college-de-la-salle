@@ -13,8 +13,10 @@ import {
   bearer,
   COORDINATOR,
   createTestApp,
+  deleteUsers,
   MATHS_TEACHER,
   type TestApp,
+  UNUSABLE_PASSWORD_HASH,
 } from './helpers.js';
 
 const message = (body: unknown) => String((body as ApiError).message);
@@ -48,7 +50,15 @@ describe('Periods (e2e)', () => {
     ).body as SchoolYearDto;
   });
 
-  afterAll(() => t.close());
+  afterAll(async () => {
+    // The student made for these tests goes too.
+    const students = await t.prisma.user.findMany({
+      where: { email: 'eleve.periodes@demo.cdls.test' },
+      select: { id: true },
+    });
+    await deleteUsers(t.prisma, students.map((u) => u.id));
+    await t.close();
+  });
 
   describe('overlap', () => {
     it('refuses two periods of the same kind and section that share a day (409, in French)', async () => {
@@ -264,7 +274,7 @@ describe('Periods (e2e)', () => {
       const user = await t.prisma.user.create({
         data: {
           email: studentEmail,
-          passwordHash: 'x',
+          passwordHash: UNUSABLE_PASSWORD_HASH,
           role: 'student',
           firstName: 'Élève',
           lastName: 'Périodes',
