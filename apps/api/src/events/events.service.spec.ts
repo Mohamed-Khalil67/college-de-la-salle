@@ -6,6 +6,7 @@ import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { TargetsService } from '../targets/targets.service.js';
+import { ChangeNoticesService } from '../notifications/change-notices.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { EventsService } from './events.service.js';
@@ -149,6 +150,7 @@ describe('EventsService', () => {
         { provide: CalendarDaysService, useValue: calendarDays },
         { provide: OccupancyService, useValue: occupancy },
         { provide: TargetsService, useValue: targets },
+        { provide: ChangeNoticesService, useValue: { homeworkAssigned: vi.fn(), eventChanged: vi.fn(), eventCancelled: vi.fn() } },
       ],
     }).compile();
     events = moduleRef.get(EventsService);

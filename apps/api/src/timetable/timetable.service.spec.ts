@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AccessService } from '../access/access.service.js';
+import { ChangeNoticesService } from '../notifications/change-notices.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -86,6 +87,7 @@ describe('TimetableService (rules checked before anything is written)', () => {
         { provide: AccessService, useValue: access },
         { provide: OccupancyService, useValue: occupancy },
         { provide: WarningsService, useValue: {} },
+        { provide: ChangeNoticesService, useValue: { sessions: vi.fn() } },
       ],
     }).compile();
     service = moduleRef.get(TimetableService);

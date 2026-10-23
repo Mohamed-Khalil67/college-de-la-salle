@@ -110,6 +110,8 @@ model User {
   /// While mustChangePassword: the temporary password stops working at this instant (null = no expiry).
   temporaryPasswordExpiresAt DateTime?  @map("temporary_password_expires_at") @db.Timestamptz(3)
   lastLoginAt                DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  /// Also send the in-app notifications by e-mail (grouped). Off by default: the user opts in.
+  notifyByEmail              Boolean    @default(false) @map("notify_by_email")
   createdAt                  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -119,6 +121,8 @@ model User {
   auditLogs               AuditLog[]
   refreshTokens           RefreshToken[]
   passwordResetTokens     PasswordResetToken[]
+  notifications           Notification[]
+  calendarFeed            CalendarFeed?
   /// Contact messages this admin marked handled.
   contactMessagesHandled  ContactMessage[]
   sectionChangesRequested SectionChangeRequest[] @relation("SectionChangeRequestedBy")
@@ -278,6 +282,8 @@ model CalendarDay {
   endsOn       DateTime        @map("ends_on") @db.Date
   sectionId    String?         @map("section_id") @db.Uuid
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Last change (the calendar feed's SEQUENCE follows it).
+  updatedAt    DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   schoolYear SchoolYear         @relation(fields: [schoolYearId], references: [id], onDelete: Cascade)
   section    Section?           @relation(fields: [sectionId], references: [id], onDelete: Cascade)
@@ -562,6 +568,8 @@ model SlotException {
   reason       String            @default("") @db.VarChar(500)
   createdById  String?           @map("created_by_id") @db.Uuid
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Last change (the calendar feed's SEQUENCE follows it).
+  updatedAt    DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   slot       TimetableSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
   newRoom    Room?         @relation(fields: [newRoomId], references: [id], onDelete: Restrict)
@@ -940,4 +948,83 @@ model ContactMessage {
   @@index([handledAt, createdAt])
   @@index([handledById])
   @@map("contact_messages")
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Calendar feed and notifications
+// ---------------------------------------------------------------------------------------------------
+
+/// A user's secret calendar feed (« Synchroniser mon agenda »): GET /api/calendar/feed/<token>.ics.
+/// The token is the id plus a random secret; only the secret's HMAC is stored. One feed per user: a new
+/// link replaces the row (new id), revoking deletes it. `passwordVersion` copies the user's
+/// passwordChangedAt when the link is made: a password change, a reset, disabling, archiving or
+/// restoring the account all bump it, and the feed stops answering.
+model CalendarFeed {
+  id              String    @id @default(uuid(7)) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  /// HMAC-SHA256 (hex) of the secret, prefix `calendar-feed:`.
+  secretHash      String    @map("secret_hash") @db.VarChar(64)
+  passwordVersion DateTime? @map("password_version") @db.Timestamptz(3)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt      DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_feeds")
+}
+
+/// NotificationKind in packages/shared.
+enum NotificationKind {
+  session_cancelled
+  session_moved
+  session_room_changed
+  session_restored
+  event_cancelled
+  event_moved
+  event_room_changed
+  grade_published
+  homework_assigned
+
+  @@map("notification_kind")
+}
+
+/// none: the user did not ask for e-mails; pending: waits for the next digest; sent; skipped: too late
+/// (the session is past, or the notification was read or waited too long).
+enum NotificationMailState {
+  none
+  pending
+  sent
+  skipped
+
+  @@map("notification_mail_state")
+}
+
+/// An in-app notification for one user, written in the same transaction as the change it announces.
+/// Deleted NOTIFICATION_RETENTION_DAYS after it was created. CHECK `notifications_mailed_check` in the
+/// migration SQL: `mailed_at` is set exactly when the mail was sent.
+model Notification {
+  id        String                @id @default(uuid(7)) @db.Uuid
+  userId    String                @map("user_id") @db.Uuid
+  kind      NotificationKind
+  title     String                @db.VarChar(160)
+  body      String                @db.VarChar(600)
+  /// A page of the user's space; null: none.
+  link      String?               @db.VarChar(200)
+  /// The day the session, event or deadline happens (no e-mail once it is past); null for a grade.
+  occursOn  DateTime?             @map("occurs_on") @db.Date
+  /// What it is about (`slot_exception`, `event`…), for support. No foreign key: the event may be deleted.
+  entity    String                @db.VarChar(40)
+  entityId  String                @map("entity_id") @db.VarChar(64)
+  readAt    DateTime?             @map("read_at") @db.Timestamptz(3)
+  mailState NotificationMailState @default(none) @map("mail_state")
+  mailedAt  DateTime?             @map("mailed_at") @db.Timestamptz(3)
+  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId], where: raw("read_at IS NULL"), map: "notifications_unread_idx")
+  @@index([createdAt], where: raw("mail_state = 'pending'"), map: "notifications_mail_pending_idx")
+  @@index([createdAt])
+  @@map("notifications")
 }

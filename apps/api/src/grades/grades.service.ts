@@ -9,6 +9,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { eventInclude, type EventRow, toEventDto } from '../events/event.mapper.js';
+import { ChangeNoticesService } from '../notifications/change-notices.service.js';
 import { toStudentSummary } from '../classes/classes.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -37,6 +38,7 @@ export class GradesService {
     private readonly classes: ClassesService,
     private readonly periods: PeriodsService,
     private readonly targets: TargetsService,
+    private readonly notices: ChangeNoticesService,
   ) {}
 
   /**
@@ -115,6 +117,8 @@ export class GradesService {
       // A late grade follows the event's state: visible if the others were published.
       const published = existing.some((g) => g.published);
       const trail: AuditEntry[] = [];
+      /** Students whose new grade is visible at once (the event's grades were published). */
+      const shown: string[] = [];
 
       for (const entry of dto.entries) {
         const before = byStudent.get(entry.studentId);
@@ -158,6 +162,7 @@ export class GradesService {
           const after = await tx.grade.create({
             data: { ...data, eventId, studentId: entry.studentId, published },
           });
+          if (published) shown.push(entry.studentId);
           trail.push({
             actorId: user.id,
             action: 'grade.create',
@@ -174,6 +179,7 @@ export class GradesService {
           data: { outOf: dto.outOf },
         });
       await audit(tx, trail);
+      await this.notices.gradesPublished(tx, event, shown, user.id);
     });
     return this.sheet(eventId, user);
   }
@@ -186,6 +192,15 @@ export class GradesService {
     await this.prisma.$transaction(async (tx) => {
       await assertClassWritable(tx, event.classId);
       await this.periods.lockOpen(tx, event.periodId);
+      // Same lock as `save`: a grade saved at the same moment is published, and announced, or neither.
+      await tx.$queryRaw`SELECT id FROM events WHERE id = ${eventId}::uuid FOR UPDATE`;
+      // The students who see their grade for the first time are told (not those who already saw it).
+      const shown = dto.published
+        ? await tx.grade.findMany({
+            where: { eventId, published: false },
+            select: { studentId: true },
+          })
+        : [];
       const { count } = await tx.grade.updateMany({
         where: { eventId },
         data: { published: dto.published },
@@ -199,6 +214,12 @@ export class GradesService {
           after: { count },
         },
       ]);
+      await this.notices.gradesPublished(
+        tx,
+        event,
+        shown.map((g) => g.studentId),
+        user.id,
+      );
     });
     return this.sheet(eventId, user);
   }

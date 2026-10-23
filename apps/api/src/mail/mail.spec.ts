@@ -14,7 +14,10 @@ const ENV: Record<string, string> = {
 describe('MailService', () => {
   it('builds a French reset mail whose link points at the public web address', async () => {
     const send = vi.fn().mockResolvedValue(undefined);
-    const mail = new MailService({ send }, { get: (k: string) => ENV[k] } as ConfigService<never, true>);
+    const mail = new MailService({ send }, { get: (k: string) => ENV[k] } as ConfigService<
+      never,
+      true
+    >);
     await mail.sendPasswordReset('eleve@demo.cdls.test', 'Léa <b>', 'tok-en_1', 60);
     const [message, from] = send.mock.calls[0] as [
       { to: string; text: string; html: string; subject: string },
@@ -23,7 +26,9 @@ describe('MailService', () => {
     expect(from).toBe(ENV['MAIL_FROM']);
     expect(message.to).toBe('eleve@demo.cdls.test');
     expect(message.subject).toContain('mot de passe');
-    expect(message.text).toContain('https://www.lasalle.test/connexion/reinitialiser?token=tok-en_1');
+    expect(message.text).toContain(
+      'https://www.lasalle.test/connexion/reinitialiser?token=tok-en_1',
+    );
     expect(message.text).toContain('valable 1 heure');
     expect(message.html).toContain('Léa &lt;b&gt;');
   });
@@ -62,5 +67,32 @@ describe('SmtpMailTransport', () => {
       text: 'T',
       html: '<p>T</p>',
     });
+  });
+});
+
+describe('MailService digest', () => {
+  it('lists the notifications, escapes them and links to the notifications page', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const mail = new MailService({ send }, { get: (k: string) => ENV[k] } as ConfigService<
+      never,
+      true
+    >);
+    await mail.sendNotificationDigest(
+      'eleve@demo.cdls.test',
+      'Léa',
+      [
+        { title: 'Séance annulée', body: 'Motif : <script>' },
+        { title: 'Note publiée', body: 'Contrôle 2' },
+      ],
+      '/eleve/notifications',
+    );
+    const [message] = send.mock.calls[0] as [{ text: string; html: string; subject: string }];
+    expect(message.subject).toBe('2 changements dans votre emploi du temps et vos devoirs');
+    expect(message.text).toContain('Tout voir : https://www.lasalle.test/eleve/notifications');
+    expect(message.html).toContain(
+      '<a href="https://www.lasalle.test/eleve/notifications">Tout voir</a>',
+    );
+    expect(message.html).toContain('&lt;script&gt;');
+    expect(message.html).not.toContain('<script>');
   });
 });

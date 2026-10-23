@@ -13,6 +13,8 @@ and how to use what already exists.
 | `src/app/eleve/` | Student space `/eleve` (routes + `ELEVE_NAV` in `eleve.routes.ts`) | Client |
 | `src/app/enseignant/` | Teacher space `/enseignant` | Client |
 | `src/app/admin/` | Administration `/admin` | Client |
+| `src/app/notifications/` | The notifications page (`/eleve/notifications`, `/enseignant/notifications`), the bell of the app bar (`notification-bell.ts`, count in `notifications-store.ts`) and the pure display rules (`notification-view.ts`) | Client |
+| `src/app/agenda-sync/` | « Synchroniser mon agenda » (`/eleve/synchroniser`, `/enseignant/synchroniser`): create, copy, instructions for Google / Apple / Outlook, revoke. The address is shown only when it is created | Client |
 | `src/app/groupes/` | « Groupes » (one page for `/enseignant/groupes` and `/admin/groupes`), the pure rules of « Assigner à » (`groups-logic.ts`, which reuses `targetedStudentIds` of `@cdls/shared`) | Client |
 | `src/app/ui/` | Shared UI kit (`cdls-*`), import from `ui/index.ts` | n/a |
 | `src/app/layout/` | `PublicLayout`, `SpaceLayout` (app bar, account menu, bottom nav), `PagePlaceholder` | n/a |

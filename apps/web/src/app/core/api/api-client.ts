@@ -12,6 +12,13 @@ import type {
   ApiError,
   CalendarDayDto,
   CalendarDayQuery,
+  CalendarFeedCreatedDto,
+  CalendarFeedDto,
+  MarkNotificationsReadResponse,
+  NotificationDto,
+  NotificationListQuery,
+  NotificationPreferencesDto,
+  NotificationSummaryDto,
   CopyClassSubjectsRequest,
   CreateActivityTypeRequest,
   CreateCalendarDayRequest,
@@ -289,6 +296,23 @@ export class ApiClient {
     handleMany: (ids: readonly string[]) =>
       this.#post<HandleContactMessagesResponse>('/contact-messages/handle', { ids } satisfies HandleContactMessagesRequest),
     remove: (id: string) => this.#delete(`/contact-messages/${id}`),
+  };
+
+  /* Notifications: the signed-in user's own */
+  readonly notifications = {
+    list: (query: NotificationListQuery = {}) => this.#get<Paginated<NotificationDto>>('/notifications', { ...query }),
+    summary: () => this.#get<NotificationSummaryDto>('/notifications/summary'),
+    markRead: (id: string) => this.#post<NotificationDto>(`/notifications/${id}/read`, {}),
+    markAllRead: () => this.#post<MarkNotificationsReadResponse>('/notifications/read-all', {}),
+    preferences: () => this.#get<NotificationPreferencesDto>('/notifications/preferences'),
+    setPreferences: (body: NotificationPreferencesDto) => this.#put<NotificationPreferencesDto>('/notifications/preferences', body),
+  };
+
+  /* « Synchroniser mon agenda »: the secret feed address (shown once, at creation) */
+  readonly calendarFeed = {
+    status: () => this.#get<CalendarFeedDto>('/calendar/feed'),
+    create: () => this.#post<CalendarFeedCreatedDto>('/calendar/feed', {}),
+    revoke: () => this.#delete('/calendar/feed'),
   };
 
   /* Report cards */

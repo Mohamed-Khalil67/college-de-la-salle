@@ -7,6 +7,7 @@ import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
+import { ChangeNoticesService, eventSchedule } from '../notifications/change-notices.service.js';
 import { groupHold } from '../occupancy/event-hold.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
@@ -40,6 +41,7 @@ export class EventsService {
     private readonly calendarDays: CalendarDaysService,
     private readonly occupancy: OccupancyService,
     private readonly targets: TargetsService,
+    private readonly notices: ChangeNoticesService,
   ) {}
 
   /** Events that take place in [from, to] and that the user may see. */
@@ -99,6 +101,8 @@ export class EventsService {
         });
         // One-off events hold their room and class like a timetable session: a clash is a 409.
         await this.occupancy.indexEvent(tx, booking(created));
+        // A new homework: the students it concerns are told, in this transaction.
+        await this.notices.homeworkAssigned(tx, created, user.id);
         return created;
       }),
     );
@@ -159,6 +163,8 @@ export class EventsService {
         });
         const updated = await tx.event.findUniqueOrThrow({ where: { id }, include: eventInclude });
         await this.occupancy.indexEvent(tx, booking(updated));
+        // Moved or in another room: the people it concerns are told, in this transaction.
+        await this.notices.eventChanged(tx, eventSchedule(current), updated, user.id);
         return updated;
       }),
     );
@@ -175,6 +181,8 @@ export class EventsService {
     }
     await this.prisma.$transaction(async (tx) => {
       await assertClassWritable(tx, current.classId);
+      // Before the delete: the audience is read from the event's targets, which go with it.
+      await this.notices.eventCancelled(tx, current, user.id);
       await tx.event.delete({ where: { id } });
     });
   }

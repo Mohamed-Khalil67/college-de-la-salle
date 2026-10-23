@@ -461,10 +461,11 @@ export function videoEmbed(url: string): string | null {
  * « Ajouter à mon agenda »: an iCalendar file
  * ---------------------------------------------------------------------------------------------- */
 
-const icsText = (s: string) =>
+/** A TEXT value of an iCalendar property, escaped (RFC 5545 §3.3.11). */
+export const icsText = (s: string) =>
   s
     .replace(/\\/g, '\\\\')
-    .replace(/\n/g, '\\n')
+    .replace(/\r\n?|\n/g, '\\n')
     .replace(/([,;])/g, '\\$1');
 const icsDate = (day: string) => day.replace(/-/g, '');
 

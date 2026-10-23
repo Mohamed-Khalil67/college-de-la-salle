@@ -4,6 +4,7 @@
  * Dates are `YYYY-MM-DD` strings, timestamps ISO 8601 strings, decimals plain numbers.
  */
 import type { ActivityColour, ActivityIcon, Attachment } from './calendar.js';
+import type { NotificationKind } from './notifications.js';
 import type { SectionId } from './space.js';
 import type {
   OccurrenceStatus,
@@ -1592,3 +1593,66 @@ export interface HandleContactMessagesResponse {
   /** How many messages this request marked handled (already handled or deleted ones are not counted). */
   readonly handled: number;
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * « Synchroniser mon agenda »: /api/calendar/feed (students and teachers). The feed itself is
+ * GET /api/calendar/feed/:token.ics, public (the token is the credential), rate-limited.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** GET /calendar/feed: the state of the user's secret link (the link itself is shown only once). */
+export interface CalendarFeedDto {
+  readonly active: boolean;
+  /** When the current link was created; null without one. */
+  readonly createdAt: string | null;
+  /** Last time a calendar app read the feed; null: never. */
+  readonly lastUsedAt: string | null;
+}
+
+/** POST /calendar/feed: a new link (any earlier one stops working). The only time the address is sent. */
+export interface CalendarFeedCreatedDto extends CalendarFeedDto {
+  /** https address to paste into the calendar app. */
+  readonly url: string;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Notifications: /api/notifications (every signed-in user sees only their own)
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface NotificationDto {
+  readonly id: string;
+  readonly kind: NotificationKind;
+  readonly title: string;
+  readonly body: string;
+  /** A page of the user's space to open (« /eleve/emploi-du-temps »); null: none. */
+  readonly link: string | null;
+  /** The day the session, event or deadline happens; null for a grade. */
+  readonly occursOn: string | null;
+  readonly createdAt: string;
+  /** null while unread. */
+  readonly readAt: string | null;
+}
+
+/** GET /notifications (newest first). */
+export interface NotificationListQuery extends PageQuery {
+  /** true: unread only. */
+  readonly unread?: boolean;
+}
+
+/** GET /notifications/summary: for the bell. */
+export interface NotificationSummaryDto {
+  readonly unread: number;
+}
+
+/** POST /notifications/read-all */
+export interface MarkNotificationsReadResponse {
+  /** How many notifications this request marked read. */
+  readonly updated: number;
+}
+
+/** GET and PUT /notifications/preferences */
+export interface NotificationPreferencesDto {
+  /** Also receive the notifications by e-mail (grouped, at most one mail every few minutes). Off by default. */
+  readonly emailEnabled: boolean;
+}
+
+export type UpdateNotificationPreferencesRequest = NotificationPreferencesDto;

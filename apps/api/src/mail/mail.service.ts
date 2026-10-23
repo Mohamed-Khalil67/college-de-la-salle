@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { digestText, type NotificationText } from '@cdls/shared';
 import type { Env } from '../config/env.validation.js';
 import { MAIL_TRANSPORT, type MailTransport } from './mail-transport.js';
 
@@ -59,5 +60,29 @@ export class MailService {
       { to, subject: 'Réinitialisation de votre mot de passe', text, html },
       this.from,
     );
+  }
+
+  /**
+   * The digest of a user's new notifications (one mail for all of them). `page` is the notifications
+   * page of their space, a path such as `/eleve/notifications`.
+   */
+  async sendNotificationDigest(
+    to: string,
+    firstName: string,
+    items: readonly NotificationText[],
+    page: string,
+  ): Promise<void> {
+    const link = `${this.webUrl}${page}`;
+    const { subject, text } = digestText(firstName, items, link);
+    const html = text
+      .split('\n')
+      .filter((line) => line !== '')
+      .map((line) =>
+        line === `Tout voir : ${link}`
+          ? `<p><a href="${escapeHtml(link)}">Tout voir</a></p>`
+          : `<p>${escapeHtml(line)}</p>`,
+      )
+      .join('\n');
+    await this.transport.send({ to, subject, text, html }, this.from);
   }
 }

@@ -6,6 +6,7 @@ import { AccessModule } from './access/access.module.js';
 import { ActivityTypesModule } from './activity-types/activity-types.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CalendarDaysModule } from './calendar-days/calendar-days.module.js';
+import { CalendarFeedModule } from './calendar-feed/calendar-feed.module.js';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { clientKey } from './common/client-key.js';
@@ -21,6 +22,7 @@ import { EventsModule } from './events/events.module.js';
 import { GradesModule } from './grades/grades.module.js';
 import { GroupsModule } from './groups/groups.module.js';
 import { HomeworkModule } from './homework/homework.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { PeriodsModule } from './periods/periods.module.js';
 import { PostsModule } from './posts/posts.module.js';
 import { RolloverModule } from './rollover/rollover.module.js';
@@ -52,7 +54,9 @@ import { UsersModule } from './users/users.module.js';
             limit: config.get('THROTTLE_LIMIT', { infer: true }),
             // Only the sign-in routes need it (they override its limit); elsewhere `default` already counts by address.
             skipIf: (context) => {
-              const path = String(context.switchToHttp().getRequest<{ path?: string }>().path ?? '');
+              const path = String(
+                context.switchToHttp().getRequest<{ path?: string }>().path ?? '',
+              );
               return !['/auth/login', '/auth/password', '/auth/forgot-password'].some((route) =>
                 path.endsWith(route),
               );
@@ -89,6 +93,8 @@ import { UsersModule } from './users/users.module.js';
     SectionChangesModule,
     TimetableModule,
     RolloverModule,
+    NotificationsModule,
+    CalendarFeedModule,
   ],
   providers: [
     // Order matters: rate limit, then authentication, then roles.
