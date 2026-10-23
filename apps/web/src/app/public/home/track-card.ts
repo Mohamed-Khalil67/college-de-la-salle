@@ -1,7 +1,9 @@
 import { NgOptimizedImage } from '@angular/common';
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { photo, type SectionPage } from '../../school';
+import { LOCALE } from '../../i18n/locale';
+import { pageUrl } from '../../i18n/pages';
+import { localizedPhoto, type SectionPage } from '../../school';
 import { Button } from '../../ui';
 import { TRACK_SUMMARY } from '../shared/track-summary';
 
@@ -15,13 +17,13 @@ import { TRACK_SUMMARY } from '../shared/track-summary';
     <img class="card__media" [ngSrc]="p.src" [width]="p.width" [height]="p.height" [alt]="p.alt" sizes="(max-width: 64rem) 100vw, 50vw" />
     <div class="card__body">
       <h3 [id]="titleId()" class="t-h1">{{ track().title }}</h3>
-      <p class="t-accent">{{ summary().kicker }}</p>
+      <p class="t-accent">{{ words().kicker }}</p>
       <ul class="bullets" role="list">
-        @for (point of summary().points; track point) {
+        @for (point of words().points; track point) {
           <li>{{ point }}</li>
         }
       </ul>
-      <p><a cdlsButton variant="secondary" [routerLink]="summary().link">Découvrir le {{ track().title }}</a></p>
+      <p><a cdlsButton variant="secondary" [routerLink]="link()">{{ discover(track().title) }}</a></p>
     </div>
   `,
   styles: `
@@ -34,7 +36,13 @@ import { TRACK_SUMMARY } from '../shared/track-summary';
 export class TrackCard {
   readonly track = input.required<SectionPage>();
 
+  readonly #locale = inject(LOCALE);
+  protected readonly discover = this.#locale.messages.home.discoverTrack;
   protected readonly summary = computed(() => TRACK_SUMMARY[this.track().slug]);
-  protected readonly image = computed(() => photo(this.summary().cardPhoto));
+  protected readonly words = computed(() => this.#locale.content.tracks[this.track().slug]);
+  protected readonly link = computed(() => pageUrl(this.#locale.lang, this.summary().page));
+  protected readonly image = computed(() =>
+    localizedPhoto(this.summary().cardPhoto, this.#locale.content.photos, this.#locale.content.photoCredits),
+  );
   protected readonly titleId = computed(() => `track-${this.track().slug}`);
 }

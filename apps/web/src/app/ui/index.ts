@@ -10,6 +10,7 @@ export { Icon, type IconName } from './icon';
 export { Modal } from './modal';
 export { Pagination } from './pagination';
 export { pageWindow } from './page-window';
+export { SkipLink } from './skip-link';
 export { Segmented, type SegmentOption } from './segmented';
 export { Tabs, type TabItem } from './tabs';
 export { tabTarget } from './tab-keys';

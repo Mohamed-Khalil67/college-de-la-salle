@@ -2,9 +2,18 @@ import { Component, ElementRef, Injector, afterNextRender, computed, inject, inp
 import { email, form, FormField, maxLength, required, submit } from '@angular/forms/signals';
 import { CONTACT_LIMITS } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
+import { LOCALE } from '../../i18n/locale';
 import { SCHOOL } from '../../school';
 import { Alert, Button, Field, FieldControl } from '../../ui';
-import { contactMailto, type ContactMessage, contactRequest } from './contact-mail';
+import {
+  CONTACT_SUBJECTS,
+  CONTACT_TRACKS,
+  type ContactSubjectId,
+  type ContactTrackId,
+  contactMailto,
+  type ContactMessage,
+  contactRequest,
+} from './contact-mail';
 
 let nextId = 0;
 
@@ -14,19 +23,11 @@ function shownError(state: { touched(): boolean; errors(): readonly { message?: 
 }
 
 function blankMessage(): ContactMessage {
-  return { name: '', email: '', phone: '', subject: SUBJECTS[0], track: '', message: '' };
+  return { name: '', email: '', phone: '', subject: CONTACT_SUBJECTS.registration, track: '', message: '' };
 }
 
-const SUBJECTS = ['Demande d’inscription', 'Scolarité d’un élève', 'Accès à l’espace élève', 'Autre question'];
-const TRACKS = [
-  'Bac nationale, jardin d’enfants',
-  'Bac nationale, primaire',
-  'Bac nationale, préparatoire',
-  'Bac nationale, secondaire',
-  'Bac français, maternelle ou élémentaire',
-  'Bac français, collège',
-  'Bac français, lycée',
-];
+const SUBJECT_IDS = Object.keys(CONTACT_SUBJECTS) as ContactSubjectId[];
+const TRACK_IDS = Object.keys(CONTACT_TRACKS) as ContactTrackId[];
 
 /** What happened to the last message sent. */
 type SendState =
@@ -38,7 +39,8 @@ type SendState =
  * `<form siteContactForm>`: « Écrire au secrétariat ». The message is posted to the site
  * (POST /api/contact) and read by the secretariat in the administration. If it cannot be sent, the
  * visitor gets a link that opens their e-mail app with the message ready to send to the college's
- * address. `full` adds the phone and subject fields (contact page).
+ * address. `full` adds the phone and subject fields (contact page). Labels follow the page's language; the
+ * subject and track sent are the French wording the secretariat reads (CONTACT_SUBJECTS, CONTACT_TRACKS).
  */
 @Component({
   selector: 'form[siteContactForm]',
@@ -51,25 +53,24 @@ type SendState =
   },
   template: `
     @if (headingLevel() === 2) {
-      <h2 [id]="titleId" class="t-h2">Écrire au secrétariat</h2>
+      <h2 [id]="titleId" class="t-h2">{{ t.title }}</h2>
     } @else {
-      <h3 [id]="titleId" class="t-h2">Écrire au secrétariat</h3>
+      <h3 [id]="titleId" class="t-h2">{{ t.title }}</h3>
     }
 
     <div aria-live="polite">
       @switch (state().kind) {
         @case ('sent') {
           <cdls-alert tone="success">
-            Merci, votre message a bien été envoyé au secrétariat. La réponse vous parviendra à
-            <strong>{{ sentTo() }}</strong>.
+            {{ t.sent.before }} <strong>{{ sentTo() }}</strong>{{ t.sent.after }}
           </cdls-alert>
         }
         @case ('failed') {
           <cdls-alert tone="danger">
             <p>{{ failure()?.reason }}</p>
             <p class="contact-fallback">
-              <a cdlsButton variant="secondary" size="sm" [href]="failure()?.mailto">Envoyer depuis ma messagerie</a>
-              <span>ou écrivez à <a [href]="'mailto:' + school.email">{{ school.email }}</a>.</span>
+              <a cdlsButton variant="secondary" size="sm" [href]="failure()?.mailto">{{ t.sendFromMail }}</a>
+              <span>{{ t.orWriteTo }} <a [href]="'mailto:' + school.email">{{ school.email }}</a>.</span>
             </p>
           </cdls-alert>
         }
@@ -78,38 +79,38 @@ type SendState =
 
     @if (full()) {
       <div class="grid-2 grid-2--tight">
-        <cdls-field label="Nom du parent ou de l’élève" [error]="nameError()">
+        <cdls-field [label]="t.name" [error]="nameError()">
           <input cdlsControl autocomplete="name" [formField]="contactForm.name" />
         </cdls-field>
-        <cdls-field label="Téléphone (facultatif)" [error]="phoneError()">
+        <cdls-field [label]="t.phone" [error]="phoneError()">
           <input cdlsControl type="tel" autocomplete="tel" [formField]="contactForm.phone" />
         </cdls-field>
       </div>
     } @else {
-      <cdls-field label="Nom du parent ou de l’élève" [error]="nameError()">
+      <cdls-field [label]="t.name" [error]="nameError()">
         <input cdlsControl autocomplete="name" [formField]="contactForm.name" />
       </cdls-field>
     }
 
-    <cdls-field label="Adresse e-mail" helper="Pour que le secrétariat puisse vous répondre." [error]="emailError()">
+    <cdls-field [label]="t.email" [helper]="t.emailHelp" [error]="emailError()">
       <input cdlsControl type="email" autocomplete="email" [formField]="contactForm.email" />
     </cdls-field>
 
     <div [class]="full() ? 'grid-2 grid-2--tight' : 'stack'">
       @if (full()) {
-        <cdls-field label="Objet">
+        <cdls-field [label]="t.subject">
           <select cdlsControl [formField]="contactForm.subject">
-            @for (s of subjects; track s) {
-              <option [value]="s">{{ s }}</option>
+            @for (s of subjects; track s.value) {
+              <option [value]="s.value">{{ s.label }}</option>
             }
           </select>
         </cdls-field>
       }
-      <cdls-field label="Filière et classe">
+      <cdls-field [label]="t.track">
         <select cdlsControl [formField]="contactForm.track">
-          <option value="">Non précisée</option>
-          @for (t of tracks; track t) {
-            <option [value]="t">{{ t }}</option>
+          <option value="">{{ t.trackNone }}</option>
+          @for (option of tracks; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
           }
         </select>
       </cdls-field>
@@ -118,18 +119,18 @@ type SendState =
     <!-- Honeypot for robots: hidden from people and from assistive technologies, out of the tab order. -->
     <div class="contact-trap" aria-hidden="true">
       <label>
-        Site web
+        {{ t.trap }}
         <input type="text" name="website" tabindex="-1" autocomplete="off" [value]="trap()" (input)="onTrap($event)" />
       </label>
     </div>
 
-    <cdls-field label="Message" helper="1 000 caractères au plus." [error]="messageError()">
+    <cdls-field [label]="t.message" [helper]="t.messageHelp" [error]="messageError()">
       <textarea cdlsControl rows="5" [formField]="contactForm.message"></textarea>
     </cdls-field>
 
-    <p class="t-body-s t-muted">Le secrétariat du collège lit chaque message et vous répond par e-mail.</p>
+    <p class="t-body-s t-muted">{{ t.note }}</p>
     <p>
-      <button cdlsButton type="submit" [disabled]="sending()">{{ sending() ? 'Envoi en cours…' : 'Envoyer le message' }}</button>
+      <button cdlsButton type="submit" [disabled]="sending()">{{ sending() ? t.sending : t.send }}</button>
     </p>
   `,
   styles: `
@@ -158,20 +159,23 @@ export class ContactForm {
   readonly #host = inject<ElementRef<HTMLFormElement>>(ElementRef);
   readonly #injector = inject(Injector);
 
+  readonly #messages = inject(LOCALE).messages;
+  protected readonly t = this.#messages.contactForm;
   protected readonly school = SCHOOL;
-  protected readonly subjects = SUBJECTS;
-  protected readonly tracks = TRACKS;
+  protected readonly subjects = SUBJECT_IDS.map((id) => ({ value: CONTACT_SUBJECTS[id], label: this.t.subjects[id] }));
+  protected readonly tracks = TRACK_IDS.map((id) => ({ value: CONTACT_TRACKS[id], label: this.t.tracks[id] }));
   protected readonly titleId = `contact-form-title-${++nextId}`;
 
   protected readonly model = signal<ContactMessage>(blankMessage());
   protected readonly contactForm = form(this.model, (path) => {
-    required(path.name, { message: 'Saisissez votre nom.' });
-    required(path.email, { message: 'Saisissez votre adresse e-mail.' });
-    email(path.email, { message: 'Saisissez une adresse complète, par exemple nom@domaine.com.' });
-    required(path.message, { message: 'Écrivez votre message.' });
-    maxLength(path.message, CONTACT_LIMITS.message, { message: 'Raccourcissez le message à 1 000 caractères au plus.' });
-    maxLength(path.name, CONTACT_LIMITS.name, { message: 'Raccourcissez le nom à 120 caractères au plus.' });
-    maxLength(path.phone, CONTACT_LIMITS.phone, { message: 'Saisissez un seul numéro de téléphone.' });
+    const errors = this.t.errors;
+    required(path.name, { message: errors.nameRequired });
+    required(path.email, { message: errors.emailRequired });
+    email(path.email, { message: errors.emailInvalid });
+    required(path.message, { message: errors.messageRequired });
+    maxLength(path.message, CONTACT_LIMITS.message, { message: errors.messageTooLong });
+    maxLength(path.name, CONTACT_LIMITS.name, { message: errors.nameTooLong });
+    maxLength(path.phone, CONTACT_LIMITS.phone, { message: errors.phoneTooLong });
   });
   protected readonly nameError = computed(() => shownError(this.contactForm.name()));
   protected readonly emailError = computed(() => shownError(this.contactForm.email()));
@@ -208,7 +212,7 @@ export class ContactForm {
       } catch (error) {
         this.state.set({
           kind: 'failed',
-          reason: apiMessage(error, 'Votre message n’a pas pu être envoyé pour le moment.'),
+          reason: this.#messages.common.showServerMessages ? apiMessage(error, this.t.notSent) : this.t.notSent,
           mailto: contactMailto(SCHOOL.email, value),
         });
       }

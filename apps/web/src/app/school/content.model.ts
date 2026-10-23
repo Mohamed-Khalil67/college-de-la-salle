@@ -1,9 +1,9 @@
 /**
  * Content model of the site. Pure types: no Angular.
  *
- * The site is in French. These pages are institutional and static (prerendered at build time);
- * everything that changes during the school year (announcements, homework, resources, grades) lives
- * in Firestore and is written by teachers: see src/app/space.
+ * French is the source language (photos.ts, school-info.ts, tracks.ts); content.en.ts and content.ar.ts
+ * translate the same shapes (school-content.ts). These pages are institutional and static (prerendered at
+ * build time); everything that changes during the school year lives in the API and is written by teachers.
  */
 
 export type PhotoId =
@@ -39,11 +39,21 @@ export interface Photo {
   readonly src: string;
   readonly width: number;
   readonly height: number;
-  /** Alternative text, in French. */
+  /** Alternative text, in the page's language. */
   readonly alt: string;
   readonly caption: string;
   readonly credit: string;
+  /** Whose archive: the Brothers' Middle East district (lasalle-po.org) or the college (lasalle-eg.net). */
+  readonly archive: PhotoArchive;
   readonly sourceUrl: string;
+}
+
+export type PhotoArchive = 'po' | 'eg';
+
+/** The words of a photo, per language (src, size and credit owner do not change). */
+export interface PhotoText {
+  readonly alt: string;
+  readonly caption: string;
 }
 
 export interface Milestone {
@@ -60,22 +70,39 @@ export interface KeyFigure {
   readonly label: string;
 }
 
-/** A head of the college, from the school's own list. */
+export type DirectorRole = 'coordinator' | 'coordinator-then-director';
+
+/** A head of the college, from the school's own list. Names are not translated. */
 export interface Director {
   readonly name: string;
-  readonly period: string;
+  /** Terms in office: [from, to], `to` null for « to this day ». */
+  readonly terms: readonly (readonly [number, number | null])[];
   /** « Frère » or « Laïc ». */
   readonly kind: 'frere' | 'laic';
-  readonly role?: string;
+  readonly role?: DirectorRole;
 }
 
+export type ContactId =
+  | 'standard'
+  | 'superieur'
+  | 'directeur'
+  | 'secondaire'
+  | 'bac'
+  | 'preparatoire'
+  | 'grand-primaire'
+  | 'petit-primaire'
+  | 'jardin';
+
+/** A department's phone numbers; its name comes from the page's language (`contactLabels`). */
 export interface ContactLine {
-  readonly label: string;
+  readonly id: ContactId;
   readonly phones: readonly string[];
 }
 
 export interface ExternalLink {
   readonly label: string;
+  /** Opens a registration form (shown again on the contact page). */
+  readonly registration?: boolean;
   readonly url: string;
   readonly note: string;
 }
@@ -94,9 +121,11 @@ export interface LevelCount {
   readonly levels: readonly { readonly level: string; readonly students: number }[];
 }
 
+export type SectionSlug = 'nationale' | 'bac';
+
 /** The two tracks of the college: Bac nationale (Egyptian programme) and Bac français. */
 export interface SectionPage {
-  readonly slug: 'nationale' | 'bac';
+  readonly slug: SectionSlug;
   readonly title: string;
   readonly kicker: string;
   readonly intro: string;

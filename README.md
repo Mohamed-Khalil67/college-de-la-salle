@@ -55,9 +55,10 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 5 content pages are prerendered into `apps/web/dist/college-website/browser` |
+| `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 6 public pages are prerendered in French, English and Arabic (18 routes) into `apps/web/dist/college-website/browser` |
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
+| `npm run e2e:public -w @cdls/web` | Public site only, no database: Playwright + Axe at 390 and 1440 px on every public page in French, English and Arabic, language switcher, hreflang, keyboard. Run `npm run build` first; it serves the build on :4610 (`E2E_PUBLIC_PORT`) |
 | `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe at 390 and 1440 px on every screen of every space) against the running stack (`E2E_BASE_URL` for another port); needs the seeded demo accounts, a high `THROTTLE_LIMIT` (say 100000) and `LOGIN_THROTTLE_LIMIT=1000` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default)  ; the run sends 4 contact messages, so wait a minute between runs or raise `CONTACT_THROTTLE_LIMIT` |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
@@ -104,6 +105,10 @@ and subjects they are assigned; admins manage everything. The request and respon
 `packages/shared/src/api.ts` for the web app to import.
 
 ## Where the content lives
+
+**The public site is in French (source), English and Arabic**: see [docs/i18n.md](docs/i18n.md) for how to edit
+a translation (the English and Arabic text is machine-drafted and awaits the school's review). The accessibility
+statement (`/accessibilite`) and what we test are in [docs/accessibility.md](docs/accessibility.md).
 
 Typed data in `apps/web/src/app/school/`: `school-info.ts` (name, milestones, directors, phones),
 `tracks.ts` (the two track pages), `photos.ts` (26 photos: file, size, alt, credit, source) and

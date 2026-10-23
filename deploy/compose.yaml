@@ -88,6 +88,8 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
     image: cdls-web:local
     restart: unless-stopped
     depends_on:

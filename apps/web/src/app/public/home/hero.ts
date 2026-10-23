@@ -1,7 +1,9 @@
 import { NgOptimizedImage } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { photo } from '../../school';
+import { LOCALE } from '../../i18n/locale';
+import { pageUrl } from '../../i18n/pages';
+import { localizedPhoto } from '../../school';
 import { Button } from '../../ui';
 
 /** `<section siteHero>`: the campus from the air under a navy scrim, with the page's h1. */
@@ -14,20 +16,21 @@ import { Button } from '../../ui';
     <div class="container">
       <div class="hero__content">
         <hr class="gold-rule" />
-        <h1 id="hero-title" class="t-display-xl">Un collège lasallien au cœur du Caire, depuis 1898</h1>
-        <p class="t-body-l">
-          Du jardin d’enfants à la Terminale, 2 400 élèves préparent la Thanaweya Amma ou le baccalauréat français, dans un
-          même projet éducatif.
-        </p>
+        <h1 id="hero-title" class="t-display-xl">{{ t.heroTitle }}</h1>
+        <p class="t-body-l">{{ t.heroLead }}</p>
         <div class="hero__actions">
-          <a cdlsButton variant="on-dark" routerLink="/contact">Préparer une inscription</a>
-          <a class="t-label" routerLink="/histoire">Découvrir notre histoire</a>
+          <a cdlsButton variant="on-dark" [routerLink]="links.contact">{{ prepare }}</a>
+          <a class="t-label" [routerLink]="links.history">{{ t.heroHistory }}</a>
         </div>
       </div>
     </div>
-    <p class="hero__credit">Le campus de Daher vu du ciel. {{ campus.credit }}.</p>
+    <p class="hero__credit">{{ t.heroCredit }} {{ campus.credit }}.</p>
   `,
 })
 export class Hero {
-  protected readonly campus = photo('campus-aerien');
+  readonly #locale = inject(LOCALE);
+  protected readonly t = this.#locale.messages.home;
+  protected readonly prepare = this.#locale.messages.common.prepareRegistration;
+  protected readonly links = { contact: pageUrl(this.#locale.lang, 'contact'), history: pageUrl(this.#locale.lang, 'history') };
+  protected readonly campus = localizedPhoto('campus-aerien', this.#locale.content.photos, this.#locale.content.photoCredits);
 }

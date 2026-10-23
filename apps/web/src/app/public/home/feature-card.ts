@@ -1,7 +1,8 @@
 import { NgOptimizedImage } from '@angular/common';
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { photo, type PhotoId } from '../../school';
+import { LOCALE } from '../../i18n/locale';
+import { localizedPhoto, type PhotoId } from '../../school';
 
 /** One « À découvrir » entry on the home page: a news-style card whose title link covers the card. */
 export interface Feature {
@@ -9,6 +10,7 @@ export interface Feature {
   readonly meta: string;
   readonly title: string;
   readonly text: string;
+  /** The page's address in the current language. */
   readonly link: string;
   readonly fragment?: string;
 }
@@ -39,5 +41,6 @@ export interface Feature {
 })
 export class FeatureCard {
   readonly feature = input.required<Feature>();
-  protected readonly image = computed(() => photo(this.feature().photo));
+  readonly #content = inject(LOCALE).content;
+  protected readonly image = computed(() => localizedPhoto(this.feature().photo, this.#content.photos, this.#content.photoCredits));
 }

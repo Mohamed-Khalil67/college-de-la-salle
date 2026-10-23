@@ -4,8 +4,19 @@
     {
       "name": "college-website",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
+      "runtimeArgs": [
+        "start"
+      ],
       "port": 4200
+    },
+    {
+      "name": "public-static",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/web/scripts/serve-static.mjs",
+        "4610"
+      ],
+      "port": 4610
     }
   ]
 }

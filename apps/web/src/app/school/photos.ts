@@ -1,12 +1,15 @@
-import type { Photo, PhotoId } from './content.model';
+import type { Photo, PhotoArchive, PhotoId, PhotoText } from './content.model';
 
 const CREDIT = 'Photo : Frères des Écoles Chrétiennes – Proche-Orient';
 const CREDIT_EG = 'Photo : Collège De La Salle – Égypte (archives, lasalle-eg.net)';
+
+/** The credit line of each archive, in French (content.en.ts and content.ar.ts translate it). */
+export const PHOTO_CREDITS: Readonly<Record<PhotoArchive, string>> = { po: CREDIT, eg: CREDIT_EG };
 const ALBUM = 'http://www.lasalle-eg.net/college/album.htm';
 
 /** A photo from the college's own archive album (lasalle-eg.net). */
 function archive(id: PhotoId, file: string, width: number, height: number, alt: string, caption: string): Photo {
-  return { id, src: `/images/archives/${file}.jpg`, width, height, alt, caption, credit: CREDIT_EG, sourceUrl: ALBUM };
+  return { id, src: `/images/archives/${file}.jpg`, width, height, alt, caption, credit: CREDIT_EG, archive: 'eg', sourceUrl: ALBUM };
 }
 
 /**
@@ -43,6 +46,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
     alt: 'Vue aérienne du Collège de la Salle à Daher, ses bâtiments et la chapelle, au milieu de la ville',
     caption: 'Le campus de Daher aujourd’hui, vu du ciel.',
     credit: CREDIT,
+    archive: 'po',
     sourceUrl: 'https://lasalle-po.org/2026/04/10/de-la-salle-daher-memories-2/',
   },
   'batiment-brique': {
@@ -53,6 +57,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
     alt: 'Le bâtiment historique en briques rouges du collège, devant la cour',
     caption: 'Le bâtiment historique en briques rouges.',
     credit: CREDIT,
+    archive: 'po',
     sourceUrl: 'https://lasalle-po.org/2026/04/10/de-la-salle-daher-memories-2/',
   },
   'construction-1954': {
@@ -63,6 +68,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
     alt: 'Photographie ancienne en noir et blanc : les nouveaux bâtiments du collège en construction',
     caption: '1954 : les travaux d’agrandissement du campus.',
     credit: CREDIT,
+    archive: 'po',
     sourceUrl: 'https://lasalle-po.org/2026/04/10/de-la-salle-daher-memories-2/',
   },
   'inauguration-1955': {
@@ -73,6 +79,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
     alt: 'Photographie en noir et blanc : coupure du ruban lors de l’inauguration des nouveaux bâtiments',
     caption: '26 novembre 1955 : inauguration des nouveaux bâtiments.',
     credit: CREDIT,
+    archive: 'po',
     sourceUrl: 'https://lasalle-po.org/2026/01/19/de-la-salle-dahermemories-the-inauguration-of-the-new-buildings-built-early-1950s/',
   },
   'inauguration-1955-discours': {
@@ -83,6 +90,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
     alt: 'Photographie en noir et blanc : un discours devant les invités lors de l’inauguration de 1955',
     caption: 'Les discours de l’inauguration, en présence des autorités.',
     credit: CREDIT,
+    archive: 'po',
     sourceUrl: 'https://lasalle-po.org/2026/01/19/de-la-salle-dahermemories-the-inauguration-of-the-new-buildings-built-early-1950s/',
   },
   'freres-1926': {
@@ -93,10 +101,26 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
     alt: 'Grande photographie de groupe en noir et blanc des Frères des écoles d’Égypte, rangés sur plusieurs rangs',
     caption: 'Avril 1926 : les Frères d’Égypte réunis au collège.',
     credit: CREDIT,
+    archive: 'po',
     sourceUrl: 'https://lasalle-po.org/2026/03/09/de-la-salle-daher-memories/',
   },
 };
 
 export function photo(id: PhotoId): Photo {
   return PHOTOS[id];
+}
+
+/** The words of every photo in French, the shape the other languages translate. */
+export const PHOTO_TEXTS_FR = Object.fromEntries(
+  Object.values(PHOTOS).map((p) => [p.id, { alt: p.alt, caption: p.caption }]),
+) as Readonly<Record<PhotoId, PhotoText>>;
+
+/** A photo with its alt text, caption and credit in another language. */
+export function localizedPhoto(
+  id: PhotoId,
+  texts: Readonly<Record<PhotoId, PhotoText>>,
+  credits: Readonly<Record<PhotoArchive, string>>,
+): Photo {
+  const p = PHOTOS[id];
+  return { ...p, ...texts[id], credit: credits[p.archive] };
 }

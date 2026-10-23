@@ -1,6 +1,7 @@
 import { NgOptimizedImage } from '@angular/common';
-import { Component, input } from '@angular/core';
-import { photo, type Milestone } from '../../school';
+import { Component, inject, input } from '@angular/core';
+import { LOCALE } from '../../i18n/locale';
+import { localizedPhoto, type Milestone, type PhotoId } from '../../school';
 
 /**
  * `<ol siteTimeline [milestones]="…">`: the site's signature. Brick Garamond years on a gold rule with
@@ -23,7 +24,7 @@ import { photo, type Milestone } from '../../school';
         <h3 class="t-h3">{{ m.title }}</h3>
         <p class="t-body-s t-muted">{{ m.text }}</p>
         @if (variant() === 'full') {
-          <p class="t-caption t-muted">Source : {{ m.source }}</p>
+          <p class="t-caption t-muted">{{ sourceLabel }} {{ m.source }}</p>
         }
         @if (m.photo; as id) {
           @let p = photoOf(id);
@@ -51,13 +52,13 @@ import { photo, type Milestone } from '../../school';
       grid-template-columns: 1fr;
       gap: var(--space-12);
       padding-top: 0;
-      padding-left: var(--space-12);
+      padding-inline-start: var(--space-12);
     }
     :host(.timeline--full)::before {
       top: 0;
       bottom: 0;
-      left: 0.6rem;
-      right: auto;
+      inset-inline-start: 0.6rem;
+      inset-inline-end: auto;
       width: 1.5px;
       height: auto;
     }
@@ -66,7 +67,7 @@ import { photo, type Milestone } from '../../school';
     }
     :host(.timeline--full) .timeline__star {
       top: 0.9rem;
-      left: calc(-1 * var(--space-12));
+      inset-inline-start: calc(-1 * var(--space-12));
     }
     @media (min-width: 56.0625rem) {
       :host(.timeline--full) .timeline__item {
@@ -86,11 +87,11 @@ import { photo, type Milestone } from '../../school';
     }
     @media (max-width: 56rem) {
       :host(.timeline--full) {
-        padding-left: var(--space-8);
+        padding-inline-start: var(--space-8);
       }
       :host(.timeline--full) .timeline__star {
         top: 0.75rem;
-        left: calc(-1 * var(--space-8));
+        inset-inline-start: calc(-1 * var(--space-8));
       }
     }
   `,
@@ -99,5 +100,7 @@ export class Timeline {
   readonly milestones = input.required<readonly Milestone[]>();
   readonly variant = input<'row' | 'full'>('row');
   readonly sizes = input('(max-width: 56rem) 100vw, 25vw');
-  protected readonly photoOf = photo;
+  readonly #locale = inject(LOCALE);
+  protected readonly sourceLabel = this.#locale.messages.common.source;
+  protected readonly photoOf = (id: PhotoId) => localizedPhoto(id, this.#locale.content.photos, this.#locale.content.photoCredits);
 }

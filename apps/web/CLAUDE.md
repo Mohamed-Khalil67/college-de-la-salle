@@ -8,7 +8,8 @@ and how to use what already exists.
 
 | Folder | What | Rendering |
 |---|---|---|
-| `src/app/public/` | Public site pages (home, histoire, bac pages, contact) | Prerendered |
+| `src/app/public/` | Public site pages (home, histoire, bac pages, contact, accessibility statement), in fr/en/ar | Prerendered |
+| `src/app/i18n/` | Languages of the public site: typed `SiteMessages` per language, page addresses, `LOCALE`, `SiteHead` (lang/dir/hreflang). See `docs/i18n.md` | n/a |
 | `src/app/auth/` | `/connexion` login page, `/connexion/oubli` and `/connexion/reinitialiser?token=` (forgotten password, framed by `auth-shell.ts`) | Client |
 | `src/app/eleve/` | Student space `/eleve` (routes + `ELEVE_NAV` in `eleve.routes.ts`) | Client |
 | `src/app/enseignant/` | Teacher space `/enseignant` | Client |
@@ -17,7 +18,7 @@ and how to use what already exists.
 | `src/app/ui/` | Shared UI kit (`cdls-*`), import from `ui/index.ts` | n/a |
 | `src/app/layout/` | `PublicLayout`, `SpaceLayout` (app bar, account menu, bottom nav), `PagePlaceholder` | n/a |
 | `src/app/core/` | `ApiClient`, `AuthStore`, interceptor, role guards | n/a |
-| `src/app/school/` | Static content of the public site (facts, milestones, photos with credits) | n/a |
+| `src/app/school/` | Static content of the public site (facts, milestones, photos with credits); `content.fr/en/ar.ts` give it per language | n/a |
 | `src/styles.css`, `src/styles/` | Tokens as a Tailwind 4 theme, prototype component classes, fonts | n/a |
 
 When several agents work in parallel, each owns one feature folder. `ui/`, `layout/`, `core/` and `styles/` are shared:
@@ -48,6 +49,13 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 - `access: 'admin' | 'coordinator'` filters by role; `href` links to another space; `secondary` items move behind « Plus » in the top bar once there are more than eight entries.
 - A new screen goes in its space's list, in « Plus » at least, and in the spec.
 
+## Public site languages
+
+Public pages and the login entry read their words from `inject(LOCALE)` (`messages` for the interface, `content` for
+the school's text): never write French text in a public component. Links go through `pageUrl(lang, page)`. CSS uses
+logical properties only (`inline-start/end`, `text-align: start`): the Arabic pages are `dir="rtl"`. Skip links are
+`<a cdlsSkipLink>`. The English and Arabic text is machine-drafted: say so when you touch it.
+
 ## Page checklist (before you commit)
 
 1. One `h1` per page (space pages start with `.page__header`); headings in order. Space pages never add a `<main>`
@@ -55,7 +63,7 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 2. Loading (`.loading-line`), error (`<cdls-alert tone="danger">`) and empty (`<cdls-empty-state>`) states.
 3. Tables: `<caption>`, `scope` on header cells; `.table--stack` + `data-label` on phones.
 4. Forms: Signal Forms, `<cdls-field>` + `cdlsControl`, errors that say how to fix the problem.
-5. Axe: 0 violations at 390 px and 1440 px (inject axe-core 4.10 from cdnjs, run tags wcag2a, wcag2aa, wcag21aa,
+5. Public pages: also `npm run e2e:public -w @cdls/web` (fr/en/ar). Axe: 0 violations at 390 px and 1440 px (inject axe-core 4.10 from cdnjs, run tags wcag2a, wcag2aa, wcag21aa,
    wcag22aa, best-practice). Keyboard: everything reachable, visible focus, Escape closes menus and dialogs.
 6. `npm run build`, `npm run lint` and `npm test` green. Pure logic goes in decorator-free `.ts` files with a
    `*.spec.ts` next to it (Vitest, `vitest.config.ts`).

@@ -57,3 +57,54 @@ router-outlet + * {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/*
+ * Arabic pages (<html lang="ar" dir="rtl">, set by i18n/site-head.ts). Layout mirrors by itself: components.css
+ * uses logical properties (inline-start/end). Here: Cairo for Arabic glyphs, with Cormorant and Inter kept for
+ * the Latin words and the digits (Cairo is loaded for the Arabic range only); no tracking or italics, which
+ * break Arabic letter joining; taller lines for Arabic's ascenders and dots.
+ */
+:root[lang="ar"] {
+  --font-display: "Cairo", "Cormorant Garamond", Georgia, serif;
+  --font-sans: "Cairo", "Inter", "Inter Fallback", system-ui, "Segoe UI", sans-serif;
+}
+:root[lang="ar"] body {
+  font-family: var(--font-sans);
+}
+:root[lang="ar"] :is(.t-display-xl, .t-display-l, .t-h1, .t-h2, .t-h3, .t-quote) {
+  letter-spacing: 0;
+}
+:root[lang="ar"] :is(.t-display-xl, .t-display-l) {
+  line-height: 1.3;
+  font-weight: 700;
+  font-variant-numeric: lining-nums;
+}
+:root[lang="ar"] :is(.t-h1, .t-h2) {
+  line-height: 1.4;
+}
+:root[lang="ar"] .t-quote {
+  font-style: normal;
+  font-size: 1.375rem;
+  line-height: 1.6;
+}
+:root[lang="ar"] :is(.t-body-l, .t-body-m, .prose p) {
+  line-height: 1.85;
+}
+/* The hero's scrim darkens the side where the text starts. */
+@media (min-width: 48.0625rem) {
+  [dir="rtl"] .hero::before {
+    background: linear-gradient(270deg, rgb(19 41 75 / 0.94) 0%, rgb(19 41 75 / 0.84) 45%, rgb(19 41 75 / 0.2) 80%, rgb(19 41 75 / 0) 100%);
+  }
+}
+[dir="rtl"] select.field__control {
+  background-position: left var(--space-4) center;
+}
+/* Icons that point the way you read (chevrons, arrows): `<cdls-icon class="flip-rtl">`. */
+[dir="rtl"] .flip-rtl > .icon {
+  transform: scaleX(-1);
+}
+/* Phone numbers keep their order (+20 first) inside Arabic sentences. */
+.phone-number {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

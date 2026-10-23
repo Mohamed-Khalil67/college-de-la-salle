@@ -3,7 +3,7 @@ import { NgOptimizedImage } from '@angular/common';
 import { Router } from '@angular/router';
 import { SECTION_LABELS } from '@cdls/shared';
 import { AuthStore, HOME_BY_ROLE } from '../core/auth/auth-store';
-import { Button, Wordmark } from '../ui';
+import { Button, SkipLink, Wordmark } from '../ui';
 import { PasswordForm } from './password-form';
 
 /**
@@ -13,9 +13,9 @@ import { PasswordForm } from './password-form';
  */
 @Component({
   selector: 'app-first-access-page',
-  imports: [NgOptimizedImage, Button, PasswordForm, Wordmark],
+  imports: [NgOptimizedImage, Button, PasswordForm, SkipLink, Wordmark],
   template: `
-    <a class="skip-link" href="#contenu">Aller au contenu</a>
+    <a cdlsSkipLink>Aller au contenu</a>
     <div class="auth">
       <aside class="auth__visual on-inverse" aria-label="Le collège">
         <img ngSrc="/images/school/batiment-brique.jpg" width="625" height="425" alt="" priority />

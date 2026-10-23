@@ -146,8 +146,8 @@ export const BAC: SectionPage = {
   ],
   links: [
     { label: 'Site de la section Bac français', url: 'https://bacdelasalle.com/', note: 'Règlement, vie scolaire, galerie, contact.' },
-    { label: 'Inscription Pre-bac', url: 'https://bacdelasalle.com/inscription/inscription-2/', note: 'Formulaire en ligne.' },
-    { label: 'Inscription Bac', url: 'https://bacdelasalle.com/inscription/inscription-2-2/', note: 'Formulaire en ligne.' },
+    { label: 'Inscription Pre-bac', registration: true, url: 'https://bacdelasalle.com/inscription/inscription-2/', note: 'Formulaire en ligne.' },
+    { label: 'Inscription Bac', registration: true, url: 'https://bacdelasalle.com/inscription/inscription-2-2/', note: 'Formulaire en ligne.' },
   ],
   counts: [
     { cycle: 'Primaire', levels: [{ level: 'Moyenne Section', students: 29 }, { level: 'CP', students: 28 }, { level: 'CM1', students: 17 }] },
@@ -156,9 +156,3 @@ export const BAC: SectionPage = {
   ],
   countsNote: 'Effectifs de la section française, année scolaire 2020-2021 (source : site de la section).',
 };
-
-export const SECTIONS: readonly SectionPage[] = [NATIONALE, BAC];
-
-export function sectionBySlug(slug: string): SectionPage | null {
-  return SECTIONS.find((s) => s.slug === slug) ?? null;
-}
