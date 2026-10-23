@@ -108,7 +108,9 @@ export class Env {
    * Set it to `false` only to try the production build over plain HTTP on another address than localhost.
    */
   @IsOptional()
-  @Transform(({ value }) => (value === undefined || value === '' ? undefined : value === true || value === 'true'))
+  @Transform(({ value }) =>
+    value === undefined || value === '' ? undefined : value === true || value === 'true',
+  )
   @IsBoolean()
   COOKIE_SECURE?: boolean;
 
@@ -170,6 +172,30 @@ export class Env {
   @IsOptional()
   @IsString()
   SMTP_PASSWORD?: string;
+
+  /** In-app notifications are deleted this many days after they were created (checked daily). */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(7)
+  @Max(3650)
+  NOTIFICATION_RETENTION_DAYS = 180;
+
+  /**
+   * Minutes between two e-mail digests: a user who opted in gets at most one mail per interval, listing
+   * every notification since the last one.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(180)
+  NOTIFICATION_MAIL_INTERVAL_MINUTES = 10;
+
+  /** Requests a minute one client may make to GET /api/calendar/feed/:token.ics (calendar apps poll hourly; a whole class behind one address stays far below it). */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  FEED_THROTTLE_LIMIT = 60;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
@@ -193,7 +219,9 @@ export function validateEnv(raw: Record<string, unknown>): Env {
     );
   }
   if (env.MAIL_TRANSPORT === 'smtp' && !env.SMTP_HOST) {
-    throw new Error('MAIL_TRANSPORT=smtp needs SMTP_HOST (and usually SMTP_USER and SMTP_PASSWORD).');
+    throw new Error(
+      'MAIL_TRANSPORT=smtp needs SMTP_HOST (and usually SMTP_USER and SMTP_PASSWORD).',
+    );
   }
   if (env.NODE_ENV === 'production' && env.MAIL_TRANSPORT === 'log') {
     throw new Error(

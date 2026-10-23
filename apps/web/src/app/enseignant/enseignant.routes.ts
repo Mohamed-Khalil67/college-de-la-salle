@@ -39,6 +39,17 @@ export const ENSEIGNANT_ROUTES: Routes = [
     loadComponent: () => import('./annonces/posts-page').then((m) => m.PostsPage),
   },
   {
+    path: 'synchroniser',
+    title: 'Synchroniser mon agenda',
+    loadComponent: () => import('../agenda-sync/agenda-sync-page').then((m) => m.AgendaSyncPage),
+  },
+  {
+    path: 'notifications',
+    title: 'Notifications',
+    loadComponent: () =>
+      import('../notifications/notifications-page').then((m) => m.NotificationsPage),
+  },
+  {
     path: 'menu',
     title: 'Toutes les pages',
     loadComponent: () => import('../layout/menu-page').then((m) => m.MenuPage),

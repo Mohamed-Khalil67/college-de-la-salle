@@ -3,6 +3,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
+import { NotificationBell } from '../notifications/notification-bell';
 import { Avatar, Icon, Wordmark } from '../ui';
 import { ChangePasswordModal } from './change-password-modal';
 import { desktopNav, mobileNav, type SpaceNavItem, visibleNav } from './space-nav';
@@ -15,7 +16,7 @@ export type { SpaceNavItem } from './space-nav';
  */
 @Component({
   selector: 'app-space-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, ChangePasswordModal],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, ChangePasswordModal, NotificationBell],
   template: `
     <div class="has-bottom-nav">
       <a class="skip-link" href="#contenu">Aller au contenu</a>
@@ -41,6 +42,9 @@ export type { SpaceNavItem } from './space-nav';
             </ul>
           </nav>
           <div class="app-bar__end account">
+            @if (notificationsLink(); as notifications) {
+              <app-notification-bell [link]="notifications" />
+            }
             <button
               #accountButton
               type="button"
@@ -165,6 +169,17 @@ export class SpaceLayout {
   /** The items this user may see: admin-only and coordinator-only entries are filtered by role. */
   protected readonly visibleNav = computed(() => visibleNav(this.nav(), this.auth.user()));
   protected readonly desktopNav = computed(() => desktopNav(this.visibleNav()));
+  /** The bell leads to the notifications page of the user's own space (students and teachers only). */
+  protected readonly notificationsLink = computed(() => {
+    switch (this.auth.role()) {
+      case 'student':
+        return '/eleve/notifications';
+      case 'teacher':
+        return '/enseignant/notifications';
+      default:
+        return null;
+    }
+  });
   protected readonly mobileNav = computed(() => mobileNav(this.visibleNav()));
   protected readonly roleLabel = computed(() => {
     switch (this.auth.role()) {

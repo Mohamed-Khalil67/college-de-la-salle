@@ -17,6 +17,8 @@ export const ELEVE_NAV: readonly SpaceNavItem[] = [
   { label: 'Notes', path: 'notes', icon: 'file-text' },
   { label: 'Absences', path: 'absences' },
   { label: 'Bulletins', path: 'bulletins' },
+  { label: 'Notifications', path: 'notifications', secondary: true },
+  { label: 'Synchroniser mon agenda', path: 'synchroniser', short: 'Agenda en ligne', secondary: true },
   { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
 ];
 
@@ -32,6 +34,8 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Appel', path: 'appel', icon: 'check' },
   { label: 'Groupes', path: 'groupes' },
   { label: 'Annonces', path: 'annonces' },
+  { label: 'Notifications', path: 'notifications', secondary: true },
+  { label: 'Synchroniser mon agenda', path: 'synchroniser', short: 'Agenda en ligne', secondary: true },
   /** Teachers the admin marked coordinateur edit the year's structure in the administration area. */
   { label: 'Coordination', path: 'coordination', href: '/admin/matieres', access: 'coordinator' },
   { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },

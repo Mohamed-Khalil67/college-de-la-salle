@@ -36,8 +36,13 @@ describe('the phone bottom bar', () => {
 describe('« Plus » lists every screen of the area', () => {
   it('has the pages that are not in the bar', () => {
     expect(labels(menu(ELEVE_NAV, student))).toEqual(
-      expect.arrayContaining(['Agenda', 'Absences', 'Bulletins']),
+      expect.arrayContaining(['Agenda', 'Absences', 'Bulletins', 'Notifications', 'Agenda en ligne']),
     );
+    expect(labels(menu(ENSEIGNANT_NAV, teacher))).toEqual(
+      expect.arrayContaining(['Notifications', 'Agenda en ligne']),
+    );
+    // Notifications and the agenda link belong to students and teachers: the administration has neither.
+    expect(ADMIN_NAV.map((i) => i.path)).not.toContain('notifications');
     expect(labels(menu(ENSEIGNANT_NAV, teacher))).toEqual(expect.arrayContaining(['Agenda', 'Groupes', 'Annonces']));
     expect(menu(ENSEIGNANT_NAV, teacher).map((i) => i.label)).not.toContain('Coordination');
     expect(menu(ENSEIGNANT_NAV, coordinator).map((i) => i.label)).toContain('Coordination');

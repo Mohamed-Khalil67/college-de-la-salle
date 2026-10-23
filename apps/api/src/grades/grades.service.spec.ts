@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { AccessService } from '../access/access.service.js';
 import { ClassesService } from '../classes/classes.service.js';
 import { TargetsService } from '../targets/targets.service.js';
+import { ChangeNoticesService } from '../notifications/change-notices.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -135,6 +136,7 @@ describe('GradesService', () => {
         { provide: ClassesService, useValue: classes },
         { provide: PeriodsService, useValue: periods },
         { provide: TargetsService, useValue: targets },
+        { provide: ChangeNoticesService, useValue: { gradesPublished: vi.fn() } },
       ],
     }).compile();
     grades = moduleRef.get(GradesService);

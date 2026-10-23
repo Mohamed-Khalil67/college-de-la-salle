@@ -23,6 +23,10 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, schoolToday, toDay } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import {
+  ChangeNoticesService,
+  type SessionNotice,
+} from '../notifications/change-notices.service.js';
 import { conflictBlocked, warningsBlocked } from '../occupancy/blocked.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { expandSlots, slotInclude, type SlotRow, toSlotData } from '../occupancy/slot-data.js';
@@ -55,6 +59,8 @@ interface Applied {
   readonly endedSlotId: string | null;
   readonly exceptionId: string | null;
   readonly audit: readonly AuditEntry[];
+  /** Sessions whose students and teacher are notified once the write is saved (one-session changes). */
+  readonly notices?: readonly SessionNotice[];
 }
 
 type Mutation = (tx: Db) => Promise<Applied>;
@@ -85,6 +91,7 @@ export class TimetableService {
     private readonly access: AccessService,
     private readonly occupancy: OccupancyService,
     private readonly warnings: WarningsService,
+    private readonly notices: ChangeNoticesService,
   ) {}
 
   /** Today in Cairo; the clock of « sessions already held ». */
@@ -137,12 +144,17 @@ export class TimetableService {
     return this.commit(async (tx) => {
       const ex = await tx.slotException.findUnique({ where: { id } });
       if (!ex) throw notFound('Exception');
+      // A cancelled, moved or re-roomed session is back to what the rule says: say so.
+      const restored = ex.kind !== 'substitute';
       const row = await this.load(tx, ex.slotId);
       await this.authorize(row, user);
       // A teacher restores what a teacher may do, not a replacement the administration named.
       if (!canEditStructure(user) && !TEACHER_KINDS.has(ex.kind)) throw forbidden();
       if (toDay(ex.date) < this.today()) throw new BadRequestException(PAST);
       await tx.slotException.delete({ where: { id } });
+      // The session changes back: the slot's change time must move on, or the calendar feed's SEQUENCE
+      // of that session would fall back below the one it showed while the exception existed.
+      await tx.timetableSlot.update({ where: { id: row.id }, data: { updatedAt: new Date() } });
       return {
         touched: [row.id],
         warn: [row.id],
@@ -158,6 +170,9 @@ export class TimetableService {
             kind: ex.kind,
           }),
         ],
+        notices: restored
+          ? [{ kind: 'session_restored', slotId: row.id, date: toDay(ex.date) }]
+          : [],
       };
     }, []);
   }
@@ -245,6 +260,9 @@ export class TimetableService {
               : e,
           ),
         );
+        // In the same transaction: the change and its notifications commit (or roll back) together.
+        if (applied.notices?.length)
+          await this.notices.sessions(tx, applied.notices, applied.audit[0]?.actorId ?? null);
         return { result: applied, warnings };
       },
       { timeout: 20_000 },
@@ -617,6 +635,12 @@ export class TimetableService {
           previous ? { kind: previous.kind } : undefined,
         ),
       ],
+      notices: sessionNotices(
+        row.id,
+        date,
+        input,
+        previous?.kind === 'substitute' ? previous.newTeacherId : null,
+      ),
     };
   }
 
@@ -737,6 +761,37 @@ export class TimetableService {
       ...(before ? { before: before as Prisma.InputJsonValue } : {}),
     };
   }
+}
+
+/** What the students and the teacher of a session are told about an exception (a substitute: nothing). */
+function sessionNotices(
+  slotId: string,
+  date: string,
+  input: SlotExceptionInput,
+  substituteId: string | null,
+): SessionNotice[] {
+  const kind =
+    input.kind === 'cancelled'
+      ? 'session_cancelled'
+      : input.kind === 'moved'
+        ? 'session_moved'
+        : input.kind === 'room_change'
+          ? 'session_room_changed'
+          : null;
+  if (!kind) return [];
+  return [
+    {
+      kind,
+      slotId,
+      date,
+      newDate: input.newDate ?? null,
+      newStart: input.newStart ?? null,
+      newEnd: input.newEnd ?? null,
+      newRoomId: input.newRoomId ?? null,
+      reason: input.reason ?? null,
+      substituteTeacherId: substituteId,
+    },
+  ];
 }
 
 function slotData(input: TimetableSlotInput) {
