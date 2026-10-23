@@ -76,3 +76,7 @@ apps/api/demo-credentials.local.md
 apps/api/.dev-db/
 # Mails written by the dev `log` transport (they contain reset links).
 apps/api/.dev-mail/
+
+# Deployment (deploy/): real settings and database dumps never go to git.
+deploy/.env
+deploy/backups/

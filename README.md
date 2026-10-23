@@ -135,7 +135,11 @@ docs/                     brainstorm.md (roles, flows, data model), brand.md, le
 The access token lives in memory only; the refresh token is an httpOnly cookie, so a reload restores the
 session. Public pages are prerendered; the spaces are client-rendered and lazy-loaded per area.
 
-Deployment (Docker on the school's server) is the next phase and is not set up yet.
+## Deployment
+
+The whole stack (site, API, PostgreSQL 18, nightly backups, HTTPS from anywhere through a Cloudflare Tunnel or Caddy) runs
+with Docker Compose from `deploy/`. Step by step for a Windows laptop or a Linux VM: [docs/deployment.md](docs/deployment.md);
+backup and restore: [deploy/restore.md](deploy/restore.md).
 
 ## History of this repository
 

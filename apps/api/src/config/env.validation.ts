@@ -104,6 +104,15 @@ export class Env {
   TRUST_PROXY = 0;
 
   /**
+   * `Secure` flag of the refresh cookie. Unset: on in production (the site is served over HTTPS), off otherwise.
+   * Set it to `false` only to try the production build over plain HTTP on another address than localhost.
+   */
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined || value === '' ? undefined : value === true || value === 'true'))
+  @IsBoolean()
+  COOKIE_SECURE?: boolean;
+
+  /**
    * Domain of the school login e-mails built at import (`prenom.nom@<domain>`), without the @.
    * Required in production (the demo domain is refused there).
    */
