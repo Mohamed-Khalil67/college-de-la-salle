@@ -18,16 +18,18 @@ import {
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
+import { DEFAULT_LANG, LANG_META } from './i18n/lang';
+import { readPublicRoute } from './i18n/locale';
 
-/** « Page — Collège de la Salle Daher » in the browser tab. */
+/** « Page — Collège de la Salle Daher » in the browser tab, in the public page's language. */
 @Injectable()
 class SiteTitleStrategy extends TitleStrategy {
   readonly #title = inject(Title);
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const page = this.buildTitle(snapshot);
-    const site = 'Collège de la Salle — Daher';
-    this.#title.setTitle(page ? `${page} — ${site}` : `${site} · Bac nationale et Bac français`);
+    const meta = LANG_META[readPublicRoute(snapshot.root)?.lang ?? DEFAULT_LANG];
+    this.#title.setTitle(page ? `${page} — ${meta.siteTitle}` : meta.homeTitle);
   }
 }
 

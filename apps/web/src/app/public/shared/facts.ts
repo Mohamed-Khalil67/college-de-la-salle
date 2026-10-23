@@ -1,4 +1,5 @@
-import { Component, input } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
+import { LOCALE } from '../../i18n/locale';
 import type { KeyFigure } from '../../school';
 import { capitalize } from './contact-mail';
 
@@ -11,7 +12,7 @@ import { capitalize } from './contact-mail';
       <dl class="facts__list">
         @for (f of facts(); track f.label) {
           <div>
-            <dt>{{ capitalize(f.label) }}</dt>
+            <dt>{{ capitalize(f.label, lang) }}</dt>
             <dd>{{ f.value }}</dd>
           </div>
         }
@@ -22,5 +23,6 @@ import { capitalize } from './contact-mail';
 export class Facts {
   readonly facts = input.required<readonly KeyFigure[]>();
   readonly label = input.required<string>();
+  protected readonly lang = inject(LOCALE).lang;
   protected readonly capitalize = capitalize;
 }

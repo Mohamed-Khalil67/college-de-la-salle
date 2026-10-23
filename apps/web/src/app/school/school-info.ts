@@ -1,4 +1,5 @@
-import type { ContactLine, Director, ExternalLink, InfoBlock, KeyFigure, Milestone } from './content.model';
+import type { Founder } from './school-content';
+import type { ContactId, ContactLine, Director, ExternalLink, InfoBlock, KeyFigure, Milestone } from './content.model';
 
 const ADMIN = 'Administration du collège';
 const ARCHIVE = 'Archives lasalliennes (lasalle-po.org)';
@@ -107,9 +108,10 @@ export const SCHOOL_HISTORY_INTRO: readonly string[] = [
 ];
 
 /** Saint Jean-Baptiste de La Salle — key dates published on the college's official site. */
-export const FOUNDER: { readonly name: string; readonly dates: string; readonly facts: readonly { readonly date: string; readonly text: string }[]; readonly summary: readonly string[] } = {
+export const FOUNDER: Founder = {
   name: 'Saint Jean-Baptiste de La Salle',
   dates: '1651 – 1719',
+  role: 'fondateur des Frères des Écoles chrétiennes',
   facts: [
     { date: '30 avril 1651', text: 'Naissance à Reims, aîné de onze enfants.' },
     { date: '9 avril 1678', text: 'Ordination sacerdotale.' },
@@ -145,46 +147,59 @@ export const FRERES_EGYPTE: readonly InfoBlock[] = [
 
 /** Heads of the college since its inauguration, as published on the official site. */
 export const DIRECTORS: readonly Director[] = [
-  { name: 'Odéric-Gabriel', period: '1905 – 1913', kind: 'frere' },
-  { name: 'Félix-Augustin', period: '1913 – 1918', kind: 'frere' },
-  { name: 'Philibert-Eugène', period: '1918 – 1923', kind: 'frere' },
-  { name: 'Dosithée-Justin', period: '1923 – 1926', kind: 'frere' },
-  { name: 'Philothée-Jean', period: '1926 – 1929', kind: 'frere' },
-  { name: 'Clément-Gabriel', period: '1929 – 1934', kind: 'frere' },
-  { name: 'Ismaël-Gabriel', period: '1934 – 1936', kind: 'frere' },
-  { name: 'Ithier-Casimir', period: '1936 – 1944', kind: 'frere' },
-  { name: 'Auguste-Julien', period: '1944 – 1947', kind: 'frere' },
-  { name: 'Blémond-Urbain', period: '1947 – 1954', kind: 'frere' },
-  { name: 'André-Léon', period: '1954 – 1956', kind: 'frere' },
-  { name: 'Louis-Antonin', period: '1956 – 1961 et 1968 – 1969', kind: 'frere' },
-  { name: 'Émilien-Cyrille', period: '1961 – 1966', kind: 'frere' },
-  { name: 'Jean Joucla', period: '1966 – 1968', kind: 'frere' },
-  { name: 'Didier Albo', period: '1969 – 1970 et 1992 – 1995', kind: 'frere' },
-  { name: 'Joseph Cavincy', period: '1970 – 1971', kind: 'frere' },
-  { name: 'Michel Andrejke', period: '1971 – 1979', kind: 'frere' },
-  { name: 'Jacques Boulad', period: '1979 – 1985', kind: 'frere' },
-  { name: 'Claude Robe (Régis)', period: '1985 – 1992', kind: 'frere' },
-  { name: 'Yves Lecocq', period: '1995 – 2003', kind: 'frere', role: 'Coordinateur' },
-  { name: 'Claude Robe (Régis)', period: '2003 – 2011', kind: 'frere', role: 'Coordinateur' },
-  { name: 'Georges Absi', period: '2011 – aujourd’hui', kind: 'frere', role: 'Coordinateur, puis directeur depuis 2014' },
-  { name: 'Maurice Antaki', period: '1963 – 1971', kind: 'laic' },
-  { name: 'Chawki Mittri', period: '1971 – 1984', kind: 'laic' },
-  { name: 'Magdi Kauzman', period: '1985 – 2010', kind: 'laic' },
-  { name: 'Medhat Nassif', period: '2010 – 2014', kind: 'laic' },
+  { name: 'Odéric-Gabriel', terms: [[1905, 1913]], kind: 'frere' },
+  { name: 'Félix-Augustin', terms: [[1913, 1918]], kind: 'frere' },
+  { name: 'Philibert-Eugène', terms: [[1918, 1923]], kind: 'frere' },
+  { name: 'Dosithée-Justin', terms: [[1923, 1926]], kind: 'frere' },
+  { name: 'Philothée-Jean', terms: [[1926, 1929]], kind: 'frere' },
+  { name: 'Clément-Gabriel', terms: [[1929, 1934]], kind: 'frere' },
+  { name: 'Ismaël-Gabriel', terms: [[1934, 1936]], kind: 'frere' },
+  { name: 'Ithier-Casimir', terms: [[1936, 1944]], kind: 'frere' },
+  { name: 'Auguste-Julien', terms: [[1944, 1947]], kind: 'frere' },
+  { name: 'Blémond-Urbain', terms: [[1947, 1954]], kind: 'frere' },
+  { name: 'André-Léon', terms: [[1954, 1956]], kind: 'frere' },
+  { name: 'Louis-Antonin', terms: [[1956, 1961], [1968, 1969]], kind: 'frere' },
+  { name: 'Émilien-Cyrille', terms: [[1961, 1966]], kind: 'frere' },
+  { name: 'Jean Joucla', terms: [[1966, 1968]], kind: 'frere' },
+  { name: 'Didier Albo', terms: [[1969, 1970], [1992, 1995]], kind: 'frere' },
+  { name: 'Joseph Cavincy', terms: [[1970, 1971]], kind: 'frere' },
+  { name: 'Michel Andrejke', terms: [[1971, 1979]], kind: 'frere' },
+  { name: 'Jacques Boulad', terms: [[1979, 1985]], kind: 'frere' },
+  { name: 'Claude Robe (Régis)', terms: [[1985, 1992]], kind: 'frere' },
+  { name: 'Yves Lecocq', terms: [[1995, 2003]], kind: 'frere', role: 'coordinator' },
+  { name: 'Claude Robe (Régis)', terms: [[2003, 2011]], kind: 'frere', role: 'coordinator' },
+  { name: 'Georges Absi', terms: [[2011, null]], kind: 'frere', role: 'coordinator-then-director' },
+  { name: 'Maurice Antaki', terms: [[1963, 1971]], kind: 'laic' },
+  { name: 'Chawki Mittri', terms: [[1971, 1984]], kind: 'laic' },
+  { name: 'Magdi Kauzman', terms: [[1985, 2010]], kind: 'laic' },
+  { name: 'Medhat Nassif', terms: [[2010, 2014]], kind: 'laic' },
 ];
 
 /** Telephone numbers by department, from the college's official contact page. */
 export const CONTACTS: readonly ContactLine[] = [
-  { label: 'Standard', phones: ['+20 2 2590 47 40', '+20 2 2590 97 65', '+20 2 2588 56 53'] },
-  { label: 'Frère Supérieur', phones: ['+20 2 2590 43 48'] },
-  { label: 'Frère Directeur du collège', phones: ['+20 2 2592 80 70'] },
-  { label: 'Cycle secondaire', phones: ['+20 2 2592 24 03'] },
-  { label: 'Bac français', phones: ['+20 2 2592 95 98'] },
-  { label: 'Cycle préparatoire', phones: ['+20 2 2588 56 51'] },
-  { label: 'Grand primaire', phones: ['+20 2 2588 56 50'] },
-  { label: 'Petit primaire', phones: ['+20 2 2588 56 49'] },
-  { label: 'Jardin d’enfants', phones: ['+20 2 2588 56 52'] },
+  { id: 'standard', phones: ['+20 2 2590 47 40', '+20 2 2590 97 65', '+20 2 2588 56 53'] },
+  { id: 'superieur', phones: ['+20 2 2590 43 48'] },
+  { id: 'directeur', phones: ['+20 2 2592 80 70'] },
+  { id: 'secondaire', phones: ['+20 2 2592 24 03'] },
+  { id: 'bac', phones: ['+20 2 2592 95 98'] },
+  { id: 'preparatoire', phones: ['+20 2 2588 56 51'] },
+  { id: 'grand-primaire', phones: ['+20 2 2588 56 50'] },
+  { id: 'petit-primaire', phones: ['+20 2 2588 56 49'] },
+  { id: 'jardin', phones: ['+20 2 2588 56 52'] },
 ];
+
+/** The departments' names in French. */
+export const CONTACT_LABELS_FR: Readonly<Record<ContactId, string>> = {
+  standard: 'Standard',
+  superieur: 'Frère Supérieur',
+  directeur: 'Frère Directeur du collège',
+  secondaire: 'Cycle secondaire',
+  bac: 'Bac français',
+  preparatoire: 'Cycle préparatoire',
+  'grand-primaire': 'Grand primaire',
+  'petit-primaire': 'Petit primaire',
+  jardin: 'Jardin d’enfants',
+};
 
 export const SCHOOL_LINKS: readonly ExternalLink[] = [
   { label: 'Site officiel du collège', url: 'http://www.lasalle-eg.net/', note: 'Annonces, inscriptions du Bac nationale, vie du collège.' },

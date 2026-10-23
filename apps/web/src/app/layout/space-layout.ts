@@ -4,7 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, Ro
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
 import { NotificationBell } from '../notifications/notification-bell';
-import { Avatar, Icon, Wordmark } from '../ui';
+import { Avatar, Icon, SkipLink, Wordmark } from '../ui';
 import { ChangePasswordModal } from './change-password-modal';
 import { desktopNav, mobileNav, type SpaceNavItem, visibleNav } from './space-nav';
 
@@ -16,10 +16,10 @@ export type { SpaceNavItem } from './space-nav';
  */
 @Component({
   selector: 'app-space-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, ChangePasswordModal, NotificationBell],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, ChangePasswordModal, NotificationBell, SkipLink],
   template: `
     <div class="has-bottom-nav">
-      <a class="skip-link" href="#contenu">Aller au contenu</a>
+      <a cdlsSkipLink>Aller au contenu</a>
 
       <header class="app-bar on-inverse">
         <div class="app-bar__inner">

@@ -93,7 +93,7 @@ a:hover {
 }
 .skip-link {
   position: absolute;
-  left: var(--space-4);
+  inset-inline-start: var(--space-4);
   top: -100px;
   z-index: 100;
   padding: var(--space-3) var(--space-4);
@@ -442,7 +442,7 @@ a:hover {
 }
 select.field__control {
   appearance: none;
-  padding-right: var(--space-12);
+  padding-inline-end: var(--space-12);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23565D6B' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right var(--space-4) center;
@@ -473,11 +473,11 @@ textarea.field__control {
   display: flex;
 }
 .field__row .field__control {
-  padding-right: 6.5rem;
+  padding-inline-end: 6.5rem;
 }
 .field__row .btn {
   position: absolute;
-  right: 4px;
+  inset-inline-end: 4px;
   top: 50%;
   transform: translateY(-50%);
   min-height: 2.25rem;
@@ -487,14 +487,14 @@ textarea.field__control {
 }
 .search .icon {
   position: absolute;
-  left: var(--space-3);
+  inset-inline-start: var(--space-3);
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-muted);
   pointer-events: none;
 }
 .search .field__control {
-  padding-left: var(--space-12);
+  padding-inline-start: var(--space-12);
 }
 
 /* Checkbox (homework done, list selection) */
@@ -565,10 +565,10 @@ textarea.field__control {
   font-size: var(--text-label-s);
   font-weight: 500;
   color: var(--color-muted);
-  border-left: 1px solid var(--color-line);
+  border-inline-start: 1px solid var(--color-line);
 }
 .segmented label:first-child span {
-  border-left: 0;
+  border-inline-start: 0;
 }
 .segmented input:hover + span {
   background: var(--color-subtle);
@@ -681,7 +681,7 @@ textarea.field__control {
   line-height: var(--text-body-s--line-height);
 }
 .table caption {
-  text-align: left;
+  text-align: start;
   padding: var(--space-4);
   font-weight: 600;
   color: var(--color-heading);
@@ -690,7 +690,7 @@ textarea.field__control {
 .table td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-line);
-  text-align: left;
+  text-align: start;
   vertical-align: middle;
 }
 .table thead th {
@@ -707,7 +707,7 @@ textarea.field__control {
   background: #fdfbf6;
 }
 .table .num {
-  text-align: right;
+  text-align: end;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -718,7 +718,7 @@ textarea.field__control {
 .table--sticky-first th:first-child,
 .table--sticky-first td:first-child {
   position: sticky;
-  left: 0;
+  inset-inline-start: 0;
   z-index: 1;
   background: var(--color-surface);
   box-shadow: inset -1px 0 0 var(--color-line);
@@ -934,7 +934,7 @@ textarea.field__control {
   text-decoration: underline;
 }
 .site-header__lang {
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--color-accent) !important;
   font-family: var(--font-arabic);
   font-weight: 600;
@@ -951,7 +951,7 @@ textarea.field__control {
   min-height: 5rem;
 }
 .site-header__nav {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 .site-header__nav ul {
   display: flex;
@@ -970,13 +970,13 @@ textarea.field__control {
   }
   .site-header__toggle {
     display: inline-flex;
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .site-header__nav {
     display: none;
     position: absolute;
-    left: 0;
-    right: 0;
+    inset-inline-start: 0;
+    inset-inline-end: 0;
     top: 100%;
     z-index: 20;
     background: var(--color-page);
@@ -994,11 +994,11 @@ textarea.field__control {
   .site-header__nav .nav-link {
     width: 100%;
     border-bottom: 1px solid var(--color-line);
-    border-left: 3px solid transparent;
-    padding-left: var(--space-3);
+    border-inline-start: 3px solid transparent;
+    padding-inline-start: var(--space-3);
   }
   .site-header__nav .nav-link[aria-current="page"] {
-    border-left-color: var(--color-primary);
+    border-inline-start-color: var(--color-primary);
   }
   .site-header__cta {
     display: none;
@@ -1107,7 +1107,7 @@ textarea.field__control {
   white-space: nowrap;
 }
 .app-bar__end {
-  margin-left: auto;
+  margin-inline-start: auto;
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -1130,7 +1130,7 @@ textarea.field__control {
 .app-bar__dot {
   position: absolute;
   top: 10px;
-  right: 10px;
+  inset-inline-end: 10px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -1252,7 +1252,7 @@ textarea.field__control {
 }
 .breadcrumb li + li::before {
   content: "/";
-  margin-right: var(--space-2);
+  margin-inline-end: var(--space-2);
   color: var(--color-line-strong);
 }
 .breadcrumb a {
@@ -1273,7 +1273,7 @@ textarea.field__control {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-right: auto;
+  margin-inline-end: auto;
   font-size: var(--text-body-s);
   color: var(--color-muted);
 }
@@ -1485,7 +1485,7 @@ textarea.field__control {
 }
 .hero__credit {
   position: absolute;
-  right: var(--gutter);
+  inset-inline-end: var(--gutter);
   bottom: var(--space-4);
   padding: 2px var(--space-2);
   border-radius: var(--radius-sm);
@@ -1523,8 +1523,8 @@ textarea.field__control {
   content: "";
   position: absolute;
   top: 0.6rem;
-  left: 0;
-  right: 0;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
   height: 1.5px;
   background: var(--color-accent);
 }
@@ -1537,7 +1537,7 @@ textarea.field__control {
 .timeline__star {
   position: absolute;
   top: calc(-1 * var(--space-8));
-  left: 0;
+  inset-inline-start: 0;
   width: 1.25rem;
   height: 1.25rem;
 }
@@ -1562,19 +1562,19 @@ textarea.field__control {
   ol.timeline {
     grid-template-columns: 1fr;
     padding-top: 0;
-    padding-left: var(--space-8);
+    padding-inline-start: var(--space-8);
   }
   .timeline::before {
     top: 0;
     bottom: 0;
-    left: 0.6rem;
-    right: auto;
+    inset-inline-start: 0.6rem;
+    inset-inline-end: auto;
     width: 1.5px;
     height: auto;
   }
   .timeline__star {
     top: 0.75rem;
-    left: calc(-1 * var(--space-8));
+    inset-inline-start: calc(-1 * var(--space-8));
   }
 }
 
@@ -1858,11 +1858,11 @@ textarea.field__control {
   flex-direction: column-reverse;
   gap: var(--space-1);
   padding: var(--space-8) var(--space-6);
-  border-left: 1px solid var(--color-line);
+  border-inline-start: 1px solid var(--color-line);
 }
 .facts__list > div:first-child {
-  border-left: 0;
-  padding-left: 0;
+  border-inline-start: 0;
+  padding-inline-start: 0;
 }
 .facts__list dd {
   font-family: var(--font-display);
@@ -1883,8 +1883,8 @@ textarea.field__control {
     padding: var(--space-6) var(--space-4);
   }
   .facts__list > div:nth-child(odd) {
-    border-left: 0;
-    padding-left: 0;
+    border-inline-start: 0;
+    padding-inline-start: 0;
   }
   .facts__list > div:nth-child(n + 3) {
     border-top: 1px solid var(--color-line);
@@ -1916,8 +1916,8 @@ textarea.field__control {
 }
 .pull-quote {
   margin-block: var(--space-4);
-  padding-left: var(--space-6);
-  border-left: 3px solid var(--color-accent);
+  padding-inline-start: var(--space-6);
+  border-inline-start: 3px solid var(--color-accent);
 }
 .pull-quote p.t-quote {
   font-size: var(--text-quote);
@@ -2058,7 +2058,7 @@ textarea.field__control {
   gap: var(--space-4);
 }
 .bars li > :last-child {
-  text-align: right;
+  text-align: end;
   font-weight: 600;
 }
 @media (max-width: 30rem) {
@@ -2106,7 +2106,7 @@ textarea.field__control {
   gap: var(--space-3);
   margin-top: var(--space-8);
   padding: var(--space-6);
-  border-left: 3px solid var(--color-accent);
+  border-inline-start: 3px solid var(--color-accent);
   background: var(--color-page);
 }
 .filters {
@@ -2232,7 +2232,7 @@ textarea.field__control {
     grid-column: 1 / -1;
   }
   .table--stack td[data-label] {
-    text-align: left;
+    text-align: start;
   }
   .table--stack td[data-label]::before {
     content: attr(data-label) " ";

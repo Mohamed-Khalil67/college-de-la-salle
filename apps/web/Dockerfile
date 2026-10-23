@@ -13,7 +13,10 @@ COPY apps/web/package.json apps/web/
 RUN npm ci --workspace=@cdls/shared --workspace=@cdls/web
 COPY packages/shared packages/shared
 COPY apps/web apps/web
-RUN npm run build -w @cdls/shared && npm run build -w @cdls/web
+# The site's public address (deploy/.env PUBLIC_WEB_URL): absolute hreflang and canonical links in the
+# prerendered pages. Empty: root-relative links.
+ARG PUBLIC_WEB_URL=
+RUN npm run build -w @cdls/shared && npm run build -w @cdls/web -- --define "SITE_ORIGIN='${PUBLIC_WEB_URL}'"
 # Content-Security-Policy: the prerendered pages carry a few inline scripts (Angular's event-dispatch
 # contract, the stylesheet swap); allow exactly those by hash instead of 'unsafe-inline' for scripts.
 RUN node apps/web/nginx/csp-hashes.mjs apps/web/dist/college-website/browser /tmp/csp.conf

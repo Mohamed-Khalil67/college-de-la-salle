@@ -9,7 +9,8 @@
     "watch": "ng build --watch --configuration development",
     "lint": "oxlint src",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:public": "playwright test -c playwright.public.config.ts"
   },
   "dependencies": {
     "@angular/common": "^22.2.0",

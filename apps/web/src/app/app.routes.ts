@@ -1,21 +1,25 @@
 import type { Routes } from '@angular/router';
 import { anonymousGuard, firstAccessGuard, roleGuard, structureGuard } from './core/auth/auth.guards';
+import type { SiteLocale } from './i18n/locale';
 import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from './layout/space-navs';
 
 const spaceLayout = () => import('./layout/space-layout').then((m) => m.SpaceLayout);
 
+/** Each language's words come in their own chunk: a French visitor never downloads the Arabic text. */
+const fr = () => import('./i18n/fr').then((m): SiteLocale => m.FR);
+const en = () => import('./i18n/en').then((m): SiteLocale => m.EN);
+const ar = () => import('./i18n/ar').then((m): SiteLocale => m.AR);
+const publicSite = (locale: () => Promise<SiteLocale>) => () =>
+  Promise.all([import('./public/public.routes'), locale()]).then(([m, l]) => m.publicRoutes(l));
+const login = (locale: () => Promise<SiteLocale>) => () =>
+  Promise.all([import('./auth/login.routes'), locale()]).then(([m, l]) => m.loginRoutes(l));
+
 export const routes: Routes = [
-  {
-    path: '',
-    loadComponent: () => import('./layout/public-layout').then((m) => m.PublicLayout),
-    loadChildren: () => import('./public/public.routes').then((m) => m.PUBLIC_ROUTES),
-  },
-  {
-    path: 'connexion',
-    title: 'Connexion',
-    canMatch: [anonymousGuard],
-    loadComponent: () => import('./auth/login-page').then((m) => m.LoginPage),
-  },
+  // Public site in English and Arabic (/en/…, /ar/…); French is the last route before the fallback.
+  { path: 'en/login', canMatch: [anonymousGuard], loadChildren: login(en) },
+  { path: 'ar/login', canMatch: [anonymousGuard], loadChildren: login(ar) },
+  { path: 'en', loadChildren: publicSite(en) },
+  { path: 'ar', loadChildren: publicSite(ar) },
   {
     path: 'connexion/oubli',
     title: 'Mot de passe oublié',
@@ -55,8 +59,10 @@ export const routes: Routes = [
     loadComponent: spaceLayout,
     loadChildren: () => import('./admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },
+  { path: 'connexion', canMatch: [anonymousGuard], loadChildren: login(fr) },
   // Addresses of the previous site.
   { path: 'espace-eleve', redirectTo: 'eleve' },
   { path: 'espace-enseignant', redirectTo: 'enseignant' },
+  { path: '', loadChildren: publicSite(fr) },
   { path: '**', redirectTo: '' },
 ];

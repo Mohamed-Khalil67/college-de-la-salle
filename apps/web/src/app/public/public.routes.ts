@@ -1,49 +1,42 @@
-import { inject } from '@angular/core';
-import { Meta } from '@angular/platform-browser';
-import type { ResolveFn, Routes } from '@angular/router';
+import type { Route, Routes } from '@angular/router';
+import { provideLocale, publicRouteData, type SiteLocale } from '../i18n/locale';
+import { childPath, type PublicPageId } from '../i18n/pages';
+import { PublicLayout } from '../layout/public-layout';
+import type { SectionSlug } from '../school';
 
-/** Per-page meta description, set before render so it is in the prerendered HTML. */
-const description: ResolveFn<boolean> = (route) => {
-  const text = route.data['description'] as string | undefined;
-  if (text) inject(Meta).updateTag({ name: 'description', content: text });
-  return true;
-};
-
-/** All pages are static and prerendered (see src/app/app.routes.server.ts). */
-export const PUBLIC_ROUTES: Routes = [
-  {
-    path: '',
-    pathMatch: 'full',
-    data: { description: 'Collège de la Salle, Daher (Le Caire, fondé en 1898) : Bac nationale et Bac français. Histoire, patrimoine, matières, espace élève et espace enseignant.' },
-    resolve: { meta: description },
-    loadComponent: () => import('./home/home-page').then((m) => m.HomePage),
-  },
-  {
-    path: 'histoire',
-    title: 'Histoire & Patrimoine',
-    data: { description: 'Histoire du Collège de la Salle à Daher depuis 1898 : le bâtiment en briques rouges, les nouveaux bâtiments de 1955, la chapelle de 1958, en photographies d’archives.' },
-    resolve: { meta: description },
-    loadComponent: () => import('./history/history-page').then((m) => m.HistoryPage),
-  },
-  {
-    path: 'bac-nationale',
-    title: 'Bac nationale',
-    data: { section: 'nationale', description: 'Bac nationale (Thanaweya Amma) au Collège de la Salle, Daher : programme du ministère égyptien, matières, espace élève et inscription.' },
-    resolve: { meta: description },
-    loadComponent: () => import('./section/section-page').then((m) => m.SectionPage),
-  },
-  {
-    path: 'bac-francais',
-    title: 'Bac français',
-    data: { section: 'bac', description: 'Bac français au Collège de la Salle, Daher : baccalauréat français, homologation AEFE, pédagogie, orientation, effectifs et inscription.' },
-    resolve: { meta: description },
-    loadComponent: () => import('./section/section-page').then((m) => m.SectionPage),
-  },
-  {
-    path: 'contact',
-    title: 'Contact',
-    data: { description: 'Adresse, e-mail et numéros de téléphone du Collège de la Salle, Daher, par service et par cycle.' },
-    resolve: { meta: description },
-    loadComponent: () => import('./contact/contact-page').then((m) => m.ContactPage),
-  },
-];
+/**
+ * The public site in one language (app.routes.ts mounts it at '', 'en' and 'ar'). Every page is static and
+ * prerendered (app.routes.server.ts); its title and description come from the language's messages, and its
+ * data says which page it is, so the language switcher and hreflang links can find it in the other languages.
+ */
+export function publicRoutes(locale: SiteLocale): Routes {
+  const { lang, messages } = locale;
+  const page = (id: PublicPageId, loadComponent: Route['loadComponent'], section?: SectionSlug): Route => {
+    const { title, description } = messages.pages[id];
+    const data = publicRouteData({ lang, page: id, description });
+    return {
+      path: childPath(lang, id),
+      pathMatch: 'full',
+      // The home page has no title of its own: the strategy shows the site's full name.
+      ...(title ? { title } : {}),
+      // `section` is bound to SectionPage's input (withComponentInputBinding).
+      data: section ? { ...data, section } : data,
+      loadComponent,
+    };
+  };
+  return [
+    {
+      path: '',
+      component: PublicLayout,
+      providers: provideLocale(locale),
+      children: [
+        page('home', () => import('./home/home-page').then((m) => m.HomePage)),
+        page('history', () => import('./history/history-page').then((m) => m.HistoryPage)),
+        page('nationale', () => import('./section/section-page').then((m) => m.SectionPage), 'nationale'),
+        page('bac', () => import('./section/section-page').then((m) => m.SectionPage), 'bac'),
+        page('contact', () => import('./contact/contact-page').then((m) => m.ContactPage)),
+        page('accessibility', () => import('./accessibility/accessibility-page').then((m) => m.AccessibilityPage)),
+      ],
+    },
+  ];
+}

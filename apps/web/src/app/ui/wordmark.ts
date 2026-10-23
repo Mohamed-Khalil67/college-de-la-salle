@@ -3,7 +3,8 @@ import { RouterLink } from '@angular/router';
 
 /**
  * The college's name with its crest. The crest is a placeholder until the school authorises its logo
- * (docs/brand.md, open decisions). When the text is hidden on small screens, `label` names the link.
+ * (docs/brand.md, open decisions). When the text is hidden on small screens, `label` names the link. The name
+ * is never translated (`lang="fr"`, so it is read in French on the English and Arabic pages too).
  */
 @Component({
   selector: 'cdls-wordmark',
@@ -14,7 +15,7 @@ import { RouterLink } from '@angular/router';
         <use [attr.href]="tone() === 'dark' ? '/icons.svg#crest-on-dark' : '/icons.svg#crest'" />
       </svg>
       <span class="wordmark__text">
-        <span class="wordmark__name">Collège de la Salle</span>
+        <span class="wordmark__name" lang="fr">Collège de la Salle</span>
         <span class="wordmark__place">{{ subtitle() }}</span>
       </span>
     </a>

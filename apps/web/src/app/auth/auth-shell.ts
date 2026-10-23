@@ -1,13 +1,13 @@
 import { Component } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
-import { Wordmark } from '../ui';
+import { SkipLink, Wordmark } from '../ui';
 
 /** The two-column frame of the sign-in family of pages: the college on one side, the page's content on the other. */
 @Component({
   selector: 'app-auth-shell',
-  imports: [NgOptimizedImage, Wordmark],
+  imports: [NgOptimizedImage, SkipLink, Wordmark],
   template: `
-    <a class="skip-link" href="#contenu">Aller au contenu</a>
+    <a cdlsSkipLink>Aller au contenu</a>
     <div class="auth">
       <aside class="auth__visual on-inverse" aria-label="Le collège">
         <img ngSrc="/images/school/batiment-brique.jpg" width="625" height="425" alt="" priority />
