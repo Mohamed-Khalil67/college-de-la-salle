@@ -1,59 +1,77 @@
-You are an expert in TypeScript, Angular, and scalable web application development. You write functional, maintainable, performant, and accessible code following Angular and TypeScript best practices.
+# CDLS: Collège de la Salle (Daher, Cairo)
 
-## TypeScript Best Practices
+School website and platform for one school. npm workspaces: `apps/web` (Angular 22), `apps/api` (NestJS 12 + Prisma 7 +
+PostgreSQL 18), `packages/shared` (`@cdls/shared`: the API contract in `src/api.ts` and the pure logic). Roles: admin
+(plus coordinator teachers), teacher, student. No parent space. Read `apps/web/CLAUDE.md` and `apps/api/CLAUDE.md` for
+the details of each side.
 
-- Use strict type checking
-- Prefer type inference when the type is obvious
-- Avoid the `any` type; use `unknown` when type is uncertain
+## Skills: load these first, every agent, every task
 
-## Angular Best Practices
+| Part of the work | Skills |
+|---|---|
+| API, database schema, migrations, Prisma | `nestjs-best-practices` |
+| Web UI | `angular-developer`, `frontend-design` |
+| Any screen you add or change | `design:accessibility-review` (Axe at 390 and 1440 px), `design:ux-copy` for words |
+| Auth, permissions, tokens, anything public | `/security-review` |
+| Before you hand work back | `/code-review` |
 
-- Always use standalone components over NgModules
-- Must NOT set `standalone: true` inside Angular decorators. It's the default in Angular v20+.
-- Do NOT set `changeDetection: ChangeDetectionStrategy.OnPush` explicitly. `OnPush` is the default in Angular v22+.
-- Use signals for state management
-- Implement lazy loading for feature routes
-- Do NOT use the `@HostBinding` and `@HostListener` decorators. Put host bindings inside the `host` object of the `@Component` or `@Directive` decorator instead
-- Use `NgOptimizedImage` for all static images.
-  - `NgOptimizedImage` does not work for inline base64 images.
+Put the skill line at the top of every brief you give an agent. The logo and crest are final: never change or fetch one.
 
-## Accessibility Requirements
+## Type safety (not optional)
 
-- It MUST pass all AXE checks.
-- It MUST follow all WCAG AA minimums, including focus management, color contrast, and ARIA attributes.
+- Contract first: a new endpoint starts as request/response interfaces in `packages/shared/src/api.ts`; the API DTO
+  classes `implements` them and the web client imports them, so a change breaks the build on both sides.
+- Strict TypeScript, no `any` (use `unknown` and narrow). String unions come with an exported const array, never a
+  hand-copied list. Typed Prisma `select`/`include`, mapped to DTOs; never return a Prisma model.
+- Database: changes only through new migrations (never edit an applied one); constraints Prisma cannot express
+  (CHECK, partial unique, exclusion) go in the migration SQL; index every foreign key and filter.
+- Pure logic lives in `packages/shared` or decorator-free files, with a spec next to it.
 
-## Components
+## How agents work here
 
-- Keep components small and focused on a single responsibility
-- Use `input()` and `output()` functions instead of decorators
-- Use `model()` for two-way bound properties with `[(prop)]` syntax instead of pairing `input()` with `output()`
-- Use `computed()` for derived state
-- Use `linkedSignal()` for state derived from multiple reactive sources that must stay synchronized
-- Prefer inline templates for small components
-- Prefer Signal Forms (`@angular/forms/signals`) for new forms. They are stable in Angular v22+ and provide signal-based state, type-safe field access, and schema-based validation
-- When not using Signal Forms, prefer Reactive forms instead of Template-driven ones
-- Do NOT use `ngClass`, use `class` bindings instead
-- Do NOT use `ngStyle`, use `style` bindings instead
-- Do NOT import `CommonModule`, import only the directives and pipes the template uses, such as `AsyncPipe` or `DatePipe`
-- When using external templates/styles, use paths relative to the component TS file.
+- One feature per agent, in its own worktree and branch from `main`. Commit on the branch; never push, never touch
+  secrets, never use `prisma migrate reset`. The owner decides merges.
+- Each agent uses its own database and ports. `cdls_main`, ports 3000 (API) and 4300 (web) belong to the main checkout.
+- Done means: `npm run build`, `npm run lint` (0 warnings), `npm test`, `npm run test:e2e`, and for UI the Playwright +
+  Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
+- A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
 
-## State Management
+## Status (2026-10-26)
 
-- Use signals for local component state
-- Use `computed()` for derived state
-- Keep state transformations pure and predictable
-- Do NOT use `mutate` on signals, use `update` or `set` instead
+Everything below is merged on local `main`; nothing is pushed to GitHub yet (`college/main` is behind).
 
-## Templates
+- **Done:** public site in fr/en/ar with accessibility statement; login, first sign-in password change, forgotten
+  password by e-mail; student, teacher and admin spaces; timetable with hard/soft conflicts and suggestions; groups and
+  « Assigner à »; grades, attendance, report cards (PDF); announcements and contact messages with clean-up; roster
+  import with numbered homonym e-mails; section-change approvals; next-year rollover; personal calendar feed and
+  notifications; Docker deployment (`deploy/`, `docs/deployment.md`).
+- **Checks on main:** 140 shared, 300 API and 188 web unit tests; 350 API e2e (stable over three runs); Playwright 112
+  passed, 71 phone variants skipped by design.
+- **Open:** the real login e-mail domain (`SCHOOL_EMAIL_DOMAIN`), SMTP details, a Cloudflare tunnel token or domain for
+  going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
+  timetable slots, school-scale testing (600 students), an independent RGAA audit.
+- More detail: `docs/school-year-design.md` (design, decisions, leftovers), `docs/deployment.md`, `docs/i18n.md`,
+  `docs/accessibility.md`, `docs/calendar-feed-notifications.md`.
 
-- Keep templates simple and avoid complex logic
-- Use native control flow (`@if`, `@for`, `@switch`) instead of `*ngIf`, `*ngFor`, `*ngSwitch`
-- Use the async pipe to handle observables
-- Do not assume globals like (`new Date()`) are available.
+## TypeScript
 
-## Services
+- Strict type checking; prefer inference when the type is obvious.
 
-- Design services around a single responsibility
-- Use the `providedIn: 'root'` option for singleton services
-- Prefer the `@Service` decorator over `@Injectable({providedIn: 'root'})` for new singleton services (Angular v22+)
-- Use the `inject()` function instead of constructor injection
+## Angular
+
+- Standalone components only; do NOT set `standalone: true` (default). Do NOT set `changeDetection: OnPush` (default
+  in v22). Zoneless.
+- Signals for state; `computed()` for derived state; `linkedSignal()` when state derives from several sources and must
+  stay in sync; never `mutate`, use `update`/`set`.
+- `input()`, `output()`, `model()` instead of decorators. No `@HostBinding`/`@HostListener`: use the `host` object.
+- Lazy-load feature routes. `NgOptimizedImage` for static images (not for inline base64).
+- Native control flow (`@if`, `@for`, `@switch`); `class` and `style` bindings, never `ngClass`/`ngStyle`; no
+  `CommonModule` import; async pipe for observables; keep templates simple. Do not assume globals such as `new Date()`
+  are available in code that also runs on the server.
+- Forms: Signal Forms (`@angular/forms/signals`) for new forms; otherwise Reactive forms.
+- Services: `inject()`, `providedIn: 'root'` or the `@Service` decorator (v22+), one responsibility each.
+- External templates and styles use paths relative to the component file; inline templates for small components.
+
+## Accessibility
+
+- Must pass all Axe checks and WCAG AA: focus management, contrast, ARIA, keyboard.
