@@ -50,6 +50,7 @@ Everything below is merged on local `main`; nothing is pushed to GitHub yet (`co
 - **Open:** the real login e-mail domain (`SCHOOL_EMAIL_DOMAIN`), SMTP details, a Cloudflare tunnel token or domain for
   going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.
+- Diagrams (system, workflows, database schema, kept in sync with `schema.prisma`): `docs/architecture.md`.
 - More detail: `docs/school-year-design.md` (design, decisions, leftovers), `docs/deployment.md`, `docs/i18n.md`,
   `docs/accessibility.md`, `docs/calendar-feed-notifications.md`.
 
