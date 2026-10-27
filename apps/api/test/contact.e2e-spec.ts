@@ -174,7 +174,7 @@ describe('Contact messages (e2e)', () => {
 
   it('refuses an empty, oversized or malformed selection', async () => {
     const admin = await t.token(ADMIN);
-    const send = (body: unknown) =>
+    const send = (body: string | object) =>
       t.http().post('/api/contact-messages/handle').set(bearer(admin)).send(body);
     await send({ ids: [] }).expect(400);
     await send({}).expect(400);

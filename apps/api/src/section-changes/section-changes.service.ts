@@ -5,7 +5,7 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toIso } from '../common/dates.js';
-import { forbidden, notFound } from '../common/errors.js';
+import { forbidden, isUniqueViolation, notFound } from '../common/errors.js';
 import { pageArgs, paginated } from '../common/pagination.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type {
@@ -39,12 +39,6 @@ const include = {
 } satisfies Prisma.SectionChangeRequestInclude;
 
 type RequestRow = Prisma.SectionChangeRequestGetPayload<{ include: typeof include }>;
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'P2002'
-  );
-}
 
 /**
  * Section changes. A student asks for themself, or the secretariat (an admin) asks for a student; only

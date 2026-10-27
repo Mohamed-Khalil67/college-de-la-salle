@@ -32,11 +32,9 @@ import {
   HandleContactMessagesResponseDto,
   UpdateContactMessageDto,
 } from './dto/contact.dto.js';
+import { throttleLimit } from '../config/throttle-limits.js';
 
-/** Read per request from the validated environment (defaults to 5). */
-function contactLimit(): number {
-  return Number(process.env['CONTACT_THROTTLE_LIMIT'] ?? 5) || 5;
-}
+const contactLimit = throttleLimit('CONTACT_THROTTLE_LIMIT');
 
 @ApiTags('contact')
 @Controller()

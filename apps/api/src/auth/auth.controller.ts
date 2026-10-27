@@ -25,14 +25,12 @@ import {
   SessionDto,
   SessionUserDto,
 } from './dto/auth.dto.js';
+import { throttleLimit } from '../config/throttle-limits.js';
 import { PasswordResetService } from './password-reset.service.js';
 
 export const REFRESH_COOKIE = 'cdls_refresh';
 
-/** Read per request from the validated environment (defaults to 5). */
-function loginLimit(): number {
-  return Number(process.env['LOGIN_THROTTLE_LIMIT'] ?? 5) || 5;
-}
+const loginLimit = throttleLimit('LOGIN_THROTTLE_LIMIT');
 
 /**
  * Per address and account, so a class behind one school address can sign in together; the address as a

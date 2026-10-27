@@ -7,6 +7,7 @@ import {
 } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { toDay } from '../common/dates.js';
+import { hasString, isRecord, readJsonList } from '../common/json.js';
 import { toActivityTypeSummary } from '../activity-types/activity-types.service.js';
 import { toTargetDto } from '../targets/target.mapper.js';
 import type { EventDto } from './dto/event.dto.js';
@@ -42,7 +43,7 @@ export function toEventDto(e: EventRow): EventDto {
     place: e.place,
     periodId: e.periodId,
     description: e.description,
-    attachments: (e.attachments ?? []) as unknown as Attachment[],
+    attachments: readJsonList(e.attachments, isAttachment),
     coefficient: Number(e.coefficient),
     target: toTargetDto(e.targets),
     authorId: e.authorId,
@@ -50,6 +51,11 @@ export function toEventDto(e: EventRow): EventDto {
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),
   };
+}
+
+/** A stored attachment: a label and an address. */
+function isAttachment(value: unknown): value is Attachment {
+  return isRecord(value) && hasString(value, 'label') && hasString(value, 'url');
 }
 
 /** `all`, `bac` or `bac-premiere`: the audience in the shared model's notation. */

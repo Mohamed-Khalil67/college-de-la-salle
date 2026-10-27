@@ -5,6 +5,7 @@ import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { toDay, toIso } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
+import { hasNullableNumber, hasNumber, hasString, isRecord, readJsonList } from '../common/json.js';
 import { wasTargeted } from '@cdls/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { toEntries } from '../targets/target.mapper.js';
@@ -340,6 +341,18 @@ export class ReportCardsService {
   }
 }
 
+/** A stored subject line of a report card. */
+function isCardSubject(value: unknown): value is ReportCardSubjectDto {
+  return (
+    isRecord(value) &&
+    hasString(value, 'subjectId') &&
+    hasString(value, 'subjectName') &&
+    hasNumber(value, 'coefficient') &&
+    hasNullableNumber(value, 'average') &&
+    hasNumber(value, 'gradeCount')
+  );
+}
+
 function toReportCardDto(c: CardRow | (ReportCard & CardRow)): ReportCardDto {
   return {
     id: c.id,
@@ -350,7 +363,7 @@ function toReportCardDto(c: CardRow | (ReportCard & CardRow)): ReportCardDto {
     average: c.average === null ? null : Number(c.average),
     rank: c.rank,
     appreciation: c.appreciation,
-    subjects: (c.subjects ?? []) as unknown as ReportCardSubjectDto[],
+    subjects: readJsonList(c.subjects, isCardSubject),
     generatedAt: c.generatedAt.toISOString(),
     publishedAt: toIso(c.publishedAt),
   };

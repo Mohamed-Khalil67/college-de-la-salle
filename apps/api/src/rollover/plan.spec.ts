@@ -262,7 +262,7 @@ describe('buildPlan', () => {
     });
 
     it('promotes a student asking for another section in their own section', () => {
-      expect(actions({ ...options, overrides: [{ studentId: 'a', action: 'section_change' }] }).a).toEqual([
+      expect(actions({ ...options, overrides: [{ studentId: 'a', action: 'section_change' }] })['a']).toEqual([
         'section_change',
         'bac/premiere',
       ]);

@@ -6,7 +6,6 @@
 import type { SectionId } from '@cdls/shared';
 import type { PrismaClient } from '../src/generated/prisma/client.js';
 import { OccupancyService } from '../src/occupancy/occupancy.service.js';
-import type { PrismaService } from '../src/prisma/prisma.service.js';
 
 /** The end of the first hour of each two-hour block the demo timetable uses. */
 const MIDDLE: Readonly<Record<string, string>> = {
@@ -69,7 +68,7 @@ export async function seedGroups(
       const second = await prisma.timetableSlot.create({
         data: { ...copy, startTime: middle, groupId: b!.id, division: 'TP' },
       });
-      const occupancy = new OccupancyService(prisma as unknown as PrismaService);
+      const occupancy = new OccupancyService();
       await occupancy.reindexSlots(prisma, [tp.id, second.id]);
     }
 

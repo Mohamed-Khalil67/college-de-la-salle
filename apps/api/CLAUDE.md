@@ -71,9 +71,17 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 - `notifications/`: `NotificationsService.write(tx, drafts, actorId)` inserts the rows inside the CALLER'S transaction; `ChangeNoticesService` (exported) resolves the audience (class roster, group members, `TargetsService.concernedIds`, the event's author, the slot's teacher) and is called by `TimetableService.run` (exceptions and restores, after the conflict checks, never on a dry run), `EventsService` (homework created, event moved or re-roomed, event deleted) and `GradesService` (grades published, late grades of a published event). The actor never notifies themself; only `active` accounts receive. Texts are French and come from `packages/shared/src/notifications.ts`. A new kind goes in the shared `NOTIFICATION_KINDS`, the Prisma enum (new migration) and the shared spec.
 - E-mail copies: `User.notifyByEmail` (default false). `NotificationMailService` (timer every `NOTIFICATION_MAIL_INTERVAL_MINUTES`, plus a daily retention purge) skips (`mail_state = 'skipped'`) notifications whose day is past, that were read, older than a day, or whose user opted out; the rest is claimed (`pending` → `sent` in one `updateMany`) before one grouped mail per user, and handed back when the send fails. e2e tests call `sendDigests()` / `purge()` directly.
 
+## Type safety
+
+- `tsconfig.json` is strict plus `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters` and `verbatimModuleSyntax` (type-only imports are `import type`). `array[i]` is `T | undefined`: narrow it. `strictPropertyInitialization` stays off for DTO classes, and `exactOptionalPropertyTypes` is not on (27 errors, mostly Prisma input types).
+- No `any`, no `as unknown as` outside specs. A `Json` column is read with `readJsonList(value, guard)` and a type guard (`common/json.ts`), never a cast: see `isAttachment` (`events/event.mapper.ts`) and `isCardSubject` (`report-cards/report-cards.service.ts`).
+- Unused constructor parameters are removed, not kept "for later": an injected service that is never read is a dependency the module graph pays for.
+- Prisma error codes go through `common/errors.ts` (`isUniqueViolation`, `isForeignKeyViolation`, `conflictOnUnique`, `conflictOnReference`); do not re-declare them in a service.
+
 ## Config
 
 - All environment variables are declared and validated in `src/config/env.validation.ts`; add new ones there and to `.env.example` (placeholders only, never real secrets). Read them with `ConfigService<Env, true>`.
+- The one exception is a `@Throttle()` limit, which is evaluated where nothing is injected: use `throttleLimit('NAME')` (`config/throttle-limits.ts`), which reads the environment per request and takes its default from `Env`. Never write `process.env[...]` or a second default in a controller.
 
 ## Deployment (Docker)
 

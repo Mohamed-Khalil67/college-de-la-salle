@@ -14,7 +14,6 @@ import type { Prisma } from '../generated/prisma/client.js';
 import { loadClosures } from '../calendar-days/closures.js';
 import { toDay } from '../common/dates.js';
 import { isExclusionViolation } from '../common/errors.js';
-import { PrismaService } from '../prisma/prisma.service.js';
 import { conflictBlocked } from './blocked.js';
 import { conflictMessage } from './conflict-messages.js';
 import type { GroupHold } from './event-hold.js';
@@ -67,8 +66,6 @@ interface Clash {
  */
 @Injectable()
 export class OccupancyService {
-  constructor(private readonly prisma: PrismaService) {}
-
   /** Rows the slots hold, computed from the stored rule and exceptions (holidays removed). */
   async entriesForSlots(db: Db, slotIds: readonly string[]): Promise<IndexRow[]> {
     if (!slotIds.length) return [];
