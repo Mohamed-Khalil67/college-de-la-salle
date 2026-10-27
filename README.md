@@ -136,7 +136,7 @@ apps/api/src/             One NestJS module per area (auth, users, classes, even
 apps/api/prisma/          Schema, migrations, seed
 packages/shared/src/      Domain logic and the API contract (api.ts) used by both apps
 design/prototypes/        Approved HTML/CSS screens (the design source)
-docs/                     architecture.md (diagrams: system, workflows, database schema), brainstorm.md, brand.md, legacy/
+docs/                     architecture-map.html (diagrams), architecture.md (where things live), brainstorm.md, brand.md, legacy/
 ```
 
 The access token lives in memory only; the refresh token is an httpOnly cookie, so a reload restores the

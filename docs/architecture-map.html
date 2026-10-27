@@ -1,0 +1,291 @@
+<title>CDLS Architecture Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one header, four tabs (system, web layers, database, school year); each tab is a drawing plus a short caption. */
+:root {
+  --bg: #f3f5f9; --surface: #ffffff; --fg: #14213d; --muted: #55607a; --line: #c3cbdb;
+  --navy: #1b2a49; --navy-bg: #e8eef7;
+  --gold: #8a6d22; --gold-bg: #f5ecd2;
+  --green: #3d6b4f; --green-bg: #e6efe8;
+  --red: #a63d2f;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1626; --surface: #172138; --fg: #e6ebf5; --muted: #9aa6c0; --line: #33405e;
+    --navy: #9db4ea; --navy-bg: #1c2742; --gold: #d6b45a; --gold-bg: #2e2a1a;
+    --green: #7fbf98; --green-bg: #1a2b22; --red: #e58a7b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1626; --surface: #172138; --fg: #e6ebf5; --muted: #9aa6c0; --line: #33405e;
+  --navy: #9db4ea; --navy-bg: #1c2742; --gold: #d6b45a; --gold-bg: #2e2a1a;
+  --green: #7fbf98; --green-bg: #1a2b22; --red: #e58a7b; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1120px; margin-inline: auto; padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 48px; }
+header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+h1 { font-size: clamp(26px, 4vw, 38px); line-height: 1.15; margin: 0; font-weight: 600; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 68ch; margin: 0; }
+nav { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+nav button { font: inherit; font-weight: 500; color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 14px; cursor: pointer; margin-bottom: -1px; }
+nav button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--gold); }
+nav button:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+h2 { font-size: 20px; margin: 0 0 4px; font-weight: 600; }
+.sub { color: var(--muted); margin: 0 0 16px; max-width: 70ch; }
+figure { margin: 0; }
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+svg { display: block; width: 100%; min-width: 640px; height: auto; font-family: var(--sans); }
+figcaption { color: var(--muted); font-size: 13.5px; margin-top: 10px; max-width: 80ch; }
+svg text { fill: var(--fg); font-size: 13px; }
+svg .t-sm { font-size: 11.5px; fill: var(--muted); }
+svg .t-mono { font-family: var(--mono); font-size: 11.5px; }
+svg .t-b { font-weight: 600; font-size: 14px; }
+svg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+svg .navy { fill: var(--navy-bg); stroke: var(--navy); stroke-width: 1.5; }
+svg .gold { fill: var(--gold-bg); stroke: var(--gold); stroke-width: 1.5; }
+svg .green { fill: var(--green-bg); stroke: var(--green); stroke-width: 1.5; }
+svg .ln { stroke: var(--fg); stroke-width: 1.4; fill: none; }
+svg .dash { stroke: var(--gold); stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+svg .ah { fill: var(--fg); }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; min-width: 0; }
+.card h3 { margin: 0 0 2px; font-size: 15px; }
+.card p { margin: 0 0 10px; color: var(--muted); font-size: 13.5px; }
+.chips { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chips li { border: 1px solid var(--line); border-left: 3px solid var(--navy); border-radius: 3px; padding: 5px 9px; background: var(--bg); min-width: 0; }
+.chips b { font-family: var(--mono); font-weight: 500; font-size: 12.5px; }
+.chips span { display: block; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.chips li.key { border-left-color: var(--gold); background: var(--gold-bg); }
+.note { margin-top: 14px; padding: 12px 16px; border: 1px solid var(--gold); background: var(--gold-bg); border-radius: 6px; max-width: 80ch; }
+.note code, .rules code, .steps code { font-family: var(--mono); font-size: 12.5px; }
+.rules { margin: 16px 0 0; padding-left: 18px; max-width: 80ch; display: grid; gap: 6px; }
+.steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px 12px 44px; position: relative; min-width: 0; }
+.steps li::before { content: counter(s); position: absolute; left: 12px; top: 12px; width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: var(--bg); font-family: var(--mono); font-size: 12px; display: grid; place-items: center; }
+.steps b { display: block; }
+.steps span { color: var(--muted); font-size: 13.5px; }
+.roles { margin-top: 24px; }
+.where { margin-top: 28px; }
+.where table { border-collapse: collapse; width: 100%; background: var(--surface); border: 1px solid var(--line); }
+.where th, .where td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13.5px; }
+.where td:last-child { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+.where .tw { overflow-x: auto; }
+@media (prefers-reduced-motion: no-preference) { nav button { transition: color .15s; } }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Collège de la Salle, Daher, Cairo</div>
+  <h1>CDLS architecture map</h1>
+  <p class="lede">One school platform in three parts: an Angular web app, a NestJS API on PostgreSQL, and a shared package that holds the contract between them. Read the tabs left to right, from the outside in.</p>
+</header>
+
+<nav role="tablist" aria-label="Architecture views">
+  <button role="tab" id="t-system" aria-selected="true" aria-controls="p-system" data-tab="system">System</button>
+  <button role="tab" id="t-web" aria-selected="false" aria-controls="p-web" data-tab="web">Web app layers</button>
+  <button role="tab" id="t-database" aria-selected="false" aria-controls="p-database" data-tab="database">Database</button>
+  <button role="tab" id="t-year" aria-selected="false" aria-controls="p-year" data-tab="year">School year</button>
+</nav>
+
+<!-- SYSTEM -->
+<section role="tabpanel" id="p-system" aria-labelledby="t-system">
+  <h2>What runs where</h2>
+  <p class="sub">Everyone reaches the school through one of two entries. The web container serves the pages, and the API is the only thing that touches the database.</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 1080 450" role="img" aria-label="Visitors, students, teachers and admins reach nginx through a Cloudflare Tunnel or Caddy. The Angular app calls the NestJS API, which reads and writes PostgreSQL. The shared package supplies types and rules to both the web app and the API.">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+      <g>
+        <rect class="navy" x="20" y="30" width="170" height="50" rx="4"/><text x="105" y="60" text-anchor="middle">Visitor</text>
+        <rect class="navy" x="20" y="100" width="170" height="50" rx="4"/><text x="105" y="130" text-anchor="middle">Student</text>
+        <rect class="navy" x="20" y="170" width="170" height="50" rx="4"/><text x="105" y="200" text-anchor="middle">Teacher</text>
+        <rect class="navy" x="20" y="240" width="170" height="50" rx="4"/><text x="105" y="261" text-anchor="middle">Admin</text><text x="105" y="278" text-anchor="middle" class="t-sm">and coordinator teachers</text>
+        <rect class="box" x="20" y="330" width="170" height="50" rx="4"/><text x="105" y="351" text-anchor="middle">Calendar app</text><text x="105" y="368" text-anchor="middle" class="t-sm">Google, Apple, Outlook</text>
+      </g>
+      <path class="ln" d="M190 55H215M190 125H215M190 195H215M190 265H215M215 55V265"/>
+      <path class="ln" d="M215 120H238" marker-end="url(#a)"/><path class="ln" d="M215 220H238" marker-end="url(#a)"/>
+      <text x="205" y="22" class="t-sm" text-anchor="start">HTTPS</text>
+      <rect class="green" x="240" y="90" width="150" height="60" rx="4"/><text x="315" y="116" text-anchor="middle" class="t-b">Cloudflare</text><text x="315" y="134" text-anchor="middle">Tunnel</text>
+      <rect class="green" x="240" y="190" width="150" height="60" rx="4"/><text x="315" y="216" text-anchor="middle" class="t-b">Caddy</text><text x="315" y="234" text-anchor="middle">Let's Encrypt</text>
+      <text x="315" y="268" text-anchor="middle" class="t-sm">one entry or the other</text>
+      <path class="ln" d="M190 355H280V252" marker-end="url(#a)"/><text x="200" y="346" class="t-sm">secret .ics link</text>
+      <path class="ln" d="M390 120L448 152" marker-end="url(#a)"/><path class="ln" d="M390 220L448 208" marker-end="url(#a)"/>
+      <rect class="box" x="450" y="110" width="170" height="140" rx="4"/>
+      <text x="535" y="140" text-anchor="middle" class="t-b">web</text><text x="535" y="160" text-anchor="middle" class="t-mono">nginx</text>
+      <text x="535" y="188" text-anchor="middle">Angular 22 app</text><text x="535" y="208" text-anchor="middle" class="t-sm">public pages prerendered</text><text x="535" y="224" text-anchor="middle" class="t-sm">in fr, en, ar</text>
+      <path class="ln" d="M620 180H688" marker-end="url(#a)"/><text x="654" y="172" text-anchor="middle" class="t-sm">/api</text>
+      <rect class="box" x="690" y="110" width="170" height="140" rx="4"/>
+      <text x="775" y="140" text-anchor="middle" class="t-b">api</text><text x="775" y="160" text-anchor="middle" class="t-mono">NestJS 12</text>
+      <text x="775" y="188" text-anchor="middle" class="t-sm">JWT + rotating refresh cookie</text><text x="775" y="206" text-anchor="middle" class="t-sm">roles, ownership checks</text><text x="775" y="224" text-anchor="middle" class="t-sm">audit log</text>
+      <path class="ln" d="M860 180H908" marker-end="url(#a)"/><text x="884" y="172" text-anchor="middle" class="t-sm">SQL</text>
+      <rect class="gold" x="910" y="110" width="150" height="140" rx="4"/>
+      <text x="985" y="140" text-anchor="middle" class="t-b">PostgreSQL 18</text>
+      <text x="985" y="176" text-anchor="middle" class="t-sm">exclusion constraints</text><text x="985" y="194" text-anchor="middle" class="t-sm">refuse double-booked</text><text x="985" y="212" text-anchor="middle" class="t-sm">rooms, teachers, classes</text>
+      <rect class="box" x="910" y="320" width="150" height="50" rx="4"/><text x="985" y="350" text-anchor="middle">Backup job</text>
+      <path class="ln" d="M985 320V252" marker-end="url(#a)"/><text x="993" y="292" class="t-sm">nightly pg_dump</text>
+      <rect class="box" x="690" y="320" width="170" height="50" rx="4"/><text x="775" y="341" text-anchor="middle">SMTP server</text><text x="775" y="358" text-anchor="middle" class="t-sm">password reset, alerts</text>
+      <path class="ln" d="M775 250V318" marker-end="url(#a)"/>
+      <rect class="gold" x="450" y="400" width="410" height="42" rx="4"/><text x="655" y="426" text-anchor="middle"><tspan class="t-mono">packages/shared</tspan>: API contract + pure logic</text>
+      <path class="dash" d="M535 400V252M775 400V372"/><text x="544" y="330" class="t-sm">types and rules</text>
+    </svg>
+    </div>
+    <figcaption>Solid arrows are requests. Dashed lines show that web and API both import the same contract, so a change to an endpoint breaks the build on both sides.</figcaption>
+  </figure>
+</section>
+
+<!-- WEB -->
+<section role="tabpanel" id="p-web" aria-labelledby="t-web" hidden>
+  <h2>How the Angular app is layered</h2>
+  <p class="sub">A layer may import from the layers below it and never from above. <code>architecture.spec.ts</code> fails the test run if a file breaks a rule.</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 760 540" role="img" aria-label="Layers of the web app from top to bottom: app routes, three role spaces, features, layout, shared, core. Each layer imports only downward.">
+      <defs><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="ah"/></marker></defs>
+      <rect class="navy" x="20" y="10" width="720" height="44" rx="4"/><text x="380" y="38" text-anchor="middle"><tspan class="t-mono">app.routes.ts</tspan> lazy-loads every area</text>
+      <path class="ln" d="M380 54V76" marker-end="url(#b)"/>
+      <rect class="navy" x="20" y="80" width="220" height="50" rx="4"/><text x="130" y="102" text-anchor="middle" class="t-mono">admin/</text><text x="130" y="119" text-anchor="middle" class="t-sm">administration space</text>
+      <rect class="navy" x="270" y="80" width="220" height="50" rx="4"/><text x="380" y="102" text-anchor="middle" class="t-mono">eleve/</text><text x="380" y="119" text-anchor="middle" class="t-sm">student space</text>
+      <rect class="navy" x="520" y="80" width="220" height="50" rx="4"/><text x="630" y="102" text-anchor="middle" class="t-mono">enseignant/</text><text x="630" y="119" text-anchor="middle" class="t-sm">teacher space</text>
+      <text x="380" y="150" text-anchor="middle" class="t-sm">role spaces never import each other</text>
+      <path class="ln" d="M380 156V176" marker-end="url(#b)"/>
+      <rect class="box" x="20" y="180" width="720" height="50" rx="4"/><text x="380" y="202" text-anchor="middle" class="t-mono">features/</text><text x="380" y="219" text-anchor="middle" class="t-sm">one folder per feature, each with a private shared/ folder</text>
+      <path class="ln" d="M380 230V250" marker-end="url(#b)"/>
+      <rect class="box" x="20" y="254" width="720" height="50" rx="4"/><text x="380" y="276" text-anchor="middle" class="t-mono">layout/</text><text x="380" y="293" text-anchor="middle" class="t-sm">page shell and menus; may import only features/notifications/notification-bell</text>
+      <path class="ln" d="M380 304V324" marker-end="url(#b)"/>
+      <rect class="gold" x="20" y="328" width="720" height="92" rx="4"/><text x="40" y="350" class="t-mono">shared/</text><text x="110" y="350" class="t-sm">reusable pieces with no feature knowledge</text>
+      <rect class="box" x="36" y="362" width="160" height="44" rx="3"/><text x="116" y="381" text-anchor="middle" class="t-mono">ui/</text><text x="116" y="397" text-anchor="middle" class="t-sm">buttons, fields</text>
+      <rect class="box" x="208" y="362" width="160" height="44" rx="3"/><text x="288" y="381" text-anchor="middle" class="t-mono">components/</text><text x="288" y="397" text-anchor="middle" class="t-sm">week view, modals</text>
+      <rect class="box" x="380" y="362" width="160" height="44" rx="3"/><text x="460" y="381" text-anchor="middle" class="t-mono">utils/</text><text x="460" y="397" text-anchor="middle" class="t-sm">format, week, forms</text>
+      <rect class="box" x="552" y="362" width="172" height="44" rx="3"/><text x="638" y="381" text-anchor="middle" class="t-mono">data/</text><text x="638" y="397" text-anchor="middle" class="t-sm">teacher data</text>
+      <path class="ln" d="M380 420V440" marker-end="url(#b)"/>
+      <rect class="green" x="20" y="444" width="720" height="44" rx="4"/><text x="380" y="472" text-anchor="middle"><tspan class="t-mono">core/</tspan> auth, HTTP client, guards. Imports nothing above it.</text>
+      <text x="20" y="518" class="t-sm"><tspan class="t-mono">i18n/</tspan> (fr, en, ar text) and <tspan class="t-mono">school/</tspan> (school content, contact) sit beside the layers and are checked by the same spec.</text>
+    </svg>
+    </div>
+    <figcaption>Arrows read as "may import". Everything the API exchanges with the web app comes from <code>@cdls/shared</code>, never from a copy inside the app.</figcaption>
+  </figure>
+  <ul class="rules">
+    <li>Role spaces are imported only by themselves and by the app routes.</li>
+    <li>A feature's <code>shared/</code> folder is private to that feature. Code needed by two features moves to <code>shared/</code>.</li>
+    <li>Strict TypeScript: no <code>any</code>, indexed access is checked, and Angular's extended diagnostics are errors.</li>
+    <li>Standalone components, signals, zoneless change detection, Signal Forms for new forms.</li>
+  </ul>
+</section>
+
+<!-- DATABASE -->
+<section role="tabpanel" id="p-database" aria-labelledby="t-database" hidden>
+  <h2>Database in three groups</h2>
+  <p class="sub">Roughly forty tables, split by what they are for. Each line names what the table links to. Every column is in <code>apps/api/prisma/schema.prisma</code>.</p>
+  <div class="grid">
+    <div class="card">
+      <h3>People, years, classes</h3>
+      <p>Who exists, and which class they are in this year.</p>
+      <ul class="chips">
+        <li><b>USER</b><span>role, status. Parent of STUDENT, TEACHER, sessions, notifications</span></li>
+        <li><b>STUDENT</b><span>→ USER, SECTION</span></li>
+        <li><b>TEACHER</b><span>→ USER. Flag: coordinator</span></li>
+        <li><b>SCHOOL_YEAR</b><span>start, end, archived at</span></li>
+        <li><b>SECTION</b><span>a stream of the school, unique code</span></li>
+        <li><b>SCHOOL_CLASS</b><span>→ SCHOOL_YEAR, SECTION, next class for rollover</span></li>
+        <li><b>ENROLLMENT</b><span>STUDENT in a SCHOOL_CLASS for one year</span></li>
+        <li><b>CLASS_SUBJECT</b><span>SCHOOL_CLASS + SUBJECT. The coefficient lives here</span></li>
+        <li><b>PERIOD</b><span>terms per year and section</span></li>
+        <li><b>SECTION_CHANGE_REQUEST</b><span>student asks, admin decides</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Timetable, groups, rooms</h3>
+      <p>Weekly rules, one-off changes, and the index that blocks clashes.</p>
+      <ul class="chips">
+        <li><b>ROOM</b><span>kind, capacity</span></li>
+        <li><b>TIMETABLE_SLOT</b><span>weekday, week parity → CLASS_SUBJECT, TEACHER, ROOM, ACTIVITY_TYPE, optional GROUP</span></li>
+        <li><b>SLOT_EXCEPTION</b><span>cancel, move or change room on one date</span></li>
+        <li><b>GROUP / GROUP_MEMBER</b><span>a class split into divisions of students</span></li>
+        <li><b>ACTIVITY_TYPE</b><span>cours, TD, TP or a teacher's own type</span></li>
+        <li class="key"><b>OCCUPANCY</b><span>time range per room, teacher, class and group. A PostgreSQL EXCLUDE constraint refuses overlaps, so no code path can double-book</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Work, grades, messages</h3>
+      <p>What teachers assign and students receive.</p>
+      <ul class="chips">
+        <li><b>EVENT</b><span>homework, exam or session → ACTIVITY_TYPE, PERIOD, SCHOOL_CLASS, author TEACHER</span></li>
+        <li><b>ASSESSMENT_TARGET</b><span>« Assigner à »: a group or a single student</span></li>
+        <li><b>GRADE</b><span>EVENT × STUDENT, score, published flag</span></li>
+        <li><b>HOMEWORK_COMPLETION</b><span>student ticks an EVENT as done</span></li>
+        <li><b>ATTENDANCE</b><span>EVENT × STUDENT, present or absent</span></li>
+        <li><b>REPORT_CARD</b><span>STUDENT × PERIOD, published as PDF</span></li>
+        <li><b>POST</b><span>announcement for a class or section</span></li>
+        <li><b>NOTIFICATION</b><span>per user, with mail state</span></li>
+        <li><b>AUDIT_LOG, CONTACT_MESSAGE</b><span>who did what; messages from the public form</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="note">Only one flow crosses all three groups. A teacher creates an <code>EVENT</code> for a class, grades land in <code>GRADE</code> against each <code>ENROLLMENT</code>'s student, and the <code>PERIOD</code> that closes freezes the coefficients on <code>CLASS_SUBJECT</code> before the <code>REPORT_CARD</code> is built.</div>
+</section>
+
+<!-- YEAR -->
+<section role="tabpanel" id="p-year" aria-labelledby="t-year" hidden>
+  <h2>A school year, end to end</h2>
+  <p class="sub">The order the platform is used in, from setting up a year to rolling into the next one.</p>
+  <ol class="steps">
+    <li><b>Set up the year</b><span>Admin creates sections, classes, subjects with coefficients, rooms.</span></li>
+    <li><b>Calendar</b><span>Periods per section, holidays and closed days.</span></li>
+    <li><b>Import the roster</b><span>Name-based e-mails; homonyms get a number.</span></li>
+    <li><b>Build the timetable</b><span>Hard conflicts are blocked, soft ones need a reason, free rooms are suggested.</span></li>
+    <li><b>Daily life</b><span>Attendance, homework and exams, grades entered then published, students notified.</span></li>
+    <li><b>Close the period</b><span>Coefficients freeze; report cards are generated, edited, published as PDF.</span></li>
+    <li><b>Preview the rollover</b><span>Shows promotions and copied groups. Writes nothing.</span></li>
+    <li><b>Apply it</b><span>One transaction: new year, promotions, groups copied, old year archived read-only.</span></li>
+  </ol>
+
+  <div class="roles">
+    <h2>Who can do what</h2>
+    <p class="sub">Every route goes through one ownership check, so students read only their own data and teachers write only to classes they teach.</p>
+    <div class="grid">
+      <div class="card"><h3>Student</h3><p>Reads own data only.</p>Timetable, homework, grades, absences, report cards, announcements, notifications, personal calendar feed.</div>
+      <div class="card"><h3>Teacher</h3><p>Writes to classes they teach.</p>Own timetable, agenda, grade entry and publishing, attendance, groups and « Assigner à », announcements.</div>
+      <div class="card"><h3>Coordinator teacher</h3><p>Teacher space plus the year structure.</p>Subjects, coefficients, rooms, periods, calendar days, timetable series.</div>
+      <div class="card"><h3>Admin</h3><p>Whole school.</p>Users and roster import, classes, school years, validations, report cards, messages, next-year rollover.</div>
+    </div>
+  </div>
+</section>
+
+<div class="where">
+  <h2>Where things live</h2>
+  <div class="tw"><table>
+    <tr><th>What</th><th>Where</th></tr>
+    <tr><td>REST contract and pure logic</td><td>packages/shared/src/</td></tr>
+    <tr><td>API modules, guards, services</td><td>apps/api/src/ (one folder per feature)</td></tr>
+    <tr><td>Schema and migrations</td><td>apps/api/prisma/schema.prisma, apps/api/prisma/migrations/</td></tr>
+    <tr><td>Web app</td><td>apps/web/src/app/ (core, shared, features, layout, role spaces)</td></tr>
+    <tr><td>Deployment</td><td>deploy/, docs/deployment.md</td></tr>
+  </table></div>
+</div>
+</div>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  function show(name) {
+    var found = false;
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-tab') === name;
+      if (on) found = true;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    return found;
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { show(t.getAttribute('data-tab')); });
+  });
+  var h = (location.hash || '').replace('#', '');
+  if (h) show(h);
+})();
+</script>
