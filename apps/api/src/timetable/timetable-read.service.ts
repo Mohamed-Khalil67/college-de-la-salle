@@ -7,7 +7,6 @@ import {
   TIMETABLE_LIMITS,
   type TimetableOccurrence,
 } from '@cdls/shared';
-import { AccessService } from '../access/access.service.js';
 import { canEditStructure } from '../access/grants.js';
 import { loadClosures } from '../calendar-days/closures.js';
 import type { AuthUser } from '../common/auth-user.js';
@@ -41,7 +40,6 @@ import { WarningsService } from './warnings.service.js';
 export class TimetableReadService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly access: AccessService,
     private readonly occupancy: OccupancyService,
     private readonly warnings: WarningsService,
   ) {}

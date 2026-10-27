@@ -200,7 +200,7 @@ describe('Structure permissions (e2e)', () => {
     {
       name: 'PATCH /class-subjects/:id',
       ok: 200,
-      call: (t, token, who, r) =>
+      call: (t, token, _who, r) =>
         status(
           t
             .http()
@@ -224,7 +224,7 @@ describe('Structure permissions (e2e)', () => {
     {
       name: 'PATCH /rooms/:id',
       ok: 200,
-      call: (t, token, who, r) =>
+      call: (t, token, _who, r) =>
         status(t.http().patch(`/api/rooms/${r.roomId}`).set(bearer(token)).send({ capacity: 35 })),
     },
     {
@@ -319,7 +319,7 @@ describe('Structure permissions (e2e)', () => {
     {
       name: 'PATCH /periods/:id',
       ok: 200,
-      call: (t, token, who, r) =>
+      call: (t, token, _who, r) =>
         status(
           t
             .http()

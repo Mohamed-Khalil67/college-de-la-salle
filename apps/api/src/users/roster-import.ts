@@ -140,7 +140,9 @@ export function checkRoster(
 
   records.forEach((record, i) => {
     const line = lineNumbers[i] ?? i + 2;
-    const fail = (message: string) => errors.push({ line, message });
+    const fail = (message: string): void => {
+      errors.push({ line, message });
+    };
     const get = (name: string) => (record[name] ?? '').trim();
     const lastName = get('lastName');
     const firstName = get('firstName');

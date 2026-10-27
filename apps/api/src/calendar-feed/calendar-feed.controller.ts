@@ -18,11 +18,9 @@ import {
   CalendarFeedDto,
   CalendarFeedFileParamDto,
 } from './dto/calendar-feed.dto.js';
+import { throttleLimit } from '../config/throttle-limits.js';
 
-/** Read per request from the validated environment (defaults to 60). */
-function feedLimit(): number {
-  return Number(process.env['FEED_THROTTLE_LIMIT'] ?? 60) || 60;
-}
+const feedLimit = throttleLimit('FEED_THROTTLE_LIMIT');
 
 @ApiTags('calendar-feed')
 @Controller('calendar/feed')

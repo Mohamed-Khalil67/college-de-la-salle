@@ -8,7 +8,6 @@ import { randomUUID } from 'node:crypto';
 import { addDays, weekday, type SectionId, type WeekParity } from '@cdls/shared';
 import type { PrismaClient } from '../src/generated/prisma/client.js';
 import { OccupancyService } from '../src/occupancy/occupancy.service.js';
-import type { PrismaService } from '../src/prisma/prisma.service.js';
 
 export interface TimetableClassSubject {
   readonly classId: string;
@@ -178,7 +177,7 @@ export async function seedTimetable(
   await prisma.timetableSlot.createMany({ data: slots });
 
   // The index: same code as the API, so a clash would be refused by the database.
-  const occupancy = new OccupancyService(prisma as unknown as PrismaService);
+  const occupancy = new OccupancyService();
   for (let i = 0; i < slots.length; i += 50)
     await occupancy.reindexSlots(prisma, slots.slice(i, i + 50).map((s) => s.id));
 
