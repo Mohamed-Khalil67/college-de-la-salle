@@ -47,7 +47,7 @@ Paste the first `:root { … }` block of `tokens.css` into `@theme { … }` in t
 
 ## Components and how to port them
 
-Every instance in the HTML carries `data-component="name"`. Suggested home: shared UI in `apps/web/src/app/ui/`, feature pieces in the area folders. Follow the root `CLAUDE.md`:
+Every instance in the HTML carries `data-component="name"`. Suggested home: shared UI in `apps/web/src/app/shared/ui/`, feature pieces in the area folders. Follow the root `CLAUDE.md`:
 - standalone components
 - `input()`, `output()` and `model()`
 - signals

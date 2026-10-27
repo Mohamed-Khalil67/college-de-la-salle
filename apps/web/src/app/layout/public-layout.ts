@@ -6,7 +6,7 @@ import { AuthStore } from '../core/auth/auth-store';
 import { LOCALE, readPublicRoute } from '../i18n/locale';
 import { pageUrl, type PublicPageId } from '../i18n/pages';
 import { SCHOOL } from '../school';
-import { Button, Icon, SkipLink, Wordmark } from '../ui';
+import { Button, Icon, SkipLink, Wordmark } from '../shared/ui';
 import { LanguageSwitcher } from './language-switcher';
 
 type NavPage = 'home' | 'history' | 'nationale' | 'bac' | 'contact';

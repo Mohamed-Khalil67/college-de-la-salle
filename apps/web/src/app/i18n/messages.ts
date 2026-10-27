@@ -1,4 +1,4 @@
-import type { ContactSubjectId, ContactTrackId } from '../public/shared/contact-mail';
+import type { ContactSubjectId, ContactTrackId } from '../school/contact-mail';
 import type { PublicPageId } from './pages';
 
 /**

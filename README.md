@@ -125,12 +125,12 @@ with the right to use them.
 
 ```
 apps/web/src/app/
-  public/        Public pages (prerendered)        auth/         /connexion
-  eleve/         Student space                      enseignant/   Teacher space
-  admin/         Administration                     school/       Static content of the public site
+  features/      One folder per feature: public (prerendered), auth, eleve, enseignant, admin,
+                 groupes, notifications, agenda-sync, timetable
+  shared/        ui/ (UI kit cdls-*), components/, utils/ (pure helpers), data/: used by several features
   layout/        Public layout, space layout (app bar, bottom nav)
-  ui/            UI kit (cdls-*): button, field, modal, tabs, grade input, pagination…
   core/          ApiClient (every endpoint), AuthStore, interceptor, role guards
+  i18n/, school/ Languages and static content of the public site
 apps/web/src/styles.css   Design tokens as a Tailwind 4 theme + component classes from the prototypes
 apps/api/src/             One NestJS module per area (auth, users, classes, events, grades, attendance…)
 apps/api/prisma/          Schema, migrations, seed

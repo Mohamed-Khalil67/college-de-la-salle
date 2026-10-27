@@ -1,0 +1,9 @@
+/* Type-checks the files that run in Node (Vitest config, the architecture spec), not in the browser. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["vitest.config.ts", "src/app/architecture.spec.ts"]
+}

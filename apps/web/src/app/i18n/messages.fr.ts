@@ -1,4 +1,4 @@
-import { CONTACT_SUBJECTS, CONTACT_TRACKS } from '../public/shared/contact-mail';
+import { CONTACT_SUBJECTS, CONTACT_TRACKS } from '../school/contact-mail';
 import type { SiteMessages } from './messages';
 
 /** The interface in French: the source of messages.en.ts and messages.ar.ts. */

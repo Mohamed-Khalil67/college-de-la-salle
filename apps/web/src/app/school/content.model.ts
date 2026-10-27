@@ -93,10 +93,13 @@ export type ContactId =
   | 'petit-primaire'
   | 'jardin';
 
+/** A list that always has a first item, so `list[0]` is typed without `undefined`. */
+export type NonEmptyList<T> = readonly [T, ...T[]];
+
 /** A department's phone numbers; its name comes from the page's language (`contactLabels`). */
 export interface ContactLine {
   readonly id: ContactId;
-  readonly phones: readonly string[];
+  readonly phones: NonEmptyList<string>;
 }
 
 export interface ExternalLink {
@@ -131,8 +134,8 @@ export interface SectionPage {
   readonly intro: string;
   readonly photo: PhotoId;
   readonly facts: readonly KeyFigure[];
-  readonly blocks: readonly InfoBlock[];
-  readonly links: readonly ExternalLink[];
+  readonly blocks: NonEmptyList<InfoBlock>;
+  readonly links: NonEmptyList<ExternalLink>;
   /** Headcount by level (Bac section only). */
   readonly counts: readonly LevelCount[];
   readonly countsNote: string;

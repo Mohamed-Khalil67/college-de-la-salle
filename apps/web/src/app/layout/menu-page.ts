@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthStore } from '../core/auth/auth-store';
-import { Icon } from '../ui';
+import { Icon } from '../shared/ui';
 import { type SpaceNavItem, visibleNav } from './space-nav';
 
 /**

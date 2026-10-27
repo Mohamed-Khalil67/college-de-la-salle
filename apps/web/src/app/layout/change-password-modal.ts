@@ -1,6 +1,6 @@
 import { Component, ElementRef, Injector, afterNextRender, effect, inject, model, signal, untracked, viewChild } from '@angular/core';
-import { PasswordForm } from '../auth/password-form';
-import { Alert, Button, Modal } from '../ui';
+import { PasswordForm } from '../shared/components/password-form';
+import { Alert, Button, Modal } from '../shared/ui';
 
 /** « Changer mon mot de passe », from the account menu of every space. */
 @Component({
