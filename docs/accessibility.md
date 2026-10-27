@@ -46,5 +46,5 @@ that code and inspected its structure:
 - Keep « 0 Axe violations at 390 and 1440 px » for every new screen (`apps/web/CLAUDE.md`, page checklist).
 - If a limitation is fixed or a new one found, update the statement in the three message files and its date
   (`accessibility.updated`).
-- The « Aller au contenu » link is `<a cdlsSkipLink>` (`ui/skip-link.ts`), never a bare `<a href="#contenu">`:
+- The « Aller au contenu » link is `<a cdlsSkipLink>` (`shared/ui/skip-link.ts`), never a bare `<a href="#contenu">`:
   the document's `<base href="/">` resolves that to the home page, so on any other page it left the page.

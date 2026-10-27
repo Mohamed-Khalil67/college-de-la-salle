@@ -10,9 +10,9 @@ const fr = () => import('./i18n/fr').then((m): SiteLocale => m.FR);
 const en = () => import('./i18n/en').then((m): SiteLocale => m.EN);
 const ar = () => import('./i18n/ar').then((m): SiteLocale => m.AR);
 const publicSite = (locale: () => Promise<SiteLocale>) => () =>
-  Promise.all([import('./public/public.routes'), locale()]).then(([m, l]) => m.publicRoutes(l));
+  Promise.all([import('./features/public/public.routes'), locale()]).then(([m, l]) => m.publicRoutes(l));
 const login = (locale: () => Promise<SiteLocale>) => () =>
-  Promise.all([import('./auth/login.routes'), locale()]).then(([m, l]) => m.loginRoutes(l));
+  Promise.all([import('./features/auth/login.routes'), locale()]).then(([m, l]) => m.loginRoutes(l));
 
 export const routes: Routes = [
   // Public site in English and Arabic (/en/…, /ar/…); French is the last route before the fallback.
@@ -24,40 +24,40 @@ export const routes: Routes = [
     path: 'connexion/oubli',
     title: 'Mot de passe oublié',
     canMatch: [anonymousGuard],
-    loadComponent: () => import('./auth/forgot-password-page').then((m) => m.ForgotPasswordPage),
+    loadComponent: () => import('./features/auth/forgot-password-page').then((m) => m.ForgotPasswordPage),
   },
   {
     // Opened from the e-mailed link; no guard, so a signed-in user can still use it.
     path: 'connexion/reinitialiser',
     title: 'Nouveau mot de passe',
-    loadComponent: () => import('./auth/reset-password-page').then((m) => m.ResetPasswordPage),
+    loadComponent: () => import('./features/auth/reset-password-page').then((m) => m.ResetPasswordPage),
   },
   {
     path: 'premier-acces',
     title: 'Premier accès',
     canMatch: [firstAccessGuard],
-    loadComponent: () => import('./auth/first-access-page').then((m) => m.FirstAccessPage),
+    loadComponent: () => import('./features/auth/first-access-page').then((m) => m.FirstAccessPage),
   },
   {
     path: 'eleve',
     canMatch: [roleGuard('student')],
     data: { areaLabel: 'Espace élève', nav: ELEVE_NAV },
     loadComponent: spaceLayout,
-    loadChildren: () => import('./eleve/eleve.routes').then((m) => m.ELEVE_ROUTES),
+    loadChildren: () => import('./features/eleve/eleve.routes').then((m) => m.ELEVE_ROUTES),
   },
   {
     path: 'enseignant',
     canMatch: [roleGuard('teacher')],
     data: { areaLabel: 'Espace enseignant', nav: ENSEIGNANT_NAV },
     loadComponent: spaceLayout,
-    loadChildren: () => import('./enseignant/enseignant.routes').then((m) => m.ENSEIGNANT_ROUTES),
+    loadChildren: () => import('./features/enseignant/enseignant.routes').then((m) => m.ENSEIGNANT_ROUTES),
   },
   {
     path: 'admin',
     canMatch: [structureGuard],
     data: { areaLabel: 'Administration', coordinatorAreaLabel: 'Coordination', nav: ADMIN_NAV },
     loadComponent: spaceLayout,
-    loadChildren: () => import('./admin/admin.routes').then((m) => m.ADMIN_ROUTES),
+    loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },
   { path: 'connexion', canMatch: [anonymousGuard], loadChildren: login(fr) },
   // Addresses of the previous site.

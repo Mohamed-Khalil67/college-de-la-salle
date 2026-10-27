@@ -3,8 +3,8 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
-import { NotificationBell } from '../notifications/notification-bell';
-import { Avatar, Icon, SkipLink, Wordmark } from '../ui';
+import { NotificationBell } from '../features/notifications/notification-bell';
+import { Avatar, Icon, SkipLink, Wordmark } from '../shared/ui';
 import { ChangePasswordModal } from './change-password-modal';
 import { desktopNav, mobileNav, type SpaceNavItem, visibleNav } from './space-nav';
 

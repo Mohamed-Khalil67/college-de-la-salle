@@ -1,5 +1,5 @@
 import type { SessionUser } from '@cdls/shared';
-import type { IconName } from '../ui';
+import type { IconName } from '../shared/ui';
 
 export interface SpaceNavItem {
   readonly label: string;

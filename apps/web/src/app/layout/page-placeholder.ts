@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { EmptyState } from '../ui';
+import { EmptyState } from '../shared/ui';
 
 /** Stands in for a space page that is not built yet: says so instead of showing a blank screen. */
 @Component({
