@@ -100,14 +100,17 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
                     </td>
                     <td data-label="Reste à faire :">
                       @if (c.gaps.length) {
-                        <ul class="prep__gaps" role="list">
-                          @for (g of c.gaps; track g.subjectId) {
-                            <li>
-                              <strong>{{ g.subjectName }}</strong>
-                              <span class="t-body-s t-muted">{{ teacher(g) }}, {{ detail(g) }}</span>
-                            </li>
-                          }
-                        </ul>
+                        <details class="prep__details" [open]="c.gaps.length <= 3">
+                          <summary>Détail, matière par matière</summary>
+                          <ul class="prep__gaps" role="list">
+                            @for (g of c.gaps; track g.subjectId) {
+                              <li>
+                                <strong>{{ g.subjectName }}</strong>
+                                <span class="t-body-s t-muted">{{ teacher(g) }}, {{ detail(g) }}</span>
+                              </li>
+                            }
+                          </ul>
+                        </details>
                       } @else if (!c.subjectCount) {
                         Ajoutez des matières à cette classe depuis « Classes et inscriptions ».
                       } @else {
@@ -136,10 +139,16 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
     .prep__sub {
       display: block;
     }
+    .prep__details summary {
+      cursor: pointer;
+      min-height: 1.5rem;
+      color: var(--color-heading);
+      font-weight: 600;
+    }
     .prep__gaps {
       display: grid;
       gap: var(--space-2);
-      margin: 0;
+      margin: var(--space-3) 0 0;
       padding: 0;
       list-style: none;
     }

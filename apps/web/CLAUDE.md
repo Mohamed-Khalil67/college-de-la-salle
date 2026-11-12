@@ -15,7 +15,7 @@ and how to use what already exists.
 | `features/auth/` | `/connexion` login page, `/connexion/oubli` and `/connexion/reinitialiser?token=` (forgotten password, framed by `auth-shell.ts`), first access | Client |
 | `features/eleve/` | Student space `/eleve`: routes in `eleve.routes.ts`, the one page in `accueil/` (`home-page.ts` + one block component per block + `home-views.ts` and `now-next.ts` pure rules) | Client |
 | `features/enseignant/` | Teacher space `/enseignant` | Client |
-| `features/admin/` | Administration `/admin` | Client |
+| `features/admin/` | Administration `/admin`: the one page in `accueil/` (`home-page.ts`, one block component per block, `admin-home-views.ts` pure views; admin only, a planner is redirected), `bulletins/report-preparation-page.ts` (« Préparer les bulletins », « Relancer », rules in `preparation-logic.ts`), `annonces/` (write and delete announcements; `audience.ts` is the admin's version of the teacher's audience rules). The home's « Ajouter un compte » and « Importer une liste » open `/admin/utilisateurs?action=creer|importer` | Client |
 | `features/timetable/` | Timetable pieces used by the three spaces: `timetable-api.ts`, `session-dialog.ts`, `session-item.ts`, `blocked-notice.ts`, pure `suggestions.ts` and `timetable-format.ts` | Client |
 | `features/notifications/` | The notifications page, the bell of the app bar (`notification-bell.ts`, count in `notifications-store.ts`) and the pure display rules (`notification-view.ts`) | Client |
 | `features/agenda-sync/` | « Synchroniser mon agenda »: create, copy, instructions for Google / Apple / Outlook, revoke. The address is shown only when it is created | Client |

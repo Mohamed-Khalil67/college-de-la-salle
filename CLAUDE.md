@@ -52,7 +52,7 @@ Everything below is merged on `main` and pushed to `college/main`.
   going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.
 - Diagrams (system, web layers, database groups, school year): `docs/architecture-map.html`; where things live: `docs/architecture.md`.
-- Next: the one-page-per-role redesign and the Planificateur permission, `docs/workflow-redesign.md` (not built yet).
+- Next: the one-page-per-role redesign, `docs/workflow-redesign.md`. Built: Planificateur permission, quick grading, student page and the admin page (`/admin`, « Préparer les bulletins », « Relancer »); teacher and planner pages and the nav clean-up (step 7) are still to come.
 - More detail: `docs/school-year-design.md` (design, decisions, leftovers), `docs/deployment.md`, `docs/i18n.md`,
   `docs/accessibility.md`, `docs/calendar-feed-notifications.md`.
 

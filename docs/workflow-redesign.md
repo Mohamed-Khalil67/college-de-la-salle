@@ -113,7 +113,7 @@ class-council comments; 3. publish (the student's Notes block shows « Bulletin 
 3. **Student one page.**
 4. **Teacher one page** (after 2).
 5. **Professeur absent** (migration for `study`, endpoint, screen) and the **Planificateur one page** (after 1).
-6. **Admin one page** and **Préparer les bulletins** with « Relancer » (after 1).
+6. **Admin one page** and **Préparer les bulletins** with « Relancer » (after 1). **Built** (branch `feat/admin-page`): `apps/web/src/app/features/admin/accueil/`, `bulletins/report-preparation-page.ts`, `annonces/`; API `report-cards/report-preparation.*`, notification kind `grades_reminder`. Left for step 7: the nav entries, and « generate the complete classes at once » (the page links to the existing Bulletins page).
 7. Remove the old nav entries, update `docs/rollout.md` and the demo script, run the full Playwright + Axe suite at 390
    and 1440 px.
 
