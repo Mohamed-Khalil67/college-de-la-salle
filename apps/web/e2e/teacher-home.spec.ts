@@ -1,7 +1,7 @@
 import { addDays, schoolToday } from '@cdls/shared';
 import { type APIRequestContext, expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
-import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
+import { axeAtBothWidths, expectNoAxeViolations, goInApp, signInAs, tokenOf } from './structure';
 
 /**
  * The teacher's one page (/enseignant): five blocks in order, each with its heading and one entry link, Axe-clean
@@ -129,14 +129,47 @@ test('each lesson of the day has Appel, Noter and Devoir; the one in progress is
     'href',
     '/enseignant/noter?classe=11111111-1111-4111-8111-111111111111&matiere=mathematiques',
   );
-  await expect(live.getByRole('link', { name: 'Devoir Première A, Mathématiques', exact: true })).toHaveAttribute('href', '/enseignant/agenda');
+  await expect(live.getByRole('link', { name: 'Devoir : ouvrir l’agenda', exact: true })).toHaveAttribute('href', '/enseignant/agenda');
   await expect(items.nth(1)).toContainText('Annulée');
   await expect(items.nth(1).getByRole('link')).toHaveCount(0);
   for (const name of ['Appel', 'Noter', 'Devoir']) {
-    const box = await live.getByRole('link', { name: new RegExp(`^${name} `) }).boundingBox();
+    const box = await live.getByRole('link', { name }).boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
   }
+  // The focus ring on a light lesson tile is dark, not the gold one of the navy block (2.4:1 on light).
+  await live.getByRole('link', { name: 'Noter' }).focus();
+  const ring = await live.getByRole('link', { name: 'Noter' }).evaluate((el) => {
+    const probe = (token: string) => {
+      const span = document.createElement('span');
+      span.style.color = `var(${token})`;
+      document.body.append(span);
+      const colour = getComputedStyle(span).color;
+      span.remove();
+      return colour;
+    };
+    return { outline: getComputedStyle(el).outlineColor, navy: probe('--color-navy-700'), gold: probe('--color-accent') };
+  });
+  expect(ring.outline).not.toBe(ring.gold);
   await axeAtBothWidths(page);
+});
+
+test('768 px and 400 % zoom: one column, nothing cut off or scrolling sideways, Axe-clean', async ({ page }) => {
+  await openHome(page);
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  const boxes = async () => Promise.all(BLOCKS.map((b) => block(page, b.heading).boundingBox()));
+  // A tablet: the blocks still stack (the three columns start at 64 rem = 1024 px).
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.waitForTimeout(200);
+  const tablet = await boxes();
+  for (let i = 1; i < tablet.length; i++) expect(tablet[i]!.y).toBeGreaterThan(tablet[i - 1]!.y);
+  expect(await overflow()).toBeLessThanOrEqual(0);
+  await expectNoAxeViolations(page);
+  // 400 % zoom on a 1280 px window is a 320 px viewport.
+  await page.setViewportSize({ width: 320, height: 256 });
+  await page.waitForTimeout(200);
+  expect(await overflow()).toBeLessThanOrEqual(0);
+  for (const b of BLOCKS) await expect(block(page, b.heading)).toBeVisible();
+  await expectNoAxeViolations(page);
 });
 
 /** A teacher gives a homework due in two days; its owner ticks it (removed after the test). */

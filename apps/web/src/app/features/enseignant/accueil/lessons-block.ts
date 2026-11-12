@@ -70,7 +70,7 @@ import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
                     >Noter<span class="visually-hidden"> {{ item.session.classLabel }}, {{ item.session.subjectName }}</span></a
                   >
                   <a cdlsButton variant="secondary" routerLink="agenda"
-                    >Devoir<span class="visually-hidden"> {{ item.session.classLabel }}, {{ item.session.subjectName }}</span></a
+                    >Devoir<span class="visually-hidden"> : ouvrir l’agenda</span></a
                   >
                 </div>
               }
@@ -109,6 +109,8 @@ import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
       border-radius: var(--radius-sm);
       background: var(--color-page);
       color: var(--color-body);
+      /* The gold focus ring of the navy block is 2.4:1 on a light tile: use the navy one here. */
+      --color-focus: var(--color-navy-700);
     }
     .lesson p {
       margin: 0;
@@ -193,9 +195,10 @@ export class LessonsBlock {
   );
   protected readonly emptyText = computed(() => lessonsEmptyText(this.#calendar().value ?? [], this.#clock.today()));
 
+  /** Reloads only what failed, and not while it is already loading (two clicks fetch once). */
   protected reload(): void {
-    this.#sessions.reload();
-    this.#days.reload();
+    if (this.#sessions.error() && !this.#sessions.isLoading()) this.#sessions.reload();
+    if (this.#days.error() && !this.#days.isLoading()) this.#days.reload();
   }
 
   protected title(session: TimetableOccurrenceDto): string {

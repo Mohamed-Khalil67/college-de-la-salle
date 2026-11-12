@@ -95,7 +95,7 @@ pages follow the same pattern). Rules:
 
 - **One small component per block**, in the space's `accueil/` folder, loading its own data with `resource()`. A slow or
   failing block shows its own state and never blanks the page. The page component only lays the blocks out (CSS grid,
-  phone first: one column in the owner's order; from 48 rem three columns, `wide` blocks span the row).
+  phone first: one column in the owner's order; from 48 rem three columns, `wide` blocks span the row; the teacher page waits for 64 rem because its blocks hold buttons and long lines).
 - **State is one union**, never flags: `blockState(snapshotOf(resource), view)` from `shared/utils/block-state.ts` gives
   `loading | error | empty | ready`; `bothOf` joins two sources. `view` is a pure function returning `null` for
   « nothing to show » (the empty state). Put the views in a decorator-free file with a spec covering the four states.

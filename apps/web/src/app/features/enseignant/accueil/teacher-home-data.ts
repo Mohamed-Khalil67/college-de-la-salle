@@ -44,9 +44,18 @@ export class TeacherHomeData {
     () => new Map((this.assignments.hasValue() ? this.assignments.value() : []).map((a) => [a.classId, a.classLabel])),
   );
 
-  /** Reloads what failed only (a retry must not repeat the requests that worked): the pending notes follow their assignments. */
+  /**
+   * Reloads what failed only (a retry must not repeat the requests that worked), and nothing already loading, so two
+   * clicks on « Réessayer » fetch once. The pending notes follow their assignments.
+   */
   reload(): void {
-    if (this.assignments.error()) this.assignments.reload();
-    else this.pending.reload();
+    if (this.assignments.error()) {
+      if (!this.assignments.isLoading()) this.assignments.reload();
+    } else if (this.pending.error() && !this.pending.isLoading()) this.pending.reload();
+  }
+
+  /** The shared calendar, when it failed and is not already loading. */
+  reloadEvents(): void {
+    if (this.events.error() && !this.events.isLoading()) this.events.reload();
   }
 }

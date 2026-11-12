@@ -3,14 +3,13 @@ import type {
   EventDto,
   HomeworkDto,
   OccurrenceDto,
-  PostDto,
   ReportCardDto,
   StudentAttendanceDto,
   StudentGradesDto,
 } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
 import { blockState, bothOf, LOADING, type Snapshot } from '../../../shared/utils/block-state';
-import { absencesView, gradesView, newsView, todoView } from './home-views';
+import { absencesView, gradesView, todoView } from './home-views';
 
 /**
  * Each block of the student's home in its four states (loading, error, empty, data), as the block
@@ -161,33 +160,5 @@ describe('Absences', () => {
     const list = [record('a', '2026-10-01', 'absent'), record('b', '2026-11-03', 'late'), record('c', '2026-10-20', 'excused')];
     const state = blockState({ error: undefined, value: list }, absencesView);
     expect(state.status === 'ready' && state.data).toEqual({ absences: 2, late: 1, latest: list[1] });
-  });
-});
-
-describe('Annonces', () => {
-  const post = (id: string, createdAt: string): PostDto => ({
-    id,
-    title: id,
-    body: 'Texte',
-    subjectId: null,
-    classId: null,
-    sectionId: null,
-    authorId: 'a',
-    authorName: 'Direction',
-    createdAt,
-  });
-  const view = (posts: readonly PostDto[]) => newsView(posts);
-
-  it('loads, then fails with its own error', () => {
-    expect(blockState(LOADING, view)).toEqual({ status: 'loading' });
-    expect(blockState({ error: failure, value: undefined }, view)).toEqual({ status: 'error', error: failure });
-  });
-  it('is empty without announcement', () => {
-    expect(blockState({ error: undefined, value: [] }, view)).toEqual({ status: 'empty' });
-  });
-  it('shows the two latest, newest first', () => {
-    const posts = [post('old', '2026-10-01T08:00:00Z'), post('new', '2026-11-09T08:00:00Z'), post('mid', '2026-11-01T08:00:00Z')];
-    const state = blockState({ error: undefined, value: posts }, view);
-    expect(state.status === 'ready' && state.data.map((p) => p.id)).toEqual(['new', 'mid']);
   });
 });

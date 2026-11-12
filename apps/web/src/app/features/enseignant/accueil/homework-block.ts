@@ -98,8 +98,8 @@ export class HomeworkBlock {
   });
 
   protected reload(): void {
-    if (this.#data.events.error()) this.#data.events.reload();
-    else this.#rows.reload();
+    if (this.#data.events.error()) this.#data.reloadEvents();
+    else if (this.#rows.error() && !this.#rows.isLoading()) this.#rows.reload();
   }
 
   protected meta(row: HomeworkRow): string {

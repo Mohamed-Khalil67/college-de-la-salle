@@ -15,7 +15,7 @@ import { WatchBlock } from './watch-block';
 /**
  * The teacher's one page: today's classes with their actions, then what is left to do, in blocks that each
  * load their own data and end with one link to their detail page. Phone: the blocks stack in this order.
- * From tablet width: Mes cours across the top, three blocks side by side, Annonces across the bottom.
+ * From 64rem (1024 px): Mes cours across the top, three blocks side by side, Annonces across the bottom.
  * « Nouvelle note » grades any class, not only today's. One permanent live region says when the page has
  * loaded and which block failed.
  */
@@ -48,7 +48,7 @@ import { WatchBlock } from './watch-block';
       gap: var(--space-4);
       grid-template-columns: minmax(0, 1fr);
     }
-    @media (min-width: 48rem) {
+    @media (min-width: 64rem) {
       .home-grid {
         gap: var(--space-6);
         grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -126,7 +126,7 @@ export class WatchBlock {
 
   protected reload(): void {
     this.#data.reload();
-    this.#data.events.reload();
+    this.#data.reloadEvents();
   }
 
   protected line(note: LateNote): string {
