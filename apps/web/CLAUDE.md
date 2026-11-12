@@ -13,7 +13,7 @@ and how to use what already exists.
 |---|---|---|
 | `features/public/` | Public site pages (home, histoire, bac pages, contact, accessibility statement), in fr/en/ar | Prerendered |
 | `features/auth/` | `/connexion` login page, `/connexion/oubli` and `/connexion/reinitialiser?token=` (forgotten password, framed by `auth-shell.ts`), first access | Client |
-| `features/eleve/` | Student space `/eleve` (routes + `ELEVE_NAV` in `eleve.routes.ts`) | Client |
+| `features/eleve/` | Student space `/eleve`: routes in `eleve.routes.ts`, the one page in `accueil/` (`home-page.ts` + one block component per block + `home-views.ts` and `now-next.ts` pure rules) | Client |
 | `features/enseignant/` | Teacher space `/enseignant` | Client |
 | `features/admin/` | Administration `/admin` | Client |
 | `features/timetable/` | Timetable pieces used by the three spaces: `timetable-api.ts`, `session-dialog.ts`, `session-item.ts`, `blocked-notice.ts`, pure `suggestions.ts` and `timetable-format.ts` | Client |
@@ -21,8 +21,8 @@ and how to use what already exists.
 | `features/agenda-sync/` | « Synchroniser mon agenda »: create, copy, instructions for Google / Apple / Outlook, revoke. The address is shown only when it is created | Client |
 | `features/groupes/` | « Groupes » (one page for `/enseignant/groupes` and `/admin/groupes`), pure rules in `groups-logic.ts` | Client |
 | `shared/ui/` | UI kit (`cdls-*`), import from `shared/ui/index.ts` | n/a |
-| `shared/components/` | Components used by several features: `LoadState`, `WeekView`, `EventDetails`, `ConfirmModal`, `PasswordForm` | n/a |
-| `shared/utils/` | Pure, decorator-free helpers with a spec next to each: `format.ts` (French labels, times, plurals), `week.ts`, `targets.ts` (« Assigner à », reuses `targetedStudentIds` of `@cdls/shared`), `forms.ts` (`shownError`), `download.ts`, `focus.ts` | n/a |
+| `shared/components/` | Components used by several features: `LoadState`, `HomeBlock` (+ `snapshotOf`), `WeekView`, `EventDetails`, `ConfirmModal`, `PasswordForm` | n/a |
+| `shared/utils/` | Pure, decorator-free helpers with a spec next to each: `block-state.ts` (`BlockState` union, `blockState`, `bothOf`), `format.ts` (French labels, times, plurals), `week.ts`, `targets.ts` (« Assigner à », reuses `targetedStudentIds` of `@cdls/shared`), `forms.ts` (`shownError`), `download.ts`, `focus.ts` | n/a |
 | `shared/data/` | Shared resources: `teacher-data.ts` (the teacher's assignments and classes) | n/a |
 | `layout/` | `PublicLayout`, `SpaceLayout` (app bar, account menu, bottom nav), `space-navs.ts`, `PagePlaceholder` | n/a |
 | `core/` | `ApiClient`, `AuthStore`, interceptor, role guards | n/a |
@@ -83,6 +83,26 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 - An item with an `icon` goes in the phone's bottom bar: five at most, the `mobileOnly` « Plus » entry last. Everything else is reached through « Plus », which lists every screen the user may see.
 - `access: 'admin' | 'coordinator'` filters by role; `href` links to another space; `secondary` items move behind « Plus » in the top bar once there are more than eight entries.
 - A new screen goes in its space's list, in « Plus » at least, and in the spec.
+
+## One page per role: the block pattern
+
+Each space opens on one page of blocks (`docs/rollout.md` says what the student sees; the teacher, planner and admin
+pages follow the same pattern). Rules:
+
+- **One small component per block**, in the space's `accueil/` folder, loading its own data with `resource()`. A slow or
+  failing block shows its own state and never blanks the page. The page component only lays the blocks out (CSS grid,
+  phone first: one column in the owner's order; from 48 rem three columns, `wide` blocks span the row).
+- **State is one union**, never flags: `blockState(snapshotOf(resource), view)` from `shared/utils/block-state.ts` gives
+  `loading | error | empty | ready`; `bothOf` joins two sources. `view` is a pure function returning `null` for
+  « nothing to show » (the empty state). Put the views in a decorator-free file with a spec covering the four states.
+  A secondary source (« Bulletin publié », holidays) must not fail the block: read its error as « no data ».
+- **Chrome is `<app-home-block>`** (`shared/components/home-block.ts`): `<section>` labelled by its `<h2>`, loading line,
+  `cdls-alert` on error, an empty text that invites (« Rien à rendre cette semaine »), and ONE entry link at the end
+  with a descriptive name (`link` relative to the space, `linkLabel`). `wide` spans the row, `tone="inverse"` is the
+  navy highlighted block (gold focus ring). The block's content is projected and shown when `state` is `ready`.
+- Sub-headings inside a block are `<h3>`; every id (`headingId`) is unique on the page; « now » comes from
+  `schoolToday()` / `schoolTimeNow()` (Cairo), passed down as an input, never `new Date()`.
+- Ticking, and any write, uses the same component and API call as the detail page (`HomeworkItem`), so both stay in step.
 
 ## Timetable conflicts
 

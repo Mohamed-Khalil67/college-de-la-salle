@@ -6,9 +6,23 @@ Draft for the school. It assumes the college runs a small pilot first, then open
 
 | Role | Can do | Cannot do (yet) |
 |---|---|---|
-| **Student** | See today's classes and the week's timetable; tick homework as done; read published grades with averages per subject and overall; see absences; read and download report cards (PDF); read announcements for their class | Change their own password; see other students' data |
+| **Student** | Open on one page of five blocks (see below); see the week's timetable; tick homework as done; read published grades with averages per subject and overall; see absences; read and download report cards (PDF); read announcements for their class | Change their own password; see other students' data |
 | **Teacher** | See their classes; add, edit and delete calendar events (course, exam, homework, with links and weekly repeat); enter grades in a grid and publish them; take attendance; post announcements to a class or section | Edit another teacher's class; open the admin area |
 | **Admin / secretariat** | Create accounts one by one or by CSV import; manage classes, enrolments, teaching assignments, school years and terms; generate, edit and publish report cards; read messages from the contact form | n/a |
+
+## What the student sees on opening the platform
+
+The student lands on one page, `/eleve`, made of blocks. Each block shows only what is checked every day and ends with one button to its detail page. On a phone the blocks stack in this order; from tablet width the three middle ones sit side by side.
+
+| Block | Shows | Button |
+|---|---|---|
+| **Maintenant** (full width, navy) | The class in progress (subject, room, teacher, end time) or « Prochain cours · dans 12 min »; a calm message when the day is over, on a holiday or on Friday and Saturday; today's classes in a row (past ones quieter, the current one outlined and marked « En cours », cancelled, moved or replaced ones written out) | Emploi du temps de la semaine |
+| **À faire** | The next homework with its tick box (ticking works here) and the tests and exams of the next two weeks with their day | Tous les devoirs et contrôles |
+| **Notes** | The overall average of the current term, the three latest published grades, and « Bulletin publié » once the term's report card is published | Toutes les notes et le bulletin |
+| **Absences** | Absences and late arrivals of the current term and the most recent one | Détail des absences |
+| **Annonces** (full width) | The two latest announcements for the student's class and section | Toutes les annonces (new page `/eleve/annonces`) |
+
+Each block loads on its own: if one fails it shows its own message and the rest of the page stays usable. The menu is unchanged for now.
 
 ## Gaps to close before the school launch
 
@@ -23,7 +37,7 @@ Use the demo accounts from `apps/api/demo-credentials.local.md` on a copy of the
 
 1. **Admin (3 min).** Sign in as admin. Show Utilisateurs (search, tabs), import a small CSV, create a class and an assignment, then Bulletins.
 2. **Teacher (5 min).** Sign in as a teacher. Create an exam in Agenda. Open Saisie des notes, type marks (decimal comma works), show the draft badge, then publish. Take attendance in Appel. Post an announcement to one class.
-3. **Student (4 min).** Sign in as a student of that class. Show that the exam, the published grade, the announcement and the absence now appear; tick a homework as done; open the report card.
+3. **Student (4 min).** Sign in as a student of that class. The home page shows everything at a glance: show that the exam (in « À faire »), the published grade (« Notes »), the announcement and the absence now appear; tick a homework as done right on the page; use the button at the end of a block to open its detail page and the report card.
 4. **Back to the admin (3 min).** Close a term, generate report cards, publish them, and show the student's PDF.
 
 Tip: use two browser profiles (or a private window) so the sessions don't replace each other.
