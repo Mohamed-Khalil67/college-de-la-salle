@@ -18,6 +18,13 @@
       }
     }
   </div>
+  @if (quick() && !scaleLocked()) {
+    <div class="scale-field">
+      <cdls-field label="Note sur" helper="Fixée dès la première note enregistrée.">
+        <input cdlsControl type="number" inputmode="decimal" [min]="scaleLimits.min" [max]="scaleLimits.max" step="1" [value]="typedScale()" (input)="setScale($event)" />
+      </cdls-field>
+    </div>
+  }
   <p class="t-body-s grid-target">
     <b>Assignée à :</b> {{ targetLine() }}.
     @if (!sheet.event.target.whole) {
@@ -145,7 +152,7 @@
     <div class="modal__footer">
       <button cdlsButton variant="secondary" type="button" (click)="confirmOpen.set(false)">Annuler</button>
       <button cdlsButton [variant]="published() ? 'danger' : 'primary'" type="button" (click)="togglePublished()">
-        {{ busy() ? 'Patientez…' : published() ? 'Retirer la publication' : publishLabel() }}
+        {{ publishing() ? 'Patientez…' : published() ? 'Retirer la publication' : publishLabel() }}
       </button>
     </div>
   </cdls-modal>

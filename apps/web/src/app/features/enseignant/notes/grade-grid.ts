@@ -1,12 +1,11 @@
 import { Component, DestroyRef, ElementRef, computed, effect, inject, input, linkedSignal, output, resource, signal, untracked, viewChild } from '@angular/core';
-import { LIMITS, type EventDto, type GradeSheetDto } from '@cdls/shared';
+import { GRADING_LIMITS, LIMITS, type EventDto, type GradeSheetDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
-import { Alert, Avatar, Badge, Button, GradeInput, Modal } from '../../../shared/ui';
+import { Alert, Avatar, Badge, Button, Field, FieldControl, GradeInput, Modal } from '../../../shared/ui';
 import { average, clockOf, mark, plural } from '../../../shared/utils/format';
 import { LoadState } from '../../../shared/components/load-state';
 import { eventTargetLine } from '../../../shared/utils/targets';
-import { columnAverage, gradeIssues, isValidScore, issuesSentence, rowAverage } from '../shared/teacher';
-import { changedSince, saveStatus } from '../noter/noter-logic';
+import { changedSince, columnAverage, gradeIssues, isValidScore, issuesSentence, rowAverage, saveStatus } from '../shared/teacher';
 
 type Marks = Readonly<Record<string, number | null>>;
 type Comments = Readonly<Record<string, string>>;
@@ -22,7 +21,7 @@ const AUTOSAVE_MS = 800;
  */
 @Component({
   selector: 'app-grade-grid',
-  imports: [Alert, Avatar, Badge, Button, GradeInput, Modal, LoadState],
+  imports: [Alert, Avatar, Badge, Button, Field, FieldControl, GradeInput, Modal, LoadState],
   templateUrl: './grade-grid.html',
   styles: `
     .grid-help {
@@ -34,6 +33,10 @@ const AUTOSAVE_MS = 800;
     .comment-input {
       min-inline-size: 12rem;
       min-block-size: 2.5rem;
+    }
+    .scale-field {
+      max-inline-size: 12rem;
+      margin-block-end: var(--space-4);
     }
     .grid-actions {
       display: flex;
@@ -79,7 +82,11 @@ export class GradeGrid {
   protected readonly marks = linkedSignal<Marks>(() => this.#saved());
   protected readonly comments = linkedSignal<Comments>(() => this.#savedComments());
 
-  protected readonly outOf = computed(() => this.main()?.rows.find((r) => r.grade)?.grade?.outOf ?? this.scale());
+  protected readonly scaleLimits = GRADING_LIMITS.scale;
+  /** The scale typed before the first mark is saved; once a mark exists the stored scale rules. */
+  protected readonly typedScale = linkedSignal(() => this.scale());
+  protected readonly scaleLocked = computed(() => !!this.main()?.rows.some((r) => r.grade));
+  protected readonly outOf = computed(() => this.main()?.rows.find((r) => r.grade)?.grade?.outOf ?? this.typedScale());
   protected readonly outOfText = computed(() => mark(this.outOf()));
   protected readonly published = computed(() => !!this.main()?.rows.some((r) => r.grade?.published));
   protected readonly dirty = computed(() => {
@@ -116,6 +123,8 @@ export class GradeGrid {
     this.removed.update((s) => new Set([...s, id]));
   }
   protected readonly busy = signal(false);
+  /** The publish (or unpublish) request, with the save before it. */
+  protected readonly publishing = signal(false);
   protected readonly savedAt = signal<Date | null>(null);
   protected readonly failure = signal<string | null>(null);
   protected readonly confirmOpen = signal(false);
@@ -140,8 +149,8 @@ export class GradeGrid {
   protected readonly publishLabel = computed(() => (this.quick() ? 'Publier aux élèves' : 'Publier les notes'));
 
   #timer: ReturnType<typeof setTimeout> | null = null;
-  /** A save was asked while another was running: run it once that one ends. */
-  #again = false;
+  /** The save that is running, so « Finir plus tard » and « Publier » wait for it instead of doing nothing. */
+  #running: Promise<void> | null = null;
 
   constructor() {
     // « Noter » saves on its own once the teacher pauses, unless a mark is outside the scale.
@@ -154,7 +163,11 @@ export class GradeGrid {
       this.comments();
       untracked(() => this.#schedule());
     });
-    this.#destroyRef.onDestroy(() => this.#clearTimer());
+    // Leaving the grid (another note, another page) saves what was typed in the last moments.
+    this.#destroyRef.onDestroy(() => {
+      this.#clearTimer();
+      if (this.quick() && this.dirty() && !this.issues().invalid.length && !this.#running) void this.save();
+    });
   }
 
   protected name(s: { firstName: string; lastName: string }): string {
@@ -193,6 +206,11 @@ export class GradeGrid {
     cells.push({ score: this.marks()[studentId] ?? null, outOf: this.outOf(), coefficient: this.event().coefficient });
     return rowAverage(cells);
   }
+  protected setScale(event: Event): void {
+    if (!(event.target instanceof HTMLInputElement)) return;
+    const value = Number(event.target.value.replace(',', '.'));
+    if (Number.isFinite(value) && value >= this.scaleLimits.min && value <= this.scaleLimits.max) this.typedScale.set(value);
+  }
   protected setMark(studentId: string, value: number | null): void {
     this.marks.update((m) => ({ ...m, [studentId]: value }));
   }
@@ -225,9 +243,15 @@ export class GradeGrid {
     this.confirmOpen.set(true);
   }
 
+  /** Saves what is typed (waiting for a save that is running); false with a message when it cannot. */
+  async flush(): Promise<boolean> {
+    if (this.#running) await this.#running;
+    return this.dirty() ? this.save() : !this.failure();
+  }
+
   /** « Finir plus tard »: saves what is typed, then hands back (the draft stays in the list). */
   protected async finishLater(): Promise<void> {
-    if (this.dirty() && !(await this.save())) return;
+    if (!(await this.flush())) return;
     this.finished.emit();
   }
 
@@ -235,9 +259,9 @@ export class GradeGrid {
   protected async save(): Promise<boolean> {
     const sheet = this.main();
     if (!sheet) return false;
-    if (this.busy()) {
-      this.#again = true;
-      return false;
+    if (this.#running) {
+      await this.#running;
+      return this.dirty() ? this.save() : !this.failure();
     }
     this.#clearTimer();
     if (this.issues().invalid.length) {
@@ -248,6 +272,8 @@ export class GradeGrid {
     this.failure.set(null);
     const sentMarks = this.marks();
     const sentComments = this.comments();
+    let finish: () => void = () => undefined;
+    this.#running = new Promise<void>((resolve) => (finish = resolve));
     try {
       const entries = [
         ...this.targetedRows().map((r) => ({
@@ -272,35 +298,40 @@ export class GradeGrid {
       return false;
     } finally {
       this.busy.set(false);
-      if (this.#again) {
-        this.#again = false;
-        if (this.dirty()) this.#schedule();
-      }
+      this.#running = null;
+      finish();
+      // Typed while the request ran: the next autosave picks it up.
+      if (this.quick() && this.dirty() && !this.issues().invalid.length) this.#schedule();
     }
   }
 
   protected async togglePublished(): Promise<void> {
     const sheet = this.main();
-    if (!sheet || this.busy()) return;
+    if (!sheet || this.publishing()) return;
     const publish = !this.published();
     if (publish && this.issues().invalid.length) {
       this.confirmError.set('Corrigez les notes hors barème avant de publier.');
       return;
     }
-    if (this.dirty() && !(await this.save())) {
-      this.confirmError.set(this.failure());
+    if (publish && this.#given() === 0) {
+      this.confirmError.set('Saisissez au moins une note avant de publier : sinon les élèves ne verraient rien.');
       return;
     }
-    this.busy.set(true);
+    this.publishing.set(true);
+    this.confirmError.set(null);
     try {
+      if (!(await this.flush())) {
+        this.confirmError.set(this.failure() ?? 'Les notes ne sont pas enregistrées. Réessayez dans un instant.');
+        return;
+      }
       this.#replace(await this.#api.grades.publish(sheet.event.id, publish));
       this.confirmOpen.set(false);
       this.savedAt.set(new Date());
-      this.publishedChange.emit(publish);
+      if (this.published() === publish) this.publishedChange.emit(publish);
     } catch (error) {
       this.confirmError.set(`${publish ? 'La publication' : 'Le retrait'} a échoué. ${apiMessage(error)}`);
     } finally {
-      this.busy.set(false);
+      this.publishing.set(false);
     }
   }
 

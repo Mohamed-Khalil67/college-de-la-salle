@@ -200,7 +200,7 @@ describe('QuickGradingService', () => {
             classId: 'c1',
             subjectId: 'mathematiques',
             activityType: { gradable: true },
-            period: { closedAt: null },
+            OR: [{ periodId: null }, { period: { closedAt: null } }],
           }),
         }),
       );

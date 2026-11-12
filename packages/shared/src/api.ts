@@ -1290,6 +1290,12 @@ export interface StudentGradeDto {
   readonly event: Pick<EventDto, 'id' | 'type' | 'title' | 'date' | 'subjectId' | 'coefficient' | 'periodId'>;
 }
 
+/** What a grade sheet accepts: the scale (« Sur ») of the marks and a note's coefficient. */
+export const GRADING_LIMITS = {
+  scale: { min: 1, max: 1000 },
+  coefficient: { min: 0, max: 20 },
+} as const;
+
 /**
  * POST /grading/assessments (teachers): « Nouvelle note ». Creates, in one step, the gradable event the
  * grades hang on (today's school date, no time, the whole class, the current open period) and answers its

@@ -1,14 +1,14 @@
 import { afterNextRender, Component, computed, ElementRef, inject, Injector, input, linkedSignal, resource, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { form, FormField, max, maxLength, min, required, submit } from '@angular/forms/signals';
-import { EVENT_LIMITS, type EventDto, type PendingGradingDto } from '@cdls/shared';
+import { EVENT_LIMITS, type EventDto, GRADING_LIMITS, type PendingGradingDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { LoadState } from '../../../shared/components/load-state';
 import { teacherAssignments } from '../../../shared/data/teacher-data';
 import { Alert, Button, EmptyState, Field, FieldControl } from '../../../shared/ui';
 import { shownError } from '../../../shared/utils/forms';
 import { GradeGrid } from '../notes/grade-grid';
-import { classSubjectChoices, COEFFICIENT_LIMITS, initialChoice, pendingMeta, quickGradeTypes, SCALE_LIMITS, scaleLine } from './noter-logic';
+import { classSubjectChoices, initialChoice, pendingMeta, quickGradeTypes, scaleLine } from './noter-logic';
 
 interface NewNoteModel {
   title: string;
@@ -98,6 +98,7 @@ export class NoterPage {
   readonly #api = inject(ApiClient);
   readonly #injector = inject(Injector);
   private readonly heading = viewChild<ElementRef<HTMLElement>>('stepHeading');
+  private readonly grid = viewChild(GradeGrid);
 
   protected readonly assignments = teacherAssignments();
   protected readonly choices = computed(() => classSubjectChoices(this.assignments.hasValue() ? this.assignments.value() : []));
@@ -126,11 +127,11 @@ export class NoterPage {
     required(p.title, { message: 'Donnez un nom à la note, par exemple « Interrogation 3 ».' });
     maxLength(p.title, EVENT_LIMITS.title, { message: `Le nom compte ${EVENT_LIMITS.title} caractères au plus.` });
     required(p.outOf, { message: `Indiquez sur combien la note est donnée, par exemple 20.` });
-    min(p.outOf, SCALE_LIMITS.min, { message: `La note est sur ${SCALE_LIMITS.min} à ${SCALE_LIMITS.max}.` });
-    max(p.outOf, SCALE_LIMITS.max, { message: `La note est sur ${SCALE_LIMITS.min} à ${SCALE_LIMITS.max}.` });
+    min(p.outOf, GRADING_LIMITS.scale.min, { message: `La note est sur ${GRADING_LIMITS.scale.min} à ${GRADING_LIMITS.scale.max}.` });
+    max(p.outOf, GRADING_LIMITS.scale.max, { message: `La note est sur ${GRADING_LIMITS.scale.min} à ${GRADING_LIMITS.scale.max}.` });
     required(p.coefficient, { message: 'Indiquez un coefficient, 1 par défaut.' });
-    min(p.coefficient, COEFFICIENT_LIMITS.min, { message: `Le coefficient va de ${COEFFICIENT_LIMITS.min} à ${COEFFICIENT_LIMITS.max}.` });
-    max(p.coefficient, COEFFICIENT_LIMITS.max, { message: `Le coefficient va de ${COEFFICIENT_LIMITS.min} à ${COEFFICIENT_LIMITS.max}.` });
+    min(p.coefficient, GRADING_LIMITS.coefficient.min, { message: `Le coefficient va de ${GRADING_LIMITS.coefficient.min} à ${GRADING_LIMITS.coefficient.max}.` });
+    max(p.coefficient, GRADING_LIMITS.coefficient.max, { message: `Le coefficient va de ${GRADING_LIMITS.coefficient.min} à ${GRADING_LIMITS.coefficient.max}.` });
   });
   protected readonly titleError = computed(() => shownError(this.noteForm.title()));
   protected readonly outOfError = computed(() => shownError(this.noteForm.outOf()));
@@ -165,14 +166,14 @@ export class NoterPage {
       this.busy.set(true);
       this.failure.set(null);
       const m = this.model();
-      const typeId = m.activityTypeId || this.types()[0]?.id;
       try {
         const sheet = await this.#api.grades.createQuick({
           classId: c.classId,
           subjectId: c.subjectId,
           title: m.title.trim(),
           coefficient: m.coefficient,
-          ...(typeId ? { activityTypeId: typeId } : {}),
+          // No choice made: the API picks the first assessment type.
+          ...(m.activityTypeId ? { activityTypeId: m.activityTypeId } : {}),
         });
         this.noteForm().reset({ ...EMPTY_NOTE });
         this.#go({ kind: 'grade', event: sheet.event, scale: m.outOf });
@@ -188,7 +189,14 @@ export class NoterPage {
     this.#go({ kind: 'grade', event: p.event, scale: p.outOf ?? 20 });
   }
 
-  /** « Finir plus tard », « Changer de note » and « Noter une autre note »: back to step 1. */
+  /** « Changer de note »: what was typed is saved first, and the teacher stays if that fails. */
+  protected async change(): Promise<void> {
+    const grid = this.grid();
+    if (grid && !(await grid.flush())) return;
+    this.backToChoice();
+  }
+
+  /** « Finir plus tard » and « Noter une autre note »: back to step 1. */
   protected backToChoice(saved?: string): void {
     this.notice.set(saved ? `« ${saved} » est enregistrée : elle vous attend dans « À finir ».` : null);
     this.pending.reload();

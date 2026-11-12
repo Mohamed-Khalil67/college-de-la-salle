@@ -48,8 +48,8 @@
               @if (types().length > 1) {
                 <cdls-field label="Type">
                   <select cdlsControl [formField]="noteForm.activityTypeId">
-                    @for (t of types(); track t.id) {
-                      <option [value]="t.id">{{ t.label }}</option>
+                    @for (t of types(); track t.id; let first = $first) {
+                      <option [value]="first ? '' : t.id">{{ t.label }}</option>
                     }
                   </select>
                 </cdls-field>
@@ -91,7 +91,7 @@
           <h2 #stepHeading id="step-grade" class="t-h2 step-heading" tabindex="-1">{{ s.event.title }}</h2>
           <p class="t-muted step-meta">{{ gradeMeta(s.event, s.scale) }}. Étape 2 sur 2.</p>
           <div class="step-back">
-            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="backToChoice()">Changer de note</button>
+            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="change()">Changer de note</button>
           </div>
           <app-grade-grid
             [event]="s.event"

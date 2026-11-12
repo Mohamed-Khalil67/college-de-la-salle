@@ -100,8 +100,9 @@ export class QuickGradingService {
   }
 
   /**
-   * The teacher's work still to grade for a class and subject: gradable events of an open period whose
-   * grades are not published yet, or not all entered. Newest first.
+   * The work still to grade for a class and subject (any teacher of it may grade, so a colleague's draft
+   * shows too): gradable events of an open period whose grades are not published yet, or not all entered.
+   * Newest first.
    */
   async pending(query: PendingGradingQueryDto, user: AuthUser): Promise<PendingGradingDto[]> {
     await this.access.assertTeachesClass(user, query.classId, query.subjectId);
@@ -110,7 +111,8 @@ export class QuickGradingService {
         classId: query.classId,
         subjectId: query.subjectId,
         activityType: { gradable: true },
-        period: { closedAt: null },
+        // An event without a period (an old graded one) still counts; one of a closed period is locked.
+        OR: [{ periodId: null }, { period: { closedAt: null } }],
       },
       include: eventInclude,
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],

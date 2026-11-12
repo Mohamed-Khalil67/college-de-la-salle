@@ -18,6 +18,7 @@ import {
   type CreateQuickAssessmentRequest,
   EVENT_LIMITS,
   type GradeDto as GradeContract,
+  GRADING_LIMITS,
   type GradeEntry,
   type GradeSheetDto as GradeSheetContract,
   LIMITS,
@@ -172,8 +173,8 @@ export class CreateQuickAssessmentDto implements CreateQuickAssessmentRequest {
   @IsOptional()
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  @Max(20)
+  @Min(GRADING_LIMITS.coefficient.min)
+  @Max(GRADING_LIMITS.coefficient.max)
   coefficient?: number;
 
   /** A gradable, non-homework type the teacher may use; omitted, the first assessment type. */

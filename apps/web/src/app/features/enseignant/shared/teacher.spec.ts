@@ -4,6 +4,7 @@ import {
   audienceFromValue,
   audienceLabel,
   audienceOptions,
+  changedSince,
   columnAverage,
   emptyEventModel,
   gradeIssues,
@@ -14,6 +15,7 @@ import {
   rollCounts,
   rollSentence,
   rowAverage,
+  saveStatus,
   timeProblem,
   toEventInput,
 } from './teacher';
@@ -135,5 +137,31 @@ describe('audiences', () => {
     expect(audienceLabel({ classId: 'c1', sectionId: null }, classes, sections)).toBe('Première');
     expect(audienceLabel({ classId: null, sectionId: 's-bac' }, classes, sections)).toBe('tout le Bac français');
     expect(audienceLabel({ classId: null, sectionId: null }, classes, sections)).toBe('tout le collège');
+  });
+});
+
+describe('saveStatus', () => {
+  const base = { saving: false, dirty: false, invalid: false, failed: false, entered: 4, total: 27, average: 14.2 };
+
+  it('reads « Enregistré · 4 / 27 · moyenne 14,2 » once saved', () => {
+    expect(saveStatus(base)).toBe('Enregistré · 4 / 27 · moyenne 14,2');
+  });
+
+  it('says when it saves, waits, failed or cannot save', () => {
+    expect(saveStatus({ ...base, saving: true })).toBe('Enregistrement… · 4 / 27');
+    expect(saveStatus({ ...base, dirty: true })).toBe('Modifications en attente · 4 / 27 · moyenne 14,2');
+    expect(saveStatus({ ...base, failed: true })).toBe('Non enregistré · 4 / 27');
+    expect(saveStatus({ ...base, invalid: true, saving: true })).toMatch(/^Note hors barème/);
+  });
+
+  it('leaves the average out before the first mark', () => {
+    expect(saveStatus({ ...base, entered: 0, average: null })).toBe('Enregistré · 0 / 27');
+  });
+});
+
+describe('changedSince', () => {
+  it('keeps only what was typed after the values were sent', () => {
+    expect(changedSince({ a: 12, b: null, c: 5 }, { a: 12, b: 14, c: null, d: 3 })).toEqual({ b: 14, c: null, d: 3 });
+    expect(changedSince({ a: 'x' }, { a: 'x' })).toEqual({});
   });
 });

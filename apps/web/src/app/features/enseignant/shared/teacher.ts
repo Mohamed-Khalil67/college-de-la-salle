@@ -12,6 +12,7 @@ import {
   SECTION_LABELS,
   type TeachingAssignmentDto,
 } from '@cdls/shared';
+import { average } from '../../../shared/utils/format';
 
 /**
  * Pure logic of the teacher space: classes from teaching assignments, the event form, the grade grid,
@@ -270,4 +271,43 @@ export function audienceLabel(
     return section ? `tout le ${section.label}` : 'une section';
   }
   return 'tout le collège';
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Autosave of the grade grid (« Noter »)
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface SaveState {
+  /** A request is running. */
+  readonly saving: boolean;
+  /** Typed marks or comments that the server does not have yet. */
+  readonly dirty: boolean;
+  /** Some typed marks are outside the scale: they are not sent. */
+  readonly invalid: boolean;
+  /** The last save failed (the reason is shown separately). */
+  readonly failed: boolean;
+  /** Marks entered, among `total` students. */
+  readonly entered: number;
+  readonly total: number;
+  /** Class average on 20, null without marks. */
+  readonly average: number | null;
+}
+
+/** The polite status line of the autosaving grid: « Enregistré · 4 / 27 · moyenne 14,2 ». */
+export function saveStatus(s: SaveState): string {
+  const counts = `${s.entered} / ${s.total}`;
+  const avg = s.average === null ? '' : ` · moyenne ${average(s.average)}`;
+  if (s.invalid) return `Note hors barème : corrigez-la pour enregistrer · ${counts}`;
+  if (s.saving) return `Enregistrement… · ${counts}`;
+  if (s.failed) return `Non enregistré · ${counts}`;
+  if (s.dirty) return `Modifications en attente · ${counts}${avg}`;
+  return `Enregistré · ${counts}${avg}`;
+}
+
+/**
+ * The entries typed while a save was running: what differs between the values sent and the values now.
+ * They are put back after the server's answer replaces the sheet, so nothing typed meanwhile is lost.
+ */
+export function changedSince<T>(sent: Readonly<Record<string, T>>, now: Readonly<Record<string, T>>): Record<string, T> {
+  return Object.fromEntries(Object.entries(now).filter(([key, value]) => !Object.is(sent[key], value)));
 }

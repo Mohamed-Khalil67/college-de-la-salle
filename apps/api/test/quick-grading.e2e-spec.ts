@@ -16,6 +16,10 @@ import {
 } from './helpers.js';
 
 const message = (body: unknown) => (body as { message?: unknown }).message;
+/** Fails with the API's answer in the message, so a refusal is readable in the log. */
+const created = (res: { status: number; body: unknown }) => {
+  if (res.status !== 201) throw new Error(`${res.status} ${JSON.stringify(res.body)}`);
+};
 
 /** « Noter »: a teacher grades a class straight away, without an agenda event first. */
 describe('Quick grading (e2e)', () => {
@@ -24,7 +28,7 @@ describe('Quick grading (e2e)', () => {
   let teacher: string;
   let pupil: string;
   const since = new Date();
-  const created: string[] = [];
+  const madeIds: string[] = [];
 
   beforeAll(async () => {
     t = await createTestApp();
@@ -36,7 +40,7 @@ describe('Quick grading (e2e)', () => {
   afterAll(async () => {
     // Grades go with their events; the publish notifications are this spec's own.
     await t.prisma.notification.deleteMany({ where: { createdAt: { gte: since } } });
-    await t.prisma.event.deleteMany({ where: { id: { in: created } } });
+    await t.prisma.event.deleteMany({ where: { id: { in: madeIds } } });
     await t.close();
   });
 
@@ -70,9 +74,9 @@ describe('Quick grading (e2e)', () => {
     const res = await create(teacher, {
       ...body('  Interrogation éclair  '),
       coefficient: 2,
-    }).expect(201);
+    }).expect(created);
     const sheet = res.body as GradeSheetDto;
-    created.push(sheet.event.id);
+    madeIds.push(sheet.event.id);
 
     expect(sheet.event).toMatchObject({
       title: 'Interrogation éclair',
@@ -103,9 +107,9 @@ describe('Quick grading (e2e)', () => {
   });
 
   it('lists it as pending until every mark is in and published; students see it only after publish', async () => {
-    const res = await create(teacher, body('Contrôle rapide')).expect(201);
+    const res = await create(teacher, body('Contrôle rapide')).expect(created);
     const sheet = res.body as GradeSheetDto;
-    created.push(sheet.event.id);
+    madeIds.push(sheet.event.id);
 
     let item = (await pending()).find((p) => p.event.id === sheet.event.id);
     expect(item).toMatchObject({
@@ -192,8 +196,9 @@ describe('Quick grading (e2e)', () => {
   });
 
   it('answers 409 when the current period is closed, and leaves its drafts out of the list', async () => {
-    const draft = (await create(teacher, body('Avant clôture')).expect(201)).body as GradeSheetDto;
-    created.push(draft.event.id);
+    const draft = (await create(teacher, body('Avant clôture')).expect(created))
+      .body as GradeSheetDto;
+    madeIds.push(draft.event.id);
     const periodId = draft.event.periodId!;
     const before = await t.prisma.event.count({ where: { classId: student.classId } });
     await t.prisma.period.update({ where: { id: periodId }, data: { closedAt: new Date() } });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivityTypeDto, PendingGradingDto, TeachingAssignmentDto } from '@cdls/shared';
-import { changedSince, classSubjectChoices, initialChoice, pendingMeta, quickGradeTypes, saveStatus, scaleLine } from './noter-logic';
+import { classSubjectChoices, initialChoice, pendingMeta, quickGradeTypes, scaleLine } from './noter-logic';
 
 const type = (id: string, flags: Partial<ActivityTypeDto>): ActivityTypeDto => ({
   id,
@@ -68,32 +68,6 @@ describe('pendingMeta', () => {
     expect(pendingMeta(pending(0, false))).toBe('Contrôle, jeudi 12 novembre, aucune note saisie, brouillon');
     expect(pendingMeta(pending(1, false))).toMatch(/1 note sur 27, brouillon$/);
     expect(pendingMeta(pending(18, true))).toMatch(/18 notes sur 27, publiée en partie$/);
-  });
-});
-
-describe('saveStatus', () => {
-  const base = { saving: false, dirty: false, invalid: false, failed: false, entered: 4, total: 27, average: 14.2 };
-
-  it('reads « Enregistré · 4 / 27 · moyenne 14,2 » once saved', () => {
-    expect(saveStatus(base)).toBe('Enregistré · 4 / 27 · moyenne 14,2');
-  });
-
-  it('says when it saves, waits, failed or cannot save', () => {
-    expect(saveStatus({ ...base, saving: true })).toBe('Enregistrement… · 4 / 27');
-    expect(saveStatus({ ...base, dirty: true })).toBe('Modifications en attente · 4 / 27 · moyenne 14,2');
-    expect(saveStatus({ ...base, failed: true })).toBe('Non enregistré · 4 / 27');
-    expect(saveStatus({ ...base, invalid: true, saving: true })).toMatch(/^Note hors barème/);
-  });
-
-  it('leaves the average out before the first mark', () => {
-    expect(saveStatus({ ...base, entered: 0, average: null })).toBe('Enregistré · 0 / 27');
-  });
-});
-
-describe('changedSince', () => {
-  it('keeps only what was typed after the values were sent', () => {
-    expect(changedSince({ a: 12, b: null, c: 5 }, { a: 12, b: 14, c: null, d: 3 })).toEqual({ b: 14, c: null, d: 3 });
-    expect(changedSince({ a: 'x' }, { a: 'x' })).toEqual({});
   });
 });
 
