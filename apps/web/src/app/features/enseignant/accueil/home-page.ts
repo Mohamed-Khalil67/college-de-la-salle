@@ -9,6 +9,7 @@ import { GradingBlock } from './grading-block';
 import { HomeworkBlock } from './homework-block';
 import { LessonsBlock } from './lessons-block';
 import { TeacherNewsBlock } from './news-block';
+import { TeacherHomeData } from './teacher-home-data';
 import { WatchBlock } from './watch-block';
 
 /**
@@ -21,7 +22,7 @@ import { WatchBlock } from './watch-block';
 @Component({
   selector: 'app-enseignant-home-page',
   imports: [Button, GradingBlock, HomeStatusRegion, HomeworkBlock, Icon, LessonsBlock, RouterLink, TeacherNewsBlock, WatchBlock],
-  providers: [HomeStatus],
+  providers: [HomeStatus, TeacherHomeData],
   template: `
     <div class="page__header">
       <div class="page__header-text">

@@ -1,13 +1,11 @@
-import { Component, computed, inject, resource } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ApiClient } from '../../../core/api/api-client';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
-import { teacherAssignments } from '../../../shared/data/teacher-data';
 import { Badge, type BadgeTone, Button } from '../../../shared/ui';
 import { blockState, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
-import { classSubjectChoices } from '../noter/noter-logic';
 import { type GradingItem, gradingView, type PendingEntry } from './home-views';
+import { TeacherHomeData } from './teacher-home-data';
 
 /**
  * « Notes à finir »: the drafts, planned exams and half-entered marks (18 / 27) of every class and subject
@@ -84,32 +82,18 @@ import { type GradingItem, gradingView, type PendingEntry } from './home-views';
   `,
 })
 export class GradingBlock {
-  readonly #api = inject(ApiClient);
   readonly #today = inject(SchoolClock).today;
-  readonly #assignments = teacherAssignments();
-
-  /** One call per class and subject taught (« Noter » shows them the same way). */
-  readonly #pending = resource({
-    params: () => (this.#assignments.hasValue() ? classSubjectChoices(this.#assignments.value()) : undefined),
-    loader: ({ params }): Promise<PendingEntry[]> =>
-      Promise.all(
-        params.map(async (choice) => ({
-          choice,
-          pending: await this.#api.grades.pending({ classId: choice.classId, subjectId: choice.subjectId }),
-        })),
-      ),
-  });
+  readonly #data = inject(TeacherHomeData);
 
   /** The assignments failing is the block failing; while they load, so does the block. */
   protected readonly state = computed(() => {
-    const error = this.#assignments.error();
-    const source: Snapshot<PendingEntry[]> = error ? { error, value: undefined } : snapshotOf(this.#pending);
+    const error = this.#data.assignments.error();
+    const source: Snapshot<PendingEntry[]> = error ? { error, value: undefined } : snapshotOf(this.#data.pending);
     return blockState(source, (entries) => gradingView(entries, this.#today()));
   });
 
   protected reload(): void {
-    this.#assignments.reload();
-    this.#pending.reload();
+    this.#data.reload();
   }
 
   protected tone(item: GradingItem): BadgeTone {

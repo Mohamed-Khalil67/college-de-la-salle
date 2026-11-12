@@ -1,6 +1,5 @@
 import {
   addDays,
-  type AttendanceSheetDto,
   type CalendarDayDto,
   isAssessment,
   type OccurrenceDto,
@@ -170,64 +169,46 @@ export function dueLabel(day: string, today: string): string {
  * À surveiller
  * ---------------------------------------------------------------------------------------------- */
 
-/** How far back the roll calls are read, how many sessions at most, and how many absences make a pattern. */
-export const ABSENCE_DAYS = 14;
-export const ROLL_SESSIONS = 12;
-export const ABSENCE_REPEAT = 2;
+/** A note still unfinished after this many days is worth a look. */
+export const LATE_AFTER_DAYS = 7;
 export const TESTS_DAYS = 14;
 export const TESTS_SHOWN = 3;
-export const ALERTS_SHOWN = 4;
+export const LATE_SHOWN = 3;
 
-/** The sessions whose roll call is read: timed, not homework, of the teacher's classes, already held, newest first. */
-export function rollSessions(
-  list: readonly OccurrenceDto[],
-  classIds: ReadonlySet<string>,
-  teacherId: string,
-  today: string,
-  count = ROLL_SESSIONS,
-): OccurrenceDto[] {
-  return list
-    .filter(
-      (o) =>
-        o.day <= today &&
-        o.day >= addDays(today, -ABSENCE_DAYS) &&
-        !!o.event.startTime &&
-        !o.event.type.homework &&
-        o.event.authorId === teacherId &&
-        o.event.classId !== null &&
-        classIds.has(o.event.classId),
-    )
-    .sort((a, b) => b.day.localeCompare(a.day) || (b.event.startTime ?? '').localeCompare(a.event.startTime ?? ''))
-    .slice(0, count);
+export interface LateNote {
+  readonly eventId: string;
+  readonly classId: string;
+  readonly subjectId: string;
+  readonly title: string;
+  /** « Première, Mathématiques · Mar. 3 nov. » */
+  readonly meta: string;
+  /** « 18 / 27 » or « Aucune note saisie ». */
+  readonly progress: string;
+  /** Days since the work took place. */
+  readonly daysAgo: number;
 }
 
-export interface AbsenceAlert {
-  readonly studentId: string;
-  readonly name: string;
-  /** Sessions the student missed (absent, not excused) among those read. */
-  readonly count: number;
-  /** The most recent day missed. */
-  readonly lastDay: string;
+/** Whole days between two calendar days (`from` is not after `to`). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 }
 
-/** Students absent (not excused) from at least `min` of the roll calls read; most absences first. */
-export function repeatedAbsences(sheets: readonly AttendanceSheetDto[], min = ABSENCE_REPEAT): AbsenceAlert[] {
-  const byStudent = new Map<string, AbsenceAlert>();
-  for (const sheet of sheets) {
-    for (const row of sheet.rows) {
-      if (row.record?.status !== 'absent') continue;
-      const before = byStudent.get(row.student.id);
-      byStudent.set(row.student.id, {
-        studentId: row.student.id,
-        name: `${row.student.firstName} ${row.student.lastName}`,
-        count: (before?.count ?? 0) + 1,
-        lastDay: before && before.lastDay > sheet.date ? before.lastDay : sheet.date,
-      });
-    }
-  }
-  return [...byStudent.values()]
-    .filter((a) => a.count >= min)
-    .sort((a, b) => b.count - a.count || b.lastDay.localeCompare(a.lastDay) || a.name.localeCompare(b.name, 'fr'));
+/** Notes that took place at least a week ago and are still not finished, the oldest first. */
+export function lateNotes(entries: readonly PendingEntry[], today: string, count = LATE_SHOWN): LateNote[] {
+  return entries
+    .flatMap(({ choice, pending }) => pending.map((p) => ({ choice, p })))
+    .filter(({ p }) => p.event.date <= addDays(today, -LATE_AFTER_DAYS))
+    .sort((a, b) => a.p.event.date.localeCompare(b.p.event.date) || a.p.event.id.localeCompare(b.p.event.id))
+    .slice(0, count)
+    .map(({ choice, p }) => ({
+      eventId: p.event.id,
+      classId: choice.classId,
+      subjectId: choice.subjectId,
+      title: p.event.title,
+      meta: `${choice.label} · ${shortDate(p.event.date)}`,
+      progress: progressText(p),
+      daysAgo: daysBetween(p.event.date, today),
+    }));
 }
 
 /** Exams and tests of the teacher's classes in the next two weeks (planned by anyone), soonest first. */
@@ -251,17 +232,16 @@ export function upcomingTests(
 }
 
 export interface WatchView {
-  readonly absences: readonly AbsenceAlert[];
+  readonly late: readonly LateNote[];
   readonly tests: readonly OccurrenceDto[];
 }
 
-/** Repeated absences and planned tests; null when there is nothing to watch. */
-export function watchView(absences: readonly AbsenceAlert[], tests: readonly OccurrenceDto[]): WatchView | null {
-  const shown = absences.slice(0, ALERTS_SHOWN);
-  return shown.length || tests.length ? { absences: shown, tests } : null;
+/** Late notes and planned tests; null when there is nothing to watch. */
+export function watchView(late: readonly LateNote[], tests: readonly OccurrenceDto[]): WatchView | null {
+  return late.length || tests.length ? { late, tests } : null;
 }
 
-/** « 3 absences, la dernière le Mar. 10 nov. » */
-export function absenceLine(a: AbsenceAlert): string {
-  return `${plural(a.count, 'absence')}, la dernière le ${shortDate(a.lastDay)}`;
+/** « 18 / 27, donnée il y a 21 jours ». */
+export function lateLine(note: Pick<LateNote, 'daysAgo' | 'progress'>): string {
+  return `${note.progress}, donnée il y a ${plural(note.daysAgo, 'jour')}`;
 }

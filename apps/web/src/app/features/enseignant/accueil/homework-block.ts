@@ -4,10 +4,10 @@ import { ApiClient } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
-import { teacherAssignments } from '../../../shared/data/teacher-data';
 import { blockState, snapshotOf } from '../../../shared/utils/block-state';
 import { subjectName } from '../../../shared/utils/format';
 import { dueLabel, givenHomework, HOMEWORK_DAYS, type HomeworkRow, homeworkView, ticksLine } from './home-views';
+import { TeacherHomeData } from './teacher-home-data';
 
 /**
  * « Devoirs donnés »: the homework the teacher gave that falls due in the next two weeks, soonest first,
@@ -70,11 +70,7 @@ export class HomeworkBlock {
   readonly #api = inject(ApiClient);
   readonly #auth = inject(AuthStore);
   readonly #today = inject(SchoolClock).today;
-  /** Class labels for the second line; without them the line just says the subject. */
-  readonly #assignments = teacherAssignments();
-  readonly #labels = computed(
-    () => new Map((this.#assignments.hasValue() ? this.#assignments.value() : []).map((a) => [a.classId, a.classLabel])),
-  );
+  readonly #data = inject(TeacherHomeData);
 
   readonly #rows = resource({
     params: () => {
@@ -101,7 +97,7 @@ export class HomeworkBlock {
 
   protected meta(row: HomeworkRow): string {
     const event = row.occurrence.event;
-    return [subjectName(event.subjectId), this.#labels().get(event.classId ?? '') ?? ''].filter(Boolean).join(', ');
+    return [subjectName(event.subjectId), this.#data.classLabels().get(event.classId ?? '') ?? ''].filter(Boolean).join(', ');
   }
   protected ticks(row: HomeworkRow): string {
     return ticksLine(row.done, row.occurrence.event.target.concerned);

@@ -7,7 +7,7 @@ Draft for the school. It assumes the college runs a small pilot first, then open
 | Role | Can do | Cannot do (yet) |
 |---|---|---|
 | **Student** | Open on one page of five blocks (see below); see the week's timetable; tick homework as done; read published grades with averages per subject and overall; see absences; read and download report cards (PDF); read announcements for their class | See other students' data |
-| **Teacher** | See their classes; add, edit and delete calendar events (course, exam, homework, with links and weekly repeat); grade a class straight away (« Noter »: new note, marks in a grid, finish later, publish) or enter marks for an agenda event; take attendance; post announcements to a class or section | Edit another teacher's class; open the admin area |
+| **Teacher** | Open on one page of five blocks (see below); see their classes; add, edit and delete calendar events (course, exam, homework, with links and weekly repeat); grade a class straight away (« Noter »: new note, marks in a grid, finish later, publish) or enter marks for an agenda event; take attendance; post announcements to a class or section | Edit another teacher's class; open the admin area |
 | **Admin / secretariat** | Create accounts one by one or by CSV import; manage classes, enrolments, teaching assignments, school years and terms; generate, edit and publish report cards; read messages from the contact form | n/a |
 
 ## What the student sees on opening the platform
@@ -23,6 +23,20 @@ The student lands on one page, `/eleve`, made of blocks. Each block shows only w
 | **Annonces** (full width) | The two latest announcements for the student's class and section | Toutes les annonces (new page `/eleve/annonces`) |
 
 Each block loads on its own: if one fails it shows its own message and the rest of the page stays usable. The menu is unchanged for now.
+
+## What the teacher sees on opening the platform
+
+The teacher lands on one page, `/enseignant`, built like the student's: blocks that load on their own, each ending with one button to its detail page. On a phone the blocks stack in this order; from tablet width the three middle ones sit side by side. The header button « Nouvelle note » grades any class, not only today's. « Mes classes » moves to `/enseignant/classes` (a link of « Plus » and the button of « À surveiller »).
+
+| Block | Shows | Button |
+|---|---|---|
+| **Mes cours aujourd'hui** (full width, navy) | Each class of the day in time order with **Appel**, **Noter** (opens the class and subject in « Noter ») and **Devoir**; the current one outlined and marked « En cours », past ones quieter (« Terminé »), cancelled or moved ones written out without actions; a calm message on a holiday or at the week-end | Mon emploi du temps de la semaine |
+| **Notes à finir** | Drafts, planned exams and half-entered marks (18 / 27) of every class and subject taught, newest first, each with « Reprendre » | Noter une classe |
+| **Devoirs donnés** | The homework the teacher gave that falls due in two weeks, with how many students ticked it | Tous mes devoirs |
+| **À surveiller** | Notes still unfinished a week after the work, and the exams and tests planned for the teacher's classes in the next two weeks (set by anyone, the school included) | Mes classes |
+| **Annonces** (full width) | The two latest announcements | Écrire ou lire les annonces |
+
+Not on the page yet: « Appel fait » on past classes and repeated absences. Both need one call per class session (roll-call sheets), which the school's single address cannot afford (the API limits each address to 120 requests a minute); they wait for a summary endpoint. The menu is unchanged apart from « Mes classes » moving behind « Plus » and the first entry being the page.
 
 ## Gaps to close before the school launch
 

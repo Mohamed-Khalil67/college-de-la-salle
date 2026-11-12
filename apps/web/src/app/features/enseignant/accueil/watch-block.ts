@@ -1,36 +1,24 @@
 import { Component, computed, inject, resource } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { addDays, type OccurrenceDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
-import { AuthStore } from '../../../core/auth/auth-store';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
-import { teacherAssignments } from '../../../shared/data/teacher-data';
-import { blockState, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
+import { Button } from '../../../shared/ui';
+import { blockState } from '../../../shared/utils/block-state';
 import { subjectName } from '../../../shared/utils/format';
 import { shortDate } from '../../timetable/timetable-format';
-import {
-  ABSENCE_DAYS,
-  absenceLine,
-  type AbsenceAlert,
-  repeatedAbsences,
-  rollSessions,
-  TESTS_DAYS,
-  upcomingTests,
-  watchView,
-} from './home-views';
-
-interface WatchSource {
-  readonly absences: readonly AbsenceAlert[];
-  readonly tests: readonly OccurrenceDto[];
-}
+import { type LateNote, lateLine, lateNotes, TESTS_DAYS, upcomingTests, watchView } from './home-views';
+import { TeacherHomeData } from './teacher-home-data';
 
 /**
- * « À surveiller »: students absent at least twice from the teacher's last roll calls, and the exams and
- * tests planned for the teacher's classes in the next two weeks (including those set by the school).
+ * « À surveiller »: the notes still unfinished a week after the work, and the exams and tests planned for the
+ * teacher's classes in the next two weeks (including those set by the school). The unfinished notes come from
+ * the page's shared data; if they cannot be read, the planned tests still show.
  */
 @Component({
   selector: 'app-watch-block',
-  imports: [HomeBlock],
+  imports: [Button, HomeBlock, RouterLink],
   template: `
     @let s = state();
     <app-home-block
@@ -40,20 +28,28 @@ interface WatchSource {
       link="classes"
       linkLabel="Mes classes"
       loadingLabel="Chargement des points à surveiller…"
-      emptyText="Rien à signaler : pas d’absences répétées ni de contrôle prévu d’ici deux semaines."
+      emptyText="Rien à signaler : pas de note en retard ni de contrôle prévu d’ici deux semaines."
       (retry)="reload()"
     >
       @if (s.status === 'ready') {
-        @if (s.data.absences.length) {
+        @if (s.data.late.length) {
           <div class="watch">
-            <h3 class="watch__title" id="bloc-surveiller-absences">Absences répétées</h3>
-            <ul class="list" role="list" aria-labelledby="bloc-surveiller-absences">
-              @for (alert of s.data.absences; track alert.studentId) {
-                <li>
+            <h3 class="watch__title" id="bloc-surveiller-retard">Notes en retard</h3>
+            <ul class="list" role="list" aria-labelledby="bloc-surveiller-retard">
+              @for (note of s.data.late; track note.eventId) {
+                <li class="watch__late">
                   <div class="list__main">
-                    <p>{{ alert.name }}</p>
-                    <p class="list__meta">{{ absence(alert) }}</p>
+                    <p>{{ note.title }}</p>
+                    <p class="list__meta">{{ note.meta }}</p>
+                    <p class="list__meta">{{ line(note) }}</p>
                   </div>
+                  <a
+                    cdlsButton
+                    variant="tertiary"
+                    routerLink="noter"
+                    [queryParams]="{ classe: note.classId, matiere: note.subjectId }"
+                    >Reprendre<span class="visually-hidden"> la note {{ note.title }}, {{ note.meta }}</span></a
+                  >
                 </li>
               }
             </ul>
@@ -95,6 +91,9 @@ interface WatchSource {
       font-weight: 600;
       color: var(--color-heading);
     }
+    .watch__late {
+      align-items: center;
+    }
     .watch__day {
       flex: none;
       font-size: var(--text-body-s);
@@ -106,50 +105,40 @@ interface WatchSource {
 })
 export class WatchBlock {
   readonly #api = inject(ApiClient);
-  readonly #auth = inject(AuthStore);
   readonly #today = inject(SchoolClock).today;
-  readonly #assignments = teacherAssignments();
-  readonly #labels = computed(
-    () => new Map((this.#assignments.hasValue() ? this.#assignments.value() : []).map((a) => [a.classId, a.classLabel])),
-  );
+  readonly #data = inject(TeacherHomeData);
 
-  readonly #watch = resource({
-    params: () => {
-      const teacherId = this.#auth.user()?.teacherId;
-      if (!teacherId || !this.#assignments.hasValue()) return undefined;
-      return { teacherId, today: this.#today(), classIds: this.#assignments.value().map((a) => a.classId) };
-    },
-    loader: async ({ params }): Promise<WatchSource> => {
-      const classIds = new Set(params.classIds);
-      const occurrences = await this.#api.calendar.occurrences({
-        from: addDays(params.today, -ABSENCE_DAYS),
-        to: addDays(params.today, TESTS_DAYS),
-      });
-      const sheets = await Promise.all(
-        rollSessions(occurrences, classIds, params.teacherId, params.today).map((o) =>
-          this.#api.attendance.sheet(o.event.id, o.day),
-        ),
-      );
-      return { absences: repeatedAbsences(sheets), tests: upcomingTests(occurrences, classIds, params.today) };
-    },
+  readonly #tests = resource({
+    params: () => (this.#data.assignments.hasValue() ? { today: this.#today(), classIds: this.#data.assignments.value().map((a) => a.classId) } : undefined),
+    loader: async ({ params }) =>
+      upcomingTests(
+        await this.#api.calendar.occurrences({ from: params.today, to: addDays(params.today, TESTS_DAYS) }),
+        new Set(params.classIds),
+        params.today,
+      ),
   });
 
   protected readonly state = computed(() => {
-    const error = this.#assignments.error();
-    const source: Snapshot<WatchSource> = error ? { error, value: undefined } : snapshotOf(this.#watch);
-    return blockState(source, (found) => watchView(found.absences, found.tests));
+    const error = this.#data.assignments.error() ?? this.#tests.error();
+    // The unfinished notes are a secondary source: unreadable, they are simply not shown.
+    const pending = this.#data.pending.hasValue() ? this.#data.pending.value() : [];
+    const late = lateNotes(pending, this.#today());
+    return blockState(
+      { error, value: this.#tests.hasValue() ? this.#tests.value() : undefined },
+      (tests) => watchView(late, tests),
+    );
   });
 
   protected reload(): void {
-    this.#assignments.reload();
-    this.#watch.reload();
+    this.#data.reload();
+    this.#tests.reload();
   }
 
-  protected absence(alert: AbsenceAlert): string {
-    return absenceLine(alert);
+  protected line(note: LateNote): string {
+    return lateLine(note);
   }
   protected testMeta(test: OccurrenceDto): string {
-    return [this.#labels().get(test.event.classId ?? ''), subjectName(test.event.subjectId), test.event.type.label]
+    return [this.#data.classLabels().get(test.event.classId ?? ''), subjectName(test.event.subjectId), test.event.type.label]
       .filter(Boolean)
       .join(', ');
   }

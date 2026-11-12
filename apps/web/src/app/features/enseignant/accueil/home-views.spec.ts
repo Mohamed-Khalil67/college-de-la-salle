@@ -1,7 +1,5 @@
 import type {
   ActivityTypeSummary,
-  AttendanceSheetDto,
-  AttendanceStatus,
   CalendarDayDto,
   EventDto,
   OccurrenceDto,
@@ -11,7 +9,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 import type { ClassSubjectChoice } from '../noter/noter-logic';
 import {
-  absenceLine,
+  daysBetween,
   dueLabel,
   givenHomework,
   gradingView,
@@ -19,9 +17,9 @@ import {
   lessonsEmptyText,
   lessonsView,
   progressText,
-  repeatedAbsences,
-  rollSessions,
   ticksLine,
+  lateLine,
+  lateNotes,
   upcomingTests,
   watchView,
 } from './home-views';
@@ -190,46 +188,42 @@ describe('homework given', () => {
 
 describe('what to watch', () => {
   const classes = new Set(['c1']);
-
-  function sheet(date: string, statuses: Readonly<Record<string, AttendanceStatus>>): AttendanceSheetDto {
-    return {
-      event: occurrence('e', date, 'cours').event,
-      date,
-      rows: Object.entries(statuses).map(([id, status]) => ({
-        student: { id, userId: `u-${id}`, firstName: id.toUpperCase(), lastName: 'Rafla', studentNumber: null },
-        record: { id: `r-${id}-${date}`, eventId: 'e', studentId: id, date, status, minutesLate: null, note: '' },
-        targeted: true,
-      })),
-    };
-  }
-
-  it('reads the roll calls of held sessions of my classes, newest first, within two weeks', () => {
-    const list = [
-      occurrence('old', '2026-10-20', 'cours'),
-      occurrence('yesterday', '2026-11-09', 'cours'),
-      occurrence('tomorrow', '2026-11-11', 'cours'),
-      occurrence('mine', TODAY, 'cours'),
-      occurrence('untimed', '2026-11-08', 'cours', { startTime: null }),
-      occurrence('homework', '2026-11-08', 'devoir'),
-      occurrence('other class', '2026-11-08', 'cours', { classId: 'c9' }),
-      occurrence('colleague', '2026-11-08', 'cours', { authorId: 'teacher-2' }),
-    ];
-    expect(rollSessions(list, classes, ME, TODAY).map((o) => o.event.id)).toEqual(['mine', 'yesterday']);
-    const many = Array.from({ length: 14 }, (_, i) => occurrence(`s${i}`, `2026-11-${String(i % 10).padStart(2, '0')}`, 'cours', { id: `s${i}` }));
-    expect(rollSessions(many, classes, ME, TODAY).length).toBeLessThanOrEqual(12);
+  const math: ClassSubjectChoice = { key: 'c1|s1', classId: 'c1', subjectId: 's1', classLabel: 'Première', label: 'Première, Mathématiques' };
+  const pending = (id: string, day: string, entered: number): PendingGradingDto => ({
+    event: occurrence(id, day, 'controle').event,
+    entered,
+    total: 27,
+    published: false,
+    outOf: entered ? 20 : null,
   });
 
-  it('flags a student absent twice, not once, and ignores excused absences and lateness', () => {
-    const sheets = [
-      sheet('2026-11-03', { a: 'absent', b: 'absent', c: 'late', d: 'excused' }),
-      sheet('2026-11-05', { a: 'absent', b: 'present', c: 'late', d: 'excused' }),
-      sheet('2026-11-09', { a: 'absent', b: 'present', c: 'late', d: 'excused' }),
+  it('lists the notes still unfinished a week after the work, the oldest first, three at most', () => {
+    const entries = [
+      {
+        choice: math,
+        pending: [
+          pending('recent', '2026-11-05', 4),
+          pending('old', '2026-10-20', 18),
+          pending('older', '2026-10-01', 0),
+          pending('edge', '2026-11-03', 27),
+          pending('another', '2026-10-25', 2),
+        ],
+      },
     ];
-    const alerts = repeatedAbsences(sheets);
-    expect(alerts.map((a) => [a.studentId, a.count, a.lastDay])).toEqual([['a', 3, '2026-11-09']]);
-    expect(alerts[0]?.name).toBe('A Rafla');
-    expect(absenceLine(alerts[0]!)).toBe('3 absences, la dernière le Lun. 9 nov.');
-    expect(repeatedAbsences([sheets[0]!])).toEqual([]);
+    const late = lateNotes(entries, TODAY);
+    expect(late.map((n) => n.eventId)).toEqual(['older', 'old', 'another']);
+    expect(late[1]).toMatchObject({ progress: '18 / 27', classId: 'c1', subjectId: 's1', daysAgo: 21 });
+    expect(late[0]?.progress).toBe('Aucune note saisie');
+    expect(lateLine(late[1]!)).toBe('18 / 27, donnée il y a 21 jours');
+    // Exactly seven days ago counts, six does not.
+    expect(lateNotes([{ choice: math, pending: [pending('seven', '2026-11-03', 1), pending('six', '2026-11-04', 1)] }], TODAY).map((n) => n.eventId)).toEqual(['seven']);
+    expect(lateNotes([], TODAY)).toEqual([]);
+  });
+
+  it('counts days between two calendar days', () => {
+    expect(daysBetween('2026-11-10', '2026-11-10')).toBe(0);
+    expect(daysBetween('2026-10-31', '2026-11-02')).toBe(2);
+    expect(lateLine({ progress: '3 / 27', daysAgo: 1 })).toBe('3 / 27, donnée il y a 1 jour');
   });
 
   it('lists the exams of my classes in the next two weeks, soonest first', () => {
@@ -242,12 +236,13 @@ describe('what to watch', () => {
       occurrence('other', '2026-11-12', 'controle', { classId: 'c9' }),
     ];
     expect(upcomingTests(list, classes, TODAY).map((o) => o.event.id)).toEqual(['soon', 'later']);
+    expect(upcomingTests(list, classes, TODAY, 1)).toHaveLength(1);
   });
 
-  it('is null when there is nothing to watch, and caps the absences at four', () => {
+  it('is null when there is nothing to watch', () => {
     expect(watchView([], [])).toBeNull();
-    const alerts = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ studentId: id, name: id, count: 2, lastDay: TODAY }));
-    expect(watchView(alerts, [])?.absences).toHaveLength(4);
+    const late = lateNotes([{ choice: math, pending: [pending('old', '2026-10-20', 3)] }], TODAY);
+    expect(watchView(late, [])?.late).toHaveLength(1);
     expect(watchView([], [occurrence('t', '2026-11-12', 'controle')])?.tests).toHaveLength(1);
   });
 });

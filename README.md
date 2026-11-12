@@ -8,7 +8,7 @@ signed-in spaces run the school year:
 | --- | --- | --- |
 | **Public site** | Everyone | Home, history and heritage, the two tracks with their subjects, contact |
 | **Espace élève** `/eleve` | Students | Dashboard, timetable, homework (tick as done), grades with averages, absences, report cards (PDF) |
-| **Espace enseignant** `/enseignant` | Teachers | Their classes, the shared calendar, « Noter » (a new note, marks typed with Enter, autosave, finish later, publish) and the grade entry of agenda events, attendance, announcements |
+| **Espace enseignant** `/enseignant` | Teachers | One page of blocks (today's classes with Appel / Noter / Devoir, notes to finish, homework given, what to watch, announcements), their classes (`/enseignant/classes`), the shared calendar, « Noter » (a new note, marks typed with Enter, autosave, finish later, publish) and the grade entry of agenda events, attendance, announcements |
 | **Administration** `/admin` | School staff | Accounts (one by one or roster CSV with generated school e-mails), section-change validations, graduation, classes and enrolments, teaching assignments, school years, periods and calendar days, **the next-year wizard** (« Nouvelle année »: preview, promotions, archive), subjects and the subjects of each class, rooms, activity types, report cards, messages from the contact form |
 
 Accounts are created by the college; there is no open sign-up. Built with **Angular 22** (standalone, zoneless,
