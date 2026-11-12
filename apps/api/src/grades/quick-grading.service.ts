@@ -24,8 +24,7 @@ export const NO_OPEN_PERIOD =
   'Aucune période ne couvre aujourd’hui pour cette classe : demandez à l’administration de créer la période en cours.';
 export const PERIOD_CLOSED =
   'La période en cours est clôturée : vous ne pouvez plus y ajouter de note.';
-export const NOT_GRADABLE_TYPE =
-  'Choisissez un type d’évaluation noté (pas un devoir à rendre).';
+export const NOT_GRADABLE_TYPE = 'Choisissez un type d’évaluation noté (pas un devoir à rendre).';
 const NO_ASSESSMENT_TYPE =
   'Aucun type d’évaluation noté n’est disponible : demandez à l’administration d’en créer un.';
 /** The picker shows the latest ones; older drafts stay reachable from « Saisie des notes ». */
