@@ -31,8 +31,14 @@ async function openHome(page: Page): Promise<void> {
 
 test('the five blocks stack in order on a phone, three side by side from tablet width, Axe-clean', async ({ page }) => {
   const errors: string[] = [];
+  const yearsRequests: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname === '/api/school-years') yearsRequests.push(r.url());
+  });
   await openHome(page);
+  // Notes and Absences share one source for the school years and the term.
+  expect(yearsRequests).toHaveLength(1);
 
   // Order of the sections and of their h2 headings.
   const headings = page.getByRole('main').getByRole('heading', { level: 2 });
