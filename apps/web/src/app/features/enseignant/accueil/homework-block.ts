@@ -1,12 +1,11 @@
 import { Component, computed, inject, resource } from '@angular/core';
-import { addDays } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
-import { blockState, snapshotOf } from '../../../shared/utils/block-state';
+import { blockState, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
 import { subjectName } from '../../../shared/utils/format';
-import { dueLabel, givenHomework, HOMEWORK_DAYS, type HomeworkRow, homeworkView, ticksLine } from './home-views';
+import { dueLabel, givenHomework, type HomeworkRow, homeworkView, ticksLine } from './home-views';
 import { TeacherHomeData } from './teacher-home-data';
 
 /**
@@ -35,7 +34,9 @@ import { TeacherHomeData } from './teacher-home-data';
               <div class="list__main">
                 <p>{{ row.occurrence.event.title }}</p>
                 <p class="list__meta">{{ meta(row) }}</p>
-                <p class="homework__ticks">{{ ticks(row) }}</p>
+                @if (ticks(row); as line) {
+                  <p class="homework__ticks">{{ line }}</p>
+                }
               </div>
               <p class="homework__day">{{ due(row) }}</p>
             </li>
@@ -72,27 +73,33 @@ export class HomeworkBlock {
   readonly #today = inject(SchoolClock).today;
   readonly #data = inject(TeacherHomeData);
 
+  /** The tick counts of the homework found in the page's shared events; a count that fails is left blank. */
   readonly #rows = resource({
     params: () => {
       const teacherId = this.#auth.user()?.teacherId;
-      return teacherId ? { teacherId, today: this.#today() } : undefined;
+      return teacherId && this.#data.events.hasValue() ? { teacherId, events: this.#data.events.value(), today: this.#today() } : undefined;
     },
-    loader: async ({ params }): Promise<HomeworkRow[]> => {
-      const occurrences = await this.#api.calendar.occurrences({ from: params.today, to: addDays(params.today, HOMEWORK_DAYS) });
-      const given = givenHomework(occurrences, params.teacherId, params.today);
-      return Promise.all(
-        given.map(async (occurrence) => ({
+    loader: async ({ params }): Promise<HomeworkRow[]> =>
+      Promise.all(
+        givenHomework(params.events, params.teacherId, params.today).map(async (occurrence) => ({
           occurrence,
-          done: (await this.#api.calendar.completions(occurrence.event.id)).length,
+          done: await this.#api.calendar.completions(occurrence.event.id).then(
+            (list) => list.length,
+            () => null,
+          ),
         })),
-      );
-    },
+      ),
   });
 
-  protected readonly state = computed(() => blockState(snapshotOf(this.#rows), homeworkView));
+  protected readonly state = computed(() => {
+    const error = this.#data.events.error();
+    const source: Snapshot<HomeworkRow[]> = error ? { error, value: undefined } : snapshotOf(this.#rows);
+    return blockState(source, homeworkView);
+  });
 
   protected reload(): void {
-    this.#rows.reload();
+    if (this.#data.events.error()) this.#data.events.reload();
+    else this.#rows.reload();
   }
 
   protected meta(row: HomeworkRow): string {
@@ -100,7 +107,7 @@ export class HomeworkBlock {
     return [subjectName(event.subjectId), this.#data.classLabels().get(event.classId ?? '') ?? ''].filter(Boolean).join(', ');
   }
   protected ticks(row: HomeworkRow): string {
-    return ticksLine(row.done, row.occurrence.event.target.concerned);
+    return row.done === null ? '' : ticksLine(row.done, row.occurrence.event.target.concerned);
   }
   protected due(row: HomeworkRow): string {
     return dueLabel(row.occurrence.day, this.#today());

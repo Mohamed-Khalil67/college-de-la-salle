@@ -143,8 +143,8 @@ export function givenHomework(
 
 export interface HomeworkRow {
   readonly occurrence: OccurrenceDto;
-  /** Students who ticked it. */
-  readonly done: number;
+  /** Students who ticked it; null when the count could not be read. */
+  readonly done: number | null;
 }
 
 /** « 12 élèves sur 27 l’ont fait » (or just the count when the class size is unknown). */

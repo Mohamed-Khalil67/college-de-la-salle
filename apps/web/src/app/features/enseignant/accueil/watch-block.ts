@@ -1,20 +1,24 @@
-import { Component, computed, inject, resource } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { addDays, type OccurrenceDto } from '@cdls/shared';
-import { ApiClient } from '../../../core/api/api-client';
+import type { OccurrenceDto } from '@cdls/shared';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { Button } from '../../../shared/ui';
-import { blockState } from '../../../shared/utils/block-state';
+import { blockState, type Snapshot } from '../../../shared/utils/block-state';
 import { subjectName } from '../../../shared/utils/format';
 import { shortDate } from '../../timetable/timetable-format';
-import { type LateNote, lateLine, lateNotes, TESTS_DAYS, upcomingTests, watchView } from './home-views';
+import { type LateNote, lateLine, lateNotes, type PendingEntry, upcomingTests, watchView } from './home-views';
 import { TeacherHomeData } from './teacher-home-data';
+
+interface WatchSource {
+  readonly pending: readonly PendingEntry[];
+  readonly events: readonly OccurrenceDto[];
+}
 
 /**
  * « À surveiller »: the notes still unfinished a week after the work, and the exams and tests planned for the
- * teacher's classes in the next two weeks (including those set by the school). The unfinished notes come from
- * the page's shared data; if they cannot be read, the planned tests still show.
+ * teacher's classes in the next two weeks (including those set by the school). Both lists come from the
+ * page's shared data (nothing is fetched twice); if one cannot be read the block says so.
  */
 @Component({
   selector: 'app-watch-block',
@@ -104,34 +108,25 @@ import { TeacherHomeData } from './teacher-home-data';
   `,
 })
 export class WatchBlock {
-  readonly #api = inject(ApiClient);
   readonly #today = inject(SchoolClock).today;
   readonly #data = inject(TeacherHomeData);
 
-  readonly #tests = resource({
-    params: () => (this.#data.assignments.hasValue() ? { today: this.#today(), classIds: this.#data.assignments.value().map((a) => a.classId) } : undefined),
-    loader: async ({ params }) =>
-      upcomingTests(
-        await this.#api.calendar.occurrences({ from: params.today, to: addDays(params.today, TESTS_DAYS) }),
-        new Set(params.classIds),
-        params.today,
-      ),
-  });
-
+  /** Any source failing is the block failing (a half-read list would say « nothing to watch » wrongly); it loads until all are in. */
   protected readonly state = computed(() => {
-    const error = this.#data.assignments.error() ?? this.#tests.error();
-    // The unfinished notes are a secondary source: unreadable, they are simply not shown.
-    const pending = this.#data.pending.hasValue() ? this.#data.pending.value() : [];
-    const late = lateNotes(pending, this.#today());
-    return blockState(
-      { error, value: this.#tests.hasValue() ? this.#tests.value() : undefined },
-      (tests) => watchView(late, tests),
+    const error = this.#data.assignments.error() ?? this.#data.pending.error() ?? this.#data.events.error();
+    const ready = this.#data.assignments.hasValue() && this.#data.pending.hasValue() && this.#data.events.hasValue();
+    const source: Snapshot<WatchSource> = error
+      ? { error, value: undefined }
+      : { error: undefined, value: ready ? { pending: this.#data.pending.value(), events: this.#data.events.value() } : undefined };
+    const classIds = new Set(this.#data.assignments.hasValue() ? this.#data.assignments.value().map((a) => a.classId) : []);
+    return blockState(source, ({ pending, events }) =>
+      watchView(lateNotes(pending, this.#today()), upcomingTests(events, classIds, this.#today())),
     );
   });
 
   protected reload(): void {
     this.#data.reload();
-    this.#tests.reload();
+    this.#data.events.reload();
   }
 
   protected line(note: LateNote): string {

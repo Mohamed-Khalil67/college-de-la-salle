@@ -205,16 +205,33 @@ test('a block that fails shows its own error and « Réessayer »; the page live
   const retry = grading.getByRole('button', { name: 'Réessayer' });
   await expect(retry).toBeVisible();
   expect((await retry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  for (const b of BLOCKS.filter((x) => x.heading !== 'Notes à finir')) await expect(block(page, b.heading).getByRole('alert')).toHaveCount(0);
-  await expect(pageStatus(page)).toHaveText('Page chargée. Le bloc « Notes à finir » n’a pas pu être chargé.');
+  // « À surveiller » reads the same notes (fetched once for the page), so it says so too; the other blocks are untouched.
+  await expect(block(page, 'À surveiller').getByRole('alert')).toHaveCount(1);
+  for (const heading of ['Mes cours aujourd’hui', 'Devoirs donnés', 'Annonces']) await expect(block(page, heading).getByRole('alert')).toHaveCount(0);
+  await expect(pageStatus(page)).toHaveText(/^Page chargée. Ces blocs n’ont pas pu être chargés : .*Notes à finir.*À surveiller|^Page chargée. Ces blocs n’ont pas pu être chargés : .*À surveiller.*Notes à finir/);
   await expect(page.getByRole('status')).toHaveCount(1);
   await axeAtBothWidths(page);
 
   failing = false;
   await retry.click();
   await expect(grading.getByRole('alert')).toHaveCount(0);
+  await expect(block(page, 'À surveiller').getByRole('alert')).toHaveCount(0);
   await expect(grading.getByRole('link', { name: 'Noter une classe', exact: true })).toBeVisible();
   await expect(pageStatus(page)).toHaveText('Page chargée.');
+  await axeAtBothWidths(page);
+});
+
+test('one block failing alone (the announcements) leaves the other four untouched', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.teacher);
+  await leaveHome(page);
+  await page.route('**/api/posts*', (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Les annonces sont indisponibles pour le moment.' }) }),
+  );
+  await goInApp(page, '/enseignant');
+  await expect(block(page, 'Annonces').getByRole('alert')).toContainText('Les annonces sont indisponibles');
+  for (const heading of ['Mes cours aujourd’hui', 'Notes à finir', 'Devoirs donnés', 'À surveiller'])
+    await expect(block(page, heading).getByRole('alert')).toHaveCount(0);
+  await expect(pageStatus(page)).toHaveText('Page chargée. Le bloc « Annonces » n’a pas pu être chargé.');
   await axeAtBothWidths(page);
 });
 
