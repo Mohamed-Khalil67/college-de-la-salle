@@ -7,7 +7,7 @@ export const ADMIN_ROUTES: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    title: 'Administration',
+    title: 'Accueil',
     canMatch: [adminOnlyGuard],
     loadComponent: () => import('./accueil/home-page').then((m) => m.AdminHomePage),
   },

@@ -432,8 +432,8 @@ test('a planner sees the structure screens and nothing else of the administratio
 
   // The navigation holds the structure screens only.
   const nav = page.getByRole('navigation', { name: 'Planification' });
-  // The planner's page comes first; the rarer screens (Salles, Types d’activité) are behind « Plus ».
-  for (const name of ['Planification', 'Classes', 'Matières', 'Année scolaire', 'Plus']) {
+  // « Accueil » (the planner's page) comes first; the rarer screens (Matières, Salles, Année…) are behind « Plus ».
+  for (const name of ['Accueil', 'Classes', 'Emploi du temps', 'Plus']) {
     await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
   }
   for (const name of ['Utilisateurs', 'Affectations', 'Validations', 'Bulletins', 'Messages']) {
@@ -505,7 +505,7 @@ test('every admin screen is free of Axe violations at 390 and 1440 px, and the p
   const bottom = page.getByRole('navigation', { name: 'Navigation mobile' });
   await bottom.getByRole('link', { name: 'Plus' }).click();
   await expect(page).toHaveURL(/\/admin\/menu$/);
-  for (const name of ['Matières', 'Salles', 'Types d’activité', 'Année scolaire', 'Messages']) {
+  for (const name of ['Matières', 'Salles', 'Types d’activité', 'Année scolaire', 'Affectations', 'Planification']) {
     await expect(page.getByRole('main').getByRole('link', { name })).toBeVisible();
   }
 });
