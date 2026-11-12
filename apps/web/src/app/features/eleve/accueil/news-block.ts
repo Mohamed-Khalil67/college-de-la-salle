@@ -1,7 +1,7 @@
 import { Component, computed, inject, resource } from '@angular/core';
 import { ApiClient } from '../../../core/api/api-client';
-import { HomeBlock, snapshotOf } from '../../../shared/components/home-block';
-import { blockState } from '../../../shared/utils/block-state';
+import { HomeBlock } from '../../../shared/components/home-block';
+import { blockState, snapshotOf } from '../../../shared/utils/block-state';
 import { newsView } from './home-views';
 import { PostItem } from './post-item';
 
@@ -20,6 +20,7 @@ import { PostItem } from './post-item';
       loadingLabel="Chargement des annonces…"
       emptyText="Aucune annonce pour l’instant. Les messages de l’école et de vos enseignants arriveront ici."
       [wide]="true"
+      (retry)="reload()"
     >
       @if (s.status === 'ready') {
         <ul class="news" role="list">
@@ -52,4 +53,8 @@ export class NewsBlock {
   readonly #api = inject(ApiClient);
   readonly #posts = resource({ loader: () => this.#api.calendar.posts({ pageSize: 2 }) });
   protected readonly state = computed(() => blockState(snapshotOf(this.#posts), (page) => newsView(page.items)));
+
+  protected reload(): void {
+    this.#posts.reload();
+  }
 }

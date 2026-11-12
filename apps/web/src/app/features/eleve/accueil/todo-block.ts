@@ -1,8 +1,9 @@
-import { Component, computed, inject, input, resource } from '@angular/core';
+import { Component, computed, inject, resource } from '@angular/core';
 import { addDays, type HomeworkDto, type OccurrenceDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
-import { HomeBlock, snapshotOf } from '../../../shared/components/home-block';
-import { blockState, bothOf } from '../../../shared/utils/block-state';
+import { SchoolClock } from '../../../core/clock/school-clock';
+import { HomeBlock } from '../../../shared/components/home-block';
+import { blockState, bothOf, snapshotOf } from '../../../shared/utils/block-state';
 import { capitalize, subjectName } from '../../../shared/utils/format';
 import { shortDate } from '../../timetable/timetable-format';
 import { HomeworkItem } from '../devoirs/homework-item';
@@ -25,6 +26,7 @@ import { TODO_DAYS, todoView } from './home-views';
       linkLabel="Tous les devoirs et contrôles"
       loadingLabel="Chargement des devoirs…"
       emptyText="Rien à rendre ni contrôle prévu d’ici deux semaines."
+      (retry)="reload()"
     >
       @if (s.status === 'ready') {
         <div class="todo">
@@ -90,10 +92,8 @@ import { TODO_DAYS, todoView } from './home-views';
   `,
 })
 export class TodoBlock {
-  /** Today in Cairo, `YYYY-MM-DD`. */
-  readonly today = input.required<string>();
-
   readonly #api = inject(ApiClient);
+  protected readonly today = inject(SchoolClock).today;
   readonly #homework = resource({
     params: () => ({ from: this.today() }),
     loader: ({ params }) => this.#api.calendar.homework(params),
@@ -108,6 +108,11 @@ export class TodoBlock {
       todoView(homework, events, this.today()),
     ),
   );
+
+  protected reload(): void {
+    this.#homework.reload();
+    this.#events.reload();
+  }
 
   /** A tick saved by the item: keep it in the list (it never moves, so the focus stays on its box). */
   protected replace(updated: HomeworkDto): void {

@@ -3,15 +3,12 @@ import {
   type HomeworkDto,
   isAssessment,
   type OccurrenceDto,
-  type PeriodDto,
   type PostDto,
   type ReportCardDto,
-  type SchoolYearDto,
   type StudentAttendanceDto,
   type StudentGradeDto,
   type StudentGradesDto,
 } from '@cdls/shared';
-import { currentYear, termOf } from '../../../shared/utils/format';
 import { latestGrades, overallAverage } from '../shared/grades';
 
 /**
@@ -23,12 +20,6 @@ import { latestGrades, overallAverage } from '../shared/grades';
 export const TODO_DAYS = 14;
 export const TODO_HOMEWORK = 4;
 export const TODO_TESTS = 3;
-
-/** The term of today in the current school year, or null (the blocks then fall back to the whole year). */
-export function currentTerm(years: readonly SchoolYearDto[], today: string): PeriodDto | null {
-  const year = currentYear(years);
-  return year ? termOf(year.periods, today) : null;
-}
 
 export interface TodoView {
   readonly homework: readonly HomeworkDto[];

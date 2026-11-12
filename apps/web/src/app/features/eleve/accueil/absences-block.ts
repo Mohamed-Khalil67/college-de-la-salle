@@ -1,12 +1,13 @@
-import { Component, computed, inject, input, resource } from '@angular/core';
+import { Component, computed, inject, resource } from '@angular/core';
 import type { StudentAttendanceDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
-import { HomeBlock, snapshotOf } from '../../../shared/components/home-block';
+import { HomeBlock } from '../../../shared/components/home-block';
+import { SchoolYears } from '../../../shared/data/school-years';
 import { Badge } from '../../../shared/ui';
-import { blockState } from '../../../shared/utils/block-state';
+import { blockState, snapshotOf } from '../../../shared/utils/block-state';
 import { ATTENDANCE_LABELS, ATTENDANCE_TONES, dayTitle, subjectName, timeSpan } from '../../../shared/utils/format';
-import { absencesView, currentTerm } from './home-views';
+import { absencesView } from './home-views';
 
 /** « Absences »: the count of the current term and the latest absence or late arrival. */
 @Component({
@@ -22,6 +23,7 @@ import { absencesView, currentTerm } from './home-views';
       linkLabel="Détail des absences"
       loadingLabel="Chargement des absences…"
       [emptyText]="emptyText()"
+      (retry)="reload()"
     >
       @if (s.status === 'ready') {
         <div class="absences__counts">
@@ -83,19 +85,16 @@ import { absencesView, currentTerm } from './home-views';
   `,
 })
 export class AbsencesBlock {
-  /** Today in Cairo, `YYYY-MM-DD`. */
-  readonly today = input.required<string>();
-
   readonly #api = inject(ApiClient);
   readonly #auth = inject(AuthStore);
-  readonly #years = resource({ loader: () => this.#api.school.years() });
-  readonly #term = computed(() => (this.#years.hasValue() ? currentTerm(this.#years.value(), this.today()) : null));
+  readonly #years = inject(SchoolYears);
+  readonly #term = this.#years.term;
 
   readonly #records = resource({
     params: () => {
       const studentId = this.#auth.user()?.studentId;
-      // Without the terms (still loading or failed), wait; then fall back to the whole year.
-      if (!studentId || this.#years.isLoading()) return undefined;
+      // Without the terms (still loading), wait; if they failed, fall back to the whole year.
+      if (!studentId || !this.#years.settled()) return undefined;
       const term = this.#term();
       return { studentId, from: term?.startsOn, to: term?.endsOn };
     },
@@ -103,6 +102,11 @@ export class AbsencesBlock {
   });
 
   protected readonly state = computed(() => blockState(snapshotOf(this.#records), absencesView));
+
+  protected reload(): void {
+    if (this.#years.years.error()) this.#years.reload();
+    this.#records.reload();
+  }
 
   protected readonly termPhrase = computed(() => {
     const term = this.#term();

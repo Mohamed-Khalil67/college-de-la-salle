@@ -1,6 +1,7 @@
-import { afterNextRender, Component, computed, DestroyRef, inject, signal } from '@angular/core';
-import { schoolToday } from '@cdls/shared';
+import { Component, computed, inject } from '@angular/core';
 import { AuthStore } from '../../../core/auth/auth-store';
+import { SchoolClock } from '../../../core/clock/school-clock';
+import { HomeStatus, HomeStatusRegion } from '../../../shared/components/home-status';
 import { dayTitle } from '../../../shared/utils/format';
 import { AbsencesBlock } from './absences-block';
 import { GradesBlock } from './grades-block';
@@ -12,10 +13,12 @@ import { TodoBlock } from './todo-block';
  * The student's one page: everything checked every day, in blocks that each load their own data and end
  * with one link to their detail page. Phone: the blocks stack in this order. From tablet width:
  * Maintenant across the top, À faire, Notes and Absences side by side, Annonces across the bottom.
+ * One permanent live region says when the page has loaded and which block failed.
  */
 @Component({
   selector: 'app-eleve-home-page',
-  imports: [AbsencesBlock, GradesBlock, NewsBlock, NowBlock, TodoBlock],
+  imports: [AbsencesBlock, GradesBlock, HomeStatusRegion, NewsBlock, NowBlock, TodoBlock],
+  providers: [HomeStatus],
   template: `
     <div class="page__header">
       <div class="page__header-text">
@@ -23,11 +26,12 @@ import { TodoBlock } from './todo-block';
         <p class="t-muted">{{ date() }}</p>
       </div>
     </div>
+    <app-home-status />
     <div class="home-grid">
-      <app-now-block [today]="today()" />
-      <app-todo-block [today]="today()" />
-      <app-grades-block [today]="today()" />
-      <app-absences-block [today]="today()" />
+      <app-now-block />
+      <app-todo-block />
+      <app-grades-block />
+      <app-absences-block />
       <app-news-block />
     </div>
   `,
@@ -47,19 +51,8 @@ import { TodoBlock } from './todo-block';
 })
 export class EleveHomePage {
   readonly #auth = inject(AuthStore);
-  /**
-   * Today in Cairo, for every block (one date for the whole page). Checked every minute in the browser, so
-   * a page left open past midnight moves on to the new day (the blocks reload for it).
-   */
-  protected readonly today = signal(schoolToday());
-  protected readonly date = computed(() => dayTitle(this.today()));
+  /** The school clock moves on by itself (a page left open follows midnight; the blocks reload for the new day). */
+  readonly #clock = inject(SchoolClock);
+  protected readonly date = computed(() => dayTitle(this.#clock.today()));
   protected readonly firstName = computed(() => this.#auth.user()?.firstName ?? '');
-
-  constructor() {
-    const destroyRef = inject(DestroyRef);
-    afterNextRender(() => {
-      const timer = setInterval(() => this.today.set(schoolToday()), 60_000);
-      destroyRef.onDestroy(() => clearInterval(timer));
-    });
-  }
 }

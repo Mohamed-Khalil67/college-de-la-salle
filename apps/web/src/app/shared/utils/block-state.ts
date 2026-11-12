@@ -4,6 +4,8 @@
  * `HomeBlock` component renders the loading, error and empty states, the block renders `ready`.
  */
 
+import type { Resource } from '@angular/core';
+
 export const BLOCK_STATUSES = ['loading', 'error', 'empty', 'ready'] as const;
 export type BlockStatus = (typeof BLOCK_STATUSES)[number];
 
@@ -17,6 +19,11 @@ export type BlockState<T> =
 export interface Snapshot<V> {
   readonly error: unknown;
   readonly value: V | undefined;
+}
+
+/** What a block reads of a `resource()`: its error, else its value (undefined while it loads). */
+export function snapshotOf<V>(ref: Resource<V | undefined>): Snapshot<V> {
+  return { error: ref.error(), value: ref.hasValue() ? ref.value() : undefined };
 }
 
 export const LOADING: Snapshot<never> = { error: undefined, value: undefined };
@@ -37,4 +44,24 @@ export function bothOf<A, B>(a: Snapshot<A>, b: Snapshot<B>): Snapshot<readonly 
   const error = a.error || b.error;
   if (error) return { error, value: undefined };
   return { error: undefined, value: a.value === undefined || b.value === undefined ? undefined : [a.value, b.value] };
+}
+
+export interface BlockReport {
+  readonly heading: string;
+  readonly status: BlockStatus;
+}
+
+/**
+ * The one sentence a page announces to assistive technology (a permanent polite region, updated with text):
+ * nothing before any block reports, « Chargement… » while one loads, then « Page chargée. » or the blocks
+ * that failed (their own alert says why).
+ */
+export function pageStatusMessage(reports: readonly BlockReport[]): string {
+  if (!reports.length) return '';
+  if (reports.some((r) => r.status === 'loading')) return 'Chargement de la page…';
+  const failed = reports.filter((r) => r.status === 'error').map((r) => r.heading);
+  if (!failed.length) return 'Page chargée.';
+  return failed.length === 1
+    ? `Page chargée. Le bloc « ${failed[0]} » n’a pas pu être chargé.`
+    : `Page chargée. Ces blocs n’ont pas pu être chargés : ${failed.join(', ')}.`;
 }

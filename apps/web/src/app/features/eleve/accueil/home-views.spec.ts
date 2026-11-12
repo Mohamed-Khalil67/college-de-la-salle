@@ -3,16 +3,14 @@ import type {
   EventDto,
   HomeworkDto,
   OccurrenceDto,
-  PeriodDto,
   PostDto,
   ReportCardDto,
-  SchoolYearDto,
   StudentAttendanceDto,
   StudentGradesDto,
 } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
 import { blockState, bothOf, LOADING, type Snapshot } from '../../../shared/utils/block-state';
-import { absencesView, currentTerm, gradesView, newsView, todoView } from './home-views';
+import { absencesView, gradesView, newsView, todoView } from './home-views';
 
 /**
  * Each block of the student's home in its four states (loading, error, empty, data), as the block
@@ -191,36 +189,5 @@ describe('Annonces', () => {
     const posts = [post('old', '2026-10-01T08:00:00Z'), post('new', '2026-11-09T08:00:00Z'), post('mid', '2026-11-01T08:00:00Z')];
     const state = blockState({ error: undefined, value: posts }, view);
     expect(state.status === 'ready' && state.data.map((p) => p.id)).toEqual(['new', 'mid']);
-  });
-});
-
-describe('currentTerm', () => {
-  const period = (id: string, startsOn: string, endsOn: string): PeriodDto => ({
-    id,
-    schoolYearId: 'y',
-    kind: 'trimester',
-    sectionId: null,
-    number: 1,
-    label: id,
-    startsOn,
-    endsOn,
-    closedAt: null,
-  });
-  const year = (isCurrent: boolean, periods: PeriodDto[]): SchoolYearDto => ({
-    id: isCurrent ? 'now' : 'old',
-    label: isCurrent ? '2026-2027' : '2025-2026',
-    startsOn: '2026-09-01',
-    endsOn: '2027-06-30',
-    isCurrent,
-    status: isCurrent ? 'current' : 'archived',
-    archivedAt: null,
-    periods,
-  });
-  it('is the term of today in the current year', () => {
-    const years = [year(false, [period('old', '2025-09-01', '2025-12-15')]), year(true, [period('t1', '2026-09-01', '2026-12-15'), period('t2', '2027-01-01', '2027-03-31')])];
-    expect(currentTerm(years, TODAY)?.id).toBe('t1');
-  });
-  it('is null without a school year', () => {
-    expect(currentTerm([], TODAY)).toBeNull();
   });
 });

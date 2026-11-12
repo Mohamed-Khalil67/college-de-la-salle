@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockState, bothOf, LOADING, type Snapshot } from './block-state';
+import { blockState, bothOf, LOADING, pageStatusMessage, type Snapshot } from './block-state';
 
 const nonEmpty = (list: readonly number[]) => (list.length ? list : null);
 
@@ -33,5 +33,25 @@ describe('bothOf', () => {
     const error = new Error('down');
     expect(bothOf(a, { error, value: undefined }).error).toBe(error);
     expect(bothOf({ error, value: undefined }, LOADING).error).toBe(error);
+  });
+});
+
+describe('pageStatusMessage', () => {
+  it('says nothing before any block reports', () => {
+    expect(pageStatusMessage([])).toBe('');
+  });
+  it('says the page is loading while one block loads', () => {
+    expect(pageStatusMessage([{ heading: 'Notes', status: 'ready' }, { heading: 'À faire', status: 'loading' }])).toBe('Chargement de la page…');
+  });
+  it('says the page is loaded, empty blocks included', () => {
+    expect(pageStatusMessage([{ heading: 'Notes', status: 'empty' }, { heading: 'À faire', status: 'ready' }])).toBe('Page chargée.');
+  });
+  it('names the blocks that failed', () => {
+    expect(pageStatusMessage([{ heading: 'Notes', status: 'error' }, { heading: 'À faire', status: 'ready' }])).toBe(
+      'Page chargée. Le bloc « Notes » n’a pas pu être chargé.',
+    );
+    expect(pageStatusMessage([{ heading: 'Notes', status: 'error' }, { heading: 'Absences', status: 'error' }])).toBe(
+      'Page chargée. Ces blocs n’ont pas pu être chargés : Notes, Absences.',
+    );
   });
 });

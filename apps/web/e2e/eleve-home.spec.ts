@@ -1,5 +1,5 @@
 import { addDays, schoolToday } from '@cdls/shared';
-import { type APIRequestContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type APIRequestContext, expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
 
@@ -136,5 +136,67 @@ test('each entry link opens its detail page', async ({ page }) => {
   // The full list of announcements (a new page) is Axe-clean too.
   await expect(page.locator('.loading-line')).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
+  await axeAtBothWidths(page);
+});
+
+/** The page's ONE permanent live region (updated with text; the five blocks add no region of their own). */
+const pageStatus = (page: Page): Locator => page.locator('app-home-status').getByRole('status');
+
+const json = (body: unknown) => (route: Route) =>
+  route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+test('a block that fails shows its own error and « Réessayer »; the page lives on; Axe-clean; the retry works', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.student);
+  // Routes are set while another page is open, so the home page's requests go through them.
+  await goInApp(page, '/eleve/absences');
+  let failing = true;
+  await page.route('**/api/posts*', (route) =>
+    failing
+      ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Les annonces sont indisponibles pour le moment.' }) })
+      : route.continue(),
+  );
+  await goInApp(page, '/eleve');
+
+  const news = block(page, 'Annonces');
+  await expect(news.getByRole('alert')).toContainText('Les annonces sont indisponibles');
+  const retry = news.getByRole('button', { name: 'Réessayer' });
+  await expect(retry).toBeVisible();
+  expect((await retry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // The other blocks are untouched, and the one live region names the block that failed.
+  for (const heading of ['Maintenant', 'À faire', 'Notes', 'Absences']) await expect(block(page, heading).getByRole('alert')).toHaveCount(0);
+  await expect(pageStatus(page)).toHaveText('Page chargée. Le bloc « Annonces » n’a pas pu être chargé.');
+  await expect(page.getByRole('status')).toHaveCount(1);
+  await axeAtBothWidths(page);
+
+  failing = false;
+  await retry.click();
+  await expect(news.getByRole('alert')).toHaveCount(0);
+  await expect(news.getByRole('article').first()).toBeVisible();
+  await expect(news.getByRole('link', { name: 'Toutes les annonces', exact: true })).toBeVisible();
+  await expect(pageStatus(page)).toHaveText('Page chargée.');
+  await axeAtBothWidths(page);
+});
+
+test('empty blocks invite instead of apologising; Axe-clean at 390 and 1440 px', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.student);
+  await goInApp(page, '/eleve/absences');
+  await page.route('**/api/timetable/occurrences*', json([]));
+  await page.route('**/api/homework*', json([]));
+  await page.route('**/api/events/occurrences*', json([]));
+  await page.route('**/api/students/*/grades*', json({ studentId: 'x', subjects: [] }));
+  await page.route('**/api/students/*/report-cards*', json([]));
+  await page.route('**/api/students/*/attendance*', json([]));
+  await page.route('**/api/posts*', json({ items: [], total: 0, page: 1, pageSize: 2 }));
+  await goInApp(page, '/eleve');
+
+  await expect(pageStatus(page)).toHaveText('Page chargée.');
+  await expect(block(page, 'Maintenant')).toContainText(/Pas de cours aujourd’hui|C’est le week-end/);
+  await expect(block(page, 'À faire')).toContainText('Rien à rendre ni contrôle prévu');
+  await expect(block(page, 'Notes')).toContainText('Pas encore de note publiée');
+  await expect(block(page, 'Absences')).toContainText('Aucune absence ni aucun retard');
+  await expect(block(page, 'Annonces')).toContainText('Aucune annonce pour l’instant');
+  // Each block still ends with its entry link, empty or not.
+  for (const b of BLOCKS) await expect(block(page, b.heading).getByRole('link', { name: b.link, exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
   await axeAtBothWidths(page);
 });

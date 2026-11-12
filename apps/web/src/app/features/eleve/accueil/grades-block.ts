@@ -1,13 +1,15 @@
-import { Component, computed, inject, input, resource } from '@angular/core';
+import { Component, computed, inject, resource } from '@angular/core';
 import type { ReportCardDto, StudentGradeDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
-import { HomeBlock, snapshotOf } from '../../../shared/components/home-block';
+import { SchoolClock } from '../../../core/clock/school-clock';
+import { HomeBlock } from '../../../shared/components/home-block';
+import { SchoolYears } from '../../../shared/data/school-years';
 import { Badge } from '../../../shared/ui';
-import { blockState, bothOf, type Snapshot } from '../../../shared/utils/block-state';
+import { blockState, bothOf, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
 import { average, mark, subjectName } from '../../../shared/utils/format';
 import { isRecent } from '../shared/grades';
-import { currentTerm, gradesView } from './home-views';
+import { gradesView } from './home-views';
 
 /**
  * « Notes »: the overall average of the current term, the three latest published grades and, once the
@@ -26,6 +28,7 @@ import { currentTerm, gradesView } from './home-views';
       linkLabel="Toutes les notes et le bulletin"
       loadingLabel="Chargement des notes…"
       [emptyText]="emptyText()"
+      (retry)="reload()"
     >
       @if (s.status === 'ready') {
         <div class="stat">
@@ -66,19 +69,17 @@ import { currentTerm, gradesView } from './home-views';
   `,
 })
 export class GradesBlock {
-  /** Today in Cairo, `YYYY-MM-DD`. */
-  readonly today = input.required<string>();
-
   readonly #api = inject(ApiClient);
   readonly #auth = inject(AuthStore);
-  readonly #years = resource({ loader: () => this.#api.school.years() });
-  readonly #term = computed(() => (this.#years.hasValue() ? currentTerm(this.#years.value(), this.today()) : null));
+  readonly #years = inject(SchoolYears);
+  protected readonly today = inject(SchoolClock).today;
+  readonly #term = this.#years.term;
 
   readonly #grades = resource({
     params: () => {
       const studentId = this.#auth.user()?.studentId;
-      // Without the terms (still loading or failed), wait; then fall back to the whole year.
-      if (!studentId || this.#years.isLoading()) return undefined;
+      // Without the terms (still loading), wait; if they failed, fall back to the whole year.
+      if (!studentId || !this.#years.settled()) return undefined;
       return { studentId, periodId: this.#term()?.id };
     },
     loader: ({ params }) => this.#api.grades.ofStudent(params.studentId, { periodId: params.periodId }),
@@ -97,6 +98,12 @@ export class GradesBlock {
       gradesView(data, published, this.#term()?.id ?? null),
     );
   });
+
+  protected reload(): void {
+    if (this.#years.years.error()) this.#years.reload();
+    this.#grades.reload();
+    this.#reportCards.reload();
+  }
 
   protected readonly termPhrase = computed(() => {
     const term = this.#term();

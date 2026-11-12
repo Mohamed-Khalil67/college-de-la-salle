@@ -1,9 +1,10 @@
-import { afterNextRender, Component, computed, DestroyRef, inject, input, resource, signal } from '@angular/core';
-import { type CalendarDayDto, schoolTimeNow, type TimetableOccurrenceDto } from '@cdls/shared';
+import { Component, computed, inject, resource } from '@angular/core';
+import type { CalendarDayDto, TimetableOccurrenceDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
-import { HomeBlock, snapshotOf } from '../../../shared/components/home-block';
+import { SchoolClock } from '../../../core/clock/school-clock';
+import { HomeBlock } from '../../../shared/components/home-block';
 import { Badge } from '../../../shared/ui';
-import { blockState, bothOf, type Snapshot } from '../../../shared/utils/block-state';
+import { blockState, bothOf, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
 import { clock } from '../../../shared/utils/format';
 import { TimetableApi } from '../../timetable/timetable-api';
 import { isStruck, sessionTitle, STATUS_LABELS, STATUS_TONES } from '../../timetable/timetable-format';
@@ -28,6 +29,7 @@ import { nowView, placeLine } from './now-next';
       loadingLabel="Chargement de la journée…"
       [wide]="true"
       tone="inverse"
+      (retry)="reload()"
     >
       @if (s.status === 'ready') {
         @let view = s.data;
@@ -197,20 +199,17 @@ import { nowView, placeLine } from './now-next';
   `,
 })
 export class NowBlock {
-  /** Today in Cairo, `YYYY-MM-DD`. */
-  readonly today = input.required<string>();
-
   readonly #timetable = inject(TimetableApi);
   readonly #api = inject(ApiClient);
-  readonly #now = signal(schoolTimeNow());
+  readonly #clock = inject(SchoolClock);
 
   readonly #sessions = resource({
-    params: () => ({ from: this.today(), to: this.today() }),
+    params: () => ({ from: this.#clock.today(), to: this.#clock.today() }),
     loader: ({ params }) => this.#timetable.occurrences(params),
   });
   /** Holidays and days without classes; if they cannot be read, the block still shows the sessions. */
   readonly #days = resource({
-    params: () => ({ from: this.today(), to: this.today() }),
+    params: () => ({ from: this.#clock.today(), to: this.#clock.today() }),
     loader: ({ params }) => this.#api.school.calendarDays(params),
   });
 
@@ -218,9 +217,14 @@ export class NowBlock {
     const days = snapshotOf(this.#days);
     const calendar: Snapshot<readonly CalendarDayDto[]> = days.error ? { error: undefined, value: [] } : days;
     return blockState(bothOf(snapshotOf(this.#sessions), calendar), ([sessions, closed]) =>
-      nowView(sessions, closed, this.today(), this.#now()),
+      nowView(sessions, closed, this.#clock.today(), this.#clock.now()),
     );
   });
+
+  protected reload(): void {
+    this.#sessions.reload();
+    this.#days.reload();
+  }
 
   /** The class shown big: the one in progress, else the next one. */
   protected readonly focus = computed(() => {
@@ -229,14 +233,6 @@ export class NowBlock {
     const state = s.data.state;
     return state.kind === 'quiet' ? null : state.session;
   });
-
-  constructor() {
-    const destroyRef = inject(DestroyRef);
-    afterNextRender(() => {
-      const timer = setInterval(() => this.#now.set(schoolTimeNow()), 30_000);
-      destroyRef.onDestroy(() => clearInterval(timer));
-    });
-  }
 
   protected title(session: TimetableOccurrenceDto): string {
     return sessionTitle(session);
