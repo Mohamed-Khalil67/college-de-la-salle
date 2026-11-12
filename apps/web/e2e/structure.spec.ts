@@ -432,8 +432,9 @@ test('a planner sees the structure screens and nothing else of the administratio
 
   // The navigation holds the structure screens only.
   const nav = page.getByRole('navigation', { name: 'Planification' });
-  for (const name of ['Classes', 'Matières', 'Salles', 'Types d’activité', 'Année scolaire']) {
-    await expect(nav.getByRole('link', { name })).toBeVisible();
+  // The planner's page comes first; the rarer screens (Salles, Types d’activité) are behind « Plus ».
+  for (const name of ['Planification', 'Classes', 'Matières', 'Année scolaire', 'Plus']) {
+    await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
   }
   for (const name of ['Utilisateurs', 'Affectations', 'Validations', 'Bulletins', 'Messages']) {
     await expect(nav.getByRole('link', { name })).toHaveCount(0);
