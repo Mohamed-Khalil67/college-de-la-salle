@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { type PostDto, schoolToday } from '@cdls/shared';
-import { longDate, subjectName } from '../../../shared/utils/format';
+import { longDate, subjectName } from '../utils/format';
 
 /** One announcement: title (h3 on the home page, h2 on the full list), who and when, then the text. */
 @Component({

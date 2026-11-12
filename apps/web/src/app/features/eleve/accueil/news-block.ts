@@ -3,7 +3,7 @@ import { ApiClient } from '../../../core/api/api-client';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { blockState, snapshotOf } from '../../../shared/utils/block-state';
 import { newsView } from './home-views';
-import { PostItem } from './post-item';
+import { PostItem } from '../../../shared/components/post-item';
 
 /** « Annonces »: the two latest announcements for the student's class and section. */
 @Component({

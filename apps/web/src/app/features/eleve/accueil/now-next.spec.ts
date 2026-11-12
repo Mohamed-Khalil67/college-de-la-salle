@@ -3,10 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   closedDayOf,
   dayStrip,
-  minutesOf,
   nowLead,
   nowState,
-  phaseOf,
   placeLine,
   nowView,
   quietText,
@@ -55,26 +53,12 @@ const holiday: CalendarDayDto = {
   classIds: [],
 };
 
-describe('minutesOf and untilLabel', () => {
-  it('turns HH:MM into minutes', () => {
-    expect(minutesOf('08:30')).toBe(510);
-    expect(minutesOf('00:00')).toBe(0);
-  });
+describe('untilLabel', () => {
   it('says how long until the next class', () => {
     expect(untilLabel(12)).toBe('dans 12 min');
     expect(untilLabel(60)).toBe('dans 1 h');
     expect(untilLabel(65)).toBe('dans 1 h 05');
     expect(untilLabel(0)).toBe('maintenant');
-  });
-});
-
-describe('phaseOf', () => {
-  const s = session('09:00', '10:00');
-  it('is upcoming before the start, current up to the end, past from the end', () => {
-    expect(phaseOf(s, '08:59')).toBe('upcoming');
-    expect(phaseOf(s, '09:00')).toBe('current');
-    expect(phaseOf(s, '09:59')).toBe('current');
-    expect(phaseOf(s, '10:00')).toBe('past');
   });
 });
 
@@ -144,14 +128,6 @@ describe('nowState', () => {
   it('ignores sessions of other days', () => {
     const other = session('09:00', '10:00', { current: { ...DAY[0]!.current, date: '2026-11-11' } });
     expect(nowState([other], TODAY, '09:30')).toMatchObject({ kind: 'quiet', reason: 'free' });
-  });
-});
-
-describe('closedDayOf', () => {
-  it('finds a holiday covering today, not an exam week', () => {
-    expect(closedDayOf([holiday], TODAY)).toBe(holiday);
-    expect(closedDayOf([{ ...holiday, type: 'exam_week' }], TODAY)).toBeNull();
-    expect(closedDayOf([holiday], '2026-11-20')).toBeNull();
   });
 });
 

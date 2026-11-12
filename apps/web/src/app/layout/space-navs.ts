@@ -23,11 +23,12 @@ export const ELEVE_NAV: readonly SpaceNavItem[] = [
 ];
 
 /**
- * Phone bottom bar (five at most): Classes, Horaire, Notes, Appel, Plus. Agenda, Groupes, Annonces and, for a
- * planner, Planification are one tap away in « Plus ».
+ * Phone bottom bar (five at most): Accueil, Horaire, Notes, Appel, Plus. Mes classes, Agenda, Groupes, Annonces
+ * and, for a planner, Planification are one tap away in « Plus ».
  */
 export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
-  { label: 'Mes classes', path: '', icon: 'users', short: 'Classes' },
+  { label: 'Tableau de bord', path: '', icon: 'home', short: 'Accueil' },
+  { label: 'Mes classes', path: 'classes' },
   { label: 'Mon emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
   { label: 'Agenda', path: 'agenda' },
   { label: 'Saisie des notes', path: 'notes', icon: 'edit', short: 'Notes' },

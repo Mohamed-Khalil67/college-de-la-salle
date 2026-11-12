@@ -111,7 +111,7 @@ class-council comments; 3. publish (the student's Notes block shows « Bulletin 
 2. **Quick grading endpoint** and the **Noter** screen. Skills: `nestjs-best-practices`, `angular-developer`,
    `frontend-design`, `design:accessibility-review`, `design:ux-copy`.
 3. **Student one page.**
-4. **Teacher one page** (after 2).
+4. **Teacher one page** (after 2). Built 12 Nov 2026 on `feat/teacher-one-page`; « Appel fait » and repeated absences are left for a summary endpoint (see `docs/rollout.md`).
 5. **Professeur absent** (migration for `study`, endpoint, screen) and the **Planificateur one page** (after 1).
 6. **Admin one page** and **Préparer les bulletins** with « Relancer » (after 1).
 7. Remove the old nav entries, update `docs/rollout.md` and the demo script, run the full Playwright + Axe suite at 390

@@ -43,10 +43,10 @@ import { schoolClasses, teacherAssignments } from '../../../shared/data/teacher-
                 }
               </ul>
               <div class="page__actions">
-                <a cdlsButton variant="secondary" size="sm" routerLink="notes" [queryParams]="{ classe: group.classId }">
+                <a cdlsButton variant="secondary" size="sm" routerLink="../notes" [queryParams]="{ classe: group.classId }">
                   Saisir des notes<span class="visually-hidden"> en {{ group.label }}</span>
                 </a>
-                <a cdlsButton variant="secondary" size="sm" routerLink="appel" [queryParams]="{ classe: group.classId }">
+                <a cdlsButton variant="secondary" size="sm" routerLink="../appel" [queryParams]="{ classe: group.classId }">
                   Faire l’appel<span class="visually-hidden"> en {{ group.label }}</span>
                 </a>
               </div>

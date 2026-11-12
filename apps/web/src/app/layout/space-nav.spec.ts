@@ -18,8 +18,8 @@ describe('the phone bottom bar', () => {
   it('shows five items at most, « Plus » last, for every role', () => {
     const cases: [string, readonly SpaceNavItem[], Who, string[]][] = [
       ['student', ELEVE_NAV, student, ['Accueil', 'Horaire', 'Devoirs', 'Notes', 'Plus']],
-      ['teacher', ENSEIGNANT_NAV, teacher, ['Classes', 'Horaire', 'Notes', 'Appel', 'Plus']],
-      ['planner, teacher space', ENSEIGNANT_NAV, planner, ['Classes', 'Horaire', 'Notes', 'Appel', 'Plus']],
+      ['teacher', ENSEIGNANT_NAV, teacher, ['Accueil', 'Horaire', 'Notes', 'Appel', 'Plus']],
+      ['planner, teacher space', ENSEIGNANT_NAV, planner, ['Accueil', 'Horaire', 'Notes', 'Appel', 'Plus']],
       ['admin', ADMIN_NAV, admin, ['Utilisateurs', 'Classes', 'Horaire', 'Année', 'Plus']],
       ['planner, administration', ADMIN_NAV, planner, ['Classes', 'Horaire', 'Année', 'Plus']],
     ];

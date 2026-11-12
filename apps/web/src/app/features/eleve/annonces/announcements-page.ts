@@ -3,7 +3,7 @@ import type { Paginated, PostDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { LoadState } from '../../../shared/components/load-state';
 import { EmptyState, Pagination } from '../../../shared/ui';
-import { PostItem } from '../accueil/post-item';
+import { PostItem } from '../../../shared/components/post-item';
 
 const PAGE_SIZE = 10;
 
