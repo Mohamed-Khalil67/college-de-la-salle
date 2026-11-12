@@ -82,7 +82,9 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 
 - An item with an `icon` goes in the phone's bottom bar: five at most, the `mobileOnly` « Plus » entry last. Everything else is reached through « Plus », which lists every screen the user may see.
 - `access: 'admin' | 'planner'` filters by role (`planner`: a teacher with `isPlanner`, for the links between the teacher space and « Planification »; an admin already sees everything); `href` links to another space; `secondary` items move behind « Plus » in the top bar once there are more than eight entries.
-- A new screen goes in its space's list, in « Plus » at least, and in the spec.
+- **Every role opens on « Accueil »** (the one page of blocks), first in its list and in the phone bar. For a planner in `/admin` that is `planification` (`access: 'planner'`, so there is never a second entry for the page); the admin's is `''` (`access: 'admin'`), with « Planification » as a screen of its own. Route titles say « Accueil » too (the app bar shows them on a phone).
+- **Keep menus small.** After « Accueil », a menu holds only what is used daily and that no block button leads to, plus the rare screens behind « Plus ». A page that a block button opens is NOT in the menu: it goes in the space's `*_DETAILS` array in `space-navs.ts` (routed as ever, never removed), which `e2e/all-screens.spec.ts` opens with Axe at both widths, and `space-nav.spec.ts` checks it is not also in the menu. Phone bar today: student Accueil, Horaire, Devoirs, Plus; teacher Accueil, Horaire, Appel, Plus; planner Accueil, Classes, Horaire, Plus; admin Accueil, Planif., Classes, Horaire, Plus.
+- A new screen goes in its space's list (menu if daily and not behind a block, otherwise `*_DETAILS`) and in the spec. In Playwright, reach a detail page through its block button, or `goInApp` for a deep link, never through a menu entry that no longer exists.
 
 ## « Noter » (quick grading)
 

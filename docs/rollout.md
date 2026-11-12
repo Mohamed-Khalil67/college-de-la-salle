@@ -22,11 +22,11 @@ The student lands on one page, `/eleve`, made of blocks. Each block shows only w
 | **Absences** | Absences and late arrivals of the current term and the most recent one | Détail des absences |
 | **Annonces** (full width) | The two latest announcements for the student's class and section | Toutes les annonces (new page `/eleve/annonces`) |
 
-Each block loads on its own: if one fails it shows its own message and the rest of the page stays usable. The menu is unchanged for now.
+Each block loads on its own: if one fails it shows its own message and the rest of the page stays usable. The menu is short: see « The menus » below.
 
 ## What the teacher sees on opening the platform
 
-The teacher lands on one page, `/enseignant`, built like the student's: blocks that load on their own, each ending with one button to its detail page. On a phone the blocks stack in this order; from tablet width the three middle ones sit side by side. The header button « Nouvelle note » grades any class, not only today's. « Mes classes » moves to `/enseignant/classes` (a link of « Plus » and the button of « À surveiller »).
+The teacher lands on one page, `/enseignant`, built like the student's: blocks that load on their own, each ending with one button to its detail page. On a phone the blocks stack in this order; from tablet width the three middle ones sit side by side. The header button « Nouvelle note » grades any class, not only today's. « Mes classes » is `/enseignant/classes` (the button of « À surveiller »).
 
 | Block | Shows | Button |
 |---|---|---|
@@ -36,7 +36,7 @@ The teacher lands on one page, `/enseignant`, built like the student's: blocks t
 | **À surveiller** | Notes still unfinished a week after the work, and the exams and tests planned for the teacher's classes in the next two weeks (set by anyone, the school included) | Mes classes |
 | **Annonces** (full width) | The two latest announcements | Écrire ou lire les annonces |
 
-Not on the page yet: « Appel fait » on past classes and repeated absences. Both need one call per class session (roll-call sheets), which the school's single address cannot afford (the API limits each address to 120 requests a minute); they wait for a summary endpoint. The menu is unchanged apart from « Mes classes » moving behind « Plus » and the first entry being the page.
+Not on the page yet: « Appel fait » on past classes and repeated absences. Both need one call per class session (roll-call sheets), which the school's single address cannot afford (the API limits each address to 120 requests a minute); they wait for a summary endpoint. The menu is described in « The menus ».
 
 ## What the administration sees on opening the platform
 
@@ -56,6 +56,19 @@ The admin lands on one page, `/admin`, made of blocks, with « Importer une list
 
 
 
+## The menus
+
+Every role has the same small menu: **Accueil** first (the one page above), then only what is used every day and that no block button leads to; the rest is behind **Plus** on a phone (the bottom bar holds five entries at most, « Plus » last). Every other page is one click from its block, and every address still works.
+
+| Role | Menu (phone bar in bold) | Reached from a block instead |
+|---|---|---|
+| **Student** | **Accueil**, **Emploi du temps**, **Devoirs**; in « Plus »: Ma section, Notifications, Synchroniser mon agenda | Notes, Absences, Bulletins, Examens et devoirs, Annonces |
+| **Teacher** | **Accueil**, **Mon emploi du temps**, **Appel**; in « Plus »: Groupes, Notifications, Synchroniser mon agenda, and Planification for a planner | Mes classes, Noter, Agenda, Annonces |
+| **Planner** (in `/admin`) | **Accueil** (= Planification), **Classes**, **Emploi du temps**; in « Plus »: Matières, Groupes, Salles, Types d’activité, Année scolaire, Mon espace enseignant | Professeur absent |
+| **Admin** | **Accueil**, **Planification**, **Classes**, **Emploi du temps**; Affectations; in « Plus »: Matières, Groupes, Salles, Types d’activité, Année scolaire | Utilisateurs, Validations, Préparer les bulletins, Bulletins, Annonces, Messages, Nouvelle année |
+
+A teacher who is also a planner sees the teacher menu with « Planification » added, and, in the administration, the planner's menu with « Mon espace enseignant » to go back. An admin account that carries the Planificateur permission keeps the admin menu. The student page title is « Accueil » too.
+
 ## Gaps to close before the school launch
 
 1. **Passwords.** Done: everyone changes the temporary password at first sign-in, can change it later from their space, and can reset a forgotten one by e-mail. The reset needs the school's SMTP details (`docs/deployment.md`).
@@ -68,7 +81,7 @@ The admin lands on one page, `/admin`, made of blocks, with « Importer une list
 Use the demo accounts from `apps/api/demo-credentials.local.md` on a copy of the data, never on the real school database.
 
 1. **Admin (3 min).** Sign in as admin: the one page shows what needs a decision. Use « Importer une liste » (a small CSV), create a class and an assignment, then open « Préparer les bulletins », show the subjects still missing and press « Relancer ».
-2. **Teacher (5 min).** Sign in as a teacher. Open Saisie des notes, click « Nouvelle note » (name, Sur, Coefficient), type the marks (decimal comma works, Enter goes to the next student, an empty cell is an absent student and does not count), watch the « Enregistré · 4 / 27 · moyenne 14,2 » line, click « Finir plus tard », reopen the draft from « À finir », then « Publier aux élèves » and confirm. Sign in as that class's student to see the grade. (Planned exams created in Agenda appear in the same « À finir » list.) Take attendance in Appel. Post an announcement to one class.
+2. **Teacher (5 min).** Sign in as a teacher. On the home page click « Nouvelle note » (name, Sur, Coefficient), type the marks (decimal comma works, Enter goes to the next student, an empty cell is an absent student and does not count), watch the « Enregistré · 4 / 27 · moyenne 14,2 » line, click « Finir plus tard », reopen the draft from « Notes à finir », then « Publier aux élèves » and confirm. Sign in as that class's student to see the grade. (Planned exams created in Agenda appear in the same « Notes à finir » block.) Take attendance with « Appel » on a lesson of the day (or the « Appel » entry of the menu). Post an announcement to one class.
 3. **Student (4 min).** Sign in as a student of that class. The home page shows everything at a glance: show that the exam (in « À faire »), the published grade (« Notes »), the announcement and the absence now appear; tick a homework as done right on the page; use the button at the end of a block to open its detail page and the report card.
 4. **Back to the admin (3 min).** Close a term, generate report cards, publish them, and show the student's PDF.
 
