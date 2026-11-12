@@ -1,11 +1,11 @@
 import { Component, DestroyRef, ElementRef, computed, effect, inject, input, linkedSignal, output, resource, signal, untracked, viewChild } from '@angular/core';
-import { GRADING_LIMITS, LIMITS, type EventDto, type GradeSheetDto } from '@cdls/shared';
+import { LIMITS, type EventDto, type GradeSheetDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Avatar, Badge, Button, Field, FieldControl, GradeInput, Modal } from '../../../shared/ui';
 import { average, clockOf, mark, plural } from '../../../shared/utils/format';
 import { LoadState } from '../../../shared/components/load-state';
 import { eventTargetLine } from '../../../shared/utils/targets';
-import { changedSince, columnAverage, gradeIssues, isValidScore, issuesSentence, rowAverage, saveStatus } from '../shared/teacher';
+import { changedSince, columnAverage, gradeIssues, isAnnounced, isValidScore, issuesSentence, rowAverage, saveStage, saveStatus, saveSummary, scaleProblem } from '../shared/teacher';
 
 type Marks = Readonly<Record<string, number | null>>;
 type Comments = Readonly<Record<string, string>>;
@@ -33,6 +33,10 @@ const AUTOSAVE_MS = 800;
     .comment-input {
       min-inline-size: 12rem;
       min-block-size: 2.5rem;
+    }
+    .grid-published {
+      margin-block-start: var(--space-3);
+      text-align: end;
     }
     .scale-field {
       max-inline-size: 12rem;
@@ -82,13 +86,24 @@ export class GradeGrid {
   protected readonly marks = linkedSignal<Marks>(() => this.#saved());
   protected readonly comments = linkedSignal<Comments>(() => this.#savedComments());
 
-  protected readonly scaleLimits = GRADING_LIMITS.scale;
-  /** The scale typed before the first mark is saved; once a mark exists the stored scale rules. */
-  protected readonly typedScale = linkedSignal(() => this.scale());
+  /** The scale as typed before the first mark is saved (a number or not); once a mark exists the stored scale rules. */
+  protected readonly scaleText = linkedSignal(() => String(this.scale()));
   protected readonly scaleLocked = computed(() => !!this.main()?.rows.some((r) => r.grade));
-  protected readonly outOf = computed(() => this.main()?.rows.find((r) => r.grade)?.grade?.outOf ?? this.typedScale());
+  readonly #typedScale = computed(() => {
+    const text = this.scaleText().trim().replace(',', '.');
+    return text === '' ? Number.NaN : Number(text);
+  });
+  /** Shown under « Note sur » while it is empty or out of range; nothing is saved until it is fixed. */
+  protected readonly scaleError = computed(() => (this.scaleLocked() ? null : scaleProblem(this.#typedScale())));
+  protected readonly outOf = computed(
+    () => this.main()?.rows.find((r) => r.grade)?.grade?.outOf ?? (this.scaleError() ? this.scale() : this.#typedScale()),
+  );
   protected readonly outOfText = computed(() => mark(this.outOf()));
   protected readonly published = computed(() => !!this.main()?.rows.some((r) => r.grade?.published));
+  /** Marks in the sheet that the students cannot see yet. */
+  readonly #hidden = computed(() => (this.main()?.rows ?? []).filter((r) => r.grade && !r.grade.published).length);
+  /** « Publier » is offered until every mark is visible; after that only « Retirer la publication » (the full grid). */
+  protected readonly retracting = computed(() => this.published() && this.#hidden() === 0);
   protected readonly dirty = computed(() => {
     const saved = this.#saved();
     const marks = this.marks();
@@ -107,6 +122,8 @@ export class GradeGrid {
     gradeIssues(this.targetedRows().map((r) => ({ name: this.name(r.student), score: this.marks()[r.student.id] ?? null })), this.outOf()),
   );
   protected readonly issuesText = computed(() => issuesSentence(this.issues()));
+  /** A mark or the scale is outside what is accepted: nothing is sent until it is fixed. */
+  readonly #blocked = computed(() => this.issues().invalid.length > 0 || !!this.scaleError());
   protected readonly classAverage = computed(() => columnAverage(this.targetedRows().map((r) => this.marks()[r.student.id] ?? null), this.outOf()));
   readonly #given = computed(
     () =>
@@ -130,32 +147,51 @@ export class GradeGrid {
   protected readonly confirmOpen = signal(false);
   protected readonly confirmError = signal<string | null>(null);
 
-  protected readonly status = computed(() => {
-    if (this.quick())
-      return saveStatus({
-        saving: this.busy(),
-        dirty: this.dirty(),
-        invalid: this.issues().invalid.length > 0,
-        failed: !!this.failure(),
-        entered: this.#given(),
-        total: this.targetedRows().length,
-        average: this.classAverage(),
-      });
-    if (this.busy()) return 'Enregistrement…';
-    if (this.dirty()) return 'Modifications non enregistrées';
-    const at = this.savedAt();
-    return at ? `Enregistré à ${clockOf(at)}` : 'Aucune modification';
+  protected readonly stage = computed(() =>
+    saveStage({
+      saving: this.busy(),
+      dirty: this.dirty(),
+      invalid: this.#blocked(),
+      failed: !!this.failure(),
+      entered: this.#given(),
+      total: this.targetedRows().length,
+      average: this.classAverage(),
+    }),
+  );
+  readonly #statusText = computed(() => {
+    if (this.quick()) return saveStatus({ saving: this.busy(), dirty: this.dirty(), invalid: this.#blocked(), failed: !!this.failure(), entered: 0, total: 0, average: null });
+    switch (this.stage()) {
+      case 'saving':
+        return 'Enregistrement…';
+      case 'pending':
+        return 'Modifications non enregistrées';
+      case 'failed':
+        return 'Non enregistré';
+      case 'invalid':
+        return 'Note hors barème : corrigez-la pour enregistrer';
+      case 'saved': {
+        const at = this.savedAt();
+        return at ? `Enregistré à ${clockOf(at)}` : 'Aucune modification';
+      }
+    }
   });
+  /** The live region: only a settled state (Enregistré, Non enregistré, Note hors barème), never the keystroke-by-keystroke ones. */
+  protected readonly announced = computed(() => (isAnnounced(this.stage()) ? this.#statusText() : ''));
+  /** Same place on screen, but not announced. */
+  protected readonly transient = computed(() => (isAnnounced(this.stage()) ? '' : this.#statusText()));
+  protected readonly summary = computed(() => saveSummary({ entered: this.#given(), total: this.targetedRows().length, average: this.classAverage() }));
   protected readonly publishLabel = computed(() => (this.quick() ? 'Publier aux élèves' : 'Publier les notes'));
 
   #timer: ReturnType<typeof setTimeout> | null = null;
+  /** Set when the grid goes away: no autosave is scheduled after that. */
+  #destroyed = false;
   /** The save that is running, so « Finir plus tard » and « Publier » wait for it instead of doing nothing. */
   #running: Promise<void> | null = null;
 
   constructor() {
     // « Noter » saves on its own once the teacher pauses, unless a mark is outside the scale.
     effect(() => {
-      if (!this.quick() || !this.dirty() || this.issues().invalid.length) {
+      if (!this.quick() || !this.dirty() || this.#blocked()) {
         this.#clearTimer();
         return;
       }
@@ -165,8 +201,9 @@ export class GradeGrid {
     });
     // Leaving the grid (another note, another page) saves what was typed in the last moments.
     this.#destroyRef.onDestroy(() => {
+      this.#destroyed = true;
       this.#clearTimer();
-      if (this.quick() && this.dirty() && !this.issues().invalid.length && !this.#running) void this.save();
+      if (this.quick() && this.dirty() && !this.#blocked() && !this.#running) void this.save();
     });
   }
 
@@ -207,9 +244,7 @@ export class GradeGrid {
     return rowAverage(cells);
   }
   protected setScale(event: Event): void {
-    if (!(event.target instanceof HTMLInputElement)) return;
-    const value = Number(event.target.value.replace(',', '.'));
-    if (Number.isFinite(value) && value >= this.scaleLimits.min && value <= this.scaleLimits.max) this.typedScale.set(value);
+    if (event.target instanceof HTMLInputElement) this.scaleText.set(event.target.value);
   }
   protected setMark(studentId: string, value: number | null): void {
     this.marks.update((m) => ({ ...m, [studentId]: value }));
@@ -264,6 +299,10 @@ export class GradeGrid {
       return this.dirty() ? this.save() : !this.failure();
     }
     this.#clearTimer();
+    if (this.scaleError()) {
+      this.failure.set(`Corrigez d’abord le barème. ${this.scaleError()}`);
+      return false;
+    }
     if (this.issues().invalid.length) {
       this.failure.set(`Corrigez d’abord les notes signalées en rouge. ${this.issuesText()}`);
       return false;
@@ -300,17 +339,22 @@ export class GradeGrid {
       this.busy.set(false);
       this.#running = null;
       finish();
-      // Typed while the request ran: the next autosave picks it up.
-      if (this.quick() && this.dirty() && !this.issues().invalid.length) this.#schedule();
+      // Typed while the request ran: the next autosave picks it up. After a failure nothing is retried on a
+      // timer: the next edit, « Finir plus tard » or « Publier » tries again.
+      if (this.quick() && this.dirty() && !this.#blocked() && !this.failure()) this.#schedule();
     }
   }
 
   protected async togglePublished(): Promise<void> {
     const sheet = this.main();
     if (!sheet || this.publishing()) return;
-    const publish = !this.published();
+    const publish = !this.retracting();
     if (publish && this.issues().invalid.length) {
       this.confirmError.set('Corrigez les notes hors barème avant de publier.');
+      return;
+    }
+    if (publish && this.scaleError()) {
+      this.confirmError.set('Corrigez le barème avant de publier.');
       return;
     }
     if (publish && this.#given() === 0) {
@@ -327,7 +371,7 @@ export class GradeGrid {
       this.#replace(await this.#api.grades.publish(sheet.event.id, publish));
       this.confirmOpen.set(false);
       this.savedAt.set(new Date());
-      if (this.published() === publish) this.publishedChange.emit(publish);
+      if (this.retracting() === publish) this.publishedChange.emit(publish);
     } catch (error) {
       this.confirmError.set(`${publish ? 'La publication' : 'Le retrait'} a échoué. ${apiMessage(error)}`);
     } finally {
@@ -337,6 +381,7 @@ export class GradeGrid {
 
   #schedule(): void {
     this.#clearTimer();
+    if (this.#destroyed) return;
     this.#timer = setTimeout(() => {
       this.#timer = null;
       void this.save();

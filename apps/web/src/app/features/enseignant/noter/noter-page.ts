@@ -1,13 +1,14 @@
-import { afterNextRender, Component, computed, ElementRef, inject, Injector, input, linkedSignal, resource, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, effect, ElementRef, inject, Injector, input, linkedSignal, resource, signal, untracked, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { form, FormField, max, maxLength, min, required, submit } from '@angular/forms/signals';
-import { EVENT_LIMITS, type EventDto, GRADING_LIMITS, type PendingGradingDto } from '@cdls/shared';
+import { form, FormField, maxLength, required, submit, validate } from '@angular/forms/signals';
+import { EVENT_LIMITS, type EventDto, type PendingGradingDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { LoadState } from '../../../shared/components/load-state';
 import { teacherAssignments } from '../../../shared/data/teacher-data';
 import { Alert, Button, EmptyState, Field, FieldControl } from '../../../shared/ui';
 import { shownError } from '../../../shared/utils/forms';
 import { GradeGrid } from '../notes/grade-grid';
+import { coefficientProblem, scaleProblem } from '../shared/teacher';
 import { classSubjectChoices, initialChoice, pendingMeta, quickGradeTypes, scaleLine } from './noter-logic';
 
 interface NewNoteModel {
@@ -78,6 +79,9 @@ const EMPTY_NOTE: NewNoteModel = { title: '', outOf: 20, coefficient: 1, activit
       color: var(--color-heading);
       font-weight: 600;
     }
+    .notice:not(:empty) {
+      margin-block-end: var(--space-4);
+    }
     .step-heading:focus {
       outline: none;
     }
@@ -106,8 +110,8 @@ export class NoterPage {
   protected readonly choice = computed(() => this.choices().find((c) => c.key === this.choiceKey()) ?? null);
   protected readonly className = computed(() => this.choice()?.classLabel ?? 'la classe');
 
-  readonly #types = resource({ loader: () => this.#api.school.activityTypes() });
-  protected readonly types = computed(() => quickGradeTypes(this.#types.hasValue() ? this.#types.value() : []));
+  protected readonly typesRes = resource({ loader: () => this.#api.school.activityTypes() });
+  protected readonly types = computed(() => quickGradeTypes(this.typesRes.hasValue() ? this.typesRes.value() : []));
 
   protected readonly pending = resource({
     params: () => {
@@ -126,17 +130,27 @@ export class NoterPage {
   protected readonly noteForm = form(this.model, (p) => {
     required(p.title, { message: 'Donnez un nom à la note, par exemple « Interrogation 3 ».' });
     maxLength(p.title, EVENT_LIMITS.title, { message: `Le nom compte ${EVENT_LIMITS.title} caractères au plus.` });
-    required(p.outOf, { message: `Indiquez sur combien la note est donnée, par exemple 20.` });
-    min(p.outOf, GRADING_LIMITS.scale.min, { message: `La note est sur ${GRADING_LIMITS.scale.min} à ${GRADING_LIMITS.scale.max}.` });
-    max(p.outOf, GRADING_LIMITS.scale.max, { message: `La note est sur ${GRADING_LIMITS.scale.min} à ${GRADING_LIMITS.scale.max}.` });
-    required(p.coefficient, { message: 'Indiquez un coefficient, 1 par défaut.' });
-    min(p.coefficient, GRADING_LIMITS.coefficient.min, { message: `Le coefficient va de ${GRADING_LIMITS.coefficient.min} à ${GRADING_LIMITS.coefficient.max}.` });
-    max(p.coefficient, GRADING_LIMITS.coefficient.max, { message: `Le coefficient va de ${GRADING_LIMITS.coefficient.min} à ${GRADING_LIMITS.coefficient.max}.` });
+    validate(p.outOf, ({ value }) => {
+      const message = scaleProblem(value());
+      return message ? { kind: 'scale', message } : null;
+    });
+    validate(p.coefficient, ({ value }) => {
+      const message = coefficientProblem(value());
+      return message ? { kind: 'coefficient', message } : null;
+    });
   });
   protected readonly titleError = computed(() => shownError(this.noteForm.title()));
   protected readonly outOfError = computed(() => shownError(this.noteForm.outOf()));
   protected readonly coefficientError = computed(() => shownError(this.noteForm.coefficient()));
   protected readonly busy = signal(false);
+
+  constructor() {
+    // The select shows the type that will be used: the first one, until the teacher picks another.
+    effect(() => {
+      const first = this.types()[0]?.id;
+      if (first && !untracked(() => this.model().activityTypeId)) untracked(() => this.model.update((m) => ({ ...m, activityTypeId: first })));
+    });
+  }
   protected readonly failure = signal<string | null>(null);
 
   protected readonly subtitle = computed(() => {
@@ -166,16 +180,17 @@ export class NoterPage {
       this.busy.set(true);
       this.failure.set(null);
       const m = this.model();
+      const typeId = m.activityTypeId || this.types()[0]?.id;
       try {
         const sheet = await this.#api.grades.createQuick({
           classId: c.classId,
           subjectId: c.subjectId,
           title: m.title.trim(),
           coefficient: m.coefficient,
-          // No choice made: the API picks the first assessment type.
-          ...(m.activityTypeId ? { activityTypeId: m.activityTypeId } : {}),
+          ...(typeId ? { activityTypeId: typeId } : {}),
         });
-        this.noteForm().reset({ ...EMPTY_NOTE });
+        // The next note starts from the same type, so the select never goes blank.
+        this.noteForm().reset({ ...EMPTY_NOTE, activityTypeId: typeId ?? '' });
         this.#go({ kind: 'grade', event: sheet.event, scale: m.outOf });
       } catch (error) {
         this.failure.set(`La note n’a pas été créée. ${apiMessage(error)}`);

@@ -5,6 +5,7 @@ import {
   type ClassDto,
   type EventDto,
   type EventInput,
+  GRADING_LIMITS,
   type ActivityTypeSummary,
   type PostDto,
   round1,
@@ -282,7 +283,7 @@ export interface SaveState {
   readonly saving: boolean;
   /** Typed marks or comments that the server does not have yet. */
   readonly dirty: boolean;
-  /** Some typed marks are outside the scale: they are not sent. */
+  /** Some typed marks (or the scale) are outside what is accepted: nothing is sent. */
   readonly invalid: boolean;
   /** The last save failed (the reason is shown separately). */
   readonly failed: boolean;
@@ -293,15 +294,39 @@ export interface SaveState {
   readonly average: number | null;
 }
 
-/** The polite status line of the autosaving grid: « Enregistré · 4 / 27 · moyenne 14,2 ». */
+/** Where the autosave stands. Only the settled stages are announced to screen readers. */
+export type SaveStage = 'saved' | 'saving' | 'pending' | 'failed' | 'invalid';
+
+export function saveStage(s: SaveState): SaveStage {
+  if (s.invalid) return 'invalid';
+  if (s.saving) return 'saving';
+  if (s.failed) return 'failed';
+  if (s.dirty) return 'pending';
+  return 'saved';
+}
+
+const SAVE_LABELS: Readonly<Record<SaveStage, string>> = {
+  saved: 'Enregistré',
+  saving: 'Enregistrement…',
+  pending: 'Modifications en attente',
+  failed: 'Non enregistré',
+  invalid: 'Note hors barème : corrigez-la pour enregistrer',
+};
+
+/** The state in words: « Enregistré », « Non enregistré », « Note hors barème… ». */
 export function saveStatus(s: SaveState): string {
+  return SAVE_LABELS[saveStage(s)];
+}
+
+/** Announced politely: only a settled state (the others change at every keystroke). */
+export function isAnnounced(stage: SaveStage): boolean {
+  return stage === 'saved' || stage === 'failed' || stage === 'invalid';
+}
+
+/** The figures next to the state, for reading, never announced: « 4 / 27 · moyenne 14,2 ». */
+export function saveSummary(s: Pick<SaveState, 'entered' | 'total' | 'average'>): string {
   const counts = `${s.entered} / ${s.total}`;
-  const avg = s.average === null ? '' : ` · moyenne ${average(s.average)}`;
-  if (s.invalid) return `Note hors barème : corrigez-la pour enregistrer · ${counts}`;
-  if (s.saving) return `Enregistrement… · ${counts}`;
-  if (s.failed) return `Non enregistré · ${counts}`;
-  if (s.dirty) return `Modifications en attente · ${counts}${avg}`;
-  return `Enregistré · ${counts}${avg}`;
+  return s.average === null ? counts : `${counts} · moyenne ${average(s.average)}`;
 }
 
 /**
@@ -310,4 +335,24 @@ export function saveStatus(s: SaveState): string {
  */
 export function changedSince<T>(sent: Readonly<Record<string, T>>, now: Readonly<Record<string, T>>): Record<string, T> {
   return Object.fromEntries(Object.entries(now).filter(([key, value]) => !Object.is(sent[key], value)));
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * The numbers of a new note
+ * ---------------------------------------------------------------------------------------------- */
+
+/** What is wrong with a scale (« Sur »), or null: it must be a number from the shared limits. */
+export function scaleProblem(value: unknown): string | null {
+  const { min, max } = GRADING_LIMITS.scale;
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+    ? null
+    : `Indiquez sur combien la note est donnée, de ${min} à ${max}.`;
+}
+
+/** What is wrong with a coefficient, or null: a number from the shared limits (0 is allowed). */
+export function coefficientProblem(value: unknown): string | null {
+  const { min, max } = GRADING_LIMITS.coefficient;
+  return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+    ? null
+    : `Indiquez un coefficient de ${min} à ${max}, 1 par défaut.`;
 }

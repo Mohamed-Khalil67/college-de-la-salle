@@ -2,16 +2,23 @@
 @if (main(); as sheet) {
   <div class="toolbar">
     <div class="toolbar__status">
-      @if (published()) {
+      @if (retracting()) {
         <cdls-badge tone="success">Publié, visible par les élèves</cdls-badge>
+      } @else if (published()) {
+        <cdls-badge tone="warning">Publié en partie</cdls-badge>
       } @else {
         <cdls-badge tone="warning">Brouillon, invisible pour les élèves</cdls-badge>
       }
-      <span role="status" aria-live="polite" class="tabular">{{ status() }}</span>
+      <!-- One live region, for settled states only; the figures and the keystroke-by-keystroke states are not announced. -->
+      <span role="status" class="tabular">{{ announced() }}</span>
+      <span class="tabular">{{ transient() }}</span>
+      @if (quick()) {
+        <span class="tabular t-muted">{{ summary() }}</span>
+      }
     </div>
     @if (!quick()) {
       <button cdlsButton variant="secondary" size="sm" type="button" (click)="save()">Enregistrer</button>
-      @if (published()) {
+      @if (retracting()) {
         <button cdlsButton variant="secondary" size="sm" type="button" (click)="openConfirm()">Retirer la publication</button>
       } @else {
         <button #publishButton cdlsButton size="sm" type="button" (click)="openConfirm()">{{ publishLabel() }}</button>
@@ -20,8 +27,8 @@
   </div>
   @if (quick() && !scaleLocked()) {
     <div class="scale-field">
-      <cdls-field label="Note sur" helper="Fixée dès la première note enregistrée.">
-        <input cdlsControl type="number" inputmode="decimal" [min]="scaleLimits.min" [max]="scaleLimits.max" step="1" [value]="typedScale()" (input)="setScale($event)" />
+      <cdls-field label="Note sur" helper="Fixée dès la première note enregistrée." [error]="scaleError()">
+        <input cdlsControl type="text" inputmode="decimal" autocomplete="off" [value]="scaleText()" (input)="setScale($event)" />
       </cdls-field>
     </div>
   }
@@ -55,7 +62,7 @@
             <th scope="col">Note <span class="cell-sub">sur {{ outOfText() }}</span></th>
             <th scope="col">Commentaire <span class="cell-sub">facultatif</span></th>
           } @else {
-            <th scope="col">{{ sheet.event.title }}<span class="cell-sub">×{{ fmt(sheet.event.coefficient) }}, {{ published() ? 'publié' : 'brouillon' }}</span></th>
+            <th scope="col">{{ sheet.event.title }}<span class="cell-sub">×{{ fmt(sheet.event.coefficient) }}, {{ retracting() ? 'publié' : published() ? 'publié en partie' : 'brouillon' }}</span></th>
             <th scope="col" class="num">Moyenne</th>
           }
         </tr>
@@ -129,15 +136,18 @@
   @if (quick()) {
     <div class="grid-actions">
       <button cdlsButton variant="secondary" type="button" (click)="finishLater()">Finir plus tard</button>
-      @if (!published()) {
+      @if (published() && retracting()) {
+        <p class="t-body-s t-muted grid-published">Publiée : une note ajoutée apparaît tout de suite chez les élèves. Pour tout retirer, ouvrez « Saisie des notes ».</p>
+      }
+      @if (!retracting()) {
         <button #publishButton cdlsButton type="button" (click)="openConfirm()">{{ publishLabel() }}</button>
       }
     </div>
   }
 
-  <cdls-modal [title]="published() ? 'Retirer la publication ?' : publishLabel() + ' ?'" [(open)]="confirmOpen">
+  <cdls-modal [title]="retracting() ? 'Retirer la publication ?' : publishLabel() + ' ?'" [(open)]="confirmOpen">
     <div class="stack stack--sm">
-      @if (published()) {
+      @if (retracting()) {
         <p>Les élèves de {{ className() }} ne verront plus ces notes, et leur moyenne sera recalculée sans elles.</p>
       } @else {
         <p>Les {{ targetedRows().length }} élèves concernés de {{ className() }} verront leur note et leur nouvelle moyenne. Vous pourrez encore corriger une note après publication.</p>
@@ -151,8 +161,8 @@
     </div>
     <div class="modal__footer">
       <button cdlsButton variant="secondary" type="button" (click)="confirmOpen.set(false)">Annuler</button>
-      <button cdlsButton [variant]="published() ? 'danger' : 'primary'" type="button" (click)="togglePublished()">
-        {{ publishing() ? 'Patientez…' : published() ? 'Retirer la publication' : publishLabel() }}
+      <button cdlsButton [variant]="retracting() ? 'danger' : 'primary'" type="button" (click)="togglePublished()">
+        {{ publishing() ? 'Patientez…' : retracting() ? 'Retirer la publication' : publishLabel() }}
       </button>
     </div>
   </cdls-modal>

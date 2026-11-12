@@ -5,11 +5,9 @@ import {
   type TeachingAssignmentDto,
 } from '@cdls/shared';
 import { dayTitle, mark } from '../../../shared/utils/format';
+import { assignmentLabel } from '../shared/teacher';
 
-/**
- * Pure rules of « Noter » (quick grading) and of the grid's autosave. No Angular here, so Vitest tests it
- * directly.
- */
+/** Pure rules of the « Noter » screen (choices, picker lines, the new note's numbers). No Angular here. */
 
 /** Types a quick grade may use: graded, not homework, not archived; exams and tests first. */
 export function quickGradeTypes(types: readonly ActivityTypeDto[]): ActivityTypeDto[] {
@@ -30,7 +28,7 @@ export function classSubjectChoices(assignments: readonly TeachingAssignmentDto[
   const seen = new Map<string, ClassSubjectChoice>();
   for (const a of assignments) {
     const key = `${a.classId}|${a.subjectId}`;
-    if (!seen.has(key)) seen.set(key, { key, classId: a.classId, subjectId: a.subjectId, classLabel: a.classLabel, label: `${a.classLabel}, ${a.subjectName}` });
+    if (!seen.has(key)) seen.set(key, { key, classId: a.classId, subjectId: a.subjectId, classLabel: a.classLabel, label: assignmentLabel(a) });
   }
   return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, 'fr'));
 }

@@ -89,15 +89,17 @@ test('a teacher grades a class straight away and the student sees the grade once
   await page.getByLabel(`Commentaire, ${pupilName}`, { exact: true }).fill('Bon travail');
 
   // Autosave, announced politely.
-  const status = page.getByRole('status').filter({ hasText: /Enregistr/ });
-  await expect(status).toHaveAttribute('aria-live', 'polite');
-  await expect(status).toContainText(`Enregistré · ${labels.length} / ${labels.length} · moyenne`, { timeout: 10_000 });
+  // The live region says the settled state only; the figures sit next to it, outside any live region.
+  const status = page.getByRole('status').filter({ hasText: 'Enregistré' });
+  await expect(status).toHaveText('Enregistré', { timeout: 10_000 });
+  await expect(page.locator('.toolbar__status')).toContainText(`${labels.length} / ${labels.length} · moyenne`);
+  await expect(page.locator('.toolbar__status [aria-live]')).toHaveCount(0);
   await expectNoAxeViolations(page);
 
   // « Finir plus tard »: back to step 1, the draft waits in « À finir ».
   await page.getByRole('button', { name: 'Finir plus tard' }).click();
   await expect(page.getByRole('heading', { level: 2, name: 'Quelle note ?' })).toBeFocused();
-  await expect(page.getByText(`« ${title} » est enregistrée`)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: `« ${title} » est enregistrée` })).toBeVisible();
   const draft = page.getByRole('button', { name: new RegExp(title) });
   await expect(draft).toContainText('brouillon');
   await draft.focus();
@@ -123,4 +125,33 @@ test('a teacher grades a class straight away and the student sees the grade once
   await signIn(page, ACCOUNTS.student);
   await goInApp(page, '/eleve/notes');
   await expect(page.getByText(title).first()).toBeVisible();
+});
+
+test('a failed autosave is reported once and not retried on a timer', async ({ page, request }, info) => {
+  test.setTimeout(60_000);
+  const login = await request.post('/api/auth/login', { data: ACCOUNTS.student });
+  const pupil = ((await login.json()) as SessionResponse).user;
+  await signIn(page, ACCOUNTS.teacher);
+  await goInApp(page, `/enseignant/noter?classe=${pupil.classId}&matiere=mathematiques`);
+  await page.getByLabel('Nom').fill(`Essai échec ${info.project.name} ${Date.now() % 100_000}`);
+  await page.getByRole('button', { name: 'Commencer la saisie' }).click();
+  const marks = page.locator('input.grade-input');
+  await expect(marks.first()).toBeVisible();
+
+  let puts = 0;
+  await page.route('**/api/events/*/grades', async (route) => {
+    if (route.request().method() === 'PUT') {
+      puts++;
+      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Panne de test.' }) });
+    } else await route.continue();
+  });
+  await marks.first().fill('12');
+  await expect(page.getByRole('status').filter({ hasText: 'Non enregistré' })).toBeVisible({ timeout: 10_000 });
+  await page.waitForTimeout(2_500);
+  expect(puts).toBe(1);
+
+  // The next edit tries again.
+  await marks.first().fill('13');
+  await expect.poll(() => puts, { timeout: 10_000 }).toBe(2);
+  await page.unroute('**/api/events/*/grades');
 });
