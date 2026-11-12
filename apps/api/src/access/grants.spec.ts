@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from './access.service.js';
-import { canEditStructure, hasGrant, isCoordinator } from './grants.js';
+import { canEditStructure, hasGrant, isPlanner } from './grants.js';
 
 const user = (role: AuthUser['role'], over: Partial<AuthUser> = {}): AuthUser => ({
   id: 'u',
@@ -14,7 +14,7 @@ const user = (role: AuthUser['role'], over: Partial<AuthUser> = {}): AuthUser =>
   studentId: null,
   teacherId: role === 'teacher' ? 't1' : null,
   classId: null,
-  isCoordinator: false,
+  isPlanner: false,
   classLabel: null,
   sectionCode: null,
   mustChangePassword: false,
@@ -22,27 +22,32 @@ const user = (role: AuthUser['role'], over: Partial<AuthUser> = {}): AuthUser =>
 });
 
 describe('grants', () => {
-  it('lets only teachers marked coordinateur coordinate', () => {
-    expect(isCoordinator(user('teacher', { isCoordinator: true }))).toBe(true);
-    expect(isCoordinator(user('teacher'))).toBe(false);
-    // The flag means nothing outside a teacher profile.
-    expect(isCoordinator(user('student', { isCoordinator: true }))).toBe(false);
-    expect(isCoordinator(user('admin', { isCoordinator: true }))).toBe(false);
-    expect(isCoordinator(user('teacher', { isCoordinator: true, teacherId: null }))).toBe(false);
+  it('lets only staff accounts marked planificateur plan', () => {
+    expect(isPlanner(user('teacher', { isPlanner: true }))).toBe(true);
+    expect(isPlanner(user('teacher'))).toBe(false);
+    // The permission is on the account: an admin account may carry it too.
+    expect(isPlanner(user('admin', { isPlanner: true }))).toBe(true);
+    expect(isPlanner(user('admin'))).toBe(false);
+    // A student never holds it, whatever the flag says; nor a teacher account without its teacher profile.
+    expect(isPlanner(user('student', { isPlanner: true }))).toBe(false);
+    expect(isPlanner(user('teacher', { isPlanner: true, teacherId: null }))).toBe(false);
   });
 
-  it('lets the admin and coordinators edit the structure, nobody else', () => {
+  it('lets the admin and planners edit the structure, nobody else', () => {
     expect(canEditStructure(user('admin'))).toBe(true);
-    expect(canEditStructure(user('teacher', { isCoordinator: true }))).toBe(true);
+    expect(canEditStructure(user('teacher', { isPlanner: true }))).toBe(true);
     expect(canEditStructure(user('teacher'))).toBe(false);
     expect(canEditStructure(user('student'))).toBe(false);
+    expect(canEditStructure(user('student', { isPlanner: true }))).toBe(false);
   });
 
-  it('matches a role or the coordinator grant', () => {
+  it('matches a role or the planner grant', () => {
     expect(hasGrant(user('admin'), 'admin')).toBe(true);
-    expect(hasGrant(user('admin'), 'coordinator')).toBe(false);
-    expect(hasGrant(user('teacher', { isCoordinator: true }), 'coordinator')).toBe(true);
-    expect(hasGrant(user('teacher', { isCoordinator: true }), 'admin')).toBe(false);
+    expect(hasGrant(user('admin'), 'planner')).toBe(false);
+    expect(hasGrant(user('teacher', { isPlanner: true }), 'planner')).toBe(true);
+    expect(hasGrant(user('admin', { isPlanner: true }), 'planner')).toBe(true);
+    expect(hasGrant(user('teacher', { isPlanner: true }), 'admin')).toBe(false);
+    expect(hasGrant(user('student', { isPlanner: true }), 'planner')).toBe(false);
   });
 
   describe('AccessService.assertCanEditStructure', () => {
@@ -54,10 +59,10 @@ describe('grants', () => {
       access = moduleRef.get(AccessService);
     });
 
-    it('passes the admin and a coordinator, refuses the rest', () => {
+    it('passes the admin and a planner, refuses the rest', () => {
       expect(() => access.assertCanEditStructure(user('admin'))).not.toThrow();
       expect(() =>
-        access.assertCanEditStructure(user('teacher', { isCoordinator: true })),
+        access.assertCanEditStructure(user('teacher', { isPlanner: true })),
       ).not.toThrow();
       expect(() => access.assertCanEditStructure(user('teacher'))).toThrow(ForbiddenException);
       expect(() => access.assertCanEditStructure(user('student'))).toThrow(ForbiddenException);

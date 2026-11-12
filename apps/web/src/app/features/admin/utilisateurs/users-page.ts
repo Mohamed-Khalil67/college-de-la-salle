@@ -39,10 +39,8 @@ const PAGE_SIZE = 20;
       <div class="page__header-text">
         <h1 class="t-h1">Utilisateurs</h1>
         <p class="t-muted">{{ subtitle() }}</p>
-        @if (role() === 'teacher') {
-          <p class="t-body-s t-muted">
-            Un coordinateur modifie les matières, les salles, les périodes, les vacances et les semaines d’examens, comme l’administration.
-          </p>
+        @if (plannerHint(); as hint) {
+          <p class="t-body-s t-muted">{{ hint }}</p>
         }
       </div>
       <div class="page__actions">
@@ -80,9 +78,9 @@ const PAGE_SIZE = 20;
               [classes]="classById()"
               [now]="now"
               [selfId]="selfId()"
-              [busyId]="coordinatorBusyId()"
+              [busyId]="plannerBusyId()"
               [revision]="revision()"
-              (coordinator)="setCoordinator($event)"
+              (planner)="setPlanner($event)"
               (edit)="startEdit($event)"
               (deactivate)="startDeactivate($event)"
               (archive)="startArchive($event)"
@@ -197,19 +195,32 @@ export class UsersPage {
   protected readonly actionError = signal<string | null>(null);
   protected readonly notice = signal<string | null>(null);
   protected readonly pageError = signal<string | null>(null);
-  protected readonly coordinatorBusyId = signal<string | null>(null);
+  protected readonly plannerBusyId = signal<string | null>(null);
+  /** What « Planificateur » means, above the tabs whose accounts can carry it (teachers and the administration). */
+  protected readonly plannerHint = computed(() => {
+    switch (this.role()) {
+      case 'teacher':
+        return 'Cochez « Planificateur » pour qu’un enseignant gère aussi les matières, les salles, le calendrier de l’année et l’emploi du temps.';
+      case 'admin':
+        return '« Planificateur » indique qui s’occupe des salles, du calendrier et de l’emploi du temps.';
+      default:
+        return null;
+    }
+  });
   protected readonly revision = signal(0);
 
-  protected async setCoordinator(change: { readonly user: UserDto; readonly value: boolean }): Promise<void> {
-    if (this.coordinatorBusyId()) return;
-    this.coordinatorBusyId.set(change.user.id);
+  protected async setPlanner(change: { readonly user: UserDto; readonly value: boolean }): Promise<void> {
+    if (this.plannerBusyId()) return;
+    this.plannerBusyId.set(change.user.id);
     this.pageError.set(null);
     try {
-      await this.#api.users.update(change.user.id, { isCoordinator: change.value });
+      await this.#api.users.update(change.user.id, { isPlanner: change.value });
       this.notice.set(
         change.value
-          ? `${fullName(change.user)} est maintenant coordinateur : ${change.user.firstName} modifie la structure de l’année.`
-          : `${fullName(change.user)} n’est plus coordinateur.`,
+          ? change.user.role === 'teacher'
+            ? `${fullName(change.user)} est maintenant planificateur : ${change.user.firstName} gère les salles, le calendrier et l’emploi du temps.`
+            : `${fullName(change.user)} est maintenant planificateur.`
+          : `${fullName(change.user)} n’est plus planificateur.`,
       );
       this.users.reload();
     } catch (error) {
@@ -217,7 +228,7 @@ export class UsersPage {
       this.pageError.set(apiMessage(error));
       this.revision.update((n) => n + 1);
     } finally {
-      this.coordinatorBusyId.set(null);
+      this.plannerBusyId.set(null);
     }
   }
 

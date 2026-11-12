@@ -73,8 +73,8 @@ export interface SessionUser {
   readonly teacherId: string | null;
   /** Students: their class in the current school year (null when not enrolled or not a student). */
   readonly classId: string | null;
-  /** Teachers marked coordinateur by the admin: they edit the year's structure too. */
-  readonly isCoordinator: boolean;
+  /** Planificateur: a permission the admin sets on a teacher or admin account (never a student). It opens the year's structure and the timetable. */
+  readonly isPlanner: boolean;
   /** Students: the label of that class (« Première »). */
   readonly classLabel: string | null;
   /** Students: their section (null when not set or not a student). */
@@ -148,8 +148,8 @@ export interface UserDto {
   readonly studentNumber: string | null;
   /** Students: their class in the current school year. */
   readonly classId: string | null;
-  /** Teachers only (false for everyone else). */
-  readonly isCoordinator: boolean;
+  /** Planificateur: teacher and admin accounts only (always false for a student). */
+  readonly isPlanner: boolean;
   /** Students: their section. */
   readonly sectionCode: SectionId | null;
   /** Students: the day they graduated (archived accounts). */
@@ -192,8 +192,8 @@ export interface UpdateUserRequest {
   readonly status?: Exclude<UserStatus, 'archived'>;
   /** A new temporary password: the user is signed out and must choose their own at next sign-in. */
   readonly password?: string;
-  /** Teachers only: coordinateur (edits subjects, rooms, periods, calendar days, school years). */
-  readonly isCoordinator?: boolean;
+  /** Planificateur (edits subjects, rooms, periods, calendar days, school years, the timetable). `true` is refused (400) for a student; so is any change to one's own account. */
+  readonly isPlanner?: boolean;
 }
 
 /** Accounts a roster import creates (admins are created one by one). */
@@ -351,7 +351,7 @@ export interface RejectSectionChangeRequest {
 }
 
 /* ------------------------------------------------------------------------------------------------
- * School structure. Writes: the admin or a coordinator (classes and assignments: the admin only).
+ * School structure. Writes: the admin or a planner (classes and assignments: the admin only).
  * ---------------------------------------------------------------------------------------------- */
 
 export type PeriodKind = 'trimester' | 'semester';
@@ -992,7 +992,7 @@ export interface SlotExceptionDto {
   readonly reason: string;
 }
 
-/** POST /timetable/slots (admin or coordinator). */
+/** POST /timetable/slots (admin or planner). */
 export interface CreateTimetableSlotRequest extends TimetableSlotInput {
   readonly acknowledgedWarnings?: readonly AcknowledgedWarning[];
 }
@@ -1151,7 +1151,7 @@ export interface FreeRoomDto extends RoomDto {
  * time; a student belongs to at most ONE group per division of a class (409 otherwise). Memberships are
  * soft: leaving sets `leftOn` and keeps the history. A student who leaves the class, or changes section,
  * leaves their groups at the same time.
- * Admins and coordinators manage any group, a teacher those of the classes they teach, a student reads
+ * Admins and planners manage any group, a teacher those of the classes they teach, a student reads
  * only their own memberships (`GET /groups/mine`).
  * ---------------------------------------------------------------------------------------------- */
 

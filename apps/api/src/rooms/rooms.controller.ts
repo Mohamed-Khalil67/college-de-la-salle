@@ -36,7 +36,7 @@ export class RoomsController {
     return this.rooms.list();
   }
 
-  /** Admin or coordinator. */
+  /** Admin or planner. */
   @StructureEditors()
   @Post()
   @ApiCreatedResponse({ type: RoomDto })
@@ -45,7 +45,7 @@ export class RoomsController {
     return this.rooms.create(body, user);
   }
 
-  /** Admin or coordinator (set `active: false` to retire a room). */
+  /** Admin or planner (set `active: false` to retire a room). */
   @StructureEditors()
   @Patch(':id')
   @ApiOkResponse({ type: RoomDto })
@@ -57,7 +57,7 @@ export class RoomsController {
     return this.rooms.update(id, body, user);
   }
 
-  /** Admin or coordinator; 409 when events use the room. */
+  /** Admin or planner; 409 when events use the room. */
   @StructureEditors()
   @Delete(':id')
   @HttpCode(204)

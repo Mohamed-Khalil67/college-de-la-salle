@@ -21,7 +21,7 @@ export interface StudentPlacement {
  *   events and posts addressed to the whole school, their section or their class;
  * - a teacher reads every event and post, but writes grades, attendance and class events only for the
  *   classes (and subjects) of their teaching assignments, and edits only what they authored;
- * - a coordinator (a teacher marked so by the admin) also edits the year's structure;
+ * - a planner (a teacher or admin account marked so by the admin) also edits the year's structure;
  * - an admin may do everything.
  */
 @Injectable()
@@ -75,7 +75,7 @@ export class AccessService {
     };
   }
 
-  /** The admin or a coordinator; everyone else is refused (structure writes reached from other routes). */
+  /** The admin or a planner; everyone else is refused (structure writes reached from other routes). */
   assertCanEditStructure(user: AuthUser): void {
     if (!canEditStructure(user)) throw forbidden();
   }

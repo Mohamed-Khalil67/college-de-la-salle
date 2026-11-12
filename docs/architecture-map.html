@@ -104,7 +104,7 @@ svg .ah { fill: var(--fg); }
         <rect class="navy" x="20" y="30" width="170" height="50" rx="4"/><text x="105" y="60" text-anchor="middle">Visitor</text>
         <rect class="navy" x="20" y="100" width="170" height="50" rx="4"/><text x="105" y="130" text-anchor="middle">Student</text>
         <rect class="navy" x="20" y="170" width="170" height="50" rx="4"/><text x="105" y="200" text-anchor="middle">Teacher</text>
-        <rect class="navy" x="20" y="240" width="170" height="50" rx="4"/><text x="105" y="261" text-anchor="middle">Admin</text><text x="105" y="278" text-anchor="middle" class="t-sm">and coordinator teachers</text>
+        <rect class="navy" x="20" y="240" width="170" height="50" rx="4"/><text x="105" y="261" text-anchor="middle">Admin</text><text x="105" y="278" text-anchor="middle" class="t-sm">and planificateurs</text>
         <rect class="box" x="20" y="330" width="170" height="50" rx="4"/><text x="105" y="351" text-anchor="middle">Calendar app</text><text x="105" y="368" text-anchor="middle" class="t-sm">Google, Apple, Outlook</text>
       </g>
       <path class="ln" d="M190 55H215M190 125H215M190 195H215M190 265H215M215 55V265"/>
@@ -186,9 +186,9 @@ svg .ah { fill: var(--fg); }
       <h3>People, years, classes</h3>
       <p>Who exists, and which class they are in this year.</p>
       <ul class="chips">
-        <li><b>USER</b><span>role, status. Parent of STUDENT, TEACHER, sessions, notifications</span></li>
+        <li><b>USER</b><span>role, status, isPlanner (never a student). Parent of STUDENT, TEACHER, sessions, notifications</span></li>
         <li><b>STUDENT</b><span>→ USER, SECTION</span></li>
-        <li><b>TEACHER</b><span>→ USER. Flag: coordinator</span></li>
+        <li><b>TEACHER</b><span>→ USER</span></li>
         <li><b>SCHOOL_YEAR</b><span>start, end, archived at</span></li>
         <li><b>SECTION</b><span>a stream of the school, unique code</span></li>
         <li><b>SCHOOL_CLASS</b><span>→ SCHOOL_YEAR, SECTION, next class for rollover</span></li>
@@ -250,7 +250,7 @@ svg .ah { fill: var(--fg); }
     <div class="grid">
       <div class="card"><h3>Student</h3><p>Reads own data only.</p>Timetable, homework, grades, absences, report cards, announcements, notifications, personal calendar feed.</div>
       <div class="card"><h3>Teacher</h3><p>Writes to classes they teach.</p>Own timetable, agenda, grade entry and publishing, attendance, groups and « Assigner à », announcements.</div>
-      <div class="card"><h3>Coordinator teacher</h3><p>Teacher space plus the year structure.</p>Subjects, coefficients, rooms, periods, calendar days, timetable series.</div>
+      <div class="card"><h3>Planificateur</h3><p>A permission on a teacher or admin account: the year structure too.</p>Subjects, coefficients, rooms, periods, calendar days, timetable series.</div>
       <div class="card"><h3>Admin</h3><p>Whole school.</p>Users and roster import, classes, school years, validations, report cards, messages, next-year rollover.</div>
     </div>
   </div>

@@ -259,8 +259,8 @@ test('runs the wizard on a copy year, promotes the students and leaves the old y
   expect(String(((await event.json()) as { message: string }).message)).toMatch(/archivée/);
 });
 
-test('is for the admin alone: a coordinator is sent back to the structure screens', async ({ page }) => {
-  await signInAs(page, ACCOUNTS.coordinator);
+test('is for the admin alone: a planner is sent back to the structure screens', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.planner);
   await goInApp(page, '/admin/nouvelle-annee');
   await expect(page).not.toHaveURL(/nouvelle-annee/);
   await expect(page.getByRole('heading', { level: 1, name: 'Nouvelle année' })).toHaveCount(0);

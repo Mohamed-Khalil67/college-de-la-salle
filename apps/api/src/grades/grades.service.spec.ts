@@ -21,7 +21,7 @@ const TEACHER: AuthUser = {
   studentId: null,
   teacherId: 't1',
   classId: null,
-  isCoordinator: false,
+  isPlanner: false,
   classLabel: null,
   sectionCode: null,
   mustChangePassword: false,

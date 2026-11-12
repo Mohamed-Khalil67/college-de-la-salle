@@ -80,7 +80,7 @@ const userInclude = {
       },
     },
   },
-  teacher: { select: { id: true, isCoordinator: true } },
+  teacher: { select: { id: true } },
 } as const;
 
 @Injectable()
@@ -285,12 +285,13 @@ type UserWithProfiles = {
   firstName: string;
   lastName: string;
   mustChangePassword: boolean;
+  isPlanner: boolean;
   student: {
     id: string;
     section?: { code: string } | null;
     enrollments?: readonly { classId: string; schoolClass?: { label: string } }[];
   } | null;
-  teacher: { id: string; isCoordinator: boolean } | null;
+  teacher: { id: string } | null;
 };
 
 export function toAuthUser(u: UserWithProfiles): AuthUser {
@@ -303,7 +304,7 @@ export function toAuthUser(u: UserWithProfiles): AuthUser {
     studentId: u.student?.id ?? null,
     teacherId: u.teacher?.id ?? null,
     classId: u.student?.enrollments?.[0]?.classId ?? null,
-    isCoordinator: u.teacher?.isCoordinator ?? false,
+    isPlanner: u.isPlanner,
     classLabel: u.student?.enrollments?.[0]?.schoolClass?.label ?? null,
     sectionCode: (u.student?.section?.code as SectionId | undefined) ?? null,
     mustChangePassword: u.mustChangePassword,

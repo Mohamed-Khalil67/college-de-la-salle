@@ -3,7 +3,7 @@ import { ACCOUNTS } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf, unique } from './structure';
 
 /**
- * Phase 1 admin screens: subjects, class subjects, rooms, activity types, school year, coordinators.
+ * Phase 1 admin screens: subjects, class subjects, rooms, activity types, school year, planners.
  * Data is created with unique names and cleaned up, so the suite can run on the same database again.
  * The phone project is skipped: every check already runs at 390 and 1440 px through Axe.
  */
@@ -386,33 +386,49 @@ test('add a holiday and see it on the calendar, then close and reopen a period',
   await expect(page.getByRole('row', { name: /3e trimestre/ })).toContainText('Ouverte');
 });
 
-test('the admin makes a teacher a coordinator, and takes it back', async ({ page }) => {
+test('the admin makes a teacher a planner, and takes it back', async ({ page }) => {
   await signInAs(page, ACCOUNTS.admin);
   await goInApp(page, '/admin/utilisateurs');
   await page.getByRole('tab', { name: /Enseignants/ }).click();
-  await expect(page.getByRole('columnheader', { name: 'Coordinateur' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Planificateur' })).toBeVisible();
   await axeAtBothWidths(page);
   const row = page.getByRole('row').filter({ hasText: 'hany.mansour' });
-  const box = row.getByRole('checkbox', { name: /Coordinateur/ });
+  const box = row.getByRole('checkbox', { name: /Planificateur/ });
   await expect(box).not.toBeChecked();
   await box.check();
-  await expect(page.getByText(/est maintenant coordinateur/)).toBeVisible();
-  await expect(row.getByRole('checkbox', { name: /Coordinateur/ })).toBeChecked();
-  await row.getByRole('checkbox', { name: /Coordinateur/ }).uncheck();
-  await expect(page.getByText(/n’est plus coordinateur/)).toBeVisible();
-  await expect(row.getByRole('checkbox', { name: /Coordinateur/ })).not.toBeChecked();
+  await expect(page.getByText(/est maintenant planificateur/)).toBeVisible();
+  await expect(row.getByRole('checkbox', { name: /Planificateur/ })).toBeChecked();
+  await row.getByRole('checkbox', { name: /Planificateur/ }).uncheck();
+  await expect(page.getByText(/n’est plus planificateur/)).toBeVisible();
+  await expect(row.getByRole('checkbox', { name: /Planificateur/ })).not.toBeChecked();
 });
 
-test('a coordinator sees the structure screens and nothing else of the administration', async ({ page, request }) => {
-  await signInAs(page, ACCOUNTS.coordinator);
+test('Planificateur is offered for teacher and admin accounts, never for students', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.admin);
+  await goInApp(page, '/admin/utilisateurs');
+  await page.getByRole('tab', { name: /Administration/ }).click();
+  await expect(page.getByRole('columnheader', { name: 'Planificateur' })).toBeVisible();
+  await expect(page.getByText(/« Planificateur » indique qui s’occupe/)).toBeVisible();
+  const own = page.getByRole('row').filter({ hasText: ACCOUNTS.admin.email });
+  await expect(own.getByRole('checkbox', { name: /Planificateur/ })).not.toBeChecked();
+  // One's own account is not editable here (the API refuses it too).
+  await expect(own.getByRole('checkbox', { name: /Planificateur/ })).toHaveAttribute('aria-disabled', 'true');
+  await axeAtBothWidths(page);
+  await page.getByRole('tab', { name: /Élèves/ }).click();
+  await expect(page.getByRole('columnheader', { name: 'Planificateur' })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: /Planificateur/ })).toHaveCount(0);
+});
+
+test('a planner sees the structure screens and nothing else of the administration', async ({ page, request }) => {
+  await signInAs(page, ACCOUNTS.planner);
   await expect(page).toHaveURL(/\/enseignant$/);
-  const link = page.getByRole('navigation', { name: 'Espace enseignant' }).getByRole('link', { name: 'Coordination' });
+  const link = page.getByRole('navigation', { name: 'Espace enseignant' }).getByRole('link', { name: 'Planification' });
   await link.click();
   await expect(page).toHaveURL(/\/admin\/matieres$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Matières' })).toBeVisible();
 
   // The navigation holds the structure screens only.
-  const nav = page.getByRole('navigation', { name: 'Coordination' });
+  const nav = page.getByRole('navigation', { name: 'Planification' });
   for (const name of ['Classes', 'Matières', 'Salles', 'Types d’activité', 'Année scolaire']) {
     await expect(nav.getByRole('link', { name })).toBeVisible();
   }
@@ -421,7 +437,7 @@ test('a coordinator sees the structure screens and nothing else of the administr
   }
   await axeAtBothWidths(page);
 
-  // An admin-only page sends the coordinator back to the structure screens.
+  // An admin-only page sends the planner back to the structure screens.
   await page.goto('/admin/utilisateurs');
   await expect(page).toHaveURL(/\/admin\/matieres$/);
 
@@ -446,7 +462,7 @@ test('a coordinator sees the structure screens and nothing else of the administr
   await expect(page.getByRole('button', { name: /Modifier Cours/ })).toHaveCount(0);
   await axeAtBothWidths(page);
 
-  // Year: a coordinator edits periods and holidays but neither closes a period nor creates a year.
+  // Year: a planner edits periods and holidays but neither closes a period nor creates a year.
   await goInApp(page, '/admin/annees');
   await expect(page.getByRole('heading', { level: 2, name: 'Calendrier annuel' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Nouvelle année' })).toHaveCount(0);
@@ -454,8 +470,8 @@ test('a coordinator sees the structure screens and nothing else of the administr
   await expect(page.getByRole('button', { name: 'Ajouter une période' })).toBeVisible();
   await axeAtBothWidths(page);
 
-  // What the API says to a coordinator: structure writes yes, accounts no.
-  const headers = await tokenOf(request, ACCOUNTS.coordinator);
+  // What the API says to a planner: structure writes yes, accounts no.
+  const headers = await tokenOf(request, ACCOUNTS.planner);
   expect((await request.get('/api/users', { headers })).status()).toBe(403);
   expect((await request.get('/api/subjects', { headers })).status()).toBe(200);
   expect((await request.get('/api/rooms', { headers })).status()).toBe(200);
@@ -465,10 +481,10 @@ test('a coordinator sees the structure screens and nothing else of the administr
   expect(close.status()).toBe(403);
 });
 
-test('a teacher who is not a coordinator cannot open the administration', async ({ page }) => {
+test('a teacher who is not a planner cannot open the administration', async ({ page }) => {
   await signInAs(page, ACCOUNTS.teacher);
   await expect(page).toHaveURL(/\/enseignant$/);
-  await expect(page.getByRole('link', { name: 'Coordination' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Planification' })).toHaveCount(0);
   await page.goto('/admin/matieres');
   await expect(page).toHaveURL(/\/enseignant$/);
 });
@@ -490,7 +506,7 @@ test('every admin screen is free of Axe violations at 390 and 1440 px, and the p
   }
 });
 
-test('a coordinator prepares a year that is not the current one yet', async ({ page, request }) => {
+test('a planner prepares a year that is not the current one yet', async ({ page, request }) => {
   const admin = await tokenOf(request, ACCOUNTS.admin);
   const label = '2031-2032';
   const sections = (await (await request.get('/api/sections', { headers: admin })).json()) as { id: string; code: string }[];
@@ -513,7 +529,7 @@ test('a coordinator prepares a year that is not the current one yet', async ({ p
   const subjects = (await (await request.get('/api/subjects', { headers: admin })).json()) as { id: string }[];
   await request.post(`/api/classes/${first.id}/subjects`, { headers: admin, data: { subjectId: subjects[0].id, coefficient: 3 } });
   try {
-    await signInAs(page, ACCOUNTS.coordinator);
+    await signInAs(page, ACCOUNTS.planner);
     await goInApp(page, '/admin/annees');
     await page.getByLabel('Année affichée').selectOption({ label: label });
     // The dates step is done without the admin making the year current, and the classes step opens that year.

@@ -43,7 +43,7 @@ const HAS_TARGETS =
 const fullName = (s: { firstName: string; lastName: string }) => `${s.firstName} ${s.lastName}`;
 
 /**
- * Groups of a class (TP A and TP B, LV2 Allemand and Espagnol). Admins and coordinators manage any group,
+ * Groups of a class (TP A and TP B, LV2 Allemand and Espagnol). Admins and planners manage any group,
  * a teacher the groups of the classes they teach, a student reads only their own memberships. Every route
  * that names a group loads it first and authorises on ITS class, never on an id sent by the caller.
  */
@@ -54,7 +54,7 @@ export class GroupsService {
     private readonly access: AccessService,
   ) {}
 
-  /** The groups of a class with their current members' ids (the class's teachers, coordinators, admins). */
+  /** The groups of a class with their current members' ids (the class's teachers, planners, admins). */
   async list(classId: string, user: AuthUser): Promise<GroupWithMembersDto[]> {
     await this.assertClass(classId);
     await this.authorize(user, classId);
@@ -310,7 +310,7 @@ export class GroupsService {
       throw notFound('Classe');
   }
 
-  /** Admins and coordinators: any class. A teacher: a class they teach. Everyone else: refused. */
+  /** Admins and planners: any class. A teacher: a class they teach. Everyone else: refused. */
   private async authorize(user: AuthUser, classId: string): Promise<void> {
     if (canEditStructure(user)) return;
     await this.access.assertTeachesClass(user, classId);

@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
-import { adminOnlyGuard, COORDINATOR_HOME } from '../../core/auth/auth.guards';
+import { adminOnlyGuard, PLANNER_HOME } from '../../core/auth/auth.guards';
 import { AuthStore } from '../../core/auth/auth-store';
 
 /** The administration (/admin). Pages are ported from design/prototypes/admin-*.html. */
@@ -8,9 +8,9 @@ export const ADMIN_ROUTES: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    redirectTo: () => (inject(AuthStore).role() === 'admin' ? 'utilisateurs' : COORDINATOR_HOME.replace('/admin/', '')),
+    redirectTo: () => (inject(AuthStore).role() === 'admin' ? 'utilisateurs' : PLANNER_HOME.replace('/admin/', '')),
   },
-  // Structure screens: the admin and the coordinators.
+  // Structure screens: the admin and the planners.
   {
     path: 'classes',
     title: 'Classes',
@@ -57,7 +57,7 @@ export const ADMIN_ROUTES: Routes = [
     title: 'Toutes les pages',
     loadComponent: () => import('../../layout/menu-page').then((m) => m.MenuPage),
   },
-  // The admin's alone: a coordinator is sent back to the structure screens.
+  // The admin's alone: a planner is sent back to the structure screens.
   {
     path: 'utilisateurs',
     title: 'Utilisateurs',

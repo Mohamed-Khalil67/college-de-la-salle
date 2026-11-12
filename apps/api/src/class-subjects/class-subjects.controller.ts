@@ -41,7 +41,7 @@ export class ClassSubjectsController {
     return this.classSubjects.list(id);
   }
 
-  /** Admin or coordinator: adds a subject to the class. */
+  /** Admin or planner: adds a subject to the class. */
   @StructureEditors()
   @Post('classes/:id/subjects')
   @ApiCreatedResponse({ type: ClassSubjectDto })
@@ -54,7 +54,7 @@ export class ClassSubjectsController {
     return this.classSubjects.create(id, body, user);
   }
 
-  /** Admin or coordinator: « Copier depuis la classe… ». Returns the class's subjects. */
+  /** Admin or planner: « Copier depuis la classe… ». Returns the class's subjects. */
   @StructureEditors()
   @Post('classes/:id/subjects/copy')
   @HttpCode(200)
@@ -67,7 +67,7 @@ export class ClassSubjectsController {
     return this.classSubjects.copy(id, body.fromClassId, user);
   }
 
-  /** Admin or coordinator: coefficient and hours per week. */
+  /** Admin or planner: coefficient and hours per week. */
   @StructureEditors()
   @Patch('class-subjects/:id')
   @ApiOkResponse({ type: ClassSubjectDto })
@@ -79,7 +79,7 @@ export class ClassSubjectsController {
     return this.classSubjects.update(id, body, user);
   }
 
-  /** Admin or coordinator; 409 while the subject has teachers or grades in the class. */
+  /** Admin or planner; 409 while the subject has teachers or grades in the class. */
   @StructureEditors()
   @Delete('class-subjects/:id')
   @HttpCode(204)

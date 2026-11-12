@@ -3,6 +3,7 @@ import { Component, computed, inject, linkedSignal, type Resource, resource, sig
 import { type ClassDto, type GroupWithMembersDto, SECTION_LABELS } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
+import { opensStructure } from '../../core/auth/planner';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../shared/ui';
 import { ConfirmModal } from '../../shared/components/confirm-modal';
 import { focusPageHeading } from '../../shared/utils/focus';
@@ -15,7 +16,7 @@ import { studentName } from '../../shared/utils/targets';
 
 /**
  * « Groupes »: the parts of a class (TP A and TP B, LV2 Allemand and Espagnol), by division. A teacher manages
- * the groups of the classes they teach; the admin and the coordinators those of every class. One page for
+ * the groups of the classes they teach; the admin and the planners those of every class. One page for
  * both spaces: the classes offered follow the role.
  */
 @Component({
@@ -164,8 +165,8 @@ export class GroupsPage {
   readonly #auth = inject(AuthStore);
   readonly #document = inject(DOCUMENT);
 
-  /** The admin and the coordinators manage every class; a teacher the classes they teach. */
-  readonly #staff = computed(() => this.#auth.role() === 'admin' || !!this.#auth.user()?.isCoordinator);
+  /** The admin and the planners manage every class; a teacher the classes they teach. */
+  readonly #staff = computed(() => opensStructure(this.#auth.user()));
   readonly #allClasses = resource({
     params: () => (this.#staffKnown() && this.#staff() ? true : undefined),
     loader: () => this.#api.school.classes(),

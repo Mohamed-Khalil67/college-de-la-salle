@@ -615,7 +615,7 @@ describe('Accounts (e2e)', () => {
     });
   });
 
-  describe('coordinator with a temporary password', () => {
+  describe('planner with a temporary password', () => {
     it('cannot edit the structure until the password is chosen, and loses access when disabled', async () => {
       const created = (
         await t
@@ -629,7 +629,7 @@ describe('Accounts (e2e)', () => {
         .http()
         .patch(`/api/users/${created.user.id}`)
         .set(bearer(admin))
-        .send({ isCoordinator: true })
+        .send({ isPlanner: true })
         .expect(200);
       const login = await t
         .http()
@@ -637,7 +637,7 @@ describe('Accounts (e2e)', () => {
         .send({ email: created.user.email, password: created.temporaryPassword })
         .expect(200);
       const temporary = (login.body as SessionResponse).accessToken;
-      // The coordinator role does not bypass the forced password change.
+      // The planner role does not bypass the forced password change.
       const blocked = await t
         .http()
         .post('/api/rooms')

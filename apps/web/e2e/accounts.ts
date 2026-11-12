@@ -9,7 +9,7 @@ export interface Account {
 const FILE = resolve(__dirname, '../../api/demo-credentials.local.md');
 
 /** Demo accounts written by `npm run db:seed` (local file, never committed). */
-function load(): { admin: Account; teacher: Account; coordinator: Account; student: Account } {
+function load(): { admin: Account; teacher: Account; planner: Account; student: Account } {
   const text = readFileSync(FILE, 'utf8');
   const row = (label: string) => {
     // Table rows look like "| admin | admin@… | password |".
@@ -24,12 +24,12 @@ function load(): { admin: Account; teacher: Account; coordinator: Account; stude
     if (!email) throw new Error(`No account under "${heading}" in ${FILE}`);
     return email;
   };
-  /** The seed marks the teacher whose last name is Samir as coordinateur. */
-  const coordinatorEmail = text.match(/- (\S*samir@\S+)/)?.[1];
-  if (!coordinatorEmail) throw new Error(`No coordinator teacher in ${FILE}: run npm run db:seed`);
+  /** The seed marks the teacher whose last name is Samir as planificateur. */
+  const plannerEmail = text.match(/- (\S*samir@\S+)/)?.[1];
+  if (!plannerEmail) throw new Error(`No planner teacher in ${FILE}: run npm run db:seed`);
   return {
     admin: row('admin'),
-    coordinator: { email: coordinatorEmail, password: row('teacher').password },
+    planner: { email: plannerEmail, password: row('teacher').password },
     teacher: { email: first('Teachers'), password: row('teacher').password },
     student: { email: first('Students'), password: row('student').password },
   };

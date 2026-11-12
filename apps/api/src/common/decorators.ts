@@ -13,17 +13,17 @@ export const ROLES = 'roles';
 /** Skips authentication (login, refresh, health). Every other route needs a valid access token. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
 
-/** A role, or `coordinator`: a teacher the admin marked coordinateur. */
-export type Grant = Role | 'coordinator';
+/** A role, or `planner`: a staff account (teacher or admin) the admin marked planificateur. */
+export type Grant = Role | 'planner';
 
 /** Restricts a route (or a controller) to these roles. Ownership is checked in the services. */
 export const Roles = (...grants: Grant[]) => SetMetadata(ROLES, grants);
 
 /**
  * Writes to the year's structure (school years, periods, calendar days, subjects, class subjects, rooms):
- * the admin or a coordinator. The one place this rule is spelled.
+ * the admin or a planner. The one place this rule is spelled.
  */
-export const StructureEditors = () => Roles('admin', 'coordinator');
+export const StructureEditors = () => Roles('admin', 'planner');
 
 /** The signed-in user. */
 export const CurrentUser = createParamDecorator((_: unknown, ctx: ExecutionContext): AuthUser => {

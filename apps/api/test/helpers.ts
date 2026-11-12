@@ -13,8 +13,8 @@ export const DOMAIN = 'demo.cdls.test';
 export const ADMIN = `admin@${DOMAIN}`;
 /** Teaches mathématiques in every class. */
 export const MATHS_TEACHER = `hany.mansour@${DOMAIN}`;
-/** A coordinateur (informatique, SES): edits the year's structure without being an admin. */
-export const COORDINATOR = `ingy.samir@${DOMAIN}`;
+/** A planificateur (informatique, SES): edits the year's structure without being an admin. */
+export const PLANNER = `ingy.samir@${DOMAIN}`;
 /** Teaches français and humanités: Bac français classes only. */
 export const FRENCH_TEACHER = `claire.dubois@${DOMAIN}`;
 

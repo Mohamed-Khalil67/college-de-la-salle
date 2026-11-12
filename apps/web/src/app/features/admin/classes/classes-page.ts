@@ -134,7 +134,7 @@ import { ClassFormModal } from './class-form-modal';
 export class ClassesPage {
   readonly #api = inject(ApiClient);
   readonly #auth = inject(AuthStore);
-  /** Creating, renaming and deleting classes is the admin's; a coordinator opens a class for its subjects. */
+  /** Creating, renaming and deleting classes is the admin's; a planner opens a class for its subjects. */
   protected readonly isAdmin = computed(() => this.#auth.role() === 'admin');
 
   protected readonly years = resource({ loader: () => this.#api.school.years() });

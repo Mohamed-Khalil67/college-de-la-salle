@@ -7,7 +7,7 @@ import type {
 import {
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   FRENCH_TEACHER,
   MATHS_TEACHER,
@@ -27,10 +27,10 @@ describe('Groups (e2e)', () => {
   let admin: string;
   let maths: string;
   let french: string;
-  let coordinator: string;
+  let planner: string;
   /** Terminale (Bac français): the maths teacher teaches it. */
   let classId: string;
-  /** A class nobody teaches: only the admin and the coordinator manage its groups. */
+  /** A class nobody teaches: only the admin and the planner manage its groups. */
   let orphanClassId: string;
   let nationaleClassId: string;
   let students: string[] = [];
@@ -56,7 +56,7 @@ describe('Groups (e2e)', () => {
     admin = await t.token(ADMIN);
     maths = await t.token(MATHS_TEACHER);
     french = await t.token(FRENCH_TEACHER);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     const p = t.prisma;
     const klass = await p.schoolClass.findFirstOrThrow({
       where: { code: 'terminale', section: { code: 'bac' }, schoolYear: { isCurrent: true } },
@@ -171,13 +171,13 @@ describe('Groups (e2e)', () => {
   });
 
   describe('permissions', () => {
-    it('lets an admin and a coordinator manage the groups of any class', async () => {
+    it('lets an admin and a planner manage the groups of any class', async () => {
       const g = await group(admin, 'E2E TP A', 'TP', orphanClassId);
-      await get(coordinator, `groups/${g.id}`).expect(200);
-      const mine = await group(coordinator, 'E2E TP B', 'TP', orphanClassId);
-      await t.http().patch(`/api/groups/${mine.id}`).set(bearer(coordinator)).send({ label: 'E2E TP C' }).expect(200);
-      await t.http().delete(`/api/groups/${mine.id}`).set(bearer(coordinator)).expect(204);
-      await get(coordinator, `groups?classId=${orphanClassId}`).expect(200);
+      await get(planner, `groups/${g.id}`).expect(200);
+      const mine = await group(planner, 'E2E TP B', 'TP', orphanClassId);
+      await t.http().patch(`/api/groups/${mine.id}`).set(bearer(planner)).send({ label: 'E2E TP C' }).expect(200);
+      await t.http().delete(`/api/groups/${mine.id}`).set(bearer(planner)).expect(204);
+      await get(planner, `groups?classId=${orphanClassId}`).expect(200);
     });
 
     it('lets a teacher manage the groups of a class they teach, and no other', async () => {

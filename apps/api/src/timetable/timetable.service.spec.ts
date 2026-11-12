@@ -21,7 +21,7 @@ const user = (over: Partial<AuthUser>): AuthUser => ({
   studentId: null,
   teacherId: 't1',
   classId: null,
-  isCoordinator: false,
+  isPlanner: false,
   classLabel: null,
   sectionCode: null,
   mustChangePassword: false,
@@ -29,7 +29,7 @@ const user = (over: Partial<AuthUser>): AuthUser => ({
 });
 const TEACHER = user({});
 const OTHER_TEACHER = user({ id: 'u2', teacherId: 't2' });
-const COORDINATOR = user({ id: 'u3', teacherId: 't3', isCoordinator: true });
+const PLANNER = user({ id: 'u3', teacherId: 't3', isPlanner: true });
 const ADMIN = user({ id: 'u4', role: 'admin', teacherId: null });
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -119,7 +119,7 @@ describe('TimetableService (rules checked before anything is written)', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('a teacher cannot name a substitute (admins and coordinators can, past the permission check)', async () => {
+  it('a teacher cannot name a substitute (admins and planners can, past the permission check)', async () => {
     await expect(
       update(TEACHER, {
         scope: 'this',
@@ -128,7 +128,7 @@ describe('TimetableService (rules checked before anything is written)', () => {
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
-      update(COORDINATOR, {
+      update(PLANNER, {
         scope: 'this',
         date: '2026-11-02',
         exception: { kind: 'substitute' },
@@ -183,7 +183,7 @@ describe('TimetableService (rules checked before anything is written)', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('only admins and coordinators delete or create', async () => {
+  it('only admins and planners delete or create', async () => {
     await expect(service.remove('s1', { scope: 'all' }, TEACHER)).rejects.toBeInstanceOf(
       ForbiddenException,
     );

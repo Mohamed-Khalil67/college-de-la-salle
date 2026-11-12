@@ -14,7 +14,7 @@ import type {
 } from './dto/subject.dto.js';
 
 /**
- * The subject catalogue, edited by the admin and coordinators (MATIERES in packages/shared is only the
+ * The subject catalogue, edited by the admin and planners (MATIERES in packages/shared is only the
  * seed). A subject's id is a slug made from its name once, so renaming never breaks stored grades.
  */
 @Injectable()

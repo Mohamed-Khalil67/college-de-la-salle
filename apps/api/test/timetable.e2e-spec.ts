@@ -13,7 +13,7 @@ import {
   activityTypeId,
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   FRENCH_TEACHER,
   MATHS_TEACHER,
@@ -41,7 +41,7 @@ const future = (wd: number, weeks = 2) => nextDay(addDays(TODAY, 7 * weeks), wd)
 describe('Timetable (e2e)', () => {
   let t: TestApp;
   let admin: string;
-  let coordinator: string;
+  let planner: string;
   let maths: string;
   let french: string;
   const base = {} as {
@@ -109,7 +109,7 @@ describe('Timetable (e2e)', () => {
   beforeAll(async () => {
     t = await createTestApp();
     admin = await t.token(ADMIN);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     maths = await t.token(MATHS_TEACHER);
     french = await t.token(FRENCH_TEACHER);
     const p = t.prisma;
@@ -437,7 +437,7 @@ describe('Timetable (e2e)', () => {
       await t.prisma.event.deleteMany({ where: { classId: base.classA } });
     });
 
-    it('the stored timetable can be audited for warnings (admin or coordinator only)', async () => {
+    it('the stored timetable can be audited for warnings (admin or planner only)', async () => {
       await post(admin, {
         ...slot({ roomId: base.small }),
         acknowledgedWarnings: [{ code: 'room_capacity', reason: 'Petit effectif ce trimestre' }],
@@ -446,7 +446,7 @@ describe('Timetable (e2e)', () => {
       const res = await t
         .http()
         .get(`/api/timetable/warnings?classId=${base.classA}&from=${from}&to=${addDays(from, 14)}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .expect(200);
       expect((res.body as { code: string }[]).map((w) => w.code)).toContain('room_capacity');
       await t
@@ -458,9 +458,9 @@ describe('Timetable (e2e)', () => {
   });
 
   describe('permissions', () => {
-    it('admins and coordinators edit any slot; a teacher cannot create or end one; students are refused', async () => {
+    it('admins and planners edit any slot; a teacher cannot create or end one; students are refused', async () => {
       const made = await create();
-      await post(coordinator, slot({ weekday: 2 })).expect(201);
+      await post(planner, slot({ weekday: 2 })).expect(201);
       await post(maths, slot({ weekday: 3 })).expect(403);
       const student = await studentOf(t.prisma, 'bac', 'premiere');
       const studentToken = await t.token(student.email);
@@ -474,7 +474,7 @@ describe('Timetable (e2e)', () => {
       const list = await t
         .http()
         .get(`/api/timetable/slots?classId=${base.classA}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .expect(200);
       expect((list.body as { total: number }).total).toBe(2);
     });

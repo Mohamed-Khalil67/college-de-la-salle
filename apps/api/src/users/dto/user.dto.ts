@@ -62,7 +62,7 @@ export class UserDto implements UserContract {
   teacherId: string | null;
   studentNumber: string | null;
   classId: string | null;
-  isCoordinator: boolean;
+  isPlanner: boolean;
   @ApiProperty({ enum: SECTIONS, nullable: true })
   sectionCode: SectionId | null;
   @ApiProperty({ type: String, nullable: true, example: '2027-06-17' })
@@ -157,10 +157,10 @@ export class UpdateUserDto implements UpdateUserRequest {
   @MaxLength(PASSWORD_MAX_LENGTH)
   password?: string;
 
-  /** Teachers only: coordinateur (edits the year's structure). */
+  /** Planificateur: edits the year's structure and the timetable. Refused (400) when `true` for a student, and for one's own account. */
   @IsOptional()
   @IsBoolean()
-  isCoordinator?: boolean;
+  isPlanner?: boolean;
 }
 
 export class CreatedUserDto implements CreatedUserResponse {

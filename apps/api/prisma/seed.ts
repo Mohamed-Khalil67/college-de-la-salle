@@ -1,7 +1,7 @@
 /**
  * Demo data for the school (and the sales demo): one school year with three trimesters and a holiday, both
  * sections and every class from CLASSES, the subject catalogue and each class's subjects, rooms, the system
- * activity types, an admin, ten teachers (one coordinator), ten students per class, a timetable, an exam
+ * activity types, an admin, ten teachers (one planner), ten students per class, a timetable, an exam
  * with published grades, a draft test, homework, attendance and announcements.
  *
  * Run with `npm run db:seed` (also runs after `prisma migrate reset`). It wipes the tables first.
@@ -288,8 +288,9 @@ async function main(): Promise<void> {
         firstName: t.first,
         lastName: t.last,
         mustChangePassword: false,
-        // Ingy Samir coordinates the year's structure (the demo shows both teacher kinds).
-        teacher: { create: { isCoordinator: t.last === 'Samir' } },
+        // Ingy Samir is a planificateur (the demo shows both teacher kinds).
+        isPlanner: t.last === 'Samir',
+        teacher: { create: {} },
       },
       include: { teacher: true },
     });

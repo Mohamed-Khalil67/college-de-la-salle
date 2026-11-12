@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { type CanMatchFn, Router } from '@angular/router';
 import type { Role } from '@cdls/shared';
 import { AuthStore, FIRST_ACCESS } from './auth-store';
+import { isTeacherPlanner, opensStructure } from './planner';
 
 /**
  * Lets only `role` into an area. A visitor goes to the login page (and comes back afterwards);
@@ -42,12 +43,12 @@ export const anonymousGuard: CanMatchFn = async () => {
   return store.user() ? inject(Router).parseUrl(store.home()) : true;
 };
 
-/** Where a coordinator lands in the administration (the structure screens). */
-export const COORDINATOR_HOME = '/admin/matieres';
+/** Where a planner lands in the administration (the structure screens). */
+export const PLANNER_HOME = '/admin/matieres';
 
 /**
  * The administration's structure screens (subjects, classes, rooms, activity types, school year): the admin,
- * and teachers the admin marked coordinateur. A teacher's flag is read again from /auth/me (at most once a minute), so a promotion
+ * and teachers the admin marked planificateur. A teacher's permission is read again from /auth/me (at most once a minute), so a promotion
  * or a revocation shows without signing in again (the API checks it on every request anyway).
  */
 export const structureGuard: CanMatchFn = async (_route, segments) => {
@@ -60,20 +61,19 @@ export const structureGuard: CanMatchFn = async (_route, segments) => {
     return router.createUrlTree(['/connexion'], { queryParams: { suite } });
   }
   if (user.mustChangePassword) return router.parseUrl(FIRST_ACCESS);
-  if (user.role === 'admin') return true;
+  // A teacher's permission is read again first (at most once a minute): a promotion shows without signing in again.
   if (user.role === 'teacher') {
     await store.reloadUserIfStale();
     user = store.user();
-    if (user?.isCoordinator) return true;
   }
-  return router.parseUrl(store.home());
+  return opensStructure(user) ? true : router.parseUrl(store.home());
 };
 
-/** The pages only the admin opens (users, assignments, validations, report cards, messages): a coordinator goes back to the structure screens. */
+/** The pages only the admin opens (users, assignments, validations, report cards, messages): a planner goes back to the structure screens. */
 export const adminOnlyGuard: CanMatchFn = () => {
   const store = inject(AuthStore);
   const router = inject(Router);
   const user = store.user();
   if (user?.role === 'admin') return true;
-  return router.parseUrl(user?.role === 'teacher' && user.isCoordinator ? COORDINATOR_HOME : store.home());
+  return router.parseUrl(isTeacherPlanner(user) ? PLANNER_HOME : store.home());
 };

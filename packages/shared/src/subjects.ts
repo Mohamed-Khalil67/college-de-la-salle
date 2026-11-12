@@ -3,7 +3,7 @@
  * publish homework or enter grades, and what the track pages show.
  *
  * For the school space this list is only seed data: the `subjects` table is the catalogue (the admin and
- * coordinators create, rename and archive subjects there), and each class's subjects and coefficients are
+ * planners create, rename and archive subjects there), and each class's subjects and coefficients are
  * its class subjects. The public site still reads the blurbs and illustrations below
  * (apps/web/public/images/matieres/, see apps/web/scripts/subject-images.mjs).
  */

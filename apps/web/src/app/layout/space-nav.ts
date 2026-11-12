@@ -1,4 +1,5 @@
 import type { SessionUser } from '@cdls/shared';
+import { isTeacherPlanner } from '../core/auth/planner';
 import type { IconName } from '../shared/ui';
 
 export interface SpaceNavItem {
@@ -8,8 +9,11 @@ export interface SpaceNavItem {
   /** Shown in the phone's bottom bar (at most five items, « Plus » included). */
   readonly icon?: IconName;
   readonly short?: string;
-  /** `admin`: only the admin sees it; `coordinator`: only a teacher marked coordinateur. No value: everyone who is in the area. */
-  readonly access?: 'admin' | 'coordinator';
+  /**
+   * `admin`: only the admin sees it; `planner`: only a teacher marked planificateur (the links between the teacher space
+   * and the administration; an admin who is also planificateur already sees everything). No value: everyone in the area.
+   */
+  readonly access?: 'admin' | 'planner';
   /** An absolute address (a link to another area); `path` is then only an identity. */
   readonly href?: string;
   /**
@@ -21,11 +25,11 @@ export interface SpaceNavItem {
   readonly secondary?: boolean;
 }
 
-/** The items this user may see: admin-only and coordinator-only entries are filtered by role. */
-export function visibleNav(nav: readonly SpaceNavItem[], user: Pick<SessionUser, 'role' | 'isCoordinator'> | null | undefined): SpaceNavItem[] {
+/** The items this user may see: admin-only and planner-only entries are filtered by role. */
+export function visibleNav(nav: readonly SpaceNavItem[], user: Pick<SessionUser, 'role' | 'isPlanner'> | null | undefined): SpaceNavItem[] {
   return nav.filter((item) => {
     if (item.access === 'admin') return user?.role === 'admin';
-    if (item.access === 'coordinator') return user?.role === 'teacher' && !!user.isCoordinator;
+    if (item.access === 'planner') return isTeacherPlanner(user);
     return true;
   });
 }

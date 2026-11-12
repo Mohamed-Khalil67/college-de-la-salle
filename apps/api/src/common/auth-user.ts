@@ -11,8 +11,8 @@ export interface AuthUser {
   readonly teacherId: string | null;
   /** Students: their class in the current school year (null when not enrolled). */
   readonly classId: string | null;
-  /** Teachers marked coordinateur: they also edit the year's structure. Read from the database on every request. */
-  readonly isCoordinator: boolean;
+  /** Accounts marked planificateur: they also edit the year's structure and the timetable. Read from the database on every request. */
+  readonly isPlanner: boolean;
   /** Students: the label of that class. */
   readonly classLabel: string | null;
   /** Students: their section. */

@@ -271,7 +271,7 @@ let nextId = 0;
 export class SessionDialog {
   readonly open = model(false);
   readonly session = input<TimetableOccurrenceDto | null>(null);
-  /** The administration (admin, coordinator): all three scopes and every kind of change. */
+  /** The administration (admin, planner): all three scopes and every kind of change. */
   readonly staff = input(false);
   /** What to offer first (the fixes of the « Conflits » panel). */
   readonly preset = input<SessionAction | null>(null);

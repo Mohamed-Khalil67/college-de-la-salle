@@ -13,7 +13,7 @@ const ADMIN: AuthUser = {
   studentId: null,
   teacherId: null,
   classId: null,
-  isCoordinator: false,
+  isPlanner: false,
   classLabel: null,
   sectionCode: null,
   mustChangePassword: false,

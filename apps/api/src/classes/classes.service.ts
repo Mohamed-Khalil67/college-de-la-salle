@@ -175,7 +175,7 @@ export class ClassesService {
   /** The class list: admins and the class's teachers. */
   async students(classId: string, user: AuthUser): Promise<ClassStudentDto[]> {
     await this.get(classId);
-    // Admins and coordinators read any class list (they manage every group); a teacher, the classes they teach.
+    // Admins and planners read any class list (they manage every group); a teacher, the classes they teach.
     if (!canEditStructure(user)) await this.access.assertTeachesClass(user, classId);
     const enrollments = await this.#enrollments(classId);
     return enrollments.map((e) =>

@@ -2,16 +2,19 @@ import type { ActivityTypeDto, ApiError, SubjectDto } from '@cdls/shared';
 import {
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
+  DOMAIN,
+  deleteUsers,
   FRENCH_TEACHER,
   MATHS_TEACHER,
   studentOf,
+  UNUSABLE_PASSWORD_HASH,
   type TestApp,
 } from './helpers.js';
 
-type Who = 'student' | 'teacher' | 'coordinator' | 'admin';
-const WHO: readonly Who[] = ['student', 'teacher', 'coordinator', 'admin'];
+type Who = 'student' | 'teacher' | 'planner' | 'admin';
+const WHO: readonly Who[] = ['student', 'teacher', 'planner', 'admin'];
 
 /** What a call needs besides the token: its own resources (so each role changes its own rows). */
 interface Resources {
@@ -29,7 +32,7 @@ interface Resources {
 
 interface Case {
   readonly name: string;
-  /** The status the admin and the coordinator get. */
+  /** The status the admin and the planner get. */
   readonly ok: number;
   readonly call: (
     t: TestApp,
@@ -49,7 +52,7 @@ interface Context {
 const status = async (req: PromiseLike<{ status: number }>) => (await req).status;
 
 /**
- * Who may edit the year's structure: the admin and the coordinators. Students and ordinary teachers are
+ * Who may edit the year's structure: the admin and the planners. Students and ordinary teachers are
  * refused, and a few actions stay with the admin alone.
  */
 describe('Structure permissions (e2e)', () => {
@@ -63,7 +66,7 @@ describe('Structure permissions (e2e)', () => {
     const pupil = await studentOf(t.prisma, 'bac', 'premiere');
     tokens.student = await t.token(pupil.email);
     tokens.teacher = await t.token(MATHS_TEACHER);
-    tokens.coordinator = await t.token(COORDINATOR);
+    tokens.planner = await t.token(PLANNER);
     tokens.admin = await t.token(ADMIN);
 
     // A spare school year with a spare class, so nothing the seed relies on is touched.
@@ -340,8 +343,8 @@ describe('Structure permissions (e2e)', () => {
     it.each(['student', 'teacher'] as const)('is refused to a %s (403)', async (who) => {
       expect(await c.call(t, tokens[who], who, resources[who], ctx)).toBe(403);
     });
-    it('is allowed to a coordinator', async () => {
-      expect(await c.call(t, tokens.coordinator, 'coordinator', resources.coordinator, ctx)).toBe(
+    it('is allowed to a planner', async () => {
+      expect(await c.call(t, tokens.planner, 'planner', resources.planner, ctx)).toBe(
         c.ok,
       );
     });
@@ -398,28 +401,28 @@ describe('Structure permissions (e2e)', () => {
       },
       { name: 'GET /users', call: (token) => t.http().get('/api/users').set(bearer(token)) },
       {
-        name: 'PATCH /users/:id (isCoordinator)',
+        name: 'PATCH /users/:id (isPlanner)',
         call: (token) =>
           t
             .http()
             .patch('/api/users/00000000-0000-4000-8000-000000000003')
             .set(bearer(token))
-            .send({ isCoordinator: true }),
+            .send({ isPlanner: true }),
       },
     ];
 
     it.each(adminOnly.map((a) => a.name))(
-      '%s is refused to students, teachers and coordinators (403)',
+      '%s is refused to students, teachers and planners (403)',
       async (name) => {
         const action = adminOnly.find((a) => a.name === name)!;
-        for (const who of ['student', 'teacher', 'coordinator'] as const) {
+        for (const who of ['student', 'teacher', 'planner'] as const) {
           expect((await action.call(tokens[who])).status, `${name} as ${who}`).toBe(403);
         }
       },
     );
   });
 
-  describe('coordinators', () => {
+  describe('planners', () => {
     it('are made and unmade by the admin, and the change applies on the next request', async () => {
       const teacherUser = await t.prisma.user.findUniqueOrThrow({
         where: { email: FRENCH_TEACHER },
@@ -434,49 +437,126 @@ describe('Structure permissions (e2e)', () => {
         .http()
         .patch(`/api/users/${teacherUser.id}`)
         .set(bearer(tokens.admin))
-        .send({ isCoordinator: true })
+        .send({ isPlanner: true })
         .expect(200);
-      await room('Salle du coordinateur').expect(201);
+      await room('Salle du planificateur').expect(201);
 
       await t
         .http()
         .patch(`/api/users/${teacherUser.id}`)
         .set(bearer(tokens.admin))
-        .send({ isCoordinator: false })
+        .send({ isPlanner: false })
         .expect(200);
       await room('Salle retirée').expect(403);
 
       const audit = await t.prisma.auditLog.findMany({
-        where: {
-          entity: 'user',
-          entityId: teacherUser.id,
-          action: { startsWith: 'teacher.coordinator' },
-        },
+        where: { entity: 'user', entityId: teacherUser.id, action: 'user.planner' },
         orderBy: { id: 'asc' },
       });
-      expect(audit.map((a) => a.action)).toEqual([
-        'teacher.coordinator.grant',
-        'teacher.coordinator.revoke',
+      expect(audit.map((a) => [a.before, a.after])).toEqual([
+        [{ isPlanner: false }, { isPlanner: true }],
+        [{ isPlanner: true }, { isPlanner: false }],
       ]);
     });
 
-    it('can only be teachers', async () => {
+    it('is a permission on the account: another admin account can carry it', async () => {
+      const other = await t.prisma.user.create({
+        data: {
+          email: `e2e.admin.planner@${DOMAIN}`,
+          passwordHash: UNUSABLE_PASSWORD_HASH,
+          role: 'admin',
+          firstName: 'Second',
+          lastName: 'Admin',
+        },
+      });
+      try {
+        const res = await t
+          .http()
+          .patch(`/api/users/${other.id}`)
+          .set(bearer(tokens.admin))
+          .send({ isPlanner: true })
+          .expect(200);
+        expect(res.body).toMatchObject({ isPlanner: true, role: 'admin' });
+        const audit = await t.prisma.auditLog.findMany({
+          where: { entity: 'user', entityId: other.id, action: 'user.planner' },
+        });
+        expect(audit.map((a) => [a.before, a.after])).toEqual([[{ isPlanner: false }, { isPlanner: true }]]);
+        // Setting the value it already has writes no second row.
+        await t.http().patch(`/api/users/${other.id}`).set(bearer(tokens.admin)).send({ isPlanner: true }).expect(200);
+        expect(await t.prisma.auditLog.count({ where: { entityId: other.id, action: 'user.planner' } })).toBe(1);
+      } finally {
+        await t.prisma.auditLog.deleteMany({ where: { entityId: other.id } });
+        await deleteUsers(t.prisma, [other.id]);
+      }
+    });
+
+    it('is only set by the admin, never on oneself by a planner', async () => {
+      const self = await t.prisma.user.findUniqueOrThrow({ where: { email: PLANNER } });
+      const teacherUser = await t.prisma.user.findUniqueOrThrow({ where: { email: MATHS_TEACHER } });
+      for (const target of [self.id, teacherUser.id])
+        await t
+          .http()
+          .patch(`/api/users/${target}`)
+          .set(bearer(tokens.planner))
+          .send({ isPlanner: target !== self.id })
+          .expect(403);
+      expect(
+        (await t.prisma.user.findUniqueOrThrow({ where: { email: MATHS_TEACHER } })).isPlanner,
+      ).toBe(false);
+    });
+
+    it('can never be a student, in the API and in the database', async () => {
       const pupil = await studentOf(t.prisma, 'bac', 'premiere');
       const user = await t.prisma.student.findUniqueOrThrow({ where: { id: pupil.studentId } });
       const res = await t
         .http()
         .patch(`/api/users/${user.userId}`)
         .set(bearer(tokens.admin))
-        .send({ isCoordinator: true })
+        .send({ isPlanner: true })
         .expect(400);
-      expect(String((res.body as ApiError).message)).toMatch(/enseignant/);
+      expect(String((res.body as ApiError).message)).toMatch(/élève/);
+      // Sending the only valid value back is not an error.
+      await t
+        .http()
+        .patch(`/api/users/${user.userId}`)
+        .set(bearer(tokens.admin))
+        .send({ isPlanner: false })
+        .expect(200);
+      // Even a write that skips the API is refused (CHECK users_planner_not_student).
+      await expect(
+        t.prisma.user.update({ where: { id: user.userId }, data: { isPlanner: true } }),
+      ).rejects.toThrow();
+      expect((await t.prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).isPlanner).toBe(
+        false,
+      );
     });
 
-    it('show up in the session of the coordinator and in the user list', async () => {
-      const me = await t.http().get('/api/auth/me').set(bearer(tokens.coordinator)).expect(200);
-      expect(me.body).toMatchObject({ isCoordinator: true });
+    it('cannot be changed on the account of the admin who asks', async () => {
+      const admin = await t.prisma.user.findUniqueOrThrow({ where: { email: ADMIN } });
+      await t
+        .http()
+        .patch(`/api/users/${admin.id}`)
+        .set(bearer(tokens.admin))
+        .send({ isPlanner: true })
+        .expect(400);
+      expect((await t.prisma.user.findUniqueOrThrow({ where: { id: admin.id } })).isPlanner).toBe(false);
+    });
+
+    it('refuses a value that is not a boolean', async () => {
+      const teacherUser = await t.prisma.user.findUniqueOrThrow({ where: { email: FRENCH_TEACHER } });
+      await t
+        .http()
+        .patch(`/api/users/${teacherUser.id}`)
+        .set(bearer(tokens.admin))
+        .send({ isPlanner: 'yes' })
+        .expect(400);
+    });
+
+    it('show up in the session of the planner and in the user list', async () => {
+      const me = await t.http().get('/api/auth/me').set(bearer(tokens.planner)).expect(200);
+      expect(me.body).toMatchObject({ isPlanner: true });
       const other = await t.http().get('/api/auth/me').set(bearer(tokens.teacher)).expect(200);
-      expect(other.body).toMatchObject({ isCoordinator: false });
+      expect(other.body).toMatchObject({ isPlanner: false });
     });
   });
 
@@ -500,21 +580,21 @@ describe('Structure permissions (e2e)', () => {
       expect(mine.ownerTeacherId).not.toBeNull();
 
       expect((await list(tokens.teacher)).map((x) => x.id)).toContain(mine.id);
-      expect((await list(tokens.coordinator)).map((x) => x.id)).not.toContain(mine.id);
+      expect((await list(tokens.planner)).map((x) => x.id)).not.toContain(mine.id);
       expect((await list(tokens.admin)).map((x) => x.id)).toContain(mine.id);
       // Someone else's private type is not even found.
       await t
         .http()
         .patch(`/api/activity-types/${mine.id}`)
-        .set(bearer(tokens.coordinator))
+        .set(bearer(tokens.planner))
         .send({ label: 'Volé' })
         .expect(404);
 
-      // Only the admin promotes: not the coordinator, not the owner.
+      // Only the admin promotes: not the planner, not the owner.
       await t
         .http()
         .post(`/api/activity-types/${mine.id}/promote`)
-        .set(bearer(tokens.coordinator))
+        .set(bearer(tokens.planner))
         .expect(403);
       await t
         .http()
@@ -529,7 +609,7 @@ describe('Structure permissions (e2e)', () => {
           .expect(200)
       ).body as ActivityTypeDto;
       expect(promoted).toMatchObject({ ownerTeacherId: null, ownerName: null });
-      expect((await list(tokens.coordinator)).map((x) => x.id)).toContain(mine.id);
+      expect((await list(tokens.planner)).map((x) => x.id)).toContain(mine.id);
       await t
         .http()
         .post(`/api/activity-types/${mine.id}/promote`)
@@ -655,7 +735,7 @@ describe('Structure permissions (e2e)', () => {
         await t
           .http()
           .post('/api/subjects')
-          .set(bearer(tokens.coordinator))
+          .set(bearer(tokens.planner))
           .send({
             name: 'Théâtre & Arts',
             group: 'Éducation et culture',

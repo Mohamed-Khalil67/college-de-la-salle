@@ -55,7 +55,7 @@ export const routes: Routes = [
   {
     path: 'admin',
     canMatch: [structureGuard],
-    data: { areaLabel: 'Administration', coordinatorAreaLabel: 'Coordination', nav: ADMIN_NAV },
+    data: { areaLabel: 'Administration', plannerAreaLabel: 'Planification', nav: ADMIN_NAV },
     loadComponent: spaceLayout,
     loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },

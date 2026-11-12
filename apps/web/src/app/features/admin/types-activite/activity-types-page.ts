@@ -14,7 +14,7 @@ type PendingAction = 'archive' | 'delete' | 'promote';
 
 /**
  * Activity types: the school's (system and school-wide) and the teachers' private ones. The admin edits
- * all, archives, deletes and shares a teacher's type with the school; a coordinator creates and edits
+ * all, archives, deletes and shares a teacher's type with the school; a planner creates and edits
  * their own private types and reads the school's.
  */
 @Component({

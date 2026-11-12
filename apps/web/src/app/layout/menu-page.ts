@@ -47,7 +47,7 @@ export class MenuPage {
   protected readonly area = computed(() => {
     const role = this.#auth.role();
     if (role === 'admin') return 'Les écrans de l’administration.';
-    if (this.#base === '/admin') return 'Les écrans de la coordination.';
+    if (this.#base === '/admin') return 'Les écrans de la planification.';
     return role === 'teacher' ? 'Les pages de votre espace enseignant.' : 'Les pages de votre espace.';
   });
 

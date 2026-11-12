@@ -154,7 +154,7 @@ export class ClassDetailPage {
   readonly #api = inject(ApiClient);
   protected readonly plural = plural;
   readonly #auth = inject(AuthStore);
-  /** The roster is the admin's: a coordinator (a teacher) only works on the class's subjects. */
+  /** The roster is the admin's: a planner (a teacher) only works on the class's subjects. */
   protected readonly isAdmin = computed(() => this.#auth.role() === 'admin');
   protected readonly tabs: readonly TabItem[] = [
     { id: 'eleves', label: 'Élèves inscrits' },

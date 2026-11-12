@@ -8,7 +8,7 @@ import type {
 import {
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   FRENCH_TEACHER,
   MATHS_TEACHER,
@@ -23,7 +23,7 @@ const body = (res: { body: unknown }) => res.body as Record<string, unknown>;
 describe('Rollover (e2e)', () => {
   let t: TestApp;
   let admin: string;
-  let coordinator: string;
+  let planner: string;
   let teacher: string;
   let french: string;
   let student: string;
@@ -54,7 +54,7 @@ describe('Rollover (e2e)', () => {
   beforeAll(async () => {
     t = await createTestApp();
     admin = await t.token(ADMIN);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     teacher = await t.token(MATHS_TEACHER);
     french = await t.token(FRENCH_TEACHER);
     source = await createRolloverSource(t.prisma, 'a');
@@ -64,9 +64,9 @@ describe('Rollover (e2e)', () => {
   afterAll(() => t.close());
 
   describe('permissions', () => {
-    it('refuses teachers, coordinators and students, on both routes', async () => {
+    it('refuses teachers, planners and students, on both routes', async () => {
       const apply0 = { ...request, planHash: 'a'.repeat(64) };
-      for (const token of [teacher, french, coordinator]) {
+      for (const token of [teacher, french, planner]) {
         await preview(token).expect(403);
         await apply(token, apply0).expect(403);
       }

@@ -44,7 +44,7 @@ const CONFLICT_DOC =
   '409 `TIMETABLE_CONFLICT` (room, teacher or class already taken; `conflicts` names what clashed and `suggestions` lists free rooms and times, as `POST /timetable/check` does) or `WARNINGS_NOT_ACKNOWLEDGED` (soft warnings need a reason each).';
 
 /**
- * The timetable. Admins and coordinators edit any slot; a teacher changes only their own sessions
+ * The timetable. Admins and planners edit any slot; a teacher changes only their own sessions
  * (exceptions: cancel, move, change room) within their assignments; students read their class.
  * Ownership is checked in the services.
  */
@@ -57,7 +57,7 @@ export class TimetableController {
     private readonly reads: TimetableReadService,
   ) {}
 
-  /** The weekly slots by class, teacher or room (admin or coordinator). */
+  /** The weekly slots by class, teacher or room (admin or planner). */
   @StructureEditors()
   @Get('slots')
   @ApiPaginatedResponse(TimetableSlotDto)
@@ -65,8 +65,8 @@ export class TimetableController {
     return this.reads.listSlots(query);
   }
 
-  /** One slot (admin, coordinator, or the teacher of the slot). */
-  @Roles('admin', 'coordinator', 'teacher')
+  /** One slot (admin, planner, or the teacher of the slot). */
+  @Roles('admin', 'planner', 'teacher')
   @Get('slots/:id')
   @ApiOkResponse({ type: TimetableSlotDto })
   getSlot(
@@ -76,7 +76,7 @@ export class TimetableController {
     return this.reads.getSlot(id, user);
   }
 
-  /** Creates a weekly slot (admin or coordinator). */
+  /** Creates a weekly slot (admin or planner). */
   @StructureEditors()
   @Post('slots')
   @ApiCreatedResponse({ type: TimetableWriteResultDto })
@@ -89,7 +89,7 @@ export class TimetableController {
   }
 
   /** « Cette séance / Celle-ci et les suivantes / Toute la série ». A teacher may only use `this`, for their own sessions. */
-  @Roles('admin', 'coordinator', 'teacher')
+  @Roles('admin', 'planner', 'teacher')
   @Patch('slots/:id')
   @ApiOkResponse({ type: TimetableWriteResultDto })
   @ApiConflictResponse({ description: CONFLICT_DOC })
@@ -101,7 +101,7 @@ export class TimetableController {
     return this.timetable.update(id, body, user);
   }
 
-  /** Cancels a session, ends a series, or deletes it (admin or coordinator). Past sessions stay. */
+  /** Cancels a session, ends a series, or deletes it (admin or planner). Past sessions stay. */
   @StructureEditors()
   @Delete('slots/:id')
   @ApiOkResponse({ type: TimetableWriteResultDto })
@@ -114,7 +114,7 @@ export class TimetableController {
   }
 
   /** Changes one session: cancelled, moved, substitute, room change (admins; teachers for their own sessions, except substitutes). */
-  @Roles('admin', 'coordinator', 'teacher')
+  @Roles('admin', 'planner', 'teacher')
   @Post('slots/:id/exceptions')
   @ApiCreatedResponse({ type: TimetableWriteResultDto })
   @ApiConflictResponse({ description: CONFLICT_DOC })
@@ -127,7 +127,7 @@ export class TimetableController {
   }
 
   /** Restores a session to what the weekly rule says. */
-  @Roles('admin', 'coordinator', 'teacher')
+  @Roles('admin', 'planner', 'teacher')
   @Delete('exceptions/:id')
   @HttpCode(200)
   @ApiOkResponse({ type: TimetableWriteResultDto })
@@ -139,7 +139,7 @@ export class TimetableController {
   }
 
   /** What a write would do (hard conflicts, warnings), without saving. */
-  @Roles('admin', 'coordinator', 'teacher')
+  @Roles('admin', 'planner', 'teacher')
   @Post('check')
   @HttpCode(200)
   @ApiOkResponse({ type: TimetableCheckResultDto })
@@ -160,7 +160,7 @@ export class TimetableController {
     return this.reads.occurrences(query, user);
   }
 
-  /** Soft warnings of the stored timetable in a range (admin or coordinator). */
+  /** Soft warnings of the stored timetable in a range (admin or planner). */
   @StructureEditors()
   @Get('warnings')
   @ApiOkResponse({ type: [TimetableWarningDto] })
@@ -169,7 +169,7 @@ export class TimetableController {
   }
 
   /** Rooms free in a time range (staff). */
-  @Roles('admin', 'coordinator', 'teacher')
+  @Roles('admin', 'planner', 'teacher')
   @Get('free-rooms')
   @ApiOkResponse({ type: [FreeRoomDto] })
   freeRooms(@Query() query: FreeRoomsQueryDto): Promise<FreeRoomDto[]> {

@@ -35,7 +35,7 @@ export class SchoolYearsController {
     return this.years.list();
   }
 
-  /** Admin or coordinator. */
+  /** Admin or planner. */
   @StructureEditors()
   @Post()
   @ApiCreatedResponse({ type: SchoolYearDto })
@@ -43,7 +43,7 @@ export class SchoolYearsController {
     return this.years.create(body, user);
   }
 
-  /** Admin or coordinator: label and dates (409 if periods or calendar days would fall outside). */
+  /** Admin or planner: label and dates (409 if periods or calendar days would fall outside). */
   @StructureEditors()
   @Patch(':id')
   @ApiOkResponse({ type: SchoolYearDto })
