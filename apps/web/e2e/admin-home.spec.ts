@@ -105,6 +105,7 @@ test('each entry link opens its detail page, and the header buttons open the acc
 test('a block that fails shows its own error and « Réessayer »; the page lives on; Axe-clean; the retry works', async ({ page }) => {
   await signInAs(page, ACCOUNTS.admin);
   await goInApp(page, '/admin/classes');
+  await expect(page.getByRole('heading', { level: 1, name: 'Classes' })).toBeVisible();
   let failing = true;
   await page.route('**/api/contact-messages*', (route) =>
     failing
@@ -133,6 +134,7 @@ test('a block that fails shows its own error and « Réessayer »; the page live
 test('a failing Bulletins block does not blank the page; its retry reloads it', async ({ page }) => {
   await signInAs(page, ACCOUNTS.admin);
   await goInApp(page, '/admin/classes');
+  await expect(page.getByRole('heading', { level: 1, name: 'Classes' })).toBeVisible();
   await page.route('**/api/periods/*/report-preparation', (route) =>
     route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Le calcul des bulletins est indisponible.' }) }),
   );
@@ -185,13 +187,27 @@ test('Préparer les bulletins: gaps per class, « Relancer » reminds the teache
   await axeAtBothWidths(page);
 
   const all = page.getByRole('button', { name: 'Relancer tous les enseignants en retard' });
-  await expect(all).toBeEnabled();
+  await expect(all).not.toHaveAttribute('aria-disabled', 'true');
+  // « Relancer tous » asks first, with the number of teachers; Annuler changes nothing.
   await all.click();
+  const dialog = page.getByRole('dialog', { name: /^Relancer \d+ enseignants? \?$/ });
+  await expect(dialog).toBeVisible();
+  await axeAtBothWidths(page);
+  await dialog.getByRole('button', { name: 'Annuler' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: /relancé/ })).toHaveCount(0);
+  await expect(all).toBeFocused();
+  await all.click();
+  await dialog.getByRole('button', { name: 'Relancer' }).click();
   const status = page.getByRole('status').filter({ hasText: /relancé/ });
   await expect(status).toBeVisible();
-  // A second click does not nag anyone again.
+  // A second time does not nag anyone again.
   await all.click();
-  await expect(page.getByRole('status')).toContainText('déjà été relancés il y a moins de 12 heures');
+  await page.getByRole('dialog').getByRole('button', { name: 'Relancer' }).click();
+  await expect(page.getByRole('status')).toContainText('déjà été relancé');
+  // The per-class buttons are touch targets and stay in the tab order while a request runs.
+  const perClass = page.getByRole('button', { name: /^Relancer les enseignants de/ }).first();
+  expect((await perClass.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expect(page.getByRole('alert')).toHaveCount(0);
   await axeAtBothWidths(page);
 });
@@ -199,11 +215,13 @@ test('Préparer les bulletins: gaps per class, « Relancer » reminds the teache
 test('Préparer les bulletins: a refused reminder and a failed load say what happened', async ({ page }) => {
   await signInAs(page, ACCOUNTS.admin);
   await goInApp(page, '/admin/classes');
+  await expect(page.getByRole('heading', { level: 1, name: 'Classes' })).toBeVisible();
   await page.route('**/api/periods/*/report-preparation/reminders', (route) =>
     route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ statusCode: 429, message: 'Trop de demandes, réessayez dans une minute.' }) }),
   );
   await goInApp(page, '/admin/bulletins/preparation');
   await page.getByRole('button', { name: 'Relancer tous les enseignants en retard' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Relancer' }).click();
   await expect(page.getByRole('alert')).toContainText('Les enseignants n’ont pas été relancés. Trop de demandes');
   await axeAtBothWidths(page);
 
@@ -211,13 +229,47 @@ test('Préparer les bulletins: a refused reminder and a failed load say what hap
     route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Le calcul des bulletins est indisponible.' }) }),
   );
   await page.reload();
-  await expect(page.getByRole('alert').filter({ hasText: 'indisponible' })).toBeVisible();
+  const alert = page.getByRole('alert').filter({ hasText: 'indisponible' });
+  await expect(alert).toBeVisible();
+  await expect(alert.getByRole('button', { name: 'Réessayer' })).toBeVisible();
+  await axeAtBothWidths(page);
+});
+
+test('Préparer les bulletins: a failing GET /school-years offers « Réessayer »; the retry loads the terms', async ({ page }) => {
+  let failing = true;
+  await page.route('**/api/school-years', (route) =>
+    failing
+      ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Les années sont indisponibles.' }) })
+      : route.continue(),
+  );
+  await signInAs(page, ACCOUNTS.admin);
+  await goInApp(page, '/admin/bulletins/preparation');
+  const alert = page.getByRole('alert').filter({ hasText: 'indisponibles' }).last();
+  await expect(alert).toBeVisible();
+  await axeAtBothWidths(page);
+  failing = false;
+  await alert.getByRole('button', { name: 'Réessayer' }).click();
+  await expect(page.getByRole('combobox', { name: 'Trimestre' })).toBeVisible();
+  await expect(page.getByRole('table')).toBeVisible();
+});
+
+test('a planner opens a class page: the subjects load, no dialog leaves a loading line behind', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.planner);
+  await goInApp(page, '/admin/classes');
+  await expect(page.getByRole('heading', { level: 1, name: 'Classes' })).toBeVisible();
+  await page.getByRole('link', { name: /Terminale|Première|Seconde/ }).first().click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+  await expect(page.getByRole('heading', { level: 2, name: 'Matières de la classe' })).toBeVisible();
+  await expect(page.locator('.loading-line')).toHaveCount(0, { timeout: 30_000 });
+  // The planner does not see the admin's roster or the enrolment search.
+  await expect(page.getByRole('heading', { name: 'Inscrire un élève' })).toHaveCount(0);
   await axeAtBothWidths(page);
 });
 
 test('Préparer les bulletins: a term with no class shows its empty state', async ({ page }) => {
   await signInAs(page, ACCOUNTS.admin);
   await goInApp(page, '/admin/classes');
+  await expect(page.getByRole('heading', { level: 1, name: 'Classes' })).toBeVisible();
   await page.route('**/api/periods/*/report-preparation', async (route) => {
     const response = await route.fetch();
     const body = (await response.json()) as Record<string, unknown>;
@@ -225,7 +277,12 @@ test('Préparer les bulletins: a term with no class shows its empty state', asyn
   });
   await goInApp(page, '/admin/bulletins/preparation');
   await expect(page.getByText('Ce trimestre ne concerne aucune classe pour l’instant.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Relancer tous les enseignants en retard' })).toBeDisabled();
+  const all = page.getByRole('button', { name: 'Relancer tous les enseignants en retard' });
+  // aria-disabled, not disabled: it keeps the focus, says why, and does nothing when pressed.
+  await expect(all).toHaveAttribute('aria-disabled', 'true');
+  await expect(all).toHaveAccessibleDescription(/Rien à relancer|clôturé|affectez-en/i);
+  await all.click({ force: true });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await axeAtBothWidths(page);
 });
 
@@ -240,7 +297,8 @@ test('Annonces: publish one for the whole school, read it on the home page, dele
   await page.getByLabel('Titre').fill(title);
   await page.getByLabel('Message').fill('Réunion de rentrée jeudi à 17 h.');
   await page.getByRole('button', { name: 'Publier l’annonce' }).click();
-  await expect(page.getByText(`L’annonce « ${title} » est publiée.`)).toBeVisible();
+  // The confirmation is said in the page's permanent live region.
+  await expect(page.getByRole('status').filter({ hasText: `L’annonce « ${title} » est publiée.` })).toBeVisible();
   await expect(page.getByRole('heading', { level: 3, name: title })).toBeVisible();
 
   await goInApp(page, '/admin');
@@ -249,9 +307,34 @@ test('Annonces: publish one for the whole school, read it on the home page, dele
   await goInApp(page, '/admin/annonces');
   await page.getByRole('button', { name: new RegExp(`Supprimer l’annonce « ${title} »`) }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Supprimer' }).click();
-  await expect(page.getByText(`L’annonce « ${title} » est supprimée.`)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: `L’annonce « ${title} » est supprimée.` })).toBeVisible();
+  // Focus lands on the list heading, not on the row that is gone.
+  await expect(page.getByRole('heading', { level: 2, name: 'Dernières annonces' })).toBeFocused();
   await expect(page.getByRole('heading', { level: 3, name: title })).toHaveCount(0);
   await axeAtBothWidths(page);
+});
+
+test('Annonces: classes and sections that fail to load are announced, with « Réessayer »', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.admin);
+  await goInApp(page, '/admin/classes');
+  await expect(page.getByRole('heading', { level: 1, name: 'Classes' })).toBeVisible();
+  let failing = true;
+  await page.route('**/api/sections', (route) =>
+    failing
+      ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'x' }) })
+      : route.continue(),
+  );
+  await goInApp(page, '/admin/annonces');
+  const alert = page.getByRole('alert').filter({ hasText: 'n’ont pas pu être chargées' });
+  await expect(alert).toBeVisible();
+  // The whole school is still offered.
+  await expect(page.getByLabel('Pour qui ?')).toContainText('Tout le collège');
+  expect((await alert.getByRole('button', { name: 'Réessayer' }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await axeAtBothWidths(page);
+  failing = false;
+  await alert.getByRole('button', { name: 'Réessayer' }).click();
+  await expect(alert).toHaveCount(0);
+  await expect(page.getByLabel('Pour qui ?').locator('option')).not.toHaveCount(1);
 });
 
 test('Annonces: an empty title is refused with a message that says how to fix it', async ({ page }) => {

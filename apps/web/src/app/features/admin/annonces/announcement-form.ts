@@ -3,8 +3,8 @@ import { form, FormField, maxLength, required, submit } from '@angular/forms/sig
 import { LIMITS, type PostDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Button, Field, FieldControl } from '../../../shared/ui';
+import { audienceFromValue, type AudienceOption, WHOLE_SCHOOL } from '../../../shared/utils/audience';
 import { shownError } from '../../../shared/utils/forms';
-import { audienceFromValue, type AudienceOption, WHOLE_SCHOOL } from './audience';
 
 interface AnnouncementModel {
   title: string;
@@ -37,13 +37,18 @@ const empty = (): AnnouncementModel => ({ title: '', body: '', audience: WHOLE_S
         <textarea cdlsControl rows="5" [formField]="postForm.body"></textarea>
       </cdls-field>
       <div>
-        <button cdlsButton type="submit" [disabled]="busy()">{{ busy() ? 'Publication…' : 'Publier l’annonce' }}</button>
+        <!-- aria-disabled, not disabled: focus stays on the button while the announcement is sent. -->
+        <button cdlsButton type="submit" [attr.aria-disabled]="busy() ? 'true' : null">
+          {{ busy() ? 'Publication…' : 'Publier l’annonce' }}
+        </button>
       </div>
     </form>
   `,
 })
 export class AnnouncementForm {
   readonly audiences = input.required<readonly AudienceOption[]>();
+  /** The administrator pressed « Publier l’annonce » (the page clears its last confirmation). */
+  readonly submitted = output<void>();
   readonly created = output<PostDto>();
 
   readonly #api = inject(ApiClient);
@@ -59,14 +64,15 @@ export class AnnouncementForm {
   protected readonly audienceError = computed(() => shownError(this.postForm.audience()));
   protected readonly bodyError = computed(() => shownError(this.postForm.body()));
 
-  protected readonly busy = signal(false);
+  /** True from the moment the form is submitted until the API has answered (the form's own state, not a flag). */
+  protected readonly busy = computed(() => this.postForm().submitting());
   protected readonly failure = signal<string | null>(null);
 
   protected onSubmit(event: Event): void {
     event.preventDefault();
     if (this.busy()) return;
+    this.submitted.emit();
     void submit(this.postForm, async () => {
-      this.busy.set(true);
       this.failure.set(null);
       try {
         const m = this.model();
@@ -79,8 +85,6 @@ export class AnnouncementForm {
         this.created.emit(post);
       } catch (error) {
         this.failure.set(`L’annonce n’a pas été publiée. ${apiMessage(error)}`);
-      } finally {
-        this.busy.set(false);
       }
       return undefined;
     });

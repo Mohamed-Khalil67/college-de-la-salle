@@ -1,22 +1,25 @@
 import { Component, computed, effect, inject, linkedSignal, resource, signal, untracked } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
-import type { PeriodDto, ReportPreparationClassDto } from '@cdls/shared';
+import { GRADE_REMINDER_COOLDOWN_HOURS, type PeriodDto, type ReportPreparationClassDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
-import { LoadState } from '../../../shared/components/load-state';
+import { SchoolClock } from '../../../core/clock/school-clock';
+import { ConfirmModal } from '../../../shared/components/confirm-modal';
+import { resourceErrorMessage } from '../../../shared/components/load-state';
 import { SchoolYears } from '../../../shared/data/school-years';
 import { Alert, Badge, Button, EmptyState, Field, FieldControl } from '../../../shared/ui';
-import { plural } from '../../../shared/utils/format';
+import { plural, termOf } from '../../../shared/utils/format';
 import { canRemind, gapDetail, reminderMessage, teachersText } from './preparation-logic';
 
 /**
  * « Préparer les bulletins »: per class, which subjects are not ready for the term's report cards, who teaches
- * them, and « Relancer », which puts a reminder in those teachers' « Notes à finir ». Generating, reviewing and
- * publishing the cards stay on the Bulletins page.
+ * them, and « Relancer », which puts a reminder in those teachers' « Notes à finir ». Reminding everyone asks
+ * first; the per-class button acts at once. Generating, reviewing and publishing the cards stay on the
+ * Bulletins page.
  */
 @Component({
   selector: 'app-report-preparation-page',
-  imports: [FormField, Alert, Badge, Button, EmptyState, Field, FieldControl, LoadState, RouterLink],
+  imports: [FormField, Alert, Badge, Button, ConfirmModal, EmptyState, Field, FieldControl, RouterLink],
   template: `
     <div class="page__header">
       <div class="page__header-text">
@@ -25,14 +28,28 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
       </div>
       <div class="page__actions">
         <a cdlsButton variant="secondary" routerLink="/admin/bulletins">Générer et publier les bulletins</a>
-        <button cdlsButton type="button" [disabled]="!canRemindAll() || busyScope() !== null" (click)="remind(null)">
+        <!-- aria-disabled, not disabled: focus stays on the button, and the hint below says why it does nothing. -->
+        <button
+          cdlsButton
+          type="button"
+          [attr.aria-disabled]="allBlocked() ? 'true' : null"
+          [attr.aria-describedby]="allHint() ? 'remind-all-hint' : null"
+          (click)="askRemindAll()"
+        >
           {{ busyScope() === 'all' ? 'Envoi…' : 'Relancer tous les enseignants en retard' }}
         </button>
       </div>
     </div>
 
+    @if (allHint(); as hint) {
+      <p class="t-body-s t-muted" id="remind-all-hint">{{ hint }}</p>
+    }
+
     @if (years.error()) {
-      <cdls-alert tone="danger">Impossible de charger les trimestres. Réessayez dans un instant.</cdls-alert>
+      <cdls-alert tone="danger">
+        {{ yearsError() }}
+        <button cdlsButton class="retry" variant="secondary" size="sm" type="button" (click)="reloadYears()">Réessayer</button>
+      </cdls-alert>
     } @else if (terms().length) {
       <form class="filters" aria-label="Choisir le trimestre" (submit)="$event.preventDefault()">
         <cdls-field label="Trimestre">
@@ -43,16 +60,29 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
           </select>
         </cdls-field>
       </form>
+      @if (!periodId()) {
+        <p class="t-muted">Choisissez un trimestre pour voir ce qu’il reste à saisir.</p>
+      }
     } @else if (years.hasValue()) {
       <cdls-empty-state icon="calendar" title="Aucun trimestre" description="Créez les trimestres de l’année depuis « Année scolaire »." />
+    } @else {
+      <p class="loading-line" role="status">Chargement des trimestres…</p>
     }
 
+    <!-- Always in the page, updated with text: a region inserted with its text is often not announced. -->
     <p class="t-body-s t-muted" role="status">{{ notice() }}</p>
     @if (failure()) {
       <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
     }
 
-    <app-load-state [ref]="preparation" label="Chargement des notes du trimestre…" />
+    @if (preparation.error()) {
+      <cdls-alert tone="danger">
+        {{ preparationError() }}
+        <button cdlsButton class="retry" variant="secondary" size="sm" type="button" (click)="preparation.reload()">Réessayer</button>
+      </cdls-alert>
+    } @else if (periodId() && !preparation.hasValue()) {
+      <p class="loading-line" role="status">Chargement des notes du trimestre…</p>
+    }
     @if (preparation.hasValue()) {
       @let prep = preparation.value();
       @if (prep) {
@@ -119,7 +149,15 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
                     </td>
                     <td class="num">
                       @if (relaunchable(c, prep.period)) {
-                        <button cdlsButton variant="secondary" size="sm" type="button" [disabled]="busyScope() !== null" (click)="remind(c.classId)">
+                        <button
+                          cdlsButton
+                          class="prep__remind"
+                          variant="secondary"
+                          size="sm"
+                          type="button"
+                          [attr.aria-disabled]="busyScope() !== null ? 'true' : null"
+                          (click)="remind(c.classId)"
+                        >
                           {{ busyScope() === c.classId ? 'Envoi…' : 'Relancer' }}<span class="visually-hidden"> les enseignants de {{ c.label }}</span>
                         </button>
                       }
@@ -134,6 +172,19 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
         }
       }
     }
+
+    <app-confirm-modal
+      [title]="confirmTitle()"
+      confirmLabel="Relancer"
+      [busy]="busyScope() === 'all'"
+      [(open)]="confirmOpen"
+      (confirmed)="remindAll()"
+    >
+      <p>
+        Chacun recevra un rappel dans « Notes à finir ». Les enseignants relancés il y a moins de
+        {{ cooldownHours }} heures sont laissés tranquilles.
+      </p>
+    </app-confirm-modal>
   `,
   styles: `
     .prep__sub {
@@ -155,16 +206,25 @@ import { canRemind, gapDetail, reminderMessage, teachersText } from './preparati
     .prep__gaps li {
       display: grid;
     }
+    .prep__remind,
+    .retry {
+      min-height: 2.75rem;
+    }
+    .retry {
+      margin-inline-start: var(--space-3);
+    }
   `,
 })
 export class ReportPreparationPage {
   readonly #api = inject(ApiClient);
-  protected readonly years = inject(SchoolYears).years;
   readonly #schoolYears = inject(SchoolYears);
+  readonly #today = inject(SchoolClock).today;
+  protected readonly years = this.#schoolYears.years;
 
-  /** The terms of the current year; the term of today is chosen first. */
+  /** The terms of the current year. */
   protected readonly terms = computed<readonly PeriodDto[]>(() => this.#schoolYears.year()?.periods ?? []);
-  readonly #model = linkedSignal(() => ({ periodId: this.#schoolYears.term()?.id ?? '' }));
+  /** The term of today; between two terms the latest one that has started, else the first. */
+  readonly #model = linkedSignal(() => ({ periodId: termOf(this.terms(), this.#today())?.id ?? '' }));
   protected readonly pickForm = form(this.#model);
   protected readonly periodId = computed(() => this.#model().periodId);
 
@@ -174,8 +234,34 @@ export class ReportPreparationPage {
   });
 
   protected readonly busyScope = signal<string | null>(null);
+  protected readonly confirmOpen = signal(false);
   protected readonly notice = signal('');
   protected readonly failure = signal<string | null>(null);
+
+  protected readonly cooldownHours = GRADE_REMINDER_COOLDOWN_HOURS;
+  protected readonly plural = plural;
+  protected readonly detail = gapDetail;
+  protected readonly teacher = teachersText;
+  protected readonly yearsError = computed(() => resourceErrorMessage(this.years.error()));
+  protected readonly preparationError = computed(() => resourceErrorMessage(this.preparation.error()));
+
+  readonly #loaded = computed(() => (this.preparation.hasValue() ? this.preparation.value() : null));
+  /** Nobody can be reminded: the term is closed, everything is ready, or no late subject has a teacher. */
+  protected readonly allBlocked = computed(() => {
+    const prep = this.#loaded();
+    return this.busyScope() !== null || !prep || !canRemind(prep.classes, prep.period.closedAt !== null);
+  });
+  /** Why « Relancer tous… » does nothing, said next to it (null while it works, or before the page is loaded). */
+  protected readonly allHint = computed(() => {
+    const prep = this.#loaded();
+    if (!prep || canRemind(prep.classes, prep.period.closedAt !== null)) return null;
+    if (prep.period.closedAt) return 'Ce trimestre est clôturé : il n’y a plus de notes à relancer.';
+    const late = prep.classes.some((c) => c.gaps.length > 0);
+    return late
+      ? 'Aucun enseignant ne peut être relancé : les matières à finir n’ont pas d’enseignant actif. Affectez-en un depuis « Affectations ».'
+      : 'Rien à relancer : toutes les notes sont saisies et publiées.';
+  });
+  protected readonly confirmTitle = computed(() => `Relancer ${plural(this.#loaded()?.lateTeacherCount ?? 0, 'enseignant')} ?`);
 
   constructor() {
     // The sentence about a reminder belongs to the term it was sent for.
@@ -188,17 +274,23 @@ export class ReportPreparationPage {
     });
   }
 
-  protected readonly plural = plural;
-  protected readonly detail = gapDetail;
-  protected readonly teacher = teachersText;
-
-  protected readonly canRemindAll = computed(() => {
-    const prep = this.preparation.hasValue() ? this.preparation.value() : null;
-    return prep ? canRemind(prep.classes, prep.period.closedAt !== null) : false;
-  });
+  protected reloadYears(): void {
+    this.#schoolYears.reload();
+  }
 
   protected relaunchable(c: ReportPreparationClassDto, period: PeriodDto): boolean {
     return canRemind([c], period.closedAt !== null);
+  }
+
+  /** « Relancer tous… »: asks first, with the number of teachers. */
+  protected askRemindAll(): void {
+    if (this.allBlocked()) return;
+    this.confirmOpen.set(true);
+  }
+
+  protected async remindAll(): Promise<void> {
+    this.confirmOpen.set(false);
+    await this.remind(null);
   }
 
   /** « Relancer » for one class, or (null) for every class of the term. */
@@ -211,6 +303,7 @@ export class ReportPreparationPage {
     try {
       const result = await this.#api.reportCards.remind(periodId, classId ? { classId } : {});
       this.notice.set(reminderMessage(result));
+      // The same teachers now wait for the cooldown: nothing to reload, the table did not change.
     } catch (error) {
       this.failure.set(`Les enseignants n’ont pas été relancés. ${apiMessage(error)}`);
     } finally {
