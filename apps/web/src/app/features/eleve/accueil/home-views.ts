@@ -3,7 +3,6 @@ import {
   type HomeworkDto,
   isAssessment,
   type OccurrenceDto,
-  type PostDto,
   type ReportCardDto,
   type StudentAttendanceDto,
   type StudentGradeDto,
@@ -86,8 +85,5 @@ export function absencesView(list: readonly StudentAttendanceDto[]): AbsencesVie
   };
 }
 
-/** The latest announcements, newest first. */
-export function newsView(posts: readonly PostDto[], count = 2): readonly PostDto[] | null {
-  const latest = [...posts].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, count);
-  return latest.length ? latest : null;
-}
+/** The latest announcements, newest first (shared with the teacher's home). */
+export { newsView } from '../../../shared/utils/posts';

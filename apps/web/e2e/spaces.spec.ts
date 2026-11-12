@@ -42,7 +42,7 @@ test('a wrong password is refused with a clear message', async ({ page }) => {
 test('each role lands in its own space and cannot open another', async ({ page }) => {
   for (const [account, home, heading] of [
     [ACCOUNTS.student, '/eleve', /Bonjour/],
-    [ACCOUNTS.teacher, '/enseignant', /classes/i],
+    [ACCOUNTS.teacher, '/enseignant', /Bonjour/],
     [ACCOUNTS.admin, '/admin/utilisateurs', /Utilisateurs/],
   ] as const) {
     await page.context().clearCookies();
