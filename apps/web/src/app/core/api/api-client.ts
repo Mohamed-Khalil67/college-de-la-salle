@@ -56,6 +56,9 @@ import type {
   EventInput,
   EventRangeQuery,
   GradeSheetDto,
+  CreateQuickAssessmentRequest,
+  PendingGradingDto,
+  PendingGradingQuery,
   GroupDetailDto,
   GroupWithMembersDto,
   HandleContactMessagesRequest,
@@ -261,6 +264,10 @@ export class ApiClient {
     sheet: (eventId: string) => this.#get<GradeSheetDto>(`/events/${eventId}/grades`),
     save: (eventId: string, body: SaveGradesRequest) => this.#put<GradeSheetDto>(`/events/${eventId}/grades`, body),
     publish: (eventId: string, published: boolean) => this.#post<GradeSheetDto>(`/events/${eventId}/grades/publish`, { published }),
+    /** « Nouvelle note »: today's gradable event for the whole class, answered as its empty sheet. */
+    createQuick: (body: CreateQuickAssessmentRequest) => this.#post<GradeSheetDto>('/grading/assessments', body),
+    /** Drafts, planned exams and half-entered marks of a class and subject (« Noter »). */
+    pending: (query: PendingGradingQuery) => this.#get<PendingGradingDto[]>('/grading/pending', { ...query }),
     ofStudent: (studentId: string, query: { periodId?: string; from?: string; to?: string } = {}) =>
       this.#get<StudentGradesDto>(`/students/${studentId}/grades`, query),
   };

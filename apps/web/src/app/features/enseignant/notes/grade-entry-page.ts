@@ -2,7 +2,7 @@ import { Component, computed, inject, input, linkedSignal, resource } from '@ang
 import { RouterLink } from '@angular/router';
 import { addDays, type EventDto, todayIso } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
-import { Button, EmptyState } from '../../../shared/ui';
+import { Button, EmptyState, Icon } from '../../../shared/ui';
 import { dayTitle, kindLabel, mark } from '../../../shared/utils/format';
 import { LoadState } from '../../../shared/components/load-state';
 import { teacherAssignments } from '../../../shared/data/teacher-data';
@@ -11,12 +11,15 @@ import { GradeGrid } from './grade-grid';
 /** Grade entry: pick a class, then one of its gradable evaluations, then fill the grid. */
 @Component({
   selector: 'app-grade-entry-page',
-  imports: [RouterLink, Button, EmptyState, LoadState, GradeGrid],
+  imports: [RouterLink, Button, EmptyState, Icon, LoadState, GradeGrid],
   template: `
     <div class="page__header">
       <div class="page__header-text">
         <h1 class="t-h1">Saisie des notes</h1>
         <p class="t-muted">{{ subtitle() }}</p>
+      </div>
+      <div class="page__actions">
+        <a cdlsButton routerLink="../noter" [queryParams]="{ classe: classId() || null }"><cdls-icon name="plus" />Nouvelle note</a>
       </div>
     </div>
 
@@ -51,7 +54,8 @@ import { GradeGrid } from './grade-grid';
             <p class="t-muted grid-meta">{{ meta(event) }}</p>
             <app-grade-grid [event]="event" [context]="context()" [className]="className()" />
           } @else {
-            <cdls-empty-state icon="file-text" title="Aucune évaluation à noter" description="Créez d’abord un examen, un contrôle, un devoir ou un TP pour cette classe dans l’agenda, puis revenez saisir les notes.">
+            <cdls-empty-state icon="file-text" title="Aucune évaluation à noter" description="Créez une note pour cette classe et saisissez-la tout de suite, ou planifiez une évaluation dans l’agenda.">
+              <a cdlsButton routerLink="../noter" [queryParams]="{ classe: classId() || null }">Nouvelle note</a>
               <a cdlsButton variant="secondary" routerLink="../agenda">Ouvrir l’agenda</a>
             </cdls-empty-state>
           }

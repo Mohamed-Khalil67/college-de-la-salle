@@ -1,145 +1,46 @@
-import { Component, computed, inject, input, linkedSignal, resource, signal } from '@angular/core';
-import type { EventDto, GradeSheetDto } from '@cdls/shared';
+import { Component, DestroyRef, ElementRef, computed, effect, inject, input, linkedSignal, output, resource, signal, untracked, viewChild } from '@angular/core';
+import { LIMITS, type EventDto, type GradeSheetDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Avatar, Badge, Button, GradeInput, Modal } from '../../../shared/ui';
 import { average, clockOf, mark, plural } from '../../../shared/utils/format';
 import { LoadState } from '../../../shared/components/load-state';
 import { eventTargetLine } from '../../../shared/utils/targets';
 import { columnAverage, gradeIssues, isValidScore, issuesSentence, rowAverage } from '../shared/teacher';
+import { changedSince, saveStatus } from '../noter/noter-logic';
 
 type Marks = Readonly<Record<string, number | null>>;
+type Comments = Readonly<Record<string, string>>;
+
+/** Quiet time after the last keystroke before the quick grid saves on its own. */
+const AUTOSAVE_MS = 800;
 
 /**
  * The grade grid of one evaluation: earlier evaluations of the same subject read-only, the selected one
  * editable (GradeInput), live averages per student and per evaluation, save, publish and unpublish.
+ * Enter moves to the next student. In `quick` mode (« Noter ») it also takes a comment per student, saves
+ * on its own with a polite status line, and offers « Finir plus tard » and « Publier aux élèves ».
  */
 @Component({
   selector: 'app-grade-grid',
   imports: [Alert, Avatar, Badge, Button, GradeInput, Modal, LoadState],
-  template: `
-    <app-load-state [ref]="sheets" label="Chargement des notes…" />
-    @if (main(); as sheet) {
-      <div class="toolbar">
-        <div class="toolbar__status">
-          @if (published()) {
-            <cdls-badge tone="success">Publié, visible par les élèves</cdls-badge>
-          } @else {
-            <cdls-badge tone="warning">Brouillon, invisible pour les élèves</cdls-badge>
-          }
-          <span role="status">{{ status() }}</span>
-        </div>
-        <button cdlsButton variant="secondary" size="sm" type="button" (click)="save()">Enregistrer</button>
-        @if (published()) {
-          <button cdlsButton variant="secondary" size="sm" type="button" (click)="openConfirm()">Retirer la publication</button>
-        } @else {
-          <button cdlsButton size="sm" type="button" (click)="openConfirm()">Publier les notes</button>
-        }
-      </div>
-      <p class="t-body-s grid-target">
-        <b>Assignée à :</b> {{ targetLine() }}.
-        @if (!sheet.event.target.whole) {
-          Seuls ces élèves apparaissent ici ; les notes des autres élèves de la classe ne se saisissent pas.
-        }
-      </p>
-      <p class="t-body-s t-muted grid-help">
-        Saisissez une note de 0 à {{ outOfText() }} (virgule acceptée), ou laissez vide. Passez d’un élève à l’autre avec Tab.
-      </p>
-      @if (failure()) {
-        <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
-      }
-
-      <div class="table-wrap" role="region" aria-labelledby="grid-caption" tabindex="0">
-        <table class="table table--sticky-first grade-grid">
-          <caption id="grid-caption" class="visually-hidden">Notes de {{ sheet.event.title }}, {{ className() }}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Élève <span class="t-muted">({{ targetedRows().length }})</span></th>
-              @for (other of others(); track other.event.id) {
-                <th scope="col" class="num">{{ other.event.title }}<span class="cell-sub">×{{ fmt(other.event.coefficient) }}, {{ isPublished(other) ? 'publié' : 'brouillon' }}</span></th>
-              }
-              <th scope="col">{{ sheet.event.title }}<span class="cell-sub">×{{ fmt(sheet.event.coefficient) }}, {{ published() ? 'publié' : 'brouillon' }}</span></th>
-              <th scope="col" class="num">Moyenne</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of sheet.rows; track row.student.id) {
-              <tr>
-                <th scope="row"><span class="person"><cdls-avatar [name]="name(row.student)" />{{ name(row.student) }}</span></th>
-                @for (other of others(); track other.event.id) {
-                  <td class="num">{{ scoreIn(other, row.student.id) }}</td>
-                }
-                <td>
-                  @if (row.targeted) {
-                    <cdls-grade-input
-                      [value]="marks()[row.student.id] ?? null"
-                      (valueChange)="setMark(row.student.id, $event)"
-                      [outOf]="outOf()"
-                      [label]="sheet.event.title + ', ' + name(row.student)"
-                      [describedBy]="'err-' + row.student.id"
-                    />
-                  } @else {
-                    <span class="tabular">{{ scoreIn(sheet, row.student.id) }}</span>
-                    <cdls-badge tone="warning">N’est plus concerné : note conservée</cdls-badge>
-                    @if (row.grade) {
-                      <button cdlsButton variant="tertiary" size="sm" type="button" [disabled]="removed().has(row.student.id)" (click)="removeFormer(row.student.id)">
-                        {{ removed().has(row.student.id) ? 'Note retirée à l’enregistrement' : 'Retirer la note' }}<span class="visually-hidden"> de {{ name(row.student) }}</span>
-                      </button>
-                    }
-                  }
-                </td>
-                <td class="num"><b>{{ avg(studentAverage(row.student.id)) }}</b></td>
-              </tr>
-              @if (row.targeted && !valid(row.student.id)) {
-                <tr class="grade-row-error" [id]="'err-' + row.student.id">
-                  <td [attr.colspan]="others().length + 3">
-                    <p class="field__error">{{ name(row.student) }} : la note doit être un nombre compris entre 0 et {{ outOfText() }}.</p>
-                  </td>
-                </tr>
-              }
-            }
-          </tbody>
-          <tfoot>
-            <tr>
-              <th scope="row">Moyenne de la classe</th>
-              @for (other of others(); track other.event.id) {
-                <td class="num">{{ avg(otherAverage(other)) }}</td>
-              }
-              <td class="tabular">{{ avg(classAverage()) }} <span class="t-muted">({{ countText() }})</span></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <cdls-modal [title]="published() ? 'Retirer la publication ?' : 'Publier les notes ?'" [(open)]="confirmOpen">
-        <div class="stack stack--sm">
-          @if (published()) {
-            <p>Les élèves de {{ className() }} ne verront plus ces notes, et leur moyenne sera recalculée sans elles.</p>
-          } @else {
-            <p>Les {{ targetedRows().length }} élèves concernés de {{ className() }} verront leur note et leur nouvelle moyenne. Vous pourrez encore corriger une note après publication.</p>
-            @if (issuesText()) {
-              <cdls-alert tone="warning">{{ issuesText() }} {{ issues().invalid.length ? 'Corrigez les notes hors barème avant de publier.' : 'Vous pouvez publier sans elles.' }}</cdls-alert>
-            }
-          }
-          @if (confirmError()) {
-            <cdls-alert tone="danger">{{ confirmError() }}</cdls-alert>
-          }
-        </div>
-        <div class="modal__footer">
-          <button cdlsButton variant="secondary" type="button" (click)="confirmOpen.set(false)">Annuler</button>
-          <button cdlsButton [variant]="published() ? 'danger' : 'primary'" type="button" (click)="togglePublished()">
-            {{ busy() ? 'Patientez…' : published() ? 'Retirer la publication' : 'Publier les notes' }}
-          </button>
-        </div>
-      </cdls-modal>
-    }
-  `,
+  templateUrl: './grade-grid.html',
   styles: `
     .grid-help {
       margin-bottom: var(--space-4);
     }
     .grid-target {
       margin-bottom: var(--space-2);
+    }
+    .comment-input {
+      min-inline-size: 12rem;
+      min-block-size: 2.5rem;
+    }
+    .grid-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: var(--space-3);
+      margin-block-start: var(--space-4);
     }
   `,
 })
@@ -148,8 +49,21 @@ export class GradeGrid {
   /** Other evaluations of the same class and subject, shown read-only before the selected one. */
   readonly context = input<readonly EventDto[]>([]);
   readonly className = input('la classe');
+  /** « Noter »: comments, autosave, « Finir plus tard » and « Publier aux élèves ». */
+  readonly quick = input(false);
+  /** The scale before the first mark is saved (it is stored with the marks, not on the event). */
+  readonly scale = input(20);
+  /** « Finir plus tard », once the marks are saved. */
+  readonly finished = output<void>();
+  /** After a publish (true) or an unpublish (false). */
+  readonly publishedChange = output<boolean>();
 
   readonly #api = inject(ApiClient);
+  readonly #destroyRef = inject(DestroyRef);
+  private readonly table = viewChild<ElementRef<HTMLTableElement>>('table');
+  private readonly publishButton = viewChild<ElementRef<HTMLButtonElement>>('publishButton');
+
+  protected readonly commentMax = LIMITS.comment;
 
   protected readonly sheets = resource({
     params: () => ({ id: this.event().id, others: this.context().map((e) => e.id) }),
@@ -158,18 +72,26 @@ export class GradeGrid {
   protected readonly main = computed<GradeSheetDto | null>(() => (this.sheets.hasValue() ? (this.sheets.value()[0] ?? null) : null));
   protected readonly others = computed(() => (this.sheets.hasValue() ? this.sheets.value().slice(1) : []));
 
-  /** Saved marks, as the server has them. */
+  /** Saved marks and comments, as the server has them. */
   readonly #saved = computed<Marks>(() => Object.fromEntries((this.main()?.rows ?? []).map((r) => [r.student.id, r.grade?.score ?? null])));
+  readonly #savedComments = computed<Comments>(() => Object.fromEntries((this.main()?.rows ?? []).map((r) => [r.student.id, r.grade?.comment ?? ''])));
   /** What the teacher typed; reset when the sheet changes (another evaluation, or after a save). */
   protected readonly marks = linkedSignal<Marks>(() => this.#saved());
+  protected readonly comments = linkedSignal<Comments>(() => this.#savedComments());
 
-  protected readonly outOf = computed(() => this.main()?.rows.find((r) => r.grade)?.grade?.outOf ?? 20);
+  protected readonly outOf = computed(() => this.main()?.rows.find((r) => r.grade)?.grade?.outOf ?? this.scale());
   protected readonly outOfText = computed(() => mark(this.outOf()));
   protected readonly published = computed(() => !!this.main()?.rows.some((r) => r.grade?.published));
   protected readonly dirty = computed(() => {
     const saved = this.#saved();
     const marks = this.marks();
-    return this.removed().size > 0 || Object.keys(saved).some((id) => !same(saved[id] ?? null, marks[id] ?? null));
+    const savedComments = this.#savedComments();
+    const comments = this.comments();
+    return (
+      this.removed().size > 0 ||
+      Object.keys(saved).some((id) => !same(saved[id] ?? null, marks[id] ?? null)) ||
+      Object.keys(savedComments).some((id) => marks[id] !== null && marks[id] !== undefined && (savedComments[id] ?? '') !== (comments[id] ?? ''))
+    );
   });
   /** The students the work concerns today (a graded student who left the group is shown, read-only). */
   protected readonly targetedRows = computed(() => (this.main()?.rows ?? []).filter((r) => r.targeted));
@@ -179,14 +101,14 @@ export class GradeGrid {
   );
   protected readonly issuesText = computed(() => issuesSentence(this.issues()));
   protected readonly classAverage = computed(() => columnAverage(this.targetedRows().map((r) => this.marks()[r.student.id] ?? null), this.outOf()));
-  protected readonly countText = computed(() => {
-    const total = this.targetedRows().length;
-    const given = this.targetedRows().filter((r) => {
-      const m = this.marks()[r.student.id] ?? null;
-      return m !== null && isValidScore(m, this.outOf());
-    }).length;
-    return `${plural(given, 'note')} sur ${total}`;
-  });
+  readonly #given = computed(
+    () =>
+      this.targetedRows().filter((r) => {
+        const m = this.marks()[r.student.id] ?? null;
+        return m !== null && isValidScore(m, this.outOf());
+      }).length,
+  );
+  protected readonly countText = computed(() => `${plural(this.#given(), 'note')} sur ${this.targetedRows().length}`);
 
   /** Graded students who left the group whose mark the teacher chose to remove (sent as an empty mark on save). */
   protected readonly removed = signal<ReadonlySet<string>>(new Set());
@@ -200,11 +122,40 @@ export class GradeGrid {
   protected readonly confirmError = signal<string | null>(null);
 
   protected readonly status = computed(() => {
+    if (this.quick())
+      return saveStatus({
+        saving: this.busy(),
+        dirty: this.dirty(),
+        invalid: this.issues().invalid.length > 0,
+        failed: !!this.failure(),
+        entered: this.#given(),
+        total: this.targetedRows().length,
+        average: this.classAverage(),
+      });
     if (this.busy()) return 'Enregistrement…';
     if (this.dirty()) return 'Modifications non enregistrées';
     const at = this.savedAt();
     return at ? `Enregistré à ${clockOf(at)}` : 'Aucune modification';
   });
+  protected readonly publishLabel = computed(() => (this.quick() ? 'Publier aux élèves' : 'Publier les notes'));
+
+  #timer: ReturnType<typeof setTimeout> | null = null;
+  /** A save was asked while another was running: run it once that one ends. */
+  #again = false;
+
+  constructor() {
+    // « Noter » saves on its own once the teacher pauses, unless a mark is outside the scale.
+    effect(() => {
+      if (!this.quick() || !this.dirty() || this.issues().invalid.length) {
+        this.#clearTimer();
+        return;
+      }
+      this.marks();
+      this.comments();
+      untracked(() => this.#schedule());
+    });
+    this.#destroyRef.onDestroy(() => this.#clearTimer());
+  }
 
   protected name(s: { firstName: string; lastName: string }): string {
     return `${s.firstName} ${s.lastName}`;
@@ -217,6 +168,10 @@ export class GradeGrid {
   }
   protected valid(studentId: string): boolean {
     return isValidScore(this.marks()[studentId] ?? null, this.outOf());
+  }
+  protected hasMark(studentId: string): boolean {
+    const m = this.marks()[studentId];
+    return m !== null && m !== undefined;
   }
   protected isPublished(sheet: GradeSheetDto): boolean {
     return sheet.rows.some((r) => r.grade?.published);
@@ -241,32 +196,74 @@ export class GradeGrid {
   protected setMark(studentId: string, value: number | null): void {
     this.marks.update((m) => ({ ...m, [studentId]: value }));
   }
+  protected setComment(studentId: string, event: Event): void {
+    const value = event.target instanceof HTMLInputElement ? event.target.value : '';
+    this.comments.update((c) => ({ ...c, [studentId]: value }));
+  }
+
+  /** Enter in a row moves to the next student's mark; after the last one, to the publish button. */
+  protected onEnter(event: Event): void {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const table = this.table()?.nativeElement;
+    const row = target.closest('tr');
+    if (!table || !row) return;
+    event.preventDefault();
+    const inputs = [...table.querySelectorAll<HTMLInputElement>('tbody input.grade-input')];
+    const index = inputs.findIndex((input) => input.closest('tr') === row);
+    const next = inputs[index + 1];
+    if (next) {
+      next.focus();
+      next.select();
+    } else {
+      this.publishButton()?.nativeElement.focus();
+    }
+  }
 
   protected openConfirm(): void {
     this.confirmError.set(null);
     this.confirmOpen.set(true);
   }
 
+  /** « Finir plus tard »: saves what is typed, then hands back (the draft stays in the list). */
+  protected async finishLater(): Promise<void> {
+    if (this.dirty() && !(await this.save())) return;
+    this.finished.emit();
+  }
+
   /** Saves the typed marks; false (with a message) when some are invalid or the API refuses. */
   protected async save(): Promise<boolean> {
     const sheet = this.main();
-    if (!sheet || this.busy()) return false;
+    if (!sheet) return false;
+    if (this.busy()) {
+      this.#again = true;
+      return false;
+    }
+    this.#clearTimer();
     if (this.issues().invalid.length) {
       this.failure.set(`Corrigez d’abord les notes signalées en rouge. ${this.issuesText()}`);
       return false;
     }
     this.busy.set(true);
     this.failure.set(null);
+    const sentMarks = this.marks();
+    const sentComments = this.comments();
     try {
       const entries = [
         ...this.targetedRows().map((r) => ({
           studentId: r.student.id,
-          score: this.marks()[r.student.id] ?? null,
-          comment: r.grade?.comment ?? '',
+          score: sentMarks[r.student.id] ?? null,
+          comment: (sentComments[r.student.id] ?? '').trim(),
         })),
         ...[...this.removed()].map((studentId) => ({ studentId, score: null, comment: '' })),
       ];
-      this.#replace(await this.#api.grades.save(sheet.event.id, { outOf: this.outOf(), entries }));
+      const saved = await this.#api.grades.save(sheet.event.id, { outOf: this.outOf(), entries });
+      // What was typed while the request ran is put back over the server's answer.
+      const typedMarks = changedSince(sentMarks, this.marks());
+      const typedComments = changedSince(sentComments, this.comments());
+      this.#replace(saved);
+      this.marks.update((m) => ({ ...m, ...typedMarks }));
+      this.comments.update((c) => ({ ...c, ...typedComments }));
       this.removed.set(new Set());
       this.savedAt.set(new Date());
       return true;
@@ -275,6 +272,10 @@ export class GradeGrid {
       return false;
     } finally {
       this.busy.set(false);
+      if (this.#again) {
+        this.#again = false;
+        if (this.dirty()) this.#schedule();
+      }
     }
   }
 
@@ -295,11 +296,25 @@ export class GradeGrid {
       this.#replace(await this.#api.grades.publish(sheet.event.id, publish));
       this.confirmOpen.set(false);
       this.savedAt.set(new Date());
+      this.publishedChange.emit(publish);
     } catch (error) {
       this.confirmError.set(`${publish ? 'La publication' : 'Le retrait'} a échoué. ${apiMessage(error)}`);
     } finally {
       this.busy.set(false);
     }
+  }
+
+  #schedule(): void {
+    this.#clearTimer();
+    this.#timer = setTimeout(() => {
+      this.#timer = null;
+      void this.save();
+    }, AUTOSAVE_MS);
+  }
+
+  #clearTimer(): void {
+    if (this.#timer !== null) clearTimeout(this.#timer);
+    this.#timer = null;
   }
 
   #replace(sheet: GradeSheetDto): void {
@@ -310,4 +325,3 @@ export class GradeGrid {
 function same(a: number | null, b: number | null): boolean {
   return a === b || (a !== null && b !== null && Number.isNaN(a) && Number.isNaN(b));
 }
-
