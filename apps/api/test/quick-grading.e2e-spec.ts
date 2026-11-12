@@ -4,6 +4,7 @@ import {
   schoolToday,
   type StudentGradesDto,
 } from '@cdls/shared';
+import { fromDay } from '../src/common/dates.js';
 import {
   activityTypeId,
   ADMIN,
@@ -28,6 +29,8 @@ describe('Quick grading (e2e)', () => {
   let teacher: string;
   let pupil: string;
   const since = new Date();
+  /** Periods covering today that earlier specs left closed: reopened for this spec, closed again after it. */
+  const reopened: { id: string; closedAt: Date }[] = [];
   const madeIds: string[] = [];
 
   beforeAll(async () => {
@@ -35,12 +38,22 @@ describe('Quick grading (e2e)', () => {
     student = await studentOf(t.prisma, 'bac', 'premiere');
     teacher = await t.token(MATHS_TEACHER);
     pupil = await t.token(student.email);
+    const today = fromDay(schoolToday());
+    const closed = await t.prisma.period.findMany({
+      where: { startsOn: { lte: today }, endsOn: { gte: today }, closedAt: { not: null } },
+    });
+    for (const p of closed) {
+      reopened.push({ id: p.id, closedAt: p.closedAt! });
+      await t.prisma.period.update({ where: { id: p.id }, data: { closedAt: null } });
+    }
   });
 
   afterAll(async () => {
     // Grades go with their events; the publish notifications are this spec's own.
     await t.prisma.notification.deleteMany({ where: { createdAt: { gte: since } } });
     await t.prisma.event.deleteMany({ where: { id: { in: madeIds } } });
+    for (const p of reopened)
+      await t.prisma.period.update({ where: { id: p.id }, data: { closedAt: p.closedAt } });
     await t.close();
   });
 
