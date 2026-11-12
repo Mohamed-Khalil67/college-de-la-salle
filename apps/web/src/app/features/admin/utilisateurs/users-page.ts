@@ -1,5 +1,6 @@
 import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
 import { debounce, form, FormField } from '@angular/forms/signals';
+import { ActivatedRoute } from '@angular/router';
 import type { ClassDto, Paginated, Role, UserDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
@@ -179,8 +180,10 @@ export class UsersPage {
     return this.search() ? `${base}, recherche « ${this.search()} »` : base;
   });
 
-  protected readonly createOpen = signal(false);
-  protected readonly importOpen = signal(false);
+  /** The home page's « Ajouter un compte » and « Importer une liste » open the page with the dialog already shown. */
+  readonly #route = inject(ActivatedRoute);
+  protected readonly createOpen = signal(this.#route.snapshot.queryParamMap.get('action') === 'creer');
+  protected readonly importOpen = signal(this.#route.snapshot.queryParamMap.get('action') === 'importer');
   protected readonly editOpen = signal(false);
   protected readonly editing = signal<UserDto | null>(null);
   protected readonly archiveOpen = signal(false);

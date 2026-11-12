@@ -75,6 +75,9 @@ import type {
   ReportCardBatchRequest,
   ReportCardBatchResponse,
   ReportCardDto,
+  ReportPreparationDto,
+  ReportReminderRequest,
+  ReportReminderResponse,
   RejectSectionChangeRequest,
   SaveAttendanceRequest,
   SaveGradesRequest,
@@ -328,6 +331,11 @@ export class ApiClient {
     publish: (periodId: string, body: ReportCardBatchRequest = {}) => this.#post<ReportCardBatchResponse>(`/periods/${periodId}/report-cards/publish`, body),
     ofTerm: (periodId: string, query: { classId?: string } = {}) => this.#get<ReportCardDto[]>(`/periods/${periodId}/report-cards`, query),
     ofStudent: (studentId: string) => this.#get<ReportCardDto[]>(`/students/${studentId}/report-cards`),
+    /** « Préparer les bulletins » (admin): per class, which subjects are not ready and who teaches them. */
+    preparation: (periodId: string) => this.#get<ReportPreparationDto>(`/periods/${periodId}/report-preparation`),
+    /** « Relancer » (admin): reminds the teachers who still have grades to finish (one class, or all). */
+    remind: (periodId: string, body: ReportReminderRequest = {}) =>
+      this.#post<ReportReminderResponse>(`/periods/${periodId}/report-preparation/reminders`, body),
     update: (id: string, appreciation: string) => this.#patch<ReportCardDto>(`/report-cards/${id}`, { appreciation }),
     /** The PDF needs the access token, so it is fetched as a blob rather than linked. */
     pdf: (id: string) => firstValueFrom(this.#http.get(`/api/report-cards/${id}/pdf`, { responseType: 'blob' })),

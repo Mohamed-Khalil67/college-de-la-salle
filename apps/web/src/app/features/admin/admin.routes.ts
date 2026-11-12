@@ -1,14 +1,15 @@
-import { inject } from '@angular/core';
 import type { Routes } from '@angular/router';
-import { adminOnlyGuard, PLANNER_HOME } from '../../core/auth/auth.guards';
-import { AuthStore } from '../../core/auth/auth-store';
+import { adminOnlyGuard } from '../../core/auth/auth.guards';
 
 /** The administration (/admin). Pages are ported from design/prototypes/admin-*.html. */
 export const ADMIN_ROUTES: Routes = [
+  // The administration's one page (docs/workflow-redesign.md). A planner is sent back to the structure screens.
   {
     path: '',
     pathMatch: 'full',
-    redirectTo: () => (inject(AuthStore).role() === 'admin' ? 'utilisateurs' : PLANNER_HOME.replace('/admin/', '')),
+    title: 'Administration',
+    canMatch: [adminOnlyGuard],
+    loadComponent: () => import('./accueil/home-page').then((m) => m.AdminHomePage),
   },
   // Structure screens: the admin and the planners.
   {
@@ -69,6 +70,18 @@ export const ADMIN_ROUTES: Routes = [
     title: 'Affectations',
     canMatch: [adminOnlyGuard],
     loadComponent: () => import('./affectations/assignments-page').then((m) => m.AssignmentsPage),
+  },
+  {
+    path: 'bulletins/preparation',
+    title: 'Préparer les bulletins',
+    canMatch: [adminOnlyGuard],
+    loadComponent: () => import('./bulletins/report-preparation-page').then((m) => m.ReportPreparationPage),
+  },
+  {
+    path: 'annonces',
+    title: 'Annonces',
+    canMatch: [adminOnlyGuard],
+    loadComponent: () => import('./annonces/announcements-page').then((m) => m.AnnouncementsPage),
   },
   {
     path: 'bulletins',
