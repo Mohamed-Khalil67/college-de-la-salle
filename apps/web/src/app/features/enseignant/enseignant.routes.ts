@@ -24,6 +24,11 @@ export const ENSEIGNANT_ROUTES: Routes = [
     loadComponent: () => import('./notes/grade-entry-page').then((m) => m.GradeEntryPage),
   },
   {
+    path: 'noter',
+    title: 'Noter',
+    loadComponent: () => import('./noter/noter-page').then((m) => m.NoterPage),
+  },
+  {
     path: 'appel',
     title: 'Appel',
     loadComponent: () => import('./appel/attendance-page').then((m) => m.AttendancePage),

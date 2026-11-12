@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -11,13 +11,19 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import {
+  type CreateQuickAssessmentRequest,
+  EVENT_LIMITS,
   type GradeDto as GradeContract,
+  GRADING_LIMITS,
   type GradeEntry,
   type GradeSheetDto as GradeSheetContract,
   LIMITS,
+  type PendingGradingDto as PendingGradingContract,
+  type PendingGradingQuery,
   type PublishGradesRequest,
   type SaveGradesRequest,
   type StudentGradeDto as StudentGradeContract,
@@ -28,6 +34,7 @@ import { StudentSummaryDto } from '../../classes/dto/class.dto.js';
 import { IsDay } from '../../common/dates.js';
 import { ActivityTypeSummaryDto } from '../../activity-types/dto/activity-type.dto.js';
 import { EventDto } from '../../events/dto/event.dto.js';
+import { trim } from '../../common/transforms.js';
 
 export class GradeDto implements GradeContract {
   id: string;
@@ -140,4 +147,57 @@ export class StudentGradesQueryDto implements StudentGradesQuery {
   @IsOptional()
   @IsDay()
   to?: string;
+}
+
+/** « Nouvelle note »: the gradable event is made behind the scenes (today, whole class, current period). */
+export class CreateQuickAssessmentDto implements CreateQuickAssessmentRequest {
+  @IsUUID()
+  classId: string;
+
+  /** A subject of the class that the teacher teaches (GET /teaching-assignments). */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  subjectId: string;
+
+  /** The name the students will see, e.g. « Interrogation 3 ». */
+  @Transform(trim)
+  @IsString()
+  @MinLength(1, { message: 'Donnez un nom à la note.' })
+  @MaxLength(EVENT_LIMITS.title, {
+    message: `Le nom ne doit pas dépasser ${EVENT_LIMITS.title} caractères.`,
+  })
+  title: string;
+
+  /** Weight of the grades, 1 by default. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(GRADING_LIMITS.coefficient.min)
+  @Max(GRADING_LIMITS.coefficient.max)
+  coefficient?: number;
+
+  /** A gradable, non-homework type the teacher may use; omitted, the first assessment type. */
+  @IsOptional()
+  @IsUUID()
+  activityTypeId?: string;
+}
+
+export class PendingGradingQueryDto implements PendingGradingQuery {
+  @IsUUID()
+  classId: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  subjectId: string;
+}
+
+export class PendingGradingDto implements PendingGradingContract {
+  event: EventDto;
+  entered: number;
+  total: number;
+  published: boolean;
+  @ApiProperty({ type: Number, nullable: true })
+  outOf: number | null;
 }

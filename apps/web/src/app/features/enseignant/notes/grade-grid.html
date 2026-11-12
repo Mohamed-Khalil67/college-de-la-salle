@@ -1,0 +1,169 @@
+<app-load-state [ref]="sheets" label="Chargement des notes…" />
+@if (main(); as sheet) {
+  <div class="toolbar">
+    <div class="toolbar__status">
+      @if (retracting()) {
+        <cdls-badge tone="success">Publié, visible par les élèves</cdls-badge>
+      } @else if (published()) {
+        <cdls-badge tone="warning">Publié en partie</cdls-badge>
+      } @else {
+        <cdls-badge tone="warning">Brouillon, invisible pour les élèves</cdls-badge>
+      }
+      <!-- One live region, for settled states only; the figures and the keystroke-by-keystroke states are not announced. -->
+      <span role="status" class="tabular">{{ announced() }}</span>
+      <span class="tabular">{{ transient() }}</span>
+      @if (quick()) {
+        <span class="tabular t-muted">{{ summary() }}</span>
+      }
+    </div>
+    @if (!quick()) {
+      <button cdlsButton variant="secondary" size="sm" type="button" (click)="save()">Enregistrer</button>
+      @if (retracting()) {
+        <button cdlsButton variant="secondary" size="sm" type="button" (click)="openConfirm()">Retirer la publication</button>
+      } @else {
+        <button #publishButton cdlsButton size="sm" type="button" (click)="openConfirm()">{{ publishLabel() }}</button>
+      }
+    }
+  </div>
+  @if (quick() && !scaleLocked()) {
+    <div class="scale-field">
+      <cdls-field label="Note sur" helper="Fixée dès la première note enregistrée." [error]="scaleError()">
+        <input cdlsControl type="text" inputmode="decimal" autocomplete="off" [value]="scaleText()" (input)="setScale($event)" />
+      </cdls-field>
+    </div>
+  }
+  <p class="t-body-s grid-target">
+    <b>Assignée à :</b> {{ targetLine() }}.
+    @if (!sheet.event.target.whole) {
+      Seuls ces élèves apparaissent ici ; les notes des autres élèves de la classe ne se saisissent pas.
+    }
+  </p>
+  <p class="t-body-s t-muted grid-help">
+    @if (quick()) {
+      Note sur {{ outOfText() }}, virgule acceptée. Entrée passe à l’élève suivant. Laissez vide pour un élève absent : il ne compte pas dans la moyenne. Tout s’enregistre seul.
+    } @else {
+      Saisissez une note de 0 à {{ outOfText() }} (virgule acceptée), ou laissez vide. Passez d’un élève à l’autre avec Entrée ou Tab.
+    }
+  </p>
+  @if (failure()) {
+    <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
+  }
+
+  <div class="table-wrap" role="region" aria-labelledby="grid-caption" tabindex="0">
+    <table #table class="table table--sticky-first grade-grid" (keydown.enter)="onEnter($event)">
+      <caption id="grid-caption" class="visually-hidden">Notes de {{ sheet.event.title }}, {{ className() }}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Élève <span class="t-muted">({{ targetedRows().length }})</span></th>
+          @for (other of others(); track other.event.id) {
+            <th scope="col" class="num">{{ other.event.title }}<span class="cell-sub">×{{ fmt(other.event.coefficient) }}, {{ isPublished(other) ? 'publié' : 'brouillon' }}</span></th>
+          }
+          @if (quick()) {
+            <th scope="col">Note <span class="cell-sub">sur {{ outOfText() }}</span></th>
+            <th scope="col">Commentaire <span class="cell-sub">facultatif</span></th>
+          } @else {
+            <th scope="col">{{ sheet.event.title }}<span class="cell-sub">×{{ fmt(sheet.event.coefficient) }}, {{ retracting() ? 'publié' : published() ? 'publié en partie' : 'brouillon' }}</span></th>
+            <th scope="col" class="num">Moyenne</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of sheet.rows; track row.student.id) {
+          <tr>
+            <th scope="row"><span class="person"><cdls-avatar [name]="name(row.student)" />{{ name(row.student) }}</span></th>
+            @for (other of others(); track other.event.id) {
+              <td class="num">{{ scoreIn(other, row.student.id) }}</td>
+            }
+            <td>
+              @if (row.targeted) {
+                <cdls-grade-input
+                  [value]="marks()[row.student.id] ?? null"
+                  (valueChange)="setMark(row.student.id, $event)"
+                  [outOf]="outOf()"
+                  [label]="(quick() ? 'Note' : sheet.event.title) + ', ' + name(row.student)"
+                  [describedBy]="'err-' + row.student.id"
+                />
+              } @else {
+                <span class="tabular">{{ scoreIn(sheet, row.student.id) }}</span>
+                <cdls-badge tone="warning">N’est plus concerné : note conservée</cdls-badge>
+                @if (row.grade) {
+                  <button cdlsButton variant="tertiary" size="sm" type="button" [disabled]="removed().has(row.student.id)" (click)="removeFormer(row.student.id)">
+                    {{ removed().has(row.student.id) ? 'Note retirée à l’enregistrement' : 'Retirer la note' }}<span class="visually-hidden"> de {{ name(row.student) }}</span>
+                  </button>
+                }
+              }
+            </td>
+            @if (quick()) {
+              <td>
+                @if (row.targeted) {
+                  <input
+                    class="field__control comment-input"
+                    autocomplete="off"
+                    [attr.aria-label]="'Commentaire, ' + name(row.student)"
+                    [maxLength]="commentMax"
+                    [disabled]="!hasMark(row.student.id)"
+                    [value]="comments()[row.student.id] ?? ''"
+                    (input)="setComment(row.student.id, $event)"
+                  />
+                }
+              </td>
+            } @else {
+              <td class="num"><b>{{ avg(studentAverage(row.student.id)) }}</b></td>
+            }
+          </tr>
+          @if (row.targeted && !valid(row.student.id)) {
+            <tr class="grade-row-error" [id]="'err-' + row.student.id">
+              <td [attr.colspan]="others().length + 3">
+                <p class="field__error">{{ name(row.student) }} : la note doit être un nombre compris entre 0 et {{ outOfText() }}.</p>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row">Moyenne de la classe</th>
+          @for (other of others(); track other.event.id) {
+            <td class="num">{{ avg(otherAverage(other)) }}</td>
+          }
+          <td class="tabular">{{ avg(classAverage()) }} <span class="t-muted">({{ countText() }})</span></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  @if (quick()) {
+    <div class="grid-actions">
+      <button cdlsButton variant="secondary" type="button" (click)="finishLater()">Finir plus tard</button>
+      @if (published() && retracting()) {
+        <p class="t-body-s t-muted grid-published">Publiée : une note ajoutée apparaît tout de suite chez les élèves. Pour tout retirer, ouvrez « Saisie des notes ».</p>
+      }
+      @if (!retracting()) {
+        <button #publishButton cdlsButton type="button" (click)="openConfirm()">{{ publishLabel() }}</button>
+      }
+    </div>
+  }
+
+  <cdls-modal [title]="retracting() ? 'Retirer la publication ?' : publishLabel() + ' ?'" [(open)]="confirmOpen">
+    <div class="stack stack--sm">
+      @if (retracting()) {
+        <p>Les élèves de {{ className() }} ne verront plus ces notes, et leur moyenne sera recalculée sans elles.</p>
+      } @else {
+        <p>Les {{ targetedRows().length }} élèves concernés de {{ className() }} verront leur note et leur nouvelle moyenne. Vous pourrez encore corriger une note après publication.</p>
+        @if (issuesText()) {
+          <cdls-alert tone="warning">{{ issuesText() }} {{ issues().invalid.length ? 'Corrigez les notes hors barème avant de publier.' : 'Vous pouvez publier sans elles.' }}</cdls-alert>
+        }
+      }
+      @if (confirmError()) {
+        <cdls-alert tone="danger">{{ confirmError() }}</cdls-alert>
+      }
+    </div>
+    <div class="modal__footer">
+      <button cdlsButton variant="secondary" type="button" (click)="confirmOpen.set(false)">Annuler</button>
+      <button cdlsButton [variant]="retracting() ? 'danger' : 'primary'" type="button" (click)="togglePublished()">
+        {{ publishing() ? 'Patientez…' : retracting() ? 'Retirer la publication' : publishLabel() }}
+      </button>
+    </div>
+  </cdls-modal>
+}

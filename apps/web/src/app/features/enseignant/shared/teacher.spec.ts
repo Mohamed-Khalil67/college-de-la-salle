@@ -4,6 +4,8 @@ import {
   audienceFromValue,
   audienceLabel,
   audienceOptions,
+  changedSince,
+  coefficientProblem,
   columnAverage,
   emptyEventModel,
   gradeIssues,
@@ -14,6 +16,11 @@ import {
   rollCounts,
   rollSentence,
   rowAverage,
+  scaleProblem,
+  isAnnounced,
+  saveStage,
+  saveStatus,
+  saveSummary,
   timeProblem,
   toEventInput,
 } from './teacher';
@@ -135,5 +142,69 @@ describe('audiences', () => {
     expect(audienceLabel({ classId: 'c1', sectionId: null }, classes, sections)).toBe('Première');
     expect(audienceLabel({ classId: null, sectionId: 's-bac' }, classes, sections)).toBe('tout le Bac français');
     expect(audienceLabel({ classId: null, sectionId: null }, classes, sections)).toBe('tout le collège');
+  });
+});
+
+describe('autosave status', () => {
+  const base = { saving: false, dirty: false, invalid: false, failed: false, entered: 4, total: 27, average: 14.2 };
+
+  it('names the stage; an out-of-scale mark outranks a running save', () => {
+    expect(saveStage(base)).toBe('saved');
+    expect(saveStage({ ...base, dirty: true })).toBe('pending');
+    expect(saveStage({ ...base, saving: true, dirty: true })).toBe('saving');
+    expect(saveStage({ ...base, failed: true, dirty: true })).toBe('failed');
+    expect(saveStage({ ...base, invalid: true, saving: true })).toBe('invalid');
+  });
+
+  it('says the state in words, without figures', () => {
+    expect(saveStatus(base)).toBe('Enregistré');
+    expect(saveStatus({ ...base, saving: true })).toBe('Enregistrement…');
+    expect(saveStatus({ ...base, dirty: true })).toBe('Modifications en attente');
+    expect(saveStatus({ ...base, failed: true })).toBe('Non enregistré');
+    expect(saveStatus({ ...base, invalid: true })).toMatch(/^Note hors barème/);
+  });
+
+  it('announces only the settled states, not the ones that flip at every keystroke', () => {
+    expect(isAnnounced('saved')).toBe(true);
+    expect(isAnnounced('failed')).toBe(true);
+    expect(isAnnounced('invalid')).toBe(true);
+    expect(isAnnounced('saving')).toBe(false);
+    expect(isAnnounced('pending')).toBe(false);
+  });
+
+  it('keeps the figures apart: « 4 / 27 · moyenne 14,2 », no average before the first mark', () => {
+    expect(saveSummary(base)).toBe('4 / 27 · moyenne 14,2');
+    expect(saveSummary({ entered: 0, total: 27, average: null })).toBe('0 / 27');
+  });
+});
+
+describe('changedSince', () => {
+  it('keeps only what was typed after the values were sent', () => {
+    expect(changedSince({ a: 12, b: null, c: 5 }, { a: 12, b: 14, c: null, d: 3 })).toEqual({ b: 14, c: null, d: 3 });
+    expect(changedSince({ a: 'x' }, { a: 'x' })).toEqual({});
+  });
+});
+
+describe('scaleProblem', () => {
+  it('accepts a number from 1 to 1000', () => {
+    for (const ok of [1, 10, 20, 40, 1000, 12.5]) expect(scaleProblem(ok)).toBeNull();
+  });
+
+  it('refuses an empty, NaN, zero, negative or too large scale with a sentence that says how to fix it', () => {
+    for (const bad of [null, undefined, Number.NaN, Number.POSITIVE_INFINITY, 0, 0.5, -3, 1001, '20']) {
+      expect(scaleProblem(bad)).toBe('Indiquez sur combien la note est donnée, de 1 à 1000.');
+    }
+  });
+});
+
+describe('coefficientProblem', () => {
+  it('accepts 0 to 20, zero included', () => {
+    for (const ok of [0, 0.5, 1, 2, 20]) expect(coefficientProblem(ok)).toBeNull();
+  });
+
+  it('refuses an empty, NaN, negative or too large coefficient', () => {
+    for (const bad of [null, undefined, Number.NaN, -1, 20.5, 21, '1']) {
+      expect(coefficientProblem(bad)).toBe('Indiquez un coefficient de 0 à 20, 1 par défaut.');
+    }
   });
 });

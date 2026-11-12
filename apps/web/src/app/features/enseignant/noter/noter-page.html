@@ -1,0 +1,120 @@
+<div class="page__header">
+  <div class="page__header-text">
+    <h1 class="t-h1">Noter</h1>
+    <p class="t-muted">{{ subtitle() }}</p>
+  </div>
+  <div class="page__actions">
+    <a cdlsButton variant="secondary" routerLink="../notes" [queryParams]="{ classe: choice()?.classId }">Toutes les notes</a>
+  </div>
+</div>
+
+<!-- Always in the page, so the notice after « Finir plus tard » is announced when it is filled in. -->
+<div role="status" class="t-body-s notice">{{ notice() }}</div>
+
+<app-load-state [ref]="assignments" label="Chargement de vos classes…" />
+@if (assignments.hasValue()) {
+  @if (choice(); as current) {
+    @let s = step();
+    @switch (s.kind) {
+      @case ('choose') {
+        <section aria-labelledby="step-choose">
+          <h2 #stepHeading id="step-choose" class="t-h2 step-heading" tabindex="-1">Quelle note ?</h2>
+          <p class="visually-hidden">Étape 1 sur 2</p>
+          @if (choices().length > 1) {
+            <div class="field choice">
+              <label class="field__label" for="noter-classe">Classe et matière</label>
+              <select class="field__control" id="noter-classe" (change)="onChoice($event)">
+                @for (c of choices(); track c.key) {
+                  <option [value]="c.key" [selected]="c.key === current.key">{{ c.label }}</option>
+                }
+              </select>
+            </div>
+          }
+
+          <div class="noter-columns">
+            <form class="card card--panel" novalidate aria-labelledby="new-note-title" (submit)="create($event)">
+              <h3 id="new-note-title" class="t-h3">Nouvelle note</h3>
+              <cdls-field label="Nom" helper="Ce que verront les élèves, par exemple « Interrogation 3 »." [error]="titleError()">
+                <input cdlsControl autocomplete="off" [formField]="noteForm.title" />
+              </cdls-field>
+              <div class="note-numbers">
+                <cdls-field label="Sur" [error]="outOfError()">
+                  <input cdlsControl type="number" inputmode="decimal" step="1" [formField]="noteForm.outOf" />
+                </cdls-field>
+                <cdls-field label="Coefficient" [error]="coefficientError()">
+                  <input cdlsControl type="number" inputmode="decimal" step="0.5" [formField]="noteForm.coefficient" />
+                </cdls-field>
+              </div>
+              <app-load-state [ref]="typesRes" label="Chargement des types…" />
+              @if (types().length > 1) {
+                <cdls-field label="Type">
+                  <select cdlsControl [formField]="noteForm.activityTypeId">
+                    @for (t of types(); track t.id) {
+                      <option [value]="t.id">{{ t.label }}</option>
+                    }
+                  </select>
+                </cdls-field>
+              }
+              <p class="t-body-s t-muted">Datée d’aujourd’hui, pour toute la classe. Les élèves ne la voient qu’une fois publiée.</p>
+              @if (failure()) {
+                <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
+              }
+              <div>
+                <button cdlsButton type="submit" [disabled]="busy()">{{ busy() ? 'Création…' : 'Commencer la saisie' }}</button>
+              </div>
+            </form>
+
+            <section class="card card--panel" aria-labelledby="pending-title">
+              <h3 id="pending-title" class="t-h3">À finir</h3>
+              <app-load-state [ref]="pending" label="Chargement des notes à finir…" />
+              @if (pending.hasValue()) {
+                @if (pendingList().length) {
+                  <ul class="pending-list" role="list">
+                    @for (p of pendingList(); track p.event.id) {
+                      <li>
+                        <button class="pending-item" type="button" (click)="resume(p)">
+                          <span class="pending-item__title">{{ p.event.title }}</span>
+                          <span class="t-body-s t-muted">{{ meta(p) }}</span>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  <p class="t-body-s t-muted">Rien à finir pour {{ current.label }} : ni brouillon, ni examen prévu.</p>
+                }
+              }
+            </section>
+          </div>
+        </section>
+      }
+      @case ('grade') {
+        <section aria-labelledby="step-grade">
+          <h2 #stepHeading id="step-grade" class="t-h2 step-heading" tabindex="-1">{{ s.event.title }}</h2>
+          <p class="t-muted step-meta">{{ gradeMeta(s.event, s.scale) }}. Étape 2 sur 2.</p>
+          <div class="step-back">
+            <button cdlsButton variant="tertiary" size="sm" type="button" (click)="change()">Changer de note</button>
+          </div>
+          <app-grade-grid
+            [event]="s.event"
+            [className]="className()"
+            [quick]="true"
+            [scale]="s.scale"
+            (finished)="backToChoice(s.event.title)"
+            (publishedChange)="onPublished($event, s.event.title)"
+          />
+        </section>
+      }
+      @case ('published') {
+        <section aria-labelledby="step-done">
+          <h2 #stepHeading id="step-done" class="t-h2 step-heading" tabindex="-1">« {{ s.title }} » est publiée</h2>
+          <cdls-alert tone="success">Les élèves de {{ className() }} voient leur note et leur nouvelle moyenne.</cdls-alert>
+          <div class="step-back">
+            <button cdlsButton type="button" (click)="backToChoice()">Noter une autre note</button>
+          </div>
+        </section>
+      }
+    }
+  } @else {
+    <cdls-empty-state icon="users" title="Aucune classe" description="Vous n’êtes affecté à aucune classe cette année." />
+  }
+}
