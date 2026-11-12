@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { type CanMatchFn, Router } from '@angular/router';
 import type { Role } from '@cdls/shared';
 import { AuthStore, FIRST_ACCESS } from './auth-store';
+import { isTeacherPlanner } from './planner';
 
 /**
  * Lets only `role` into an area. A visitor goes to the login page (and comes back afterwards);
@@ -64,7 +65,7 @@ export const structureGuard: CanMatchFn = async (_route, segments) => {
   if (user.role === 'teacher') {
     await store.reloadUserIfStale();
     user = store.user();
-    if (user?.isPlanner) return true;
+    if (isTeacherPlanner(user)) return true;
   }
   return router.parseUrl(store.home());
 };
@@ -75,5 +76,5 @@ export const adminOnlyGuard: CanMatchFn = () => {
   const router = inject(Router);
   const user = store.user();
   if (user?.role === 'admin') return true;
-  return router.parseUrl(user?.role === 'teacher' && user.isPlanner ? PLANNER_HOME : store.home());
+  return router.parseUrl(isTeacherPlanner(user) ? PLANNER_HOME : store.home());
 };

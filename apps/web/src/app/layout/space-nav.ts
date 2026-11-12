@@ -1,4 +1,5 @@
 import type { SessionUser } from '@cdls/shared';
+import { isTeacherPlanner } from '../core/auth/planner';
 import type { IconName } from '../shared/ui';
 
 export interface SpaceNavItem {
@@ -28,7 +29,7 @@ export interface SpaceNavItem {
 export function visibleNav(nav: readonly SpaceNavItem[], user: Pick<SessionUser, 'role' | 'isPlanner'> | null | undefined): SpaceNavItem[] {
   return nav.filter((item) => {
     if (item.access === 'admin') return user?.role === 'admin';
-    if (item.access === 'planner') return user?.role === 'teacher' && !!user.isPlanner;
+    if (item.access === 'planner') return isTeacherPlanner(user);
     return true;
   });
 }

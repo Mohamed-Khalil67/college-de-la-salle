@@ -217,7 +217,9 @@ export class UsersPage {
       await this.#api.users.update(change.user.id, { isPlanner: change.value });
       this.notice.set(
         change.value
-          ? `${fullName(change.user)} est maintenant planificateur : ${change.user.firstName} gère les salles, le calendrier et l’emploi du temps.`
+          ? change.user.role === 'teacher'
+            ? `${fullName(change.user)} est maintenant planificateur : ${change.user.firstName} gère les salles, le calendrier et l’emploi du temps.`
+            : `${fullName(change.user)} est maintenant planificateur.`
           : `${fullName(change.user)} n’est plus planificateur.`,
       );
       this.users.reload();

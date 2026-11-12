@@ -3,6 +3,7 @@ import { Component, computed, inject, linkedSignal, type Resource, resource, sig
 import { type ClassDto, type GroupWithMembersDto, SECTION_LABELS } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
+import { opensStructure } from '../../core/auth/planner';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../shared/ui';
 import { ConfirmModal } from '../../shared/components/confirm-modal';
 import { focusPageHeading } from '../../shared/utils/focus';
@@ -165,7 +166,7 @@ export class GroupsPage {
   readonly #document = inject(DOCUMENT);
 
   /** The admin and the planners manage every class; a teacher the classes they teach. */
-  readonly #staff = computed(() => this.#auth.role() === 'admin' || !!this.#auth.user()?.isPlanner);
+  readonly #staff = computed(() => opensStructure(this.#auth.user()));
   readonly #allClasses = resource({
     params: () => (this.#staffKnown() && this.#staff() ? true : undefined),
     loader: () => this.#api.school.classes(),

@@ -52,7 +52,7 @@ interface UserRow {
                 <td data-label="Filière :">{{ row.track }}</td>
               }
               @if (canPlan()) {
-                <td data-label="Droits :">
+                <td data-label="Planificateur :">
                   <label class="check">
                     <input
                       #plannerBox
