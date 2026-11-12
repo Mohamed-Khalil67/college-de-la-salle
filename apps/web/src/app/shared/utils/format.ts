@@ -128,6 +128,12 @@ export function currentYear(years: readonly SchoolYearDto[]): SchoolYearDto | nu
   return years.find((y) => y.isCurrent) ?? years.at(-1) ?? null;
 }
 
+/** The term of `day` in the current school year, or null (the blocks then fall back to the whole year). */
+export function currentTerm(years: readonly SchoolYearDto[], day: string): PeriodDto | null {
+  const year = currentYear(years);
+  return year ? termOf(year.periods, day) : null;
+}
+
 /** The term containing `day`, else the last term that started before it, else the first one. */
 export function termOf(terms: readonly PeriodDto[], day: string): PeriodDto | null {
   const sorted = [...terms].sort((a, b) => a.startsOn.localeCompare(b.startsOn));

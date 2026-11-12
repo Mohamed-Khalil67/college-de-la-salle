@@ -4,8 +4,14 @@ import type { Routes } from '@angular/router';
 export const ELEVE_ROUTES: Routes = [
   {
     path: '',
+    // The one page: Maintenant, À faire, Notes, Absences, Annonces (each block links to its page below).
     title: 'Tableau de bord',
-    loadComponent: () => import('./tableau-de-bord/dashboard-page').then((m) => m.DashboardPage),
+    loadComponent: () => import('./accueil/home-page').then((m) => m.EleveHomePage),
+  },
+  {
+    path: 'annonces',
+    title: 'Annonces',
+    loadComponent: () => import('./annonces/announcements-page').then((m) => m.AnnouncementsPage),
   },
   {
     path: 'emploi-du-temps',

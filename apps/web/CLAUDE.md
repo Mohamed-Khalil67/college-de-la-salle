@@ -13,7 +13,7 @@ and how to use what already exists.
 |---|---|---|
 | `features/public/` | Public site pages (home, histoire, bac pages, contact, accessibility statement), in fr/en/ar | Prerendered |
 | `features/auth/` | `/connexion` login page, `/connexion/oubli` and `/connexion/reinitialiser?token=` (forgotten password, framed by `auth-shell.ts`), first access | Client |
-| `features/eleve/` | Student space `/eleve` (routes + `ELEVE_NAV` in `eleve.routes.ts`) | Client |
+| `features/eleve/` | Student space `/eleve`: routes in `eleve.routes.ts`, the one page in `accueil/` (`home-page.ts` + one block component per block + `home-views.ts` and `now-next.ts` pure rules) | Client |
 | `features/enseignant/` | Teacher space `/enseignant` | Client |
 | `features/admin/` | Administration `/admin` | Client |
 | `features/timetable/` | Timetable pieces used by the three spaces: `timetable-api.ts`, `session-dialog.ts`, `session-item.ts`, `blocked-notice.ts`, pure `suggestions.ts` and `timetable-format.ts` | Client |
@@ -21,11 +21,11 @@ and how to use what already exists.
 | `features/agenda-sync/` | « Synchroniser mon agenda »: create, copy, instructions for Google / Apple / Outlook, revoke. The address is shown only when it is created | Client |
 | `features/groupes/` | « Groupes » (one page for `/enseignant/groupes` and `/admin/groupes`), pure rules in `groups-logic.ts` | Client |
 | `shared/ui/` | UI kit (`cdls-*`), import from `shared/ui/index.ts` | n/a |
-| `shared/components/` | Components used by several features: `LoadState`, `WeekView`, `EventDetails`, `ConfirmModal`, `PasswordForm` | n/a |
-| `shared/utils/` | Pure, decorator-free helpers with a spec next to each: `format.ts` (French labels, times, plurals), `week.ts`, `targets.ts` (« Assigner à », reuses `targetedStudentIds` of `@cdls/shared`), `forms.ts` (`shownError`), `download.ts`, `focus.ts` | n/a |
-| `shared/data/` | Shared resources: `teacher-data.ts` (the teacher's assignments and classes) | n/a |
+| `shared/components/` | Components used by several features: `LoadState`, `HomeBlock` + `HomeStatus` / `HomeStatusRegion` (home-page blocks), `WeekView`, `EventDetails`, `ConfirmModal`, `PasswordForm` | n/a |
+| `shared/utils/` | Pure, decorator-free helpers with a spec next to each: `block-state.ts` (`BlockState` union, `blockState`, `snapshotOf`, `bothOf`, `pageStatusMessage`), `format.ts` (French labels, times, plurals), `week.ts`, `targets.ts` (« Assigner à », reuses `targetedStudentIds` of `@cdls/shared`), `forms.ts` (`shownError`), `download.ts`, `focus.ts` | n/a |
+| `shared/data/` | Shared resources: `teacher-data.ts` (the teacher's assignments and classes), `school-years.ts` (`SchoolYears` root service: the years and the term of today, loaded once) | n/a |
 | `layout/` | `PublicLayout`, `SpaceLayout` (app bar, account menu, bottom nav), `space-navs.ts`, `PagePlaceholder` | n/a |
-| `core/` | `ApiClient`, `AuthStore`, interceptor, role guards | n/a |
+| `core/` | `ApiClient`, `AuthStore`, `SchoolClock` (`clock/`: Cairo `today` and `now` signals, one browser-only timer), interceptor, role guards | n/a |
 | `i18n/` | Languages of the public site: typed `SiteMessages` per language, page addresses, `LOCALE`, `SiteHead` (lang/dir/hreflang). See `docs/i18n.md` | n/a |
 | `school/` | Static content of the public site (facts, milestones, photos with credits); `content.fr/en/ar.ts` give it per language; `contact-mail.ts` | n/a |
 | `src/styles.css`, `src/styles/` | Tokens as a Tailwind 4 theme, prototype component classes, fonts | n/a |
@@ -87,6 +87,32 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 ## « Noter » (quick grading)
 
 `features/enseignant/noter/` (`/enseignant/noter?classe=&matiere=`): step 1 « Quelle note ? » (new note via a Signal Form, or a draft or planned exam from `api.grades.pending`), step 2 the SAME `notes/grade-grid.ts` in `[quick]` mode (Enter to the next student, then to « Publier aux élèves »; optional comment; autosave after 800 ms with a polite `role="status"` line from the pure `saveStatus`; « Finir plus tard »; publish behind a confirmation). Do not write a second grid: extend `GradeGrid`. Focus moves to each step's heading. An empty cell is an absent student (no grade row). Signal Forms refuse `min`, `max` and `[maxLength]` attributes on a bound control: the validators set them.
+
+## One page per role: the block pattern
+
+Each space opens on one page of blocks (`docs/rollout.md` says what the student sees; the teacher, planner and admin
+pages follow the same pattern). Rules:
+
+- **One small component per block**, in the space's `accueil/` folder, loading its own data with `resource()`. A slow or
+  failing block shows its own state and never blanks the page. The page component only lays the blocks out (CSS grid,
+  phone first: one column in the owner's order; from 48 rem three columns, `wide` blocks span the row).
+- **State is one union**, never flags: `blockState(snapshotOf(resource), view)` from `shared/utils/block-state.ts` gives
+  `loading | error | empty | ready`; `bothOf` joins two sources. `view` is a pure function returning `null` for
+  « nothing to show » (the empty state). Put the views in a decorator-free file with a spec covering the four states.
+  A secondary source (« Bulletin publié », holidays) must not fail the block: read its error as « no data ».
+- **Chrome is `<app-home-block>`** (`shared/components/home-block.ts`): `<section>` labelled by its `<h2>`, loading line,
+  `cdls-alert` on error with a « Réessayer » button (listen to `(retry)` and reload the block's resources), an empty
+  text that invites (« Rien à rendre cette semaine »), and ONE entry link at the end with a descriptive name (`link`
+  relative to the space, optional; `linkLabel`). `wide` spans the row, `tone` is one of `HOME_BLOCK_TONES`
+  (`inverse` = the navy highlighted block, gold focus ring). The block's content is projected and shown when `state` is `ready`.
+- **One live region per page**: the page component has `providers: [HomeStatus]` and ONE `<app-home-status />` (a
+  permanent visually hidden `role="status"`, updated with text: « Page chargée. », or the blocks that failed). The blocks
+  report to it by themselves; they add no `role="status"` of their own.
+- Sub-headings inside a block are `<h3>`; every id (`headingId`) is unique on the page. « Now » comes from the root
+  `SchoolClock` (`today()`, `now()`, Cairo time, one browser-only timer that follows midnight): never a `today` input,
+  a local timer or `new Date()`. School years and the term of today come from the root `SchoolYears` (one
+  GET /school-years for all blocks; wait on `settled()`, fall back to the whole year when `years.error()`).
+- Ticking, and any write, uses the same component and API call as the detail page (`HomeworkItem`), so both stay in step.
 
 ## Timetable conflicts
 

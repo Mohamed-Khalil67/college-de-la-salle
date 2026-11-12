@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ActivityTypeSummary, PeriodDto } from '@cdls/shared';
-import { average, clock, dayTitle, dueBadge, isAssessment, plural, termOf, timeSpan, whereOf } from './format';
+import type { ActivityTypeSummary, PeriodDto, SchoolYearDto } from '@cdls/shared';
+import { average, clock, currentTerm, dayTitle, dueBadge, isAssessment, plural, termOf, timeSpan, whereOf } from './format';
 
 const type = (code: string, flags: Partial<ActivityTypeSummary> = {}): ActivityTypeSummary => ({
   id: `type-${code}`,
@@ -71,5 +71,36 @@ describe('format', () => {
     expect(termOf(terms, '2026-12-25')?.id).toBe('t1');
     expect(termOf(terms, '2026-08-01')?.id).toBe('t1');
     expect(termOf([], '2026-08-01')).toBeNull();
+  });
+});
+
+describe('currentTerm', () => {
+  const period = (id: string, startsOn: string, endsOn: string): PeriodDto => ({
+    id,
+    schoolYearId: 'y',
+    kind: 'trimester',
+    sectionId: null,
+    number: 1,
+    label: id,
+    startsOn,
+    endsOn,
+    closedAt: null,
+  });
+  const year = (isCurrent: boolean, periods: PeriodDto[]): SchoolYearDto => ({
+    id: isCurrent ? 'now' : 'old',
+    label: isCurrent ? '2026-2027' : '2025-2026',
+    startsOn: '2026-09-01',
+    endsOn: '2027-06-30',
+    isCurrent,
+    status: isCurrent ? 'current' : 'archived',
+    archivedAt: null,
+    periods,
+  });
+  it('is the term of today in the current year', () => {
+    const years = [year(false, [period('old', '2025-09-01', '2025-12-15')]), year(true, [period('t1', '2026-09-01', '2026-12-15'), period('t2', '2027-01-01', '2027-03-31')])];
+    expect(currentTerm(years, '2026-11-10')?.id).toBe('t1');
+  });
+  it('is null without a school year', () => {
+    expect(currentTerm([], '2026-11-10')).toBeNull();
   });
 });
