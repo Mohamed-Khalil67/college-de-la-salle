@@ -3,7 +3,7 @@ import {
   activityTypeId,
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   MATHS_TEACHER,
   studentOf,
@@ -19,7 +19,7 @@ const message = (body: unknown) => String((body as ApiError).message);
 describe('Calendar days (e2e)', () => {
   let t: TestApp;
   let admin: string;
-  let coordinator: string;
+  let planner: string;
   let teacher: string;
   let bac: Awaited<ReturnType<typeof studentOf>>;
   let nationale: Awaited<ReturnType<typeof studentOf>>;
@@ -37,7 +37,7 @@ describe('Calendar days (e2e)', () => {
     const res = await t
       .http()
       .post('/api/calendar-days')
-      .set(bearer(coordinator))
+      .set(bearer(planner))
       .send({ schoolYearId: yearId, ...body })
       .expect(201);
     const dto = res.body as CalendarDayDto;
@@ -56,7 +56,7 @@ describe('Calendar days (e2e)', () => {
   beforeAll(async () => {
     t = await createTestApp();
     admin = await t.token(ADMIN);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     teacher = await t.token(MATHS_TEACHER);
     bac = await studentOf(t.prisma, 'bac', 'premiere');
     nationale = await studentOf(t.prisma, 'nationale', 'secondaire-1');

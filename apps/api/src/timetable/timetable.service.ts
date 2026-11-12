@@ -672,7 +672,7 @@ export class TimetableService {
     return row;
   }
 
-  /** Admins and coordinators edit everything; a teacher only the sessions they teach (their own slots and assignments). */
+  /** Admins and planners edit everything; a teacher only the sessions they teach (their own slots and assignments). */
   private async authorize(row: SlotRow, user: AuthUser): Promise<void> {
     if (canEditStructure(user)) return;
     if (

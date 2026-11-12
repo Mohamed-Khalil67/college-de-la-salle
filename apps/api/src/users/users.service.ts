@@ -51,7 +51,7 @@ const MALFORMED_CSV =
 const ARCHIVED = 'Compte archivé : restaurez-le avant de le modifier.';
 
 const include = {
-  teacher: { select: { id: true, isCoordinator: true } },
+  teacher: { select: { id: true } },
   student: {
     select: {
       id: true,
@@ -219,13 +219,12 @@ export class UsersService {
     const current = await this.row(id);
     if (id === actor.id && dto.status === 'disabled')
       throw new BadRequestException('Vous ne pouvez pas désactiver votre propre compte.');
-    if (dto.isCoordinator !== undefined && current.role !== 'teacher')
-      throw new BadRequestException('Seul un enseignant peut être coordinateur.');
+    // The permission belongs to staff accounts (the database refuses it too: users_planner_not_student).
+    if (dto.isPlanner !== undefined && current.role === 'student')
+      throw new BadRequestException('Un élève ne peut pas être planificateur.');
     const restoring = current.status === 'archived' && dto.status === 'active';
     if (current.status === 'archived' && !restoring) throw new ConflictException(ARCHIVED);
-    const coordinatorChange =
-      dto.isCoordinator !== undefined &&
-      dto.isCoordinator !== (current.teacher?.isCoordinator ?? false);
+    const plannerChange = dto.isPlanner !== undefined && dto.isPlanner !== current.isPlanner;
 
     const reset = dto.password !== undefined;
     // Disabling or restoring ends the sessions already issued: their access tokens carry the old version.
@@ -241,9 +240,7 @@ export class UsersService {
           ...(restoring && current.student
             ? { student: { update: { graduatedOn: null } } }
             : {}),
-          ...(coordinatorChange
-            ? { teacher: { update: { isCoordinator: dto.isCoordinator } } }
-            : {}),
+          ...(plannerChange ? { isPlanner: dto.isPlanner } : {}),
           // A reset password is temporary: the user chooses their own at next sign-in.
           ...(reset
             ? {
@@ -280,15 +277,15 @@ export class UsersService {
           },
         ]);
       // A permission change: keep a trace of who granted or removed it.
-      if (coordinatorChange)
+      if (plannerChange)
         await audit(tx, [
           {
             actorId: actor.id,
-            action: dto.isCoordinator ? 'teacher.coordinator.grant' : 'teacher.coordinator.revoke',
+            action: 'user.planner',
             entity: 'user',
             entityId: id,
-            before: { isCoordinator: current.teacher?.isCoordinator ?? false },
-            after: { isCoordinator: dto.isCoordinator ?? false },
+            before: { isPlanner: current.isPlanner },
+            after: { isPlanner: row.isPlanner },
           },
         ]);
       return row;
@@ -657,7 +654,7 @@ export function toUserDto(u: UserRow): UserDto {
     teacherId: u.teacher?.id ?? null,
     studentNumber: u.student?.studentNumber ?? null,
     classId: u.student?.enrollments[0]?.classId ?? null,
-    isCoordinator: u.teacher?.isCoordinator ?? false,
+    isPlanner: u.isPlanner,
     sectionCode: (u.student?.section?.code as SectionId | undefined) ?? null,
     graduatedOn: u.student?.graduatedOn ? toDay(u.student.graduatedOn) : null,
   };

@@ -30,7 +30,7 @@ import { PeriodsService } from './periods.service.js';
 export class PeriodsController {
   constructor(private readonly periods: PeriodsService) {}
 
-  /** Admin or coordinator. 409 when it overlaps a period of the same kind and section. */
+  /** Admin or planner. 409 when it overlaps a period of the same kind and section. */
   @StructureEditors()
   @Post('school-years/:id/periods')
   @ApiCreatedResponse({ type: PeriodDto })
@@ -43,7 +43,7 @@ export class PeriodsController {
     return this.periods.create(id, body, user);
   }
 
-  /** Admin or coordinator. A closed period is locked (409). Grades never move with the dates. */
+  /** Admin or planner. A closed period is locked (409). Grades never move with the dates. */
   @StructureEditors()
   @Patch('periods/:id')
   @ApiOkResponse({ type: PeriodDto })
@@ -56,7 +56,7 @@ export class PeriodsController {
     return this.periods.update(id, body, user);
   }
 
-  /** Admin or coordinator; 409 when it has report cards or grades. */
+  /** Admin or planner; 409 when it has report cards or grades. */
   @StructureEditors()
   @Delete('periods/:id')
   @HttpCode(204)

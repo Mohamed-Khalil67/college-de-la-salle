@@ -18,7 +18,7 @@ const user = (role: AuthUser['role'], over: Partial<AuthUser> = {}): AuthUser =>
   studentId: null,
   teacherId: role === 'teacher' ? 't1' : null,
   classId: null,
-  isCoordinator: false,
+  isPlanner: false,
   classLabel: null,
   sectionCode: null,
   mustChangePassword: false,

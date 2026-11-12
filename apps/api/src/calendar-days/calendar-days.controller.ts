@@ -46,7 +46,7 @@ export class CalendarDaysController {
     return this.days.list(query, user);
   }
 
-  /** Admin or coordinator. */
+  /** Admin or planner. */
   @StructureEditors()
   @Post()
   @ApiCreatedResponse({ type: CalendarDayDto })
@@ -57,7 +57,7 @@ export class CalendarDaysController {
     return this.days.create(body, user);
   }
 
-  /** Admin or coordinator. */
+  /** Admin or planner. */
   @StructureEditors()
   @Patch(':id')
   @ApiOkResponse({ type: CalendarDayDto })
@@ -69,7 +69,7 @@ export class CalendarDaysController {
     return this.days.update(id, body, user);
   }
 
-  /** Admin or coordinator. */
+  /** Admin or planner. */
   @StructureEditors()
   @Delete(':id')
   @HttpCode(204)

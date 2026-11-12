@@ -112,6 +112,9 @@ model User {
   lastLoginAt                DateTime?  @map("last_login_at") @db.Timestamptz(3)
   /// Also send the in-app notifications by e-mail (grouped). Off by default: the user opts in.
   notifyByEmail              Boolean    @default(false) @map("notify_by_email")
+  /// Planificateur: also edits the year's structure and the timetable. A permission on the account (a teacher or
+  /// an admin, never a student: CHECK users_planner_not_student in the migration). Set by the admin.
+  isPlanner                  Boolean    @default(false) @map("is_planner")
   createdAt                  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -163,8 +166,6 @@ model Student {
 model Teacher {
   id            String  @id @default(uuid(7)) @db.Uuid
   userId        String  @unique @map("user_id") @db.Uuid
-  /// Coordinateur: also edits the year's structure (subjects, rooms, periods, calendar days). Set by the admin.
-  isCoordinator Boolean @default(false) @map("is_coordinator")
 
   user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments        TeachingAssignment[]
@@ -380,7 +381,7 @@ model Enrollment {
   @@map("enrollments")
 }
 
-/// A catalogue subject, created by the admin or a coordinator (seeded from MATIERES in packages/shared).
+/// A catalogue subject, created by the admin or a planner (seeded from MATIERES in packages/shared).
 /// `id` is a stable slug made from the name (`mathematiques`), stored on events and posts.
 model Subject {
   id         String    @id @db.VarChar(40)

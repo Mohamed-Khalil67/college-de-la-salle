@@ -52,24 +52,24 @@ describe('RolesGuard', () => {
     expect(() => guard.canActivate(context())).toThrow(ForbiddenException);
   });
 
-  it('lets a coordinator through where the route names the coordinator grant', () => {
-    metadata({ roles: ['admin', 'coordinator'] });
+  it('lets a planner through where the route names the planner grant', () => {
+    metadata({ roles: ['admin', 'planner'] });
     expect(
-      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isCoordinator: true })),
+      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isPlanner: true })),
     ).toBe(true);
     expect(guard.canActivate(context({ role: 'admin' }))).toBe(true);
     expect(() =>
-      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isCoordinator: false })),
+      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isPlanner: false })),
     ).toThrow(ForbiddenException);
-    expect(() => guard.canActivate(context({ role: 'student', isCoordinator: true }))).toThrow(
+    expect(() => guard.canActivate(context({ role: 'student', isPlanner: true }))).toThrow(
       ForbiddenException,
     );
   });
 
-  it('does not let a coordinator through an admin-only route', () => {
+  it('does not let a planner through an admin-only route', () => {
     metadata({ roles: ['admin'] });
     expect(() =>
-      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isCoordinator: true })),
+      guard.canActivate(context({ role: 'teacher', teacherId: 't1', isPlanner: true })),
     ).toThrow(ForbiddenException);
   });
 });

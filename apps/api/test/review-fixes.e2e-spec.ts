@@ -14,7 +14,7 @@ import {
   activityTypeId,
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   DOMAIN,
   FRENCH_TEACHER,
@@ -32,7 +32,7 @@ const day = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 describe('Review fixes (e2e)', () => {
   let t: TestApp;
   let admin: string;
-  let coordinator: string;
+  let planner: string;
   let maths: string;
   let bacId: string;
   let yearSeq = 0;
@@ -61,7 +61,7 @@ describe('Review fixes (e2e)', () => {
   beforeAll(async () => {
     t = await createTestApp();
     admin = await t.token(ADMIN);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     maths = await t.token(MATHS_TEACHER);
     bacId = (await t.prisma.section.findFirstOrThrow({ where: { code: 'bac' } })).id;
   });
@@ -112,23 +112,23 @@ describe('Review fixes (e2e)', () => {
       const patch = (token: string, coefficient: number) =>
         t.http().patch(`/api/class-subjects/${target.id}`).set(bearer(token)).send({ coefficient });
 
-      // Open period: the coordinator (who does not teach it) may edit.
-      await patch(coordinator, 3).expect(200);
+      // Open period: the planner (who does not teach it) may edit.
+      await patch(planner, 3).expect(200);
 
-      // A coordinator teaching the subject in that class leaves the coefficient to an admin.
-      const coordinatorTeacher = await t.prisma.teacher.findFirstOrThrow({
+      // A planner teaching the subject in that class leaves the coefficient to an admin.
+      const plannerTeacher = await t.prisma.teacher.findFirstOrThrow({
         where: { user: { email: { startsWith: 'ingy.samir@' } } },
       });
       await t.prisma.teachingAssignment.create({
-        data: { teacherId: coordinatorTeacher.id, classSubjectId: target.id },
+        data: { teacherId: plannerTeacher.id, classSubjectId: target.id },
       });
-      await patch(coordinator, 4).expect(403);
+      await patch(planner, 4).expect(403);
       await patch(admin, 4).expect(200);
       // The hours are not weights.
       await t
         .http()
         .patch(`/api/class-subjects/${target.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ hoursPerWeek: 3 })
         .expect(200);
       await t.prisma.teachingAssignment.deleteMany({ where: { classSubjectId: target.id } });
@@ -138,10 +138,10 @@ describe('Review fixes (e2e)', () => {
       const card = await t.prisma.reportCard.create({
         data: { studentId: student.id, periodId: period.id, classId: schoolClass.id },
       });
-      const cards = await patch(coordinator, 6).expect(409);
+      const cards = await patch(planner, 6).expect(409);
       expect(message(cards.body)).toMatch(/coefficients ne peuvent plus changer/);
       await t.prisma.reportCard.delete({ where: { id: card.id } });
-      await patch(coordinator, 6).expect(200);
+      await patch(planner, 6).expect(200);
 
       // Closed period: frozen, also for copy.
       await t.http().post(`/api/periods/${period.id}/close`).set(bearer(admin)).expect(200);
@@ -150,7 +150,7 @@ describe('Review fixes (e2e)', () => {
       await t
         .http()
         .post(`/api/classes/${schoolClass.id}/subjects/copy`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ fromClassId: other.id })
         .expect(409);
       const unchanged = await t.prisma.classSubject.findUniqueOrThrow({ where: { id: target.id } });
@@ -263,7 +263,7 @@ describe('Review fixes (e2e)', () => {
         .set(bearer(student))
         .send({ studentId: other.studentId, toSection: 'bac', reason: 'Pour un autre' })
         .expect(403);
-      for (const token of [maths, admin, coordinator])
+      for (const token of [maths, admin, planner])
         await t.http().get('/api/section-changes/mine').set(bearer(token)).expect(403);
       await t.http().get('/api/section-changes/mine').set(bearer(student)).expect(200);
       await t.http().get('/api/section-changes').set(bearer(student)).expect(403);

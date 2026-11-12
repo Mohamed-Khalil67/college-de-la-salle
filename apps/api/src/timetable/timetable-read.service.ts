@@ -44,7 +44,7 @@ export class TimetableReadService {
     private readonly warnings: WarningsService,
   ) {}
 
-  /** The weekly slots (admin or coordinator), by class, teacher or room. */
+  /** The weekly slots (admin or planner), by class, teacher or room. */
   async listSlots(query: TimetableSlotListQueryDto): Promise<Paginated<TimetableSlotDto>> {
     const where: Prisma.TimetableSlotWhereInput = {
       ...(query.classId ? { classSubject: { classId: query.classId } } : {}),
@@ -63,7 +63,7 @@ export class TimetableReadService {
     return paginated(rows.map(toSlotDto), total, query);
   }
 
-  /** One slot: admins and coordinators any, a teacher only theirs. */
+  /** One slot: admins and planners any, a teacher only theirs. */
   async getSlot(id: string, user: AuthUser): Promise<TimetableSlotDto> {
     const row = await this.prisma.timetableSlot.findUnique({ where: { id }, include: slotInclude });
     if (!row) throw notFound('Séance');
@@ -109,7 +109,7 @@ export class TimetableReadService {
     return sessions.map((o) => toOccurrenceDto(o, names, this.canChange(o, user, today, taught)));
   }
 
-  /** The soft warnings of the stored timetable in a range (admin or coordinator), for the « Conflits » panel. */
+  /** The soft warnings of the stored timetable in a range (admin or planner), for the « Conflits » panel. */
   async warningsFor(query: TimetableOccurrenceQueryDto): Promise<TimetableWarningDto[]> {
     const scope = await this.scope(query, null);
     const sessions = await this.sessions(this.prisma, scope, query.from, query.to);
@@ -231,7 +231,7 @@ export class TimetableReadService {
     };
   }
 
-  /** May this user cancel, move, change the room of or restore the session? Admins and coordinators; a teacher their own. */
+  /** May this user cancel, move, change the room of or restore the session? Admins and planners; a teacher their own. */
   private canChange(
     o: TimetableOccurrence<SlotData>,
     user: AuthUser,

@@ -29,7 +29,7 @@ export class SubjectsController {
     return this.subjects.list(query);
   }
 
-  /** Admin or coordinator. The id is made from the name. */
+  /** Admin or planner. The id is made from the name. */
   @StructureEditors()
   @Post()
   @ApiCreatedResponse({ type: SubjectDto })
@@ -38,7 +38,7 @@ export class SubjectsController {
     return this.subjects.create(body, user);
   }
 
-  /** Admin or coordinator: rename, change the sections, archive or restore. */
+  /** Admin or planner: rename, change the sections, archive or restore. */
   @StructureEditors()
   @Patch(':id')
   @ApiOkResponse({ type: SubjectDto })

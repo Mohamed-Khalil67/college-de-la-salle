@@ -32,7 +32,7 @@ import {
 import { GroupsService } from './groups.service.js';
 
 /**
- * Groups of a class. Admins and coordinators manage any group, a teacher those of the classes they teach
+ * Groups of a class. Admins and planners manage any group, a teacher those of the classes they teach
  * (checked in the service on the group's own class), a student reads only `GET /groups/mine`.
  */
 @ApiTags('groups')

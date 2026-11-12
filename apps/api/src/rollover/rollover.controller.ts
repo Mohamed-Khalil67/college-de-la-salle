@@ -17,7 +17,7 @@ import {
 } from './dto/rollover.dto.js';
 import { RolloverService } from './rollover.service.js';
 
-/** The next-year wizard. Admin only: coordinators do not run the rollover. */
+/** The next-year wizard. Admin only: planners do not run the rollover. */
 @ApiTags('rollover')
 @ApiBearerAuth()
 @Roles('admin')

@@ -11,7 +11,7 @@ import {
   activityTypeId,
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   FRENCH_TEACHER,
   MATHS_TEACHER,
@@ -25,7 +25,7 @@ const message = (body: unknown) => String((body as ApiError).message);
 describe('Catalogue (e2e)', () => {
   let t: TestApp;
   let admin: string;
-  let coordinator: string;
+  let planner: string;
   let maths: string;
   let french: string;
   let yearId: string;
@@ -40,7 +40,7 @@ describe('Catalogue (e2e)', () => {
   beforeAll(async () => {
     t = await createTestApp();
     admin = await t.token(ADMIN);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     maths = await t.token(MATHS_TEACHER);
     french = await t.token(FRENCH_TEACHER);
     // A year of its own: other specs close the current year's periods, which freezes coefficients.
@@ -75,7 +75,7 @@ describe('Catalogue (e2e)', () => {
       const added = await t
         .http()
         .post(`/api/classes/${classes.a}/subjects`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ subjectId: 'mathematiques', coefficient: 4, hoursPerWeek: 5.5 })
         .expect(201);
       expect(added.body).toMatchObject({
@@ -136,7 +136,7 @@ describe('Catalogue (e2e)', () => {
         await t
           .http()
           .post(`/api/classes/${classes.b}/subjects/copy`)
-          .set(bearer(coordinator))
+          .set(bearer(planner))
           .send({ fromClassId: classes.a })
           .expect(200)
       ).body as ClassSubjectDto[];
@@ -234,7 +234,7 @@ describe('Catalogue (e2e)', () => {
       await t
         .http()
         .delete(`/api/class-subjects/${maths1.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .expect(204);
       expect((await subjectsOf(classes.a)).map((s) => s.subjectId)).toEqual(['arabe']);
     });
@@ -284,7 +284,7 @@ describe('Catalogue (e2e)', () => {
         await t
           .http()
           .post('/api/rooms')
-          .set(bearer(coordinator))
+          .set(bearer(planner))
           .send({ name: 'Salle 99', capacity: 24, kind: 'lab' })
           .expect(201)
       ).body as RoomDto;
@@ -351,7 +351,7 @@ describe('Catalogue (e2e)', () => {
         await t
           .http()
           .patch(`/api/rooms/${room.id}`)
-          .set(bearer(coordinator))
+          .set(bearer(planner))
           .send({ active: false })
           .expect(200)
       ).body as RoomDto;

@@ -11,7 +11,7 @@ import {
   activityTypeId,
   ADMIN,
   bearer,
-  COORDINATOR,
+  PLANNER,
   createTestApp,
   deleteUsers,
   MATHS_TEACHER,
@@ -25,7 +25,7 @@ const message = (body: unknown) => String((body as ApiError).message);
 describe('Periods (e2e)', () => {
   let t: TestApp;
   let admin: string;
-  let coordinator: string;
+  let planner: string;
   let teacher: string;
   let year: SchoolYearDto;
   let sections: SectionDto[];
@@ -36,7 +36,7 @@ describe('Periods (e2e)', () => {
   beforeAll(async () => {
     t = await createTestApp();
     admin = await t.token(ADMIN);
-    coordinator = await t.token(COORDINATOR);
+    planner = await t.token(PLANNER);
     teacher = await t.token(MATHS_TEACHER);
     sections = (await t.http().get('/api/sections').set(bearer(admin)).expect(200))
       .body as SectionDto[];
@@ -44,7 +44,7 @@ describe('Periods (e2e)', () => {
       await t
         .http()
         .post('/api/school-years')
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ label: '2060-2061', startsOn: '2060-09-01', endsOn: '2061-06-30' })
         .expect(201)
     ).body as SchoolYearDto;
@@ -62,13 +62,13 @@ describe('Periods (e2e)', () => {
 
   describe('overlap', () => {
     it('refuses two periods of the same kind and section that share a day (409, in French)', async () => {
-      await post(coordinator, {
+      await post(planner, {
         number: 1,
         label: '1er trimestre',
         startsOn: '2060-09-01',
         endsOn: '2060-12-15',
       }).expect(201);
-      const res = await post(coordinator, {
+      const res = await post(planner, {
         number: 2,
         label: '2e trimestre',
         startsOn: '2060-12-15',
@@ -76,7 +76,7 @@ describe('Periods (e2e)', () => {
       }).expect(409);
       expect(message(res.body)).toMatch(/chevauche une autre période/);
 
-      await post(coordinator, {
+      await post(planner, {
         number: 2,
         label: '2e trimestre',
         startsOn: '2060-12-16',
@@ -159,26 +159,26 @@ describe('Periods (e2e)', () => {
       const res = await t
         .http()
         .patch(`/api/periods/${first.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ endsOn: '2061-01-10' })
         .expect(409);
       expect(message(res.body)).toMatch(/chevauche/);
       await t
         .http()
         .patch(`/api/periods/${first.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ endsOn: '2061-01-10', label: 'Trimestre 1' })
         .expect(409);
       await t
         .http()
         .patch(`/api/periods/${first.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ endsOn: '2060-12-10' })
         .expect(200);
       await t
         .http()
         .patch(`/api/periods/${first.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ startsOn: '2060-12-20' })
         .expect(400);
     });
@@ -210,25 +210,25 @@ describe('Periods (e2e)', () => {
   });
 
   describe('school years', () => {
-    it('are edited by a coordinator, but never to leave a period outside', async () => {
+    it('are edited by a planner, but never to leave a period outside', async () => {
       const res = await t
         .http()
         .patch(`/api/school-years/${year.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ endsOn: '2061-03-01' })
         .expect(409);
       expect(message(res.body)).toMatch(/sortiraient de l’année/);
       const ok = await t
         .http()
         .patch(`/api/school-years/${year.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ endsOn: '2061-07-15' })
         .expect(200);
       expect((ok.body as SchoolYearDto).endsOn).toBe('2061-07-15');
       await t
         .http()
         .patch(`/api/school-years/${year.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ startsOn: '2062-01-01' })
         .expect(400);
     });
@@ -381,7 +381,7 @@ describe('Periods (e2e)', () => {
       await t
         .http()
         .patch(`/api/periods/${period.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ startsOn: '2060-10-20' })
         .expect(200);
       expect(await grades()).toEqual(before);
@@ -424,7 +424,7 @@ describe('Periods (e2e)', () => {
       const edit = await t
         .http()
         .patch(`/api/periods/${period.id}`)
-        .set(bearer(coordinator))
+        .set(bearer(planner))
         .send({ label: 'Retouché' })
         .expect(409);
       expect(message(edit.body)).toMatch(/clôturée/);

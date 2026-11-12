@@ -34,8 +34,8 @@ export class SessionUserDto implements SessionUser {
   teacherId: string | null;
   @ApiProperty({ type: String, nullable: true, description: 'Students: their current class.' })
   classId: string | null;
-  /** Teachers marked coordinateur by the admin. */
-  isCoordinator: boolean;
+  /** Accounts marked planificateur by the admin (a teacher or an admin, never a student). */
+  isPlanner: boolean;
   @ApiProperty({ type: String, nullable: true, description: 'Students: the label of their class.' })
   classLabel: string | null;
   @ApiProperty({ type: String, nullable: true, enum: ['nationale', 'bac'] })
