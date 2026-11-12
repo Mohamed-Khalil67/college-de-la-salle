@@ -499,6 +499,8 @@ enum SlotExceptionKind {
   moved
   substitute
   room_change
+  /// Supervised study: the lesson becomes a study watched by `newTeacherId`, in `newRoomId` or the lesson's room.
+  study
 
   @@map("slot_exception_kind")
 }
@@ -980,6 +982,8 @@ enum NotificationKind {
   session_moved
   session_room_changed
   session_restored
+  session_substituted
+  session_study
   event_cancelled
   event_moved
   event_room_changed

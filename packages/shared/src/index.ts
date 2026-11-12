@@ -9,3 +9,4 @@ export * from './rollover.js';
 export * from './feed.js';
 export * from './notifications.js';
 export * from './suggestions.js';
+export * from './planner.js';

@@ -127,6 +127,7 @@ export function sessionFeedItem(o: TimetableOccurrence, info: SessionFeedInfo): 
   if (o.changes.includes('room'))
     lines.push(`Salle changée (avant : ${info.originalRoom ?? 'aucune'}).`);
   if (o.status === 'substitute') lines.push('Séance assurée par un remplaçant.');
+  if (o.status === 'study') lines.push('Étude surveillée à la place du cours.');
   if (o.exception?.reason) lines.push(`Motif : ${o.exception.reason}`);
   return {
     uid: `slot-${o.slot.id}-${o.originalDate}`,

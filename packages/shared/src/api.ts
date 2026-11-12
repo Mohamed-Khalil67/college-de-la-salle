@@ -1756,3 +1756,161 @@ export interface NotificationPreferencesDto {
 }
 
 export type UpdateNotificationPreferencesRequest = NotificationPreferencesDto;
+
+/* ------------------------------------------------------------------------------------------------
+ * Planificateur (admin or planner): the one page and « Professeur absent »
+ * ---------------------------------------------------------------------------------------------- */
+
+/** What the planner decides for each lesson of an absent teacher. */
+export const ABSENCE_CHOICE_KINDS = ['cancelled', 'substitute', 'study'] as const;
+export type AbsenceChoiceKind = (typeof ABSENCE_CHOICE_KINDS)[number];
+export const ABSENCE_CHOICE_LABELS: Readonly<Record<AbsenceChoiceKind, string>> = {
+  cancelled: 'Annuler',
+  substitute: 'Remplacer',
+  study: 'Étude surveillée',
+};
+
+/** « Professeur absent » covers at most this many days at once (a school month). */
+export const ABSENCE_MAX_DAYS = 31;
+/** …and this many lessons in one save. */
+export const ABSENCE_MAX_CHOICES = 200;
+
+/** A teacher free during a lesson. */
+export interface AbsenceTeacherOption {
+  readonly teacherId: string;
+  readonly name: string;
+  /** Teaches this subject in the school: the first suggestion. */
+  readonly sameSubject: boolean;
+}
+
+/** One lesson the absent teacher was to give. */
+export interface AbsenceSessionDto {
+  readonly slotId: string;
+  /** The session's original day. */
+  readonly date: string;
+  readonly classLabel: string;
+  readonly groupLabel: string | null;
+  readonly subjectName: string;
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly roomId: string | null;
+  readonly roomName: string | null;
+  /** What the lesson already is (cancelled, covered…); null: untouched. */
+  readonly currentKind: SlotExceptionKind | null;
+  /** Teachers with nothing at that time, the ones of the subject first. */
+  readonly freeTeachers: readonly AbsenceTeacherOption[];
+}
+
+/** GET /planner/absence?teacherId&from&to (admin or planner): the lessons to look after. */
+export interface AbsencePreviewQuery {
+  readonly teacherId: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+export interface AbsencePreviewDto {
+  readonly teacherId: string;
+  readonly teacherName: string;
+  readonly from: string;
+  readonly to: string;
+  readonly sessions: readonly AbsenceSessionDto[];
+}
+
+export interface AbsenceChoice {
+  readonly slotId: string;
+  /** The session's original day. */
+  readonly date: string;
+  readonly kind: AbsenceChoiceKind;
+  /** substitute: the covering teacher; study: the supervisor (both required). */
+  readonly teacherId?: string | null;
+  /** study: the room (the lesson's own room by default). */
+  readonly roomId?: string | null;
+}
+
+/** POST /planner/absence: one choice per lesson, saved together, then the people concerned are told. */
+export interface ApplyAbsenceRequest {
+  readonly teacherId: string;
+  readonly from: string;
+  readonly to: string;
+  /** Shown to the students in their notification. */
+  readonly reason?: string;
+  readonly choices: readonly AbsenceChoice[];
+  readonly acknowledgedWarnings?: readonly AcknowledgedWarning[];
+}
+
+export interface ApplyAbsenceResult {
+  readonly cancelled: number;
+  readonly substituted: number;
+  readonly study: number;
+  /** Notifications written (students and teachers). */
+  readonly notified: number;
+  readonly warnings: readonly TimetableWarningDto[];
+}
+
+/** A session of the day that differs from the weekly rule. */
+export interface PlannerChangeDto {
+  readonly slotId: string;
+  readonly date: string;
+  readonly kind: SlotExceptionKind;
+  readonly classLabel: string;
+  readonly subjectName: string;
+  readonly startTime: string;
+  readonly endTime: string;
+  /** The teacher of the weekly rule. */
+  readonly teacherName: string;
+  /** The covering teacher or the supervisor. */
+  readonly coverName: string | null;
+  readonly roomName: string | null;
+  readonly reason: string;
+  /** The students were notified of this change. */
+  readonly notified: boolean;
+}
+
+/** GET /planner/today?date: the changes of a day (admin or planner). */
+export interface PlannerTodayDto {
+  readonly date: string;
+  readonly changes: readonly PlannerChangeDto[];
+}
+
+export interface PlannerRoomNowDto {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: RoomKind;
+  readonly capacity: number | null;
+  /** HH:MM, free until then; null: free for the rest of the day. */
+  readonly freeUntil: string | null;
+}
+
+/** GET /planner/rooms-now: the active rooms nobody holds right now. */
+export interface PlannerRoomsNowDto {
+  readonly date: string;
+  /** HH:MM, Cairo time. */
+  readonly time: string;
+  readonly free: readonly PlannerRoomNowDto[];
+  readonly total: number;
+}
+
+export interface PlannerMissingSubjectDto {
+  readonly subjectName: string;
+  /** Hours per week still to place. */
+  readonly missingHours: number;
+}
+
+export interface PlannerClassCoverageDto {
+  readonly classId: string;
+  readonly label: string;
+  /** Hours per week asked for by the class's subjects, and placed in the timetable. */
+  readonly expectedHours: number;
+  readonly placedHours: number;
+  readonly missing: readonly PlannerMissingSubjectDto[];
+  readonly complete: boolean;
+}
+
+/** GET /planner/timetables: how complete the timetable of the current year is (admin or planner). */
+export interface PlannerTimetablesDto {
+  readonly yearLabel: string | null;
+  readonly classes: readonly PlannerClassCoverageDto[];
+  /** Teachers with at least one lesson in the timetable, out of the teachers with an assignment. */
+  readonly teachersPlaced: number;
+  readonly teachersTotal: number;
+}
