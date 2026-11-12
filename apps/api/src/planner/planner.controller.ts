@@ -11,6 +11,7 @@ import {
   ApplyAbsenceResultDto,
   PlannerDayQueryDto,
   PlannerRoomsNowDto,
+  PlannerTeacherDto,
   PlannerTimetablesDto,
   PlannerTodayDto,
 } from './dto/planner.dto.js';
@@ -29,6 +30,13 @@ export class PlannerController {
     private readonly planner: PlannerService,
     private readonly timetable: TimetableService,
   ) {}
+
+  /** The active teachers, to choose the absent one (the user list is the admin's alone). */
+  @Get('teachers')
+  @ApiOkResponse({ type: [PlannerTeacherDto] })
+  teachers(): Promise<PlannerTeacherDto[]> {
+    return this.planner.teachers();
+  }
 
   /** The lessons of an absent teacher between two days, with the teachers free to cover each. */
   @Get('absence')

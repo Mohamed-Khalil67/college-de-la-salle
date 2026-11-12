@@ -405,15 +405,12 @@ export class AbsencePage {
     to: shownError(this.periodForm.to()),
   }));
 
-  readonly #teachersSource = resource({ loader: () => this.#api.school.assignments() });
-  protected readonly teachers = computed(() => {
-    const map = new Map<string, string>();
-    if (this.#teachersSource.hasValue())
-      for (const a of this.#teachersSource.value()) map.set(a.teacherId, a.teacherName);
-    return [...map]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-  });
+  readonly #teachersSource = resource({ loader: () => this.#api.planner.teachers() });
+  protected readonly teachers = computed(() =>
+    this.#teachersSource.hasValue()
+      ? this.#teachersSource.value().map((t) => ({ id: t.teacherId, name: t.name }))
+      : [],
+  );
   readonly #roomsSource = resource({ loader: () => this.#api.school.rooms() });
   protected readonly rooms = computed(() =>
     this.#roomsSource.hasValue() ? this.#roomsSource.value().filter((r) => r.active) : [],

@@ -647,7 +647,12 @@ export interface UpdateActivityTypeRequest extends Partial<CreateActivityTypeReq
 /* Calendar days: /api/calendar-days -------------------------------------------------------------- */
 
 export type CalendarDayType = 'holiday' | 'exam_week' | 'no_classes' | 'event_day';
-export const CALENDAR_DAY_TYPES: readonly CalendarDayType[] = ['holiday', 'exam_week', 'no_classes', 'event_day'];
+export const CALENDAR_DAY_TYPES: readonly CalendarDayType[] = [
+  'holiday',
+  'exam_week',
+  'no_classes',
+  'event_day',
+];
 export const CALENDAR_DAY_TYPE_LABELS: Readonly<Record<CalendarDayType, string>> = {
   holiday: 'Vacances ou jour férié',
   exam_week: 'Semaine d’examens',
@@ -860,11 +865,7 @@ export interface TimetableSlotDto extends TimetableSlotInput {
 
 /** Soft rules: they warn, and the save needs a reason for each. */
 export type TimetableWarningCode =
-  | 'exam_week'
-  | 'room_capacity'
-  | 'tp_outside_lab'
-  | 'assessments_overload'
-  | 'hours_exceeded';
+  'exam_week' | 'room_capacity' | 'tp_outside_lab' | 'assessments_overload' | 'hours_exceeded';
 export const TIMETABLE_WARNING_CODES: readonly TimetableWarningCode[] = [
   'exam_week',
   'room_capacity',
@@ -926,7 +927,10 @@ export const TIMETABLE_SUGGESTION_KINDS: readonly TimetableSuggestionKind[] = ['
  * `newDate`/`newStart`/`newEnd`) or the weekly rule (`roomId`, or `weekday`/`startTime`/`endTime`).
  */
 export type TimetableSuggestionTarget = 'session' | 'series';
-export const TIMETABLE_SUGGESTION_TARGETS: readonly TimetableSuggestionTarget[] = ['session', 'series'];
+export const TIMETABLE_SUGGESTION_TARGETS: readonly TimetableSuggestionTarget[] = [
+  'session',
+  'series',
+];
 
 /**
  * A free active room of a compatible kind that seats the class (or the group) during every session of the
@@ -1290,7 +1294,10 @@ export interface PublishGradesRequest {
 
 export interface StudentGradeDto {
   readonly grade: GradeDto;
-  readonly event: Pick<EventDto, 'id' | 'type' | 'title' | 'date' | 'subjectId' | 'coefficient' | 'periodId'>;
+  readonly event: Pick<
+    EventDto,
+    'id' | 'type' | 'title' | 'date' | 'subjectId' | 'coefficient' | 'periodId'
+  >;
 }
 
 /** What a grade sheet accepts: the scale (« Sur ») of the marks and a note's coefficient. */
@@ -1784,6 +1791,12 @@ export interface AbsenceTeacherOption {
   readonly name: string;
   /** Teaches this subject in the school: the first suggestion. */
   readonly sameSubject: boolean;
+}
+
+/** GET /planner/teachers: the active teachers, to pick the absent one (a planner may not list users). */
+export interface PlannerTeacherDto {
+  readonly teacherId: string;
+  readonly name: string;
 }
 
 /** One lesson the absent teacher was to give. */

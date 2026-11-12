@@ -29,6 +29,7 @@ import {
   type PlannerRoomNowDto as RoomNowContract,
   type PlannerRoomsNowDto as RoomsNowContract,
   type PlannerTimetablesDto as TimetablesContract,
+  type PlannerTeacherDto as TeacherContract,
   type PlannerTodayDto as TodayContract,
   ROOM_KINDS,
   type RoomKind,
@@ -124,6 +125,11 @@ export class ApplyAbsenceDto implements ApplyAbsenceRequest {
 }
 
 /* Responses ------------------------------------------------------------------------------------ */
+
+export class PlannerTeacherDto implements TeacherContract {
+  teacherId: string;
+  name: string;
+}
 
 export class AbsenceTeacherOptionDto implements AbsenceTeacherContract {
   teacherId: string;

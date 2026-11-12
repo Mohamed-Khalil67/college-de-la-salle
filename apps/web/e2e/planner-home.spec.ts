@@ -1,5 +1,12 @@
 import { addDays, schoolToday, weekday } from '@cdls/shared';
-import { type APIRequestContext, expect, type Locator, type Page, type Route, test } from '@playwright/test';
+import {
+  type APIRequestContext,
+  expect,
+  type Locator,
+  type Page,
+  type Route,
+  test,
+} from '@playwright/test';
 import { ACCOUNTS } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
 
@@ -14,16 +21,27 @@ test.beforeEach(({}, testInfo) => {
 
 const BLOCKS = [
   { heading: 'À régler', link: 'Régler les conflits', path: '/admin/emploi-du-temps' },
-  { heading: 'Changements aujourd’hui', link: 'Toutes les modifications', path: '/admin/emploi-du-temps' },
+  {
+    heading: 'Changements aujourd’hui',
+    link: 'Toutes les modifications',
+    path: '/admin/emploi-du-temps',
+  },
   { heading: 'Salles maintenant', link: 'Occupation des salles', path: '/admin/emploi-du-temps' },
   { heading: 'L’année', link: 'Calendrier de l’année', path: '/admin/annees' },
-  { heading: 'Emplois du temps', link: 'Ouvrir la grille (classe, enseignant, salle)', path: '/admin/emploi-du-temps' },
+  {
+    heading: 'Emplois du temps',
+    link: 'Ouvrir la grille (classe, enseignant, salle)',
+    path: '/admin/emploi-du-temps',
+  },
 ] as const;
 
-const block = (page: Page, heading: string): Locator => page.getByRole('region', { name: heading, exact: true });
+const block = (page: Page, heading: string): Locator =>
+  page.getByRole('region', { name: heading, exact: true });
 const pageStatus = (page: Page): Locator => page.locator('app-home-status').getByRole('status');
-const json = (body: unknown, status = 200) => (route: Route) =>
-  route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+const json =
+  (body: unknown, status = 200) =>
+  (route: Route) =>
+    route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 
 /** Opens an address through the router without waiting for it to stay (a guard may send the user elsewhere). */
 async function goTo(page: Page, path: string): Promise<void> {
@@ -40,27 +58,45 @@ async function openPlanner(page: Page, account = ACCOUNTS.planner): Promise<void
   await expect(page.locator('.loading-line')).toHaveCount(0, { timeout: 30_000 });
 }
 
-test('the five blocks stack in order on a phone, wide ones span the row on desktop, Axe-clean', async ({ page }) => {
+test('the five blocks stack in order on a phone, wide ones span the row on desktop, Axe-clean', async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await openPlanner(page);
 
-  await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveText(BLOCKS.map((b) => b.heading));
+  await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveText(
+    BLOCKS.map((b) => b.heading),
+  );
   for (const b of BLOCKS) {
     const region = block(page, b.heading);
     await expect(region).toBeVisible();
-    await expect(region.getByRole('link', { name: b.link, exact: true })).toHaveAttribute('href', b.path);
+    await expect(region.getByRole('link', { name: b.link, exact: true })).toHaveAttribute(
+      'href',
+      b.path,
+    );
   }
   // The two header buttons: a planner who teaches has « Examen » too.
-  await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toHaveAttribute('href', '/admin/planification/professeur-absent');
-  await expect(page.getByRole('link', { name: 'Examen', exact: true })).toHaveAttribute('href', '/enseignant/agenda');
+  await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toHaveAttribute(
+    'href',
+    '/admin/planification/professeur-absent',
+  );
+  await expect(page.getByRole('link', { name: 'Examen', exact: true })).toHaveAttribute(
+    'href',
+    '/enseignant/agenda',
+  );
 
   const boxes = async () => Promise.all(BLOCKS.map((b) => block(page, b.heading).boundingBox()));
   await page.setViewportSize({ width: 390, height: 844 });
   const phone = await boxes();
-  for (let i = 1; i < phone.length; i++) expect(phone[i]!.y, `${BLOCKS[i]!.heading} below the block before`).toBeGreaterThan(phone[i - 1]!.y);
+  for (let i = 1; i < phone.length; i++)
+    expect(phone[i]!.y, `${BLOCKS[i]!.heading} below the block before`).toBeGreaterThan(
+      phone[i - 1]!.y,
+    );
   for (const b of BLOCKS) {
-    const box = await block(page, b.heading).getByRole('link', { name: b.link, exact: true }).boundingBox();
+    const box = await block(page, b.heading)
+      .getByRole('link', { name: b.link, exact: true })
+      .boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -76,7 +112,9 @@ test('the five blocks stack in order on a phone, wide ones span the row on deskt
   expect(errors).toEqual([]);
 });
 
-test('the admin has the page too, without « Examen »; a plain teacher and a student are sent away', async ({ page }) => {
+test('the admin has the page too, without « Examen »; a plain teacher and a student are sent away', async ({
+  page,
+}) => {
   await openPlanner(page, ACCOUNTS.admin);
   await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Examen', exact: true })).toHaveCount(0);
@@ -105,12 +143,19 @@ test('each entry link opens its detail page', async ({ page }) => {
   }
 });
 
-test('a block that fails shows its own error and « Réessayer »; the page lives on; the retry works', async ({ page }) => {
+test('a block that fails shows its own error and « Réessayer »; the page lives on; the retry works', async ({
+  page,
+}) => {
   await signInAs(page, ACCOUNTS.planner);
   await goInApp(page, '/admin/classes');
   let failing = true;
   await page.route('**/api/planner/today*', (route) =>
-    failing ? json({ statusCode: 500, message: 'Les changements sont indisponibles pour le moment.' }, 500)(route) : route.continue(),
+    failing
+      ? json(
+          { statusCode: 500, message: 'Les changements sont indisponibles pour le moment.' },
+          500,
+        )(route)
+      : route.continue(),
   );
   await goInApp(page, '/admin/planification');
 
@@ -119,8 +164,11 @@ test('a block that fails shows its own error and « Réessayer »; the page live
   const retry = changes.getByRole('button', { name: 'Réessayer' });
   await expect(retry).toBeVisible();
   expect((await retry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  for (const heading of ['Salles maintenant', 'Emplois du temps']) await expect(block(page, heading).getByRole('alert')).toHaveCount(0);
-  await expect(pageStatus(page)).toHaveText('Page chargée. Le bloc « Changements aujourd’hui » n’a pas pu être chargé.');
+  for (const heading of ['Salles maintenant', 'Emplois du temps'])
+    await expect(block(page, heading).getByRole('alert')).toHaveCount(0);
+  await expect(pageStatus(page)).toHaveText(
+    'Page chargée. Le bloc « Changements aujourd’hui » n’a pas pu être chargé.',
+  );
   await expect(page.getByRole('status')).toHaveCount(1);
   await axeAtBothWidths(page);
 
@@ -135,19 +183,32 @@ test('empty blocks invite instead of apologising; Axe-clean', async ({ page }) =
   await signInAs(page, ACCOUNTS.planner);
   await goInApp(page, '/admin/classes');
   await page.route('**/api/planner/today*', json({ date: schoolToday(), changes: [] }));
-  await page.route('**/api/planner/rooms-now*', json({ date: schoolToday(), time: '10:00', free: [], total: 0 }));
-  await page.route('**/api/planner/timetables*', json({ yearLabel: '2026-2027', classes: [], teachersPlaced: 0, teachersTotal: 0 }));
+  await page.route(
+    '**/api/planner/rooms-now*',
+    json({ date: schoolToday(), time: '10:00', free: [], total: 0 }),
+  );
+  await page.route(
+    '**/api/planner/timetables*',
+    json({ yearLabel: '2026-2027', classes: [], teachersPlaced: 0, teachersTotal: 0 }),
+  );
   await page.route('**/api/timetable/warnings*', json([]));
   await page.route('**/api/school-years*', json([]));
   await goInApp(page, '/admin/planification');
 
   await expect(pageStatus(page)).toHaveText('Page chargée.');
-  await expect(block(page, 'À régler')).toContainText('Rien à régler pour les deux semaines à venir');
-  await expect(block(page, 'Changements aujourd’hui')).toContainText('Aucun changement aujourd’hui');
+  await expect(block(page, 'À régler')).toContainText(
+    'Rien à régler pour les deux semaines à venir',
+  );
+  await expect(block(page, 'Changements aujourd’hui')).toContainText(
+    'Aucun changement aujourd’hui',
+  );
   await expect(block(page, 'Salles maintenant')).toContainText('Aucune salle n’est enregistrée');
   await expect(block(page, 'L’année')).toContainText('Aucune année scolaire');
   await expect(block(page, 'Emplois du temps')).toContainText('Aucune classe cette année');
-  for (const b of BLOCKS) await expect(block(page, b.heading).getByRole('link', { name: b.link, exact: true })).toBeVisible();
+  for (const b of BLOCKS)
+    await expect(
+      block(page, b.heading).getByRole('link', { name: b.link, exact: true }),
+    ).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await axeAtBothWidths(page);
 });
@@ -161,19 +222,37 @@ async function nextWeekday(from: string, wanted: number): Promise<string> {
 }
 
 /** Puts every session of the teacher back to the weekly rule (through the API). */
-async function restore(request: APIRequestContext, teacherEmail: string, from: string, to: string): Promise<void> {
+async function restore(
+  request: APIRequestContext,
+  teacherEmail: string,
+  from: string,
+  to: string,
+): Promise<void> {
   const admin = await tokenOf(request, ACCOUNTS.admin);
-  const teacher = await tokenOf(request, { email: teacherEmail, password: ACCOUNTS.teacher.password });
-  const me = (await (await request.get('/api/auth/me', { headers: teacher })).json()) as { teacherId: string };
+  const teacher = await tokenOf(request, {
+    email: teacherEmail,
+    password: ACCOUNTS.teacher.password,
+  });
+  const me = (await (await request.get('/api/auth/me', { headers: teacher })).json()) as {
+    teacherId: string;
+  };
   const sessions = (await (
-    await request.get(`/api/timetable/occurrences?teacherId=${me.teacherId}&from=${from}&to=${to}`, { headers: admin })
+    await request.get(
+      `/api/timetable/occurrences?teacherId=${me.teacherId}&from=${from}&to=${to}`,
+      { headers: admin },
+    )
   ).json()) as { exceptionId: string | null }[];
-  for (const s of sessions) if (s.exceptionId) await request.delete(`/api/timetable/exceptions/${s.exceptionId}`, { headers: admin });
+  for (const s of sessions)
+    if (s.exceptionId)
+      await request.delete(`/api/timetable/exceptions/${s.exceptionId}`, { headers: admin });
 }
 
 async function teacherName(request: APIRequestContext): Promise<string> {
   const teacher = await tokenOf(request, ACCOUNTS.teacher);
-  const me = (await (await request.get('/api/auth/me', { headers: teacher })).json()) as { firstName: string; lastName: string };
+  const me = (await (await request.get('/api/auth/me', { headers: teacher })).json()) as {
+    firstName: string;
+    lastName: string;
+  };
   return `${me.firstName} ${me.lastName}`;
 }
 
@@ -184,7 +263,10 @@ async function lookUp(page: Page, name: string, from: string, to: string): Promi
   await page.getByRole('button', { name: 'Voir les séances' }).click();
 }
 
-test('Professeur absent: a teacher and days, one choice per lesson, saved together; Axe-clean at each step', async ({ page, request }) => {
+test('Professeur absent: a teacher and days, one choice per lesson, saved together; Axe-clean at each step', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(180_000);
   const name = await teacherName(request);
   const from = addDays(schoolToday(), 28);
@@ -215,11 +297,21 @@ test('Professeur absent: a teacher and days, one choice per lesson, saved togeth
 
     // Remplacer proposes a free teacher of the subject; Étude surveillée asks for a supervisor.
     await lessons.nth(1).getByRole('radio', { name: 'Remplacer' }).check();
-    await expect(lessons.nth(1).getByLabel('Enseignant qui remplace')).not.toHaveValue('');
+    // The demo school has one teacher of mathématiques: nobody of the subject is free, and the page says so.
+    const cover = lessons.nth(1).getByLabel('Enseignant qui remplace');
+    await expect(
+      lessons.nth(1).getByText('Aucun enseignant de la matière n’est libre'),
+    ).toBeVisible();
+    await expect(lessons.nth(1).getByText('Choisissez l’enseignant qui remplace.')).toBeVisible();
+    await cover.selectOption({ index: 1 });
+    await expect(cover).not.toHaveValue('');
     await lessons.nth(2).getByRole('radio', { name: 'Étude surveillée' }).check();
-    await expect(lessons.nth(2).getByText('Choisissez la personne qui surveille l’étude.')).toBeVisible();
+    await expect(
+      lessons.nth(2).getByText('Choisissez la personne qui surveille l’étude.'),
+    ).toBeVisible();
     await lessons.nth(2).getByLabel('Personne qui surveille').selectOption({ index: 1 });
-    for (let i = 3; i < count; i++) await lessons.nth(i).getByRole('radio', { name: 'Annuler' }).check();
+    for (let i = 3; i < count; i++)
+      await lessons.nth(i).getByRole('radio', { name: 'Annuler' }).check();
     await expect(page.getByText('À enregistrer :')).toContainText('annulée');
     await page.getByLabel('Motif (facultatif)').fill('Formation (test Playwright)');
     await axeAtBothWidths(page);
@@ -241,7 +333,10 @@ test('Professeur absent: a teacher and days, one choice per lesson, saved togeth
   }
 });
 
-test('Professeur absent: a failing lookup, a day without lessons, a refused save', async ({ page, request }) => {
+test('Professeur absent: a failing lookup, a day without lessons, a refused save', async ({
+  page,
+  request,
+}) => {
   test.setTimeout(180_000);
   const name = await teacherName(request);
   await signInAs(page, ACCOUNTS.planner);
@@ -257,7 +352,10 @@ test('Professeur absent: a failing lookup, a day without lessons, a refused save
   let failing = true;
   await page.route('**/api/planner/absence?*', (route) =>
     failing && route.request().method() === 'GET'
-      ? json({ statusCode: 500, message: 'Les séances sont indisponibles pour le moment.' }, 500)(route)
+      ? json(
+          { statusCode: 500, message: 'Les séances sont indisponibles pour le moment.' },
+          500,
+        )(route)
       : route.continue(),
   );
   const from = addDays(schoolToday(), 28);
@@ -279,7 +377,9 @@ test('Professeur absent: a failing lookup, a day without lessons, a refused save
             statusCode: 409,
             message: 'Conflit',
             code: 'TIMETABLE_CONFLICT',
-            conflicts: [{ kind: 'teacher', message: 'Cet enseignant a déjà une séance à ce moment.' }],
+            conflicts: [
+              { kind: 'teacher', message: 'Cet enseignant a déjà une séance à ce moment.' },
+            ],
             warnings: [],
             suggestions: [],
           }),
@@ -287,9 +387,12 @@ test('Professeur absent: a failing lookup, a day without lessons, a refused save
       : route.continue(),
   );
   const count = await lessons.count();
-  for (let i = 0; i < count; i++) await lessons.nth(i).getByRole('radio', { name: 'Annuler' }).check();
+  for (let i = 0; i < count; i++)
+    await lessons.nth(i).getByRole('radio', { name: 'Annuler' }).check();
   await page.getByRole('button', { name: 'Enregistrer et prévenir' }).click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Cet enseignant a déjà une séance' })).toBeVisible();
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Cet enseignant a déjà une séance' }),
+  ).toBeVisible();
   await expect(page.locator('.alert--success')).toHaveCount(0);
   await axeAtBothWidths(page);
 });

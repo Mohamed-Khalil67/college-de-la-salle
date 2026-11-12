@@ -22,6 +22,7 @@ import { personName } from '../timetable/timetable.mapper.js';
 import type {
   AbsencePreviewDto,
   AbsencePreviewQueryDto,
+  PlannerTeacherDto,
   AbsenceSessionDto,
   PlannerRoomsNowDto,
   PlannerTimetablesDto,
@@ -58,6 +59,17 @@ export class PlannerService {
     private readonly reads: TimetableReadService,
     private readonly occupancy: OccupancyService,
   ) {}
+
+  /** The active teachers by name. */
+  async teachers(): Promise<PlannerTeacherDto[]> {
+    const rows = await this.prisma.teacher.findMany({
+      where: { user: { status: 'active' } },
+      include: { user: true },
+    });
+    return rows
+      .map((t) => ({ teacherId: t.id, name: personName(t.user) }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  }
 
   /** The lessons a teacher gives between two days (from today on), each with the teachers free at that time. */
   async absence(query: AbsencePreviewQueryDto, user: AuthUser): Promise<AbsencePreviewDto> {

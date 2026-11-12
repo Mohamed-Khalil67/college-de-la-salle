@@ -3,6 +3,7 @@ import {
   type AbsencePreviewDto,
   type ApplyAbsenceResult,
   type PlannerRoomsNowDto,
+  type PlannerTeacherDto,
   type PlannerTimetablesDto,
   type PlannerTodayDto,
   type TimetableWarningDto,
@@ -89,6 +90,7 @@ describe('Planner (e2e)', () => {
         await t.http().get('/api/planner/today').set(bearer(token)).expect(status);
         await t.http().get('/api/planner/rooms-now').set(bearer(token)).expect(status);
         await t.http().get('/api/planner/timetables').set(bearer(token)).expect(status);
+        await t.http().get('/api/planner/teachers').set(bearer(token)).expect(status);
       }
       await t
         .http()
@@ -106,6 +108,16 @@ describe('Planner (e2e)', () => {
   });
 
   describe('the lessons of an absent teacher', () => {
+    it('lists the active teachers by name for a planner, who may not list users', async () => {
+      const res = await t.http().get('/api/planner/teachers').set(bearer(planner)).expect(200);
+      const teachers = res.body as PlannerTeacherDto[];
+      expect(teachers.length).toBeGreaterThan(1);
+      expect(teachers.some((x) => x.teacherId === mathsTeacherId)).toBe(true);
+      const names = teachers.map((x) => x.name);
+      expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'fr')));
+      await t.http().get('/api/users').set(bearer(planner)).expect(403);
+    });
+
     it('lists them in order, with teachers free at that time and never the absent one', async () => {
       const result = await preview();
       expect(result.teacherId).toBe(mathsTeacherId);

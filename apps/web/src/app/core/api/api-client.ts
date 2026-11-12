@@ -7,6 +7,7 @@ import type {
   ApplyAbsenceRequest,
   ApplyAbsenceResult,
   PlannerRoomsNowDto,
+  PlannerTeacherDto,
   PlannerTimetablesDto,
   PlannerTodayDto,
   TimetableWarningDto,
@@ -163,6 +164,7 @@ export class ApiClient {
     absence: (query: AbsencePreviewQuery) => this.#get<AbsencePreviewDto>('/planner/absence', { ...query }),
     /** One choice per lesson, saved together; 409 TIMETABLE_CONFLICT or WARNINGS_NOT_ACKNOWLEDGED. */
     applyAbsence: (body: ApplyAbsenceRequest) => this.#post<ApplyAbsenceResult>('/planner/absence', body),
+    teachers: () => this.#get<PlannerTeacherDto[]>('/planner/teachers'),
     today: (date?: string) => this.#get<PlannerTodayDto>('/planner/today', { date }),
     roomsNow: () => this.#get<PlannerRoomsNowDto>('/planner/rooms-now'),
     timetables: () => this.#get<PlannerTimetablesDto>('/planner/timetables'),
