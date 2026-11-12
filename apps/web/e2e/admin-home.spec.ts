@@ -179,6 +179,8 @@ test('Préparer les bulletins: gaps per class, « Relancer » reminds the teache
   await expect(table).toBeVisible();
   await expect(table.getByRole('row')).not.toHaveCount(1);
   // The demo year has unfinished subjects: a class row names the subject and its teacher.
+  // Long lists are folded: open the first one.
+  await table.getByText('Détail, matière par matière').first().click();
   await expect(table.getByText(/notes? (saisies?|à publier)|aucune note saisie/).first()).toBeVisible();
   await axeAtBothWidths(page);
 

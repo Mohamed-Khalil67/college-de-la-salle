@@ -3,8 +3,11 @@ import {
   GRADE_REMINDER_COOLDOWN_HOURS,
   type GradeReminderItem,
   gradesReminderNotice,
+  schoolToday,
   type SectionId,
 } from '@cdls/shared';
+import type { Period } from '../generated/prisma/client.js';
+import { fromDay } from '../common/dates.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { notFound } from '../common/errors.js';
@@ -41,7 +44,7 @@ export class ReportPreparationService {
   ) {}
 
   async preparation(periodId: string): Promise<ReportPreparationDto> {
-    return (await this.build(periodId, undefined)).dto;
+    return (await this.build(await this.period(periodId), undefined)).dto;
   }
 
   /**
@@ -55,8 +58,10 @@ export class ReportPreparationService {
     dto: ReportReminderDto,
     actor: AuthUser,
   ): Promise<ReportReminderResultDto> {
-    const prep = await this.build(periodId, dto.classId);
-    if (prep.dto.period.closedAt) throw new ConflictException(PERIOD_ALREADY_CLOSED);
+    const period = await this.period(periodId);
+    // Refuse before the aggregate queries: a closed term has nothing to remind.
+    if (period.closedAt) throw new ConflictException(PERIOD_ALREADY_CLOSED);
+    const prep = await this.build(period, dto.classId);
 
     const items = new Map<string, GradeReminderItem[]>();
     let withoutTeacher = 0;
@@ -89,7 +94,8 @@ export class ReportPreparationService {
             where: {
               userId: { in: users },
               kind: 'grades_reminder',
-              entityId: periodId,
+              // A reminder for the whole period also covers a class; one for a class only covers that class.
+              entityId: { in: dto.classId ? [dto.classId, periodId] : [periodId] },
               createdAt: { gte: cutoff },
             },
             select: { userId: true },
@@ -112,8 +118,8 @@ export class ReportPreparationService {
           text: () => text,
           topic: 'grades',
           occursOn: null,
-          entity: 'period',
-          entityId: periodId,
+          entity: dto.classId ? 'class' : 'period',
+          entityId: dto.classId ?? periodId,
         });
       }
       const written = await this.notifications.write(tx, drafts, actor.id);
@@ -138,9 +144,15 @@ export class ReportPreparationService {
   }
 
   /** The classes of the period's year (its section only, when it has one) with their gaps. */
-  private async build(periodId: string, classId: string | undefined): Promise<Preparation> {
+  private async period(periodId: string): Promise<Period> {
     const period = await this.prisma.period.findUnique({ where: { id: periodId } });
     if (!period) throw notFound('Période');
+    return period;
+  }
+
+  private async build(period: Period, classId: string | undefined): Promise<Preparation> {
+    const periodId = period.id;
+    const today = fromDay(schoolToday());
     const classes = await this.prisma.schoolClass.findMany({
       where: {
         schoolYearId: period.schoolYearId,
@@ -177,11 +189,15 @@ export class ReportPreparationService {
       }),
       this.prisma.event.findMany({
         where: { periodId, classId: { in: classIds }, subjectId: { not: null }, activityType: { gradable: true } },
-        select: { id: true, classId: true, subjectId: true, _count: { select: { targets: true } } },
+        select: { id: true, classId: true, subjectId: true, date: true, _count: { select: { targets: true } } },
       }),
       this.prisma.grade.groupBy({
         by: ['eventId', 'published'],
-        where: { event: { periodId, classId: { in: classIds }, activityType: { gradable: true } } },
+        // Marks of students no longer enrolled this year do not stand in for a missing one.
+        where: {
+          event: { periodId, classId: { in: classIds }, activityType: { gradable: true } },
+          student: { enrollments: { some: { schoolYearId: period.schoolYearId, leftOn: null } } },
+        },
         _count: { _all: true },
       }),
       this.prisma.reportCard.groupBy({
@@ -210,6 +226,8 @@ export class ReportPreparationService {
       const own = subjects.filter((s) => s.classId === c.id);
       const gapEvents: GapEvent[] = events
         .filter((e) => e.classId === c.id && e.subjectId)
+        // Work not held yet (a planned exam) has no marks to wait for; marks already entered always count.
+        .filter((e) => e.date <= today || (gradedOf.get(e.id)?.graded ?? 0) > 0)
         .map((e) => ({
           subjectId: e.subjectId ?? '',
           // Marks of events aimed at some students are not compared with the class size.
@@ -220,7 +238,6 @@ export class ReportPreparationService {
       const gaps: ReportGapDto[] = classGaps(
         own.map((s) => s.subjectId),
         gapEvents,
-        count,
       ).map((g) => {
         const subject = own.find((s) => s.subjectId === g.subjectId);
         const teachers = (subject?.assignments ?? []).map((a) => {

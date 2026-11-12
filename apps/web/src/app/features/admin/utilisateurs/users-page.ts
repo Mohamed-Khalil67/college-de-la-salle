@@ -1,6 +1,8 @@
-import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, linkedSignal, resource, signal, untracked } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { debounce, form, FormField } from '@angular/forms/signals';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { map } from 'rxjs';
 import type { ClassDto, Paginated, Role, UserDto } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
@@ -182,8 +184,31 @@ export class UsersPage {
 
   /** The home page's « Ajouter un compte » and « Importer une liste » open the page with the dialog already shown. */
   readonly #route = inject(ActivatedRoute);
-  protected readonly createOpen = signal(this.#route.snapshot.queryParamMap.get('action') === 'creer');
-  protected readonly importOpen = signal(this.#route.snapshot.queryParamMap.get('action') === 'importer');
+  readonly #router = inject(Router);
+  readonly #action = toSignal(this.#route.queryParamMap.pipe(map((p) => p.get('action'))), {
+    initialValue: this.#route.snapshot.queryParamMap.get('action'),
+  });
+  protected readonly createOpen = signal(this.#action() === 'creer');
+  protected readonly importOpen = signal(this.#action() === 'importer');
+
+  constructor() {
+    // A link with ?action= opens its dialog even when the page is already open; closing it clears the address.
+    effect(() => {
+      const action = this.#action();
+      untracked(() => {
+        if (action === 'creer') this.createOpen.set(true);
+        if (action === 'importer') this.importOpen.set(true);
+      });
+    });
+    effect(() => {
+      const open = this.createOpen() || this.importOpen();
+      if (open) return;
+      untracked(() => {
+        if (this.#route.snapshot.queryParamMap.has('action'))
+          void this.#router.navigate([], { relativeTo: this.#route, queryParams: { action: null }, queryParamsHandling: 'merge', replaceUrl: true });
+      });
+    });
+  }
   protected readonly editOpen = signal(false);
   protected readonly editing = signal<UserDto | null>(null);
   protected readonly archiveOpen = signal(false);

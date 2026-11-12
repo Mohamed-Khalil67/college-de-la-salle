@@ -1,5 +1,5 @@
 import { Component, DOCUMENT, computed, inject, resource, signal } from '@angular/core';
-import type { PostDto } from '@cdls/shared';
+import { type PostDto, schoolToday } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { LoadState } from '../../../shared/components/load-state';
 import { SchoolYears } from '../../../shared/data/school-years';
@@ -112,7 +112,7 @@ export class AnnouncementsPage {
 
   protected meta(p: PostDto): string {
     const who = audienceLabel(p, this.#classList(), this.#sectionList());
-    return [p.authorName, `pour ${who}`, `le ${longDate(p.createdAt.slice(0, 10))}`].join(', ');
+    return [p.authorName, `pour ${who}`, `le ${longDate(schoolToday(new Date(p.createdAt)))}`].join(', ');
   }
 
   /** The deleted post's button is gone: focus moves to the list heading instead. */
@@ -144,6 +144,9 @@ export class AnnouncementsPage {
       this.#deleted = true;
       this.deleteOpen.set(false);
       this.notice.set(`L’annonce « ${p.title} » est supprimée.`);
+      // Deleting the last post of the last page: go back to the page before, which still exists.
+      const total = this.posts.hasValue() ? this.posts.value().total - 1 : 0;
+      this.page.update((n) => Math.min(n, Math.max(1, Math.ceil(total / PAGE_SIZE))));
       this.posts.reload();
     } catch (error) {
       this.deleteError.set(`L’annonce n’a pas été supprimée. ${apiMessage(error)}`);

@@ -1,4 +1,4 @@
-import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
+import { Component, computed, effect, inject, linkedSignal, resource, signal, untracked } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
 import { RouterLink } from '@angular/router';
 import type { PeriodDto, ReportPreparationClassDto } from '@cdls/shared';
@@ -176,6 +176,17 @@ export class ReportPreparationPage {
   protected readonly busyScope = signal<string | null>(null);
   protected readonly notice = signal('');
   protected readonly failure = signal<string | null>(null);
+
+  constructor() {
+    // The sentence about a reminder belongs to the term it was sent for.
+    effect(() => {
+      this.periodId();
+      untracked(() => {
+        this.notice.set('');
+        this.failure.set(null);
+      });
+    });
+  }
 
   protected readonly plural = plural;
   protected readonly detail = gapDetail;

@@ -25,13 +25,12 @@ export interface Gap {
 }
 
 /**
- * The gap of one subject, or null when it is ready. `studentCount` is what an event with no mark at all
- * is expected to reach. Marks above the number of students (a student who left) count as many as there are.
+ * The gap of one subject, or null when it is ready. Marks above the number of students concerned (a student who
+ * left) count as many as there are.
  */
 export function subjectGap(
   subjectId: string,
   events: readonly GapEvent[],
-  studentCount: number,
 ): Gap | null {
   const mine = events.filter((e) => e.subjectId === subjectId);
   if (!mine.some((e) => e.graded > 0)) return { subjectId, reason: 'no_grades', entered: 0, total: 0 };
@@ -40,7 +39,14 @@ export function subjectGap(
   let total = 0;
   let unfinished = false;
   for (const e of mine) {
-    const expected = e.concerned ?? (e.graded > 0 ? e.graded : studentCount);
+    // An event with no mark at all is unfinished; its expected total is the class when it concerns the whole
+    // class, and unknown (0) when it is aimed at some students.
+    if (e.graded === 0) {
+      unfinished = true;
+      total += e.concerned ?? 0;
+      continue;
+    }
+    const expected = e.concerned ?? e.graded;
     const got = Math.min(e.graded, expected);
     if (got < expected) {
       unfinished = true;
@@ -61,7 +67,6 @@ export function subjectGap(
 export function classGaps(
   subjectIds: readonly string[],
   events: readonly GapEvent[],
-  studentCount: number,
 ): Gap[] {
-  return subjectIds.flatMap((id) => subjectGap(id, events, studentCount) ?? []);
+  return subjectIds.flatMap((id) => subjectGap(id, events) ?? []);
 }

@@ -54,6 +54,13 @@ describe('reminderMessage', () => {
     expect(reminderMessage({ ...result, teachers: 2, alreadyReminded: 2 })).toContain('Réessayez plus tard.');
   });
 
+  it('says when a teacher could not be reached, instead of « tout est prêt »', () => {
+    expect(reminderMessage({ ...result, teachers: 2, notified: 1 })).toBe(
+      '1 enseignant relancé. 1 enseignant n’a pas pu être joint : compte désactivé ou archivé.',
+    );
+    expect(reminderMessage({ ...result, teachers: 1 })).toContain('n’a pas pu être joint');
+  });
+
   it('points at subjects nobody teaches', () => {
     expect(reminderMessage({ ...result, withoutTeacher: 2 })).toContain('2 matières n’ont aucun enseignant affecté');
   });

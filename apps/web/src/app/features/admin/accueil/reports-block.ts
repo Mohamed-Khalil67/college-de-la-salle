@@ -128,7 +128,12 @@ export class ReportsBlock {
     loader: ({ params }) => (params.periodId ? this.#api.reportCards.preparation(params.periodId) : Promise.resolve(null)),
   });
 
-  protected readonly state = computed(() => blockState(snapshotOf(this.#preparation), (prep) => reportsView(prep, this.#today())));
+  protected readonly state = computed(() => {
+    // Without the terms there is nothing to ask for: that failure is the block's own, with its retry.
+    const yearsError = this.#years.years.error();
+    const snapshot = yearsError ? { error: yearsError, value: undefined } : snapshotOf(this.#preparation);
+    return blockState(snapshot, (prep) => reportsView(prep, this.#today()));
+  });
 
   protected readonly plural = plural;
   protected readonly date = longDate;

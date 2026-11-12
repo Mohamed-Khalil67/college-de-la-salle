@@ -136,7 +136,7 @@ describe('Report preparation and reminders (e2e)', () => {
     expect(n?.title).toMatch(/^Notes à finir : /);
     expect(n?.body).toContain('Mathématiques');
     expect(n?.link).toBe('/enseignant/notes');
-    expect(n?.entityId).toBe(periodId);
+    expect(n?.entityId).toBe(classId);
 
     const audit = await t.prisma.auditLog.findMany({
       where: { createdAt: { gte: since }, action: 'report_preparation.remind', entityId: periodId },

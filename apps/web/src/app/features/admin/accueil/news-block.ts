@@ -1,5 +1,5 @@
 import { Component, computed, inject, resource } from '@angular/core';
-import type { PostDto } from '@cdls/shared';
+import { type PostDto, schoolToday } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { blockState, snapshotOf } from '../../../shared/utils/block-state';
@@ -83,6 +83,6 @@ export class AdminNewsBlock {
   }
 
   protected meta(p: PostDto): string {
-    return `${p.authorName}, le ${longDate(p.createdAt.slice(0, 10))}`;
+    return `${p.authorName}, le ${longDate(schoolToday(new Date(p.createdAt)))}`;
   }
 }

@@ -1,5 +1,5 @@
 import { Component, computed, inject, resource } from '@angular/core';
-import type { ContactMessageDto } from '@cdls/shared';
+import { type ContactMessageDto, schoolToday } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { blockState, snapshotOf } from '../../../shared/utils/block-state';
@@ -59,6 +59,6 @@ export class MessagesBlock {
   }
 
   protected meta(m: ContactMessageDto): string {
-    return `${m.name}, le ${longDate(m.createdAt.slice(0, 10))}`;
+    return `${m.name}, le ${longDate(schoolToday(new Date(m.createdAt)))}`;
   }
 }
