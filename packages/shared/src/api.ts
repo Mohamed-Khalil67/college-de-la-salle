@@ -1324,8 +1324,8 @@ export interface PendingGradingQuery {
 }
 
 /**
- * A gradable event of the class and subject whose grades are not published yet, or not all entered
- * (drafts, planned exams, half-entered marks), in an open period. Newest first.
+ * A gradable event of the class and subject in an open period where a mark is missing or not yet
+ * published (drafts, planned exams, half-entered marks). Newest first, 100 at most.
  */
 export interface PendingGradingDto {
   readonly event: EventDto;
@@ -1333,7 +1333,7 @@ export interface PendingGradingDto {
   readonly entered: number;
   /** Students the work concerns today. */
   readonly total: number;
-  /** Some grades are already visible to the students (then `entered < total`). */
+  /** Some grades are already visible to the students (late marks added to a published note show at once). */
   readonly published: boolean;
   /** The scale of the grades entered so far, null before the first mark. */
   readonly outOf: number | null;

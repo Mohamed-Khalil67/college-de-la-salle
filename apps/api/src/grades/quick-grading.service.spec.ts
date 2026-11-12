@@ -8,8 +8,10 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { TargetsService } from '../targets/targets.service.js';
 import { GradesService } from './grades.service.js';
 import {
+  NO_ASSESSMENT_TYPE,
   NO_OPEN_PERIOD,
   NOT_GRADABLE_TYPE,
+  PENDING_LIMIT,
   PERIOD_CLOSED,
   QuickGradingService,
 } from './quick-grading.service.js';
@@ -175,7 +177,82 @@ describe('QuickGradingService', () => {
     });
   });
 
+  describe('create, edge cases', () => {
+    it('answers 409 when the school has no assessment type to default to', async () => {
+      prisma.activityType.findFirst.mockResolvedValue(null);
+      await expect(service.create(body, TEACHER)).rejects.toThrow(
+        new ConflictException(NO_ASSESSMENT_TYPE),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('says « clôturée » when the period is closed between the lookup and the lock', async () => {
+      periods.lockOpen.mockRejectedValue(new ConflictException('La période est clôturée : …'));
+      await expect(service.create(body, TEACHER)).rejects.toThrow(
+        new ConflictException(PERIOD_CLOSED),
+      );
+      expect(tx.event.create).not.toHaveBeenCalled();
+    });
+
+    it('lets an unexpected lock error through untouched', async () => {
+      periods.lockOpen.mockRejectedValue(new Error('connexion perdue'));
+      await expect(service.create(body, TEACHER)).rejects.toThrow('connexion perdue');
+    });
+  });
+
   describe('pending', () => {
+    it('keeps a note until every mark is entered AND visible to the students', async () => {
+      prisma.event.findMany.mockResolvedValue([{ id: 'late' }, { id: 'done' }, { id: 'empty' }]);
+      targets.annotate.mockResolvedValue([
+        eventDto('late', 2),
+        eventDto('done', 2),
+        eventDto('empty', 2),
+      ]);
+      prisma.grade.findMany.mockResolvedValue([
+        { eventId: 'late', published: true, outOf: 20 },
+        { eventId: 'late', published: false, outOf: 20 },
+        { eventId: 'done', published: true, outOf: 20 },
+        { eventId: 'done', published: true, outOf: 20 },
+      ]);
+      const list = await callPending(service);
+      expect(list.map((p) => [p.event.id, p.entered, p.published])).toEqual([
+        ['late', 2, true],
+        ['empty', 0, false],
+      ]);
+    });
+
+    it('reads grades in a stable order, so the scale is always the first mark’s', async () => {
+      prisma.event.findMany.mockResolvedValue([{ id: 'a' }]);
+      targets.annotate.mockResolvedValue([eventDto('a', 2)]);
+      prisma.grade.findMany.mockResolvedValue([]);
+      await callPending(service);
+      expect(prisma.grade.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }),
+      );
+    });
+
+    it('caps at 100 AFTER leaving finished work out, so older drafts never vanish', async () => {
+      // 150 events, newest first: the 120 newest are finished, the 30 oldest are drafts.
+      const ids = Array.from({ length: 150 }, (_, i) => `e${i}`);
+      prisma.event.findMany.mockResolvedValue(ids.map((id) => ({ id })));
+      targets.annotate.mockResolvedValue(ids.map((id) => eventDto(id, 1)));
+      prisma.grade.findMany.mockResolvedValue(
+        ids.slice(0, 120).map((eventId) => ({ eventId, published: true, outOf: 20 })),
+      );
+      const list = await callPending(service);
+      expect(list).toHaveLength(30);
+      expect(list[0]?.event.id).toBe('e120');
+      expect(list.at(-1)?.event.id).toBe('e149');
+    });
+
+    it('never answers more than the cap', async () => {
+      const ids = Array.from({ length: PENDING_LIMIT + 20 }, (_, i) => `d${i}`);
+      prisma.event.findMany.mockResolvedValue(ids.map((id) => ({ id })));
+      targets.annotate.mockResolvedValue(ids.map((id) => eventDto(id, 1)));
+      prisma.grade.findMany.mockResolvedValue([]);
+      expect(await callPending(service)).toHaveLength(PENDING_LIMIT);
+    });
+
     it('lists drafts and half-entered work, leaves out fully published work', async () => {
       prisma.event.findMany.mockResolvedValue([{ id: 'draft' }, { id: 'half' }, { id: 'done' }]);
       targets.annotate.mockResolvedValue([

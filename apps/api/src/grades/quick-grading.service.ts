@@ -25,10 +25,12 @@ export const NO_OPEN_PERIOD =
 export const PERIOD_CLOSED =
   'La période en cours est clôturée : vous ne pouvez plus y ajouter de note.';
 export const NOT_GRADABLE_TYPE = 'Choisissez un type d’évaluation noté (pas un devoir à rendre).';
-const NO_ASSESSMENT_TYPE =
+export const NO_ASSESSMENT_TYPE =
   'Aucun type d’évaluation noté n’est disponible : demandez à l’administration d’en créer un.';
-/** The picker shows the latest ones; older drafts stay reachable from « Saisie des notes ». */
-const PENDING_LIMIT = 100;
+/** The picker shows the latest 100 events still to grade; the cap applies after finished work is left out. */
+export const PENDING_LIMIT = 100;
+/** Safety bound on the events read for one class and subject (a school year holds a few hundred at most). */
+const PENDING_SCAN = 1000;
 
 /**
  * « Noter »: grade a class straight away. The grades still hang on a gradable event; this service creates
@@ -62,7 +64,8 @@ export class QuickGradingService {
       assertAssessmentType(await this.types.usable(typeId, user));
       await assertClassWritable(tx, dto.classId);
       const period = await this.currentPeriod(tx, dto.classId, today);
-      await this.periods.lockOpen(tx, period.id);
+      // The shared lock refuses a period closed since `resolveFor`: say it the way `currentPeriod` does.
+      await this.lockPeriod(tx, period.id);
       const event = await tx.event.create({
         data: {
           activityTypeId: typeId,
@@ -101,8 +104,8 @@ export class QuickGradingService {
 
   /**
    * The work still to grade for a class and subject (any teacher of it may grade, so a colleague's draft
-   * shows too): gradable events of an open period whose grades are not published yet, or not all entered.
-   * Newest first.
+   * shows too): gradable events of an open period where a mark is still missing or not yet published.
+   * Newest first; the 100-event cap is applied after the finished ones are left out.
    */
   async pending(query: PendingGradingQueryDto, user: AuthUser): Promise<PendingGradingDto[]> {
     await this.access.assertTeachesClass(user, query.classId, query.subjectId);
@@ -116,7 +119,7 @@ export class QuickGradingService {
       },
       include: eventInclude,
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
-      take: PENDING_LIMIT,
+      take: PENDING_SCAN,
     });
     if (!rows.length) return [];
     const [events, grades] = await Promise.all([
@@ -124,14 +127,16 @@ export class QuickGradingService {
       this.prisma.grade.findMany({
         where: { eventId: { in: rows.map((r) => r.id) } },
         select: { eventId: true, published: true, outOf: true },
+        // A stable order, so « the scale of the first mark » is always the same one.
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       }),
     ]);
-    const byEvent = new Map<string, { count: number; published: boolean; outOf: number }>();
+    const byEvent = new Map<string, { count: number; visible: number; outOf: number }>();
     for (const g of grades) {
       const seen = byEvent.get(g.eventId);
       byEvent.set(g.eventId, {
         count: (seen?.count ?? 0) + 1,
-        published: (seen?.published ?? false) || g.published,
+        visible: (seen?.visible ?? 0) + (g.published ? 1 : 0),
         outOf: seen?.outOf ?? Number(g.outOf),
       });
     }
@@ -140,15 +145,23 @@ export class QuickGradingService {
         const graded = byEvent.get(event.id);
         const total = event.target.concerned ?? 0;
         return {
-          event,
-          // A grade kept for a student who left the group does not count twice.
-          entered: Math.min(graded?.count ?? 0, total),
-          total,
-          published: graded?.published ?? false,
-          outOf: graded?.outOf ?? null,
+          item: {
+            event,
+            // A grade kept for a student who left the group does not count twice.
+            entered: Math.min(graded?.count ?? 0, total),
+            total,
+            published: (graded?.visible ?? 0) > 0,
+            outOf: graded?.outOf ?? null,
+          },
+          // Done only when every student has a mark and every mark is visible to the students.
+          allVisible: (graded?.visible ?? 0) === (graded?.count ?? 0),
         };
       })
-      .filter((p) => !p.published || p.entered < p.total);
+      .filter(
+        ({ item, allVisible }) => item.entered < item.total || !allVisible || item.entered === 0,
+      )
+      .map(({ item }) => item)
+      .slice(0, PENDING_LIMIT);
   }
 
   /** The first assessment type (gradable, neither homework nor weekly) the teacher may use, in the school's order. */
@@ -166,6 +179,15 @@ export class QuickGradingService {
     });
     if (!type) throw new ConflictException(NO_ASSESSMENT_TYPE);
     return type.id;
+  }
+
+  /** The shared lock refuses a period closed since the lookup: say it with the same sentence. */
+  private async lockPeriod(tx: Prisma.TransactionClient, periodId: string): Promise<void> {
+    try {
+      await this.periods.lockOpen(tx, periodId);
+    } catch (error) {
+      throw error instanceof ConflictException ? new ConflictException(PERIOD_CLOSED) : error;
+    }
   }
 
   /** The period that covers today for this class, open; a clear 409 otherwise. */
