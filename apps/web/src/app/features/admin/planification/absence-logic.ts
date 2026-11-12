@@ -78,7 +78,10 @@ export function untreated(
   sessions: readonly AbsenceSessionDto[],
   decisions: Decisions,
 ): AbsenceSessionDto[] {
-  return sessions.filter((s) => s.currentKind === null && decisionOf(decisions, s).kind === '');
+  // Only a cancelled lesson is settled: one moved or in another room is still the absent teacher's.
+  return sessions.filter(
+    (s) => s.currentKind !== 'cancelled' && decisionOf(decisions, s).kind === '',
+  );
 }
 
 /** Everything that stops the save: lessons with no choice, and choices that lack their teacher. */

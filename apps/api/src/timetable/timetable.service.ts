@@ -390,12 +390,9 @@ export class TimetableService {
         if (choice.teacherId === dto.teacherId)
           throw new BadRequestException('L’enseignant absent ne peut pas se remplacer lui-même.');
         const row = await this.load(tx, choice.slotId);
-        const gives =
-          row.teacherId === dto.teacherId ||
-          row.exceptions.some(
-            (e) => toDay(e.date) === choice.date && e.newTeacherId === dto.teacherId,
-          );
-        if (!gives)
+        // Whoever gives the lesson that day: the covering teacher or supervisor when there is one, else the rule's.
+        const existing = row.exceptions.find((e) => toDay(e.date) === choice.date);
+        if ((existing?.newTeacherId ?? row.teacherId) !== dto.teacherId)
           throw new BadRequestException('Cette séance n’est pas donnée par cet enseignant.');
         const input: SlotExceptionInput =
           choice.kind === 'cancelled'

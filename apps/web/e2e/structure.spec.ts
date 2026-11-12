@@ -424,7 +424,10 @@ test('a planner sees the structure screens and nothing else of the administratio
   await expect(page).toHaveURL(/\/enseignant$/);
   const link = page.getByRole('navigation', { name: 'Espace enseignant' }).getByRole('link', { name: 'Planification' });
   await link.click();
-  await expect(page).toHaveURL(/\/admin\/matieres$/);
+  // A planner lands on the planner's one page, then opens the structure screens.
+  await expect(page).toHaveURL(/\/admin\/planification$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Planification' })).toBeVisible();
+  await goInApp(page, '/admin/matieres');
   await expect(page.getByRole('heading', { level: 1, name: 'Matières' })).toBeVisible();
 
   // The navigation holds the structure screens only.
@@ -439,7 +442,7 @@ test('a planner sees the structure screens and nothing else of the administratio
 
   // An admin-only page sends the planner back to the structure screens.
   await page.goto('/admin/utilisateurs');
-  await expect(page).toHaveURL(/\/admin\/matieres$/);
+  await expect(page).toHaveURL(/\/admin\/planification$/);
 
   // Classes: open one for its subjects; no creation, renaming or deletion, no roster.
   await goInApp(page, '/admin/classes');

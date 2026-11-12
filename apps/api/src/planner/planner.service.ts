@@ -5,6 +5,7 @@ import {
   type PlannerClassCoverageDto,
   daysBetween,
   freeUntil,
+  type NotificationKind,
   type RoomKind,
   schoolTimeNow,
   schoolToday,
@@ -43,6 +44,15 @@ const STATUS_KIND: Readonly<Record<string, SlotExceptionKind | null>> = {
   substitute: 'substitute',
   room_change: 'room_change',
   study: 'study',
+};
+
+/** The notification a change of each kind writes. */
+const NOTICE_KIND: Readonly<Record<SlotExceptionKind, NotificationKind>> = {
+  cancelled: 'session_cancelled',
+  moved: 'session_moved',
+  room_change: 'session_room_changed',
+  substitute: 'session_substituted',
+  study: 'session_study',
 };
 
 const clamp = (day: string, lo: string, hi: string) => (day < lo ? lo : day > hi ? hi : day);
@@ -95,7 +105,8 @@ export class PlannerService {
           o.status !== 'moved_from' &&
           o.originalDate >= query.from &&
           o.originalDate <= query.to &&
-          (o.original.teacherId === query.teacherId || o.current.teacherId === query.teacherId),
+          // The lesson is theirs today: untouched, cancelled, moved or re-roomed; not one already given to someone else.
+          o.current.teacherId === query.teacherId,
       )
       .sort(
         (a, b) =>
@@ -192,19 +203,17 @@ export class PlannerService {
         },
       },
     });
-    const told = new Set(
-      (
-        await this.prisma.notification.findMany({
-          where: {
-            entity: 'timetable_slot',
-            entityId: { in: rows.map((r) => `${r.slotId}@${toDay(r.date)}`) },
-            user: { role: 'student' },
-          },
-          select: { entityId: true },
-          distinct: ['entityId'],
-        })
-      ).map((n) => n.entityId),
-    );
+    // Told = a student notification of the kind THIS change calls for (a cancelled then covered lesson is not told twice).
+    const sent = await this.prisma.notification.findMany({
+      where: {
+        entity: 'timetable_slot',
+        entityId: { in: rows.map((r) => `${r.slotId}@${toDay(r.date)}`) },
+        user: { role: 'student' },
+      },
+      select: { entityId: true, kind: true },
+      distinct: ['entityId', 'kind'],
+    });
+    const told = new Set(sent.map((n) => `${n.entityId}#${n.kind}`));
     return {
       date: day,
       changes: rows
@@ -222,7 +231,7 @@ export class PlannerService {
           coverName: r.newTeacher ? personName(r.newTeacher.user) : null,
           roomName: r.newRoom?.name ?? r.slot.room?.name ?? null,
           reason: r.reason,
-          notified: told.has(`${r.slotId}@${toDay(r.date)}`),
+          notified: told.has(`${r.slotId}@${toDay(r.date)}#${NOTICE_KIND[r.kind]}`),
         }))
         .sort(
           (a, b) =>

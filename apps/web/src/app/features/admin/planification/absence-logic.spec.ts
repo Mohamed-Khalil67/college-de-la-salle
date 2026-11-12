@@ -115,6 +115,10 @@ describe('what stops the save', () => {
       }),
     ).toHaveLength(1);
   });
+  it('still wants a choice for a lesson that was only moved or re-roomed', () => {
+    const moved = session({ slotId: 'mv', currentKind: 'moved' });
+    expect(untreated([moved], {})).toEqual([moved]);
+  });
   it('reports an incomplete choice', () => {
     const a = session();
     const check = checkBeforeSave([a], {

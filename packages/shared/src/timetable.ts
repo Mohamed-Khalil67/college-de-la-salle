@@ -57,6 +57,16 @@ export type OccurrenceStatus =
   | 'room_change'
   | 'study';
 
+export const OCCURRENCE_STATUSES: readonly OccurrenceStatus[] = [
+  'normal',
+  'cancelled',
+  'moved',
+  'moved_from',
+  'substitute',
+  'room_change',
+  'study',
+];
+
 /** Days run Sunday (0) to Saturday (6), as in `weekday()`; the school week is Sunday to Thursday. */
 export const WEEKDAY_LABELS: readonly string[] = [
   'Dimanche',
