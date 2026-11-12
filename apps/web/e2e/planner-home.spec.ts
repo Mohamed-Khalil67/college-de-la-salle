@@ -317,13 +317,13 @@ test('Professeur absent: a teacher and days, one choice per lesson, saved togeth
     ).toBeFocused();
     const count = await lessons.count();
     expect(count).toBeGreaterThan(2);
-    // The lesson count is the one status line of the step; the section itself is not a live region.
+    // The lesson count is the one status line of the step (the warnings keep their own region); the section itself is not a live region.
     await expect(page.locator('section[aria-labelledby="absence-etape-2"]')).not.toHaveAttribute(
       'aria-live',
       /.+/,
     );
     await expect(
-      page.locator('section[aria-labelledby="absence-etape-2"] [role="status"]'),
+      page.locator('section[aria-labelledby="absence-etape-2"] p[role="status"]'),
     ).toHaveCount(1);
     // The fieldset's legend names the choice: no second radiogroup; touch targets are at least 44 px high.
     await expect(lessons.first().getByRole('radiogroup')).toHaveCount(0);
