@@ -43,8 +43,8 @@ export const anonymousGuard: CanMatchFn = async () => {
   return store.user() ? inject(Router).parseUrl(store.home()) : true;
 };
 
-/** Where a planner lands in the administration (the structure screens). */
-export const PLANNER_HOME = '/admin/matieres';
+/** Where a planner lands in the administration: the planner's one page. */
+export const PLANNER_HOME = '/admin/planification';
 
 /**
  * The administration's structure screens (subjects, classes, rooms, activity types, school year): the admin,

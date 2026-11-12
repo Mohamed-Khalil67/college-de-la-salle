@@ -18,18 +18,24 @@ import type { Target } from './space.js';
 export type WeekParity = 'A' | 'B';
 export const WEEK_PARITIES: readonly WeekParity[] = ['A', 'B'];
 
-export type SlotExceptionKind = 'cancelled' | 'moved' | 'substitute' | 'room_change';
+/**
+ * `study` is a supervised study: the lesson becomes a study period watched by `newTeacherId` (the supervisor),
+ * in `newRoomId` or, without it, the lesson's own room.
+ */
+export type SlotExceptionKind = 'cancelled' | 'moved' | 'substitute' | 'room_change' | 'study';
 export const SLOT_EXCEPTION_KINDS: readonly SlotExceptionKind[] = [
   'cancelled',
   'moved',
   'substitute',
   'room_change',
+  'study',
 ];
 export const SLOT_EXCEPTION_LABELS: Readonly<Record<SlotExceptionKind, string>> = {
   cancelled: 'Annulée',
   moved: 'Déplacée',
   substitute: 'Remplacement',
   room_change: 'Salle changée',
+  study: 'Étude surveillée',
 };
 
 /** « Cette séance / Celle-ci et les suivantes / Toute la série ». */
@@ -48,7 +54,18 @@ export type OccurrenceStatus =
   | 'moved'
   | 'moved_from'
   | 'substitute'
-  | 'room_change';
+  | 'room_change'
+  | 'study';
+
+export const OCCURRENCE_STATUSES: readonly OccurrenceStatus[] = [
+  'normal',
+  'cancelled',
+  'moved',
+  'moved_from',
+  'substitute',
+  'room_change',
+  'study',
+];
 
 /** Days run Sunday (0) to Saturday (6), as in `weekday()`; the school week is Sunday to Thursday. */
 export const WEEKDAY_LABELS: readonly string[] = [
@@ -329,7 +346,13 @@ export function expandTimetable<S extends SlotRule>(
         continue;
       }
       const status: OccurrenceStatus =
-        ex.kind === 'moved' ? 'moved' : ex.kind === 'substitute' ? 'substitute' : 'room_change';
+        ex.kind === 'moved'
+          ? 'moved'
+          : ex.kind === 'substitute'
+            ? 'substitute'
+            : ex.kind === 'study'
+              ? 'study'
+              : 'room_change';
       if (inRange(current.date, from, to))
         out.push({
           key: `${slot.id}@${date}`,
@@ -508,6 +531,10 @@ export function exceptionProblems(e: {
     case 'room_change':
       if (!e.newRoomId) out.push('Choisissez la nouvelle salle.');
       if (e.newDate || time || e.newTeacherId) out.push('Un changement de salle ne change que la salle.');
+      break;
+    case 'study':
+      if (!e.newTeacherId) out.push('Choisissez la personne qui surveille l’étude.');
+      if (e.newDate || time) out.push('Une étude surveillée garde le jour et l’heure du cours.');
       break;
   }
   return out;

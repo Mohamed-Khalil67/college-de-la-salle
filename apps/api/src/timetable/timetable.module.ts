@@ -11,5 +11,6 @@ import { WarningsService } from './warnings.service.js';
   imports: [OccupancyModule, NotificationsModule],
   controllers: [TimetableController],
   providers: [TimetableService, TimetableReadService, WarningsService, TimetableSuggestionsService],
+  exports: [TimetableService, TimetableReadService],
 })
 export class TimetableModule {}

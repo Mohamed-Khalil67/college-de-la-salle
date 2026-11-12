@@ -77,16 +77,18 @@ describe('the top navigation', () => {
     expect(adminTop).not.toContain('Salles');
     // The rollover is run once a year: it sits behind « Plus » in the top bar.
     expect(adminTop).not.toContain('Nouvelle année');
-    expect(adminTop.length).toBeLessThanOrEqual(9);
+    expect(adminTop.length).toBeLessThanOrEqual(10);
     const plannerTop = desktopNav(visibleNav(ADMIN_NAV, planner)).map((i) => i.label);
-    expect(plannerTop).toEqual(expect.arrayContaining(['Salles', 'Types d’activité']));
-    expect(plannerTop).not.toContain('Plus');
+    // The planner's own page comes first; the rarer structure screens move behind « Plus ».
+    expect(plannerTop.slice(0, 2)).toEqual(['Planification', 'Classes']);
+    expect(plannerTop).not.toContain('Salles');
+    expect(plannerTop).toContain('Plus');
   });
 });
 
 describe('the Planificateur permission', () => {
   it('is labelled « Planification » in the teacher space, nowhere for a plain teacher or a student', () => {
-    expect(ENSEIGNANT_NAV.find((i) => i.access === 'planner')).toMatchObject({ label: 'Planification', href: '/admin/matieres' });
+    expect(ENSEIGNANT_NAV.find((i) => i.access === 'planner')).toMatchObject({ label: 'Planification', href: '/admin/planification' });
     expect(visibleNav(ENSEIGNANT_NAV, teacher).some((i) => i.access === 'planner')).toBe(false);
     // A student never holds it (the API and the database refuse it); the nav does not trust the flag either.
     expect(visibleNav(ELEVE_NAV, { role: 'student', isPlanner: true })).toEqual(visibleNav(ELEVE_NAV, student));

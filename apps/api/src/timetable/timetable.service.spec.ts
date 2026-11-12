@@ -10,7 +10,10 @@ import { TimetableService } from './timetable.service.js';
 import { WarningsService } from './warnings.service.js';
 
 // The archived-year guard reads the database (raw SQL); its own behaviour is covered by the e2e tests.
-vi.mock('../school-years/year-guard.js', () => ({ assertClassWritable: vi.fn(), assertYearWritable: vi.fn() }));
+vi.mock('../school-years/year-guard.js', () => ({
+  assertClassWritable: vi.fn(),
+  assertYearWritable: vi.fn(),
+}));
 
 const user = (over: Partial<AuthUser>): AuthUser => ({
   id: 'u1',

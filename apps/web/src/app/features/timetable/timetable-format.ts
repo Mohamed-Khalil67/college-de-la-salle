@@ -23,6 +23,7 @@ export const STATUS_LABELS: Readonly<Record<OccurrenceStatus, string>> = {
   moved_from: 'Déplacée',
   substitute: 'Remplacement',
   room_change: 'Salle changée',
+  study: 'Étude surveillée',
 };
 
 export const STATUS_TONES: Readonly<Record<OccurrenceStatus, BadgeTone>> = {
@@ -32,6 +33,7 @@ export const STATUS_TONES: Readonly<Record<OccurrenceStatus, BadgeTone>> = {
   moved_from: 'warning',
   substitute: 'info',
   room_change: 'info',
+  study: 'info',
 };
 
 /** A session that no longer takes place where the rule puts it: shown struck through. */

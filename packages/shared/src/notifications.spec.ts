@@ -59,6 +59,29 @@ describe('notification texts', () => {
     expect(sessionNotice({ ...base, kind: 'session_restored' }).body).toContain('comme prévu');
   });
 
+  it('names the covering teacher and the supervisor of a study', () => {
+    const cover = sessionNotice({
+      ...base,
+      kind: 'session_substituted',
+      coverName: 'Hany Mansour',
+      reason: 'Formation',
+    });
+    expect(cover.title).toContain('remplacé');
+    expect(cover.body).toContain('assurée par Hany Mansour');
+    expect(cover.body).toContain('Motif : Formation');
+    const study = sessionNotice({
+      ...base,
+      kind: 'session_study',
+      coverName: 'Ingy Samir',
+      newRoom: 'B12',
+    });
+    expect(study.title).toContain('étude surveillée');
+    expect(study.body).toContain('par Ingy Samir, salle B12');
+    expect(sessionNotice({ ...base, kind: 'session_substituted' }).body).toContain(
+      'un autre enseignant',
+    );
+  });
+
   it('describes event changes', () => {
     const label = 'Examen — Fonctions';
     expect(

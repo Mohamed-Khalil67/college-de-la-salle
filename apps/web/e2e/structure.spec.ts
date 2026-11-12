@@ -424,13 +424,17 @@ test('a planner sees the structure screens and nothing else of the administratio
   await expect(page).toHaveURL(/\/enseignant$/);
   const link = page.getByRole('navigation', { name: 'Espace enseignant' }).getByRole('link', { name: 'Planification' });
   await link.click();
-  await expect(page).toHaveURL(/\/admin\/matieres$/);
+  // A planner lands on the planner's one page, then opens the structure screens.
+  await expect(page).toHaveURL(/\/admin\/planification$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Planification' })).toBeVisible();
+  await goInApp(page, '/admin/matieres');
   await expect(page.getByRole('heading', { level: 1, name: 'Matières' })).toBeVisible();
 
   // The navigation holds the structure screens only.
   const nav = page.getByRole('navigation', { name: 'Planification' });
-  for (const name of ['Classes', 'Matières', 'Salles', 'Types d’activité', 'Année scolaire']) {
-    await expect(nav.getByRole('link', { name })).toBeVisible();
+  // The planner's page comes first; the rarer screens (Salles, Types d’activité) are behind « Plus ».
+  for (const name of ['Planification', 'Classes', 'Matières', 'Année scolaire', 'Plus']) {
+    await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
   }
   for (const name of ['Utilisateurs', 'Affectations', 'Validations', 'Bulletins', 'Messages']) {
     await expect(nav.getByRole('link', { name })).toHaveCount(0);
@@ -439,7 +443,7 @@ test('a planner sees the structure screens and nothing else of the administratio
 
   // An admin-only page sends the planner back to the structure screens.
   await page.goto('/admin/utilisateurs');
-  await expect(page).toHaveURL(/\/admin\/matieres$/);
+  await expect(page).toHaveURL(/\/admin\/planification$/);
 
   // Classes: open one for its subjects; no creation, renaming or deletion, no roster.
   await goInApp(page, '/admin/classes');

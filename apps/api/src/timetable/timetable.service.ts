@@ -14,6 +14,11 @@ import {
   type TimetableWarningDto,
   type AcknowledgedWarning,
   type SlotExceptionInput,
+  ABSENCE_MAX_CHOICES,
+  ABSENCE_MAX_DAYS,
+  type ApplyAbsenceRequest,
+  type ApplyAbsenceResult,
+  daysBetween,
 } from '@cdls/shared';
 import { AccessService } from '../access/access.service.js';
 import { canEditStructure } from '../access/grants.js';
@@ -52,6 +57,8 @@ interface Applied {
   readonly touched: readonly string[];
   /** Slots whose sessions are checked for soft warnings (new or changed rules). */
   readonly warn: readonly string[];
+  /** Several sessions are checked, no more (a bulk exception write). Takes the place of `onlySession`. */
+  readonly onlySessions?: readonly { readonly slotId: string; readonly date: string }[];
   /** Only this session is checked (an exception), not the whole series. */
   readonly onlySession: { readonly slotId: string; readonly date: string } | null;
   /** Also check the rule itself (hours per week). */
@@ -144,12 +151,32 @@ export class TimetableService {
     );
   }
 
+  /**
+   * « Professeur absent »: one choice per lesson (cancel, substitute, supervised study), all written in ONE
+   * transaction with their audit rows and their notifications. Hard conflicts (a covering teacher already
+   * busy) roll everything back; soft warnings need an acknowledgement, as for any other write.
+   */
+  async applyAbsence(dto: ApplyAbsenceRequest, user: AuthUser): Promise<ApplyAbsenceResult> {
+    const applied = await this.occupancy.guard(
+      this.run(this.absenceMutation(dto, user), dto.acknowledgedWarnings ?? []),
+    );
+    const count = (kind: SlotExceptionInput['kind']) =>
+      dto.choices.filter((c) => c.kind === kind).length;
+    return {
+      cancelled: count('cancelled'),
+      substituted: count('substitute'),
+      study: count('study'),
+      notified: applied.notified,
+      warnings: applied.warnings,
+    };
+  }
+
   async removeException(id: string, user: AuthUser): Promise<TimetableWriteResultDto> {
     return this.commit(async (tx) => {
       const ex = await tx.slotException.findUnique({ where: { id } });
       if (!ex) throw notFound('Exception');
-      // A cancelled, moved or re-roomed session is back to what the rule says: say so.
-      const restored = ex.kind !== 'substitute';
+      // The session is back to what the rule says: say so (and free the covering teacher, if any).
+      const cover = ex.kind === 'substitute' || ex.kind === 'study' ? ex.newTeacherId : null;
       const row = await this.load(tx, ex.slotId);
       await this.authorize(row, user);
       // A teacher restores what a teacher may do, not a replacement the administration named.
@@ -175,9 +202,14 @@ export class TimetableService {
             kind: ex.kind,
           }),
         ],
-        notices: restored
-          ? [{ kind: 'session_restored', slotId: row.id, date: toDay(ex.date) }]
-          : [],
+        notices: [
+          {
+            kind: 'session_restored',
+            slotId: row.id,
+            date: toDay(ex.date),
+            substituteTeacherId: cover,
+          },
+        ],
       };
     }, []);
   }
@@ -242,7 +274,7 @@ export class TimetableService {
   private async run(
     mutation: Mutation,
     acknowledged: readonly AcknowledgedWarning[] | null,
-  ): Promise<{ result: Applied; warnings: TimetableWarningDto[] }> {
+  ): Promise<{ result: Applied; warnings: TimetableWarningDto[]; notified: number }> {
     return this.prisma.$transaction(
       async (tx) => {
         const applied = await mutation(tx);
@@ -270,9 +302,10 @@ export class TimetableService {
           ),
         );
         // In the same transaction: the change and its notifications commit (or roll back) together.
-        if (applied.notices?.length)
-          await this.notices.sessions(tx, applied.notices, applied.audit[0]?.actorId ?? null);
-        return { result: applied, warnings };
+        const notified = applied.notices?.length
+          ? await this.notices.sessions(tx, applied.notices, applied.audit[0]?.actorId ?? null)
+          : 0;
+        return { result: applied, warnings, notified };
       },
       { timeout: 20_000 },
     );
@@ -307,17 +340,127 @@ export class TimetableService {
         ),
       );
     }
-    const wanted = applied.onlySession
-      ? sessions.filter(
-          (s) =>
-            s.slot.id === applied.onlySession!.slotId &&
-            s.originalDate === applied.onlySession!.date,
+    const wanted = applied.onlySessions
+      ? sessions.filter((s) =>
+          applied.onlySessions!.some((o) => s.slot.id === o.slotId && s.originalDate === o.date),
         )
-      : sessions.filter((s) => s.current.date >= today);
+      : applied.onlySession
+        ? sessions.filter(
+            (s) =>
+              s.slot.id === applied.onlySession!.slotId &&
+              s.originalDate === applied.onlySession!.date,
+          )
+        : sessions.filter((s) => s.current.date >= today);
     return this.warnings.forSessions(tx, wanted, applied.series);
   }
 
   /* Mutations --------------------------------------------------------------------------------- */
+
+  private absenceMutation(dto: ApplyAbsenceRequest, user: AuthUser): Mutation {
+    return async (tx) => {
+      if (!canEditStructure(user)) throw forbidden();
+      if (dto.to < dto.from) throw new BadRequestException('La fin doit suivre le début.');
+      if (daysBetween(dto.from, dto.to) >= ABSENCE_MAX_DAYS)
+        throw new BadRequestException(`Une absence couvre ${ABSENCE_MAX_DAYS} jours au plus.`);
+      if (dto.from < this.today()) throw new BadRequestException(PAST);
+      if (!dto.choices.length || dto.choices.length > ABSENCE_MAX_CHOICES)
+        throw new BadRequestException(
+          `Indiquez entre 1 et ${ABSENCE_MAX_CHOICES} séances à traiter.`,
+        );
+      const teacher = await tx.teacher.findUnique({
+        where: { id: dto.teacherId },
+        include: { user: true },
+      });
+      if (!teacher) throw notFound('Enseignant');
+      const seen = new Set<string>();
+      const activeCovers = new Set<string>();
+      const parts: Applied[] = [];
+      for (const choice of dto.choices) {
+        const key = `${choice.slotId}@${choice.date}`;
+        if (seen.has(key))
+          throw new BadRequestException('Une séance ne peut être traitée qu’une fois.');
+        seen.add(key);
+        if (choice.date < dto.from || choice.date > dto.to)
+          throw new BadRequestException('Une séance est en dehors des dates de l’absence.');
+        if (choice.kind !== 'cancelled' && !choice.teacherId)
+          throw new BadRequestException(
+            choice.kind === 'substitute'
+              ? 'Choisissez l’enseignant qui remplace.'
+              : 'Choisissez la personne qui surveille l’étude.',
+          );
+        if (choice.teacherId === dto.teacherId)
+          throw new BadRequestException('L’enseignant absent ne peut pas se remplacer lui-même.');
+        const row = await this.load(tx, choice.slotId);
+        // Whoever gives the lesson that day: the covering teacher or supervisor when there is one, else the rule's.
+        const existing = row.exceptions.find((e) => toDay(e.date) === choice.date);
+        if ((existing?.newTeacherId ?? row.teacherId) !== dto.teacherId)
+          throw new BadRequestException('Cette séance n’est pas donnée par cet enseignant.');
+        // A lesson already moved or re-roomed keeps its exception: covering it would silently undo that change.
+        if (
+          choice.kind !== 'cancelled' &&
+          (existing?.kind === 'moved' || existing?.kind === 'room_change')
+        )
+          throw new BadRequestException(
+            'Cette séance a été déplacée ou change de salle : rétablissez-la d’abord (emploi du temps), puis remplacez-la ou transformez-la en étude.',
+          );
+        if (choice.teacherId && !activeCovers.has(choice.teacherId)) {
+          const cover = await tx.teacher.findUnique({
+            where: { id: choice.teacherId },
+            include: { user: { select: { status: true } } },
+          });
+          if (!cover) throw notFound('Enseignant');
+          if (cover.user.status !== 'active')
+            throw new BadRequestException(
+              'Cet enseignant n’est plus actif : choisissez-en un autre.',
+            );
+          activeCovers.add(choice.teacherId);
+        }
+        const input: SlotExceptionInput =
+          choice.kind === 'cancelled'
+            ? { kind: 'cancelled', reason: dto.reason }
+            : choice.kind === 'substitute'
+              ? { kind: 'substitute', newTeacherId: choice.teacherId, reason: dto.reason }
+              : {
+                  kind: 'study',
+                  newTeacherId: choice.teacherId,
+                  newRoomId: choice.roomId,
+                  reason: dto.reason,
+                };
+        parts.push(
+          await this.writeException(
+            tx,
+            row,
+            choice.date,
+            definedOnly(input) as SlotExceptionInput,
+            user,
+          ),
+        );
+      }
+      const slots = [...new Set(parts.flatMap((p) => p.touched))];
+      return {
+        touched: slots,
+        warn: slots,
+        onlySession: null,
+        onlySessions: parts.flatMap((p) => (p.onlySession ? [p.onlySession] : [])),
+        series: false,
+        slotId: null,
+        endedSlotId: null,
+        exceptionId: null,
+        suggest: null,
+        audit: [
+          this.entry(user, 'teacher_absence.apply', 'teacher', dto.teacherId, {
+            teacher: `${teacher.user.firstName} ${teacher.user.lastName}`,
+            from: dto.from,
+            to: dto.to,
+            reason: dto.reason ?? '',
+            sessions: dto.choices.length,
+          }),
+          ...parts.flatMap((p) => p.audit),
+        ],
+        notices: parts.flatMap((p) => p.notices ?? []),
+      };
+    };
+  }
 
   private createMutation(input: TimetableSlotInput, user: AuthUser): Mutation {
     return async (tx) => {
@@ -657,7 +800,9 @@ export class TimetableService {
         row.id,
         date,
         input,
-        previous?.kind === 'substitute' ? previous.newTeacherId : null,
+        previous?.kind === 'substitute' || previous?.kind === 'study'
+          ? previous.newTeacherId
+          : null,
       ),
     };
   }
@@ -781,7 +926,7 @@ export class TimetableService {
   }
 }
 
-/** What the students and the teacher of a session are told about an exception (a substitute: nothing). */
+/** What the students, the teacher and the covering teacher of a session are told about an exception. */
 function sessionNotices(
   slotId: string,
   date: string,
@@ -795,8 +940,9 @@ function sessionNotices(
         ? 'session_moved'
         : input.kind === 'room_change'
           ? 'session_room_changed'
-          : null;
-  if (!kind) return [];
+          : input.kind === 'substitute'
+            ? 'session_substituted'
+            : 'session_study';
   return [
     {
       kind,
@@ -808,6 +954,8 @@ function sessionNotices(
       newRoomId: input.newRoomId ?? null,
       reason: input.reason ?? null,
       substituteTeacherId: substituteId,
+      coverTeacherId:
+        input.kind === 'substitute' || input.kind === 'study' ? (input.newTeacherId ?? null) : null,
     },
   ];
 }

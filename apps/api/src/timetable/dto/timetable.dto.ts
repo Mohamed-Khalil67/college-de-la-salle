@@ -29,6 +29,7 @@ import {
   type DeleteTimetableSlotQuery,
   type FreeRoomDto as FreeRoomContract,
   type FreeRoomsQuery,
+  OCCURRENCE_STATUSES,
   type OccurrenceStatus,
   type RoomKind,
   ROOM_KINDS,
@@ -513,9 +514,7 @@ export class TimetableOccurrenceDto implements OccurrenceContract {
   key: string;
   slotId: string;
   originalDate: string;
-  @ApiProperty({
-    enum: ['normal', 'cancelled', 'moved', 'moved_from', 'substitute', 'room_change'],
-  })
+  @ApiProperty({ enum: OCCURRENCE_STATUSES })
   status: OccurrenceStatus;
   current: SessionValuesDto;
   original: SessionValuesDto;

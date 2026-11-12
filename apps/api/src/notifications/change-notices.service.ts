@@ -35,6 +35,8 @@ export interface SessionNotice {
   readonly reason?: string | null;
   /** The substitute teacher this change takes the session away from (told too); null: none. */
   readonly substituteTeacherId?: string | null;
+  /** session_substituted: the covering teacher; session_study: the supervisor (told too, and named to the others). */
+  readonly coverTeacherId?: string | null;
 }
 
 /** The schedule of an event row, for comparing it before and after an edit. */
@@ -66,8 +68,15 @@ export class ChangeNoticesService {
     private readonly targets: TargetsService,
   ) {}
 
-  /** Sessions cancelled, moved, re-roomed or restored: the students of the session and its teacher. */
-  async sessions(tx: Db, notices: readonly SessionNotice[], actorId: string | null): Promise<void> {
+  /**
+   * Sessions cancelled, moved, re-roomed, covered, turned into a study or restored: the students of the session,
+   * its teacher and the covering teacher. Returns how many notifications were written.
+   */
+  async sessions(
+    tx: Db,
+    notices: readonly SessionNotice[],
+    actorId: string | null,
+  ): Promise<number> {
     const drafts: NotificationDraft[] = [];
     for (const notice of notices) {
       // Queries inside a transaction run one after the other.
@@ -89,6 +98,12 @@ export class ChangeNoticesService {
             where: { classId: slot.classSubject.classId, leftOn: null },
             select: { student: { select: { userId: true } } },
           });
+      const cover = notice.coverTeacherId
+        ? await tx.teacher.findUnique({
+            where: { id: notice.coverTeacherId },
+            select: { userId: true, user: { select: { firstName: true, lastName: true } } },
+          })
+        : null;
       const facts: Omit<SessionChangeFacts, 'className'> = {
         kind: notice.kind,
         subject: slot.classSubject.subject.name,
@@ -100,6 +115,7 @@ export class ChangeNoticesService {
         newEnd: notice.newEnd ?? null,
         newRoom,
         reason: notice.reason ?? null,
+        coverName: cover ? `${cover.user.firstName} ${cover.user.lastName}` : null,
       };
       const substitute = notice.substituteTeacherId
         ? await tx.teacher.findUnique({
@@ -116,6 +132,7 @@ export class ChangeNoticesService {
           ...students.map((s) => ({ userId: s.student.userId, role: 'student' as const })),
           { userId: slot.teacher.userId, role: 'teacher' },
           ...(substitute ? [{ userId: substitute.userId, role: 'teacher' as const }] : []),
+          ...(cover ? [{ userId: cover.userId, role: 'teacher' as const }] : []),
         ],
         text: (role: Role) =>
           sessionNotice({ ...facts, className: role === 'student' ? null : className }),
@@ -126,7 +143,7 @@ export class ChangeNoticesService {
         entityId: `${slot.id}@${notice.date}`,
       });
     }
-    await this.notifications.write(tx, drafts, actorId);
+    return this.notifications.write(tx, drafts, actorId);
   }
 
   /** An edited one-off event: moved, or in another room or place. Nothing for other edits or the past. */

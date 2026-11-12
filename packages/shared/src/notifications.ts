@@ -11,6 +11,8 @@ export const NOTIFICATION_KINDS = [
   'session_moved',
   'session_room_changed',
   'session_restored',
+  'session_substituted',
+  'session_study',
   'event_cancelled',
   'event_moved',
   'event_room_changed',
@@ -24,6 +26,8 @@ export const NOTIFICATION_KIND_LABELS: Readonly<Record<NotificationKind, string>
   session_moved: 'Séance déplacée',
   session_room_changed: 'Salle changée',
   session_restored: 'Séance rétablie',
+  session_substituted: 'Cours remplacé',
+  session_study: 'Étude surveillée',
   event_cancelled: 'Événement annulé',
   event_moved: 'Événement déplacé',
   event_room_changed: 'Lieu changé',
@@ -37,6 +41,8 @@ export const SCHEDULE_NOTIFICATION_KINDS: readonly NotificationKind[] = [
   'session_moved',
   'session_room_changed',
   'session_restored',
+  'session_substituted',
+  'session_study',
   'event_cancelled',
   'event_moved',
   'event_room_changed',
@@ -70,7 +76,12 @@ const why = (reason: string | null | undefined) =>
 export interface SessionChangeFacts {
   readonly kind: Extract<
     NotificationKind,
-    'session_cancelled' | 'session_moved' | 'session_room_changed' | 'session_restored'
+    | 'session_cancelled'
+    | 'session_moved'
+    | 'session_room_changed'
+    | 'session_restored'
+    | 'session_substituted'
+    | 'session_study'
   >;
   readonly subject: string;
   /** The class, for teachers (« Bac français — Première »); null for students. */
@@ -83,6 +94,8 @@ export interface SessionChangeFacts {
   readonly newEnd?: string | null;
   readonly newRoom?: string | null;
   readonly reason?: string | null;
+  /** session_substituted: the covering teacher; session_study: the supervisor. */
+  readonly coverName?: string | null;
 }
 
 export function sessionNotice(f: SessionChangeFacts): NotificationText {
@@ -105,6 +118,16 @@ export function sessionNotice(f: SessionChangeFacts): NotificationText {
       return clean({
         title: `${f.subject} : changement de salle le ${longDay(f.day)}`,
         body: `La séance de ${f.subject}${who} du ${when} a lieu en salle ${f.newRoom ?? 'à préciser'}.${why(f.reason)}`,
+      });
+    case 'session_substituted':
+      return clean({
+        title: `${f.subject} : cours du ${longDay(f.day)} remplacé`,
+        body: `La séance de ${f.subject}${who} du ${when} est assurée par ${f.coverName ?? 'un autre enseignant'}${f.newRoom ? `, salle ${f.newRoom}` : ''}.${why(f.reason)}`,
+      });
+    case 'session_study':
+      return clean({
+        title: `${f.subject} : étude surveillée le ${longDay(f.day)}`,
+        body: `La séance de ${f.subject}${who} du ${when} devient une étude surveillée${f.coverName ? ` par ${f.coverName}` : ''}${f.newRoom ? `, salle ${f.newRoom}` : ''}.${why(f.reason)}`,
       });
     case 'session_restored':
       return clean({

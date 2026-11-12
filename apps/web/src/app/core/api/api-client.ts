@@ -2,6 +2,15 @@ import { HttpClient, type HttpErrorResponse, HttpParams } from '@angular/common/
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
+  AbsencePreviewDto,
+  AbsencePreviewQuery,
+  ApplyAbsenceRequest,
+  ApplyAbsenceResult,
+  PlannerRoomsNowDto,
+  PlannerTeacherDto,
+  PlannerTimetablesDto,
+  PlannerTodayDto,
+  TimetableWarningDto,
   RolloverApplyRequest,
   RolloverPreview,
   RolloverRequest,
@@ -148,6 +157,20 @@ export class ApiClient {
   #delete<T = void>(url: string): Promise<T> {
     return firstValueFrom(this.#http.delete<T>(`/api${url}`));
   }
+
+  /* Planificateur (admin or planner): the one page and « Professeur absent » */
+  readonly planner = {
+    /** The lessons of an absent teacher between two days, with the teachers free to cover each. */
+    absence: (query: AbsencePreviewQuery) => this.#get<AbsencePreviewDto>('/planner/absence', { ...query }),
+    /** One choice per lesson, saved together; 409 TIMETABLE_CONFLICT or WARNINGS_NOT_ACKNOWLEDGED. */
+    applyAbsence: (body: ApplyAbsenceRequest) => this.#post<ApplyAbsenceResult>('/planner/absence', body),
+    teachers: () => this.#get<PlannerTeacherDto[]>('/planner/teachers'),
+    today: (date?: string) => this.#get<PlannerTodayDto>('/planner/today', { date }),
+    roomsNow: () => this.#get<PlannerRoomsNowDto>('/planner/rooms-now'),
+    timetables: () => this.#get<PlannerTimetablesDto>('/planner/timetables'),
+    /** The whole school's soft warnings between two days. */
+    warnings: (query: { from: string; to: string }) => this.#get<TimetableWarningDto[]>('/timetable/warnings', { ...query }),
+  };
 
   /* School structure */
   /** The next-year wizard (admin only). */
