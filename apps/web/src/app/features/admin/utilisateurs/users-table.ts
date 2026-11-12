@@ -59,7 +59,7 @@ interface UserRow {
                       type="checkbox"
                       [checked]="row.user.isPlanner"
                       [attr.data-saved]="row.user.isPlanner"
-                      [attr.aria-disabled]="row.user.status !== 'active' || busyId() !== null ? 'true' : null"
+                      [attr.aria-disabled]="row.user.status !== 'active' || row.isSelf || busyId() !== null ? 'true' : null"
                       (click)="onBoxClick($event, row.user)"
                     />
                     <span>Planificateur<span class="visually-hidden"> : {{ row.name }}</span></span>

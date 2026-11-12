@@ -202,7 +202,7 @@ export class UsersPage {
       case 'teacher':
         return 'Cochez « Planificateur » pour qu’un enseignant gère aussi les matières, les salles, le calendrier de l’année et l’emploi du temps.';
       case 'admin':
-        return 'L’administration a déjà tous les droits. « Planificateur » indique qui s’occupe des salles, du calendrier et de l’emploi du temps.';
+        return '« Planificateur » indique qui s’occupe des salles, du calendrier et de l’emploi du temps.';
       default:
         return null;
     }

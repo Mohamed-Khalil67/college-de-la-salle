@@ -408,9 +408,11 @@ test('Planificateur is offered for teacher and admin accounts, never for student
   await goInApp(page, '/admin/utilisateurs');
   await page.getByRole('tab', { name: /Administration/ }).click();
   await expect(page.getByRole('columnheader', { name: 'Planificateur' })).toBeVisible();
-  await expect(page.getByText(/L’administration a déjà tous les droits/)).toBeVisible();
+  await expect(page.getByText(/« Planificateur » indique qui s’occupe/)).toBeVisible();
   const own = page.getByRole('row').filter({ hasText: ACCOUNTS.admin.email });
   await expect(own.getByRole('checkbox', { name: /Planificateur/ })).not.toBeChecked();
+  // One's own account is not editable here (the API refuses it too).
+  await expect(own.getByRole('checkbox', { name: /Planificateur/ })).toHaveAttribute('aria-disabled', 'true');
   await axeAtBothWidths(page);
   await page.getByRole('tab', { name: /Élèves/ }).click();
   await expect(page.getByRole('columnheader', { name: 'Planificateur' })).toHaveCount(0);

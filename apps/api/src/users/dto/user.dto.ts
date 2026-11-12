@@ -157,7 +157,7 @@ export class UpdateUserDto implements UpdateUserRequest {
   @MaxLength(PASSWORD_MAX_LENGTH)
   password?: string;
 
-  /** Teacher and admin accounts only (400 for a student): planificateur, edits the year's structure and the timetable. */
+  /** Planificateur: edits the year's structure and the timetable. Refused (400) when `true` for a student, and for one's own account. */
   @IsOptional()
   @IsBoolean()
   isPlanner?: boolean;

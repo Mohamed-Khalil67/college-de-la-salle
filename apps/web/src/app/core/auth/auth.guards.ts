@@ -2,7 +2,7 @@ import { inject } from '@angular/core';
 import { type CanMatchFn, Router } from '@angular/router';
 import type { Role } from '@cdls/shared';
 import { AuthStore, FIRST_ACCESS } from './auth-store';
-import { isTeacherPlanner } from './planner';
+import { isTeacherPlanner, opensStructure } from './planner';
 
 /**
  * Lets only `role` into an area. A visitor goes to the login page (and comes back afterwards);
@@ -61,13 +61,12 @@ export const structureGuard: CanMatchFn = async (_route, segments) => {
     return router.createUrlTree(['/connexion'], { queryParams: { suite } });
   }
   if (user.mustChangePassword) return router.parseUrl(FIRST_ACCESS);
-  if (user.role === 'admin') return true;
+  // A teacher's permission is read again first (at most once a minute): a promotion shows without signing in again.
   if (user.role === 'teacher') {
     await store.reloadUserIfStale();
     user = store.user();
-    if (isTeacherPlanner(user)) return true;
   }
-  return router.parseUrl(store.home());
+  return opensStructure(user) ? true : router.parseUrl(store.home());
 };
 
 /** The pages only the admin opens (users, assignments, validations, report cards, messages): a planner goes back to the structure screens. */

@@ -4,9 +4,12 @@ import {
   bearer,
   PLANNER,
   createTestApp,
+  DOMAIN,
+  deleteUsers,
   FRENCH_TEACHER,
   MATHS_TEACHER,
   studentOf,
+  UNUSABLE_PASSWORD_HASH,
   type TestApp,
 } from './helpers.js';
 
@@ -456,25 +459,34 @@ describe('Structure permissions (e2e)', () => {
       ]);
     });
 
-    it('is a permission on the account: an admin account can carry it too', async () => {
-      const admin = await t.prisma.user.findUniqueOrThrow({ where: { email: ADMIN } });
+    it('is a permission on the account: another admin account can carry it', async () => {
+      const other = await t.prisma.user.create({
+        data: {
+          email: `e2e.admin.planner@${DOMAIN}`,
+          passwordHash: UNUSABLE_PASSWORD_HASH,
+          role: 'admin',
+          firstName: 'Second',
+          lastName: 'Admin',
+        },
+      });
       try {
         const res = await t
           .http()
-          .patch(`/api/users/${admin.id}`)
+          .patch(`/api/users/${other.id}`)
           .set(bearer(tokens.admin))
           .send({ isPlanner: true })
           .expect(200);
         expect(res.body).toMatchObject({ isPlanner: true, role: 'admin' });
-        const me = await t.http().get('/api/auth/me').set(bearer(tokens.admin)).expect(200);
-        expect(me.body).toMatchObject({ role: 'admin', isPlanner: true });
-        // Nothing more and nothing less than before: the admin keeps the admin's own pages.
-        await t.http().get(`/api/users/${admin.id}`).set(bearer(tokens.admin)).expect(200);
-      } finally {
-        await t.prisma.user.update({ where: { id: admin.id }, data: { isPlanner: false } });
-        await t.prisma.auditLog.deleteMany({
-          where: { entity: 'user', entityId: admin.id, action: 'user.planner' },
+        const audit = await t.prisma.auditLog.findMany({
+          where: { entity: 'user', entityId: other.id, action: 'user.planner' },
         });
+        expect(audit.map((a) => [a.before, a.after])).toEqual([[{ isPlanner: false }, { isPlanner: true }]]);
+        // Setting the value it already has writes no second row.
+        await t.http().patch(`/api/users/${other.id}`).set(bearer(tokens.admin)).send({ isPlanner: true }).expect(200);
+        expect(await t.prisma.auditLog.count({ where: { entityId: other.id, action: 'user.planner' } })).toBe(1);
+      } finally {
+        await t.prisma.auditLog.deleteMany({ where: { entityId: other.id } });
+        await deleteUsers(t.prisma, [other.id]);
       }
     });
 
@@ -517,6 +529,17 @@ describe('Structure permissions (e2e)', () => {
       expect((await t.prisma.user.findUniqueOrThrow({ where: { id: user.userId } })).isPlanner).toBe(
         false,
       );
+    });
+
+    it('cannot be changed on the account of the admin who asks', async () => {
+      const admin = await t.prisma.user.findUniqueOrThrow({ where: { email: ADMIN } });
+      await t
+        .http()
+        .patch(`/api/users/${admin.id}`)
+        .set(bearer(tokens.admin))
+        .send({ isPlanner: true })
+        .expect(400);
+      expect((await t.prisma.user.findUniqueOrThrow({ where: { id: admin.id } })).isPlanner).toBe(false);
     });
 
     it('refuses a value that is not a boolean', async () => {

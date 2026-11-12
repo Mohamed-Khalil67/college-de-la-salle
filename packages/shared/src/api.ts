@@ -192,7 +192,7 @@ export interface UpdateUserRequest {
   readonly status?: Exclude<UserStatus, 'archived'>;
   /** A new temporary password: the user is signed out and must choose their own at next sign-in. */
   readonly password?: string;
-  /** Teacher and admin accounts only (400 for a student): planificateur (edits subjects, rooms, periods, calendar days, school years, the timetable). */
+  /** Planificateur (edits subjects, rooms, periods, calendar days, school years, the timetable). `true` is refused (400) for a student; so is any change to one's own account. */
   readonly isPlanner?: boolean;
 }
 

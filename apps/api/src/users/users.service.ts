@@ -224,13 +224,22 @@ export class UsersService {
       throw new BadRequestException('Un élève ne peut pas être planificateur.');
     const restoring = current.status === 'archived' && dto.status === 'active';
     if (current.status === 'archived' && !restoring) throw new ConflictException(ARCHIVED);
-    const plannerChange = dto.isPlanner !== undefined && dto.isPlanner !== current.isPlanner;
+    // An admin keeps every right whatever the flag says: changing one's own would only mislead.
+    if (dto.isPlanner !== undefined && id === actor.id)
+      throw new BadRequestException('Vous ne pouvez pas modifier votre propre permission de planificateur.');
 
     const reset = dto.password !== undefined;
     // Disabling or restoring ends the sessions already issued: their access tokens carry the old version.
     const statusChanged = dto.status !== undefined && dto.status !== current.status;
     const passwordHash = reset ? await hash(dto.password!) : undefined;
     const user = await this.prisma.$transaction(async (tx) => {
+      // The permission before the change is read under a row lock, so two admins cannot both audit "false to true".
+      let plannerBefore = current.isPlanner;
+      if (dto.isPlanner !== undefined) {
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${id}::uuid FOR UPDATE`;
+        plannerBefore = (await tx.user.findUniqueOrThrow({ where: { id }, select: { isPlanner: true } })).isPlanner;
+      }
+      const plannerChange = dto.isPlanner !== undefined && dto.isPlanner !== plannerBefore;
       const row = await tx.user.update({
         where: { id },
         data: {
@@ -284,7 +293,7 @@ export class UsersService {
             action: 'user.planner',
             entity: 'user',
             entityId: id,
-            before: { isPlanner: current.isPlanner },
+            before: { isPlanner: plannerBefore },
             after: { isPlanner: row.isPlanner },
           },
         ]);

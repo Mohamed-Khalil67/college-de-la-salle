@@ -163,9 +163,10 @@ export class SpaceLayout {
   protected readonly accountOpen = signal(false);
   protected readonly passwordOpen = signal(false);
   protected readonly base = computed(() => '/' + (this.#route.snapshot.pathFromRoot.flatMap((r) => r.url.map((s) => s.path)).join('/') || ''));
-  protected readonly area = computed(() =>
-    this.auth.role() === 'teacher' && this.plannerAreaLabel() ? (this.plannerAreaLabel() ?? '') : this.areaLabel(),
-  );
+  protected readonly area = computed(() => {
+    const planner = this.plannerAreaLabel();
+    return this.auth.role() === 'teacher' && planner ? planner : this.areaLabel();
+  });
   /** The items this user may see: admin-only and planner-only entries are filtered by role. */
   protected readonly visibleNav = computed(() => visibleNav(this.nav(), this.auth.user()));
   protected readonly desktopNav = computed(() => desktopNav(this.visibleNav()));
