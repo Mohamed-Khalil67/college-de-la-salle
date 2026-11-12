@@ -2,7 +2,7 @@
 
 School website and platform for one school. npm workspaces: `apps/web` (Angular 22), `apps/api` (NestJS 12 + Prisma 7 +
 PostgreSQL 18), `packages/shared` (`@cdls/shared`: the API contract in `src/api.ts` and the pure logic). Roles: admin
-(plus coordinator teachers), teacher, student. No parent space. Read `apps/web/CLAUDE.md` and `apps/api/CLAUDE.md` for
+(plus the « Planificateur » permission on teacher or admin accounts), teacher, student. No parent space. Read `apps/web/CLAUDE.md` and `apps/api/CLAUDE.md` for
 the details of each side.
 
 ## Skills: load these first, every agent, every task

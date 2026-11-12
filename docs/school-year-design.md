@@ -239,7 +239,7 @@ Agents load `nestjs-best-practices`, `angular-developer` and `frontend-design`, 
 | Question | Decision |
 |---|---|
 | How accounts are created | From the school's list of names: the admin imports the roster; each student gets a name-based school e-mail kept until graduation. No public sign-up. |
-| Who edits the year structure | The admin and teachers marked **coordinateur**. Other teachers manage their own lessons, work and groups. |
+| Who edits the year structure | The admin and accounts marked **planificateur** (was « coordinateur » until the 12 Nov 2026 redesign: now a permission on the account, see `docs/workflow-redesign.md`). Other teachers manage their own lessons, work and groups. |
 | Periods | **Separate per section**: each section has its own periods, holidays and exam weeks; school-wide days can apply to both. |
 | Custom activity types | **Private to the teacher**; the admin can promote one to a school-wide type. |
 | Logo | The current crest and wordmark are final. |
