@@ -10,6 +10,17 @@ export const ADMIN_ROUTES: Routes = [
     pathMatch: 'full',
     redirectTo: () => (inject(AuthStore).role() === 'admin' ? 'utilisateurs' : PLANNER_HOME.replace('/admin/', '')),
   },
+  // The planner's one page and « Professeur absent » (admin and planners; the API checks it as well).
+  {
+    path: 'planification',
+    title: 'Planification',
+    loadComponent: () => import('./planification/planner-home-page').then((m) => m.PlannerHomePage),
+  },
+  {
+    path: 'planification/professeur-absent',
+    title: 'Professeur absent',
+    loadComponent: () => import('./planification/absence-page').then((m) => m.AbsencePage),
+  },
   // Structure screens: the admin and the planners.
   {
     path: 'classes',

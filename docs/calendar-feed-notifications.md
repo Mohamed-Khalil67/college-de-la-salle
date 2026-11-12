@@ -24,7 +24,9 @@ student or teacher could subscribe to, and no word when a session is cancelled o
 ## Notifications
 
 - A `notifications` row per concerned user, written **in the transaction of the change**: a session cancelled, moved,
-  re-roomed or restored (timetable exception), an event moved, re-roomed or cancelled, a homework assigned, grades
+  re-roomed, covered by another teacher (`session_substituted`), turned into a supervised study (`session_study`) or
+  restored (timetable exception; the covering teacher or supervisor is told too, also when the session is taken away
+  from them), an event moved, re-roomed or cancelled, a homework assigned, grades
   published. Students are notified for their class (whole-class sessions, their groups' sessions, the work assigned to
   them); the teacher of the session and the author of an event are told too, unless they made the change.
 - A bell in the app bar of the student and teacher spaces (link named « Notifications, N non lues », count announced
@@ -35,7 +37,6 @@ student or teacher could subscribe to, and no word when a session is cancelled o
 
 ## Left for later
 
-- A substitute teacher named by the administration is not announced (the substitution only changes the teacher).
 - Notifications for series-wide timetable edits (« toute la série »): only single-session changes announce themselves.
 - Weekly legacy events are not announced session by session.
 - Push notifications (browser or phone).

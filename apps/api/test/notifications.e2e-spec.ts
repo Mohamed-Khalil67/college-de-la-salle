@@ -239,11 +239,12 @@ describe('Notifications (e2e)', () => {
           .send({ date, ...body });
       await send({ kind: 'substitute', newTeacherId: substitute.id }).expect(201);
       const entity = `${slot.id}@${date}`;
-      // Naming a substitute announces nothing (see docs); taking the session away does, to them too.
-      expect(await countFor([substitute.userId], entity)).toBe(0);
-      await send({ kind: 'cancelled' }).expect(201);
+      // Naming a substitute tells them and the teacher of the slot; taking the session away tells them again.
       expect(await countFor([substitute.userId], entity)).toBe(1);
       expect(await countFor([mathsUserId], entity)).toBe(1);
+      await send({ kind: 'cancelled' }).expect(201);
+      expect(await countFor([substitute.userId], entity)).toBe(2);
+      expect(await countFor([mathsUserId], entity)).toBe(2);
       await restore(slot.id, date);
     });
 

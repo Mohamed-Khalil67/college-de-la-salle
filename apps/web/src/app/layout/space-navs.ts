@@ -37,7 +37,7 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Notifications', path: 'notifications', secondary: true },
   { label: 'Synchroniser mon agenda', path: 'synchroniser', short: 'Agenda en ligne', secondary: true },
   /** Teachers the admin marked planificateur edit the year's structure in the administration area. */
-  { label: 'Planification', path: 'planification', href: '/admin/matieres', access: 'planner' },
+  { label: 'Planification', path: 'planification', href: '/admin/planification', access: 'planner' },
   { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
 ];
 
@@ -47,6 +47,8 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
  * go in the phone's bottom bar (five at most); « Plus » lists every screen there.
  */
 export const ADMIN_NAV: readonly SpaceNavItem[] = [
+  /** The planner's one page (a planner lands here); in « Plus » on the phone. */
+  { label: 'Planification', path: 'planification', short: 'Planif.' },
   { label: 'Utilisateurs', path: 'utilisateurs', icon: 'users', access: 'admin' },
   { label: 'Classes', path: 'classes', icon: 'book' },
   { label: 'Emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
