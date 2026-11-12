@@ -17,33 +17,36 @@ export interface CopyResult {
   imports: [FormField, Modal, Alert, Button, Field, FieldControl],
   template: `
     <cdls-modal title="Copier les matières d’une autre classe" [(open)]="open">
-      <form class="stack" novalidate (submit)="onSubmit($event)">
-        @if (classes.error()) {
-          <cdls-alert tone="danger">{{ loadError() }}</cdls-alert>
-        } @else if (!classes.hasValue()) {
-          <p class="loading-line" role="status">Chargement des classes…</p>
-        } @else {
-          <cdls-field label="Copier depuis" [error]="sourceError()" [helper]="others().length ? '' : 'Il n’y a pas d’autre classe cette année.'">
-            <select cdlsControl [formField]="copyForm.fromClassId">
-              <option value="">Choisir une classe</option>
-              @for (item of others(); track item.id) {
-                <option [value]="item.id">{{ label(item) }}</option>
-              }
-            </select>
-          </cdls-field>
-          <cdls-alert tone="info">
-            Les matières qui manquent à la classe sont ajoutées. Pour celles qu’elle a déjà, le coefficient et les heures
-            deviennent ceux de la classe copiée. Les enseignants ne sont pas copiés.
-          </cdls-alert>
-        }
-        @if (failure()) {
-          <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
-        }
-        <div class="modal__footer">
-          <button cdlsButton variant="secondary" type="button" (click)="open.set(false)">Annuler</button>
-          <button cdlsButton type="submit" [disabled]="busy() || !classes.hasValue()">{{ busy() ? 'Copie…' : 'Copier les matières' }}</button>
-        </div>
-      </form>
+      <!-- Closed, the dialog holds nothing: its loading line would otherwise sit in the page. -->
+      @if (open()) {
+        <form class="stack" novalidate (submit)="onSubmit($event)">
+          @if (classes.error()) {
+            <cdls-alert tone="danger">{{ loadError() }}</cdls-alert>
+          } @else if (!classes.hasValue()) {
+            <p class="loading-line" role="status">Chargement des classes…</p>
+          } @else {
+            <cdls-field label="Copier depuis" [error]="sourceError()" [helper]="others().length ? '' : 'Il n’y a pas d’autre classe cette année.'">
+              <select cdlsControl [formField]="copyForm.fromClassId">
+                <option value="">Choisir une classe</option>
+                @for (item of others(); track item.id) {
+                  <option [value]="item.id">{{ label(item) }}</option>
+                }
+              </select>
+            </cdls-field>
+            <cdls-alert tone="info">
+              Les matières qui manquent à la classe sont ajoutées. Pour celles qu’elle a déjà, le coefficient et les heures
+              deviennent ceux de la classe copiée. Les enseignants ne sont pas copiés.
+            </cdls-alert>
+          }
+          @if (failure()) {
+            <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
+          }
+          <div class="modal__footer">
+            <button cdlsButton variant="secondary" type="button" (click)="open.set(false)">Annuler</button>
+            <button cdlsButton type="submit" [disabled]="busy() || !classes.hasValue()">{{ busy() ? 'Copie…' : 'Copier les matières' }}</button>
+          </div>
+        </form>
+      }
     </cdls-modal>
   `,
 })

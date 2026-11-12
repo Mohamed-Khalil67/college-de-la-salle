@@ -1,6 +1,10 @@
 import { Env } from './env.validation.js';
 
-type LimitKey = 'LOGIN_THROTTLE_LIMIT' | 'CONTACT_THROTTLE_LIMIT' | 'FEED_THROTTLE_LIMIT';
+type LimitKey =
+  | 'LOGIN_THROTTLE_LIMIT'
+  | 'CONTACT_THROTTLE_LIMIT'
+  | 'FEED_THROTTLE_LIMIT'
+  | 'REMINDER_THROTTLE_LIMIT';
 
 const DEFAULTS = new Env();
 

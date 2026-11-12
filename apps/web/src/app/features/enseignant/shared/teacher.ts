@@ -7,12 +7,12 @@ import {
   type EventInput,
   GRADING_LIMITS,
   type ActivityTypeSummary,
-  type PostDto,
   round1,
   type SectionDto,
   SECTION_LABELS,
   type TeachingAssignmentDto,
 } from '@cdls/shared';
+import type { AudienceOption } from '../../../shared/utils/audience';
 import { average } from '../../../shared/utils/format';
 
 /**
@@ -237,10 +237,8 @@ export function rollSentence(c: RollCounts): string {
  * Announcement audiences: `class:<id>`, `section:<id>` or `all`
  * ---------------------------------------------------------------------------------------------- */
 
-export interface AudienceOption {
-  readonly value: string;
-  readonly label: string;
-}
+// Reading a choice and naming an audience are shared with the administration.
+export { audienceFromValue, audienceLabel, type AudienceOption } from '../../../shared/utils/audience';
 
 /** The teacher's classes, then the sections of those classes, then the whole school. */
 export function audienceOptions(myClasses: readonly ClassDto[], sections: readonly SectionDto[]): AudienceOption[] {
@@ -254,25 +252,6 @@ export function audienceOptions(myClasses: readonly ClassDto[], sections: readon
   return [...classOptions, ...sectionOptions, { value: 'all', label: 'Tous les élèves du collège' }];
 }
 
-export function audienceFromValue(value: string): { readonly classId: string | null; readonly sectionId: string | null } {
-  if (value.startsWith('class:')) return { classId: value.slice(6), sectionId: null };
-  if (value.startsWith('section:')) return { classId: null, sectionId: value.slice(8) };
-  return { classId: null, sectionId: null };
-}
-
-/** « Première », « tout le Bac français » or « tout le collège » (read after « pour »). */
-export function audienceLabel(
-  post: Pick<PostDto, 'classId' | 'sectionId'>,
-  classes: readonly ClassDto[],
-  sections: readonly SectionDto[],
-): string {
-  if (post.classId) return classes.find((c) => c.id === post.classId)?.label ?? 'une classe';
-  if (post.sectionId) {
-    const section = sections.find((s) => s.id === post.sectionId);
-    return section ? `tout le ${section.label}` : 'une section';
-  }
-  return 'tout le collège';
-}
 
 /* ------------------------------------------------------------------------------------------------
  * Autosave of the grade grid (« Noter »)

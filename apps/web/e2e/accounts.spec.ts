@@ -275,6 +275,8 @@ test('roster import: preview the generated e-mails, then create the accounts', a
 
   await signIn(page, ACCOUNTS.admin);
   await page.locator('.app-bar').waitFor();
+  await goInApp(page, '/admin/utilisateurs');
+  await page.locator('.app-bar').waitFor();
   await page.getByRole('button', { name: 'Importer un CSV' }).click();
   const dialog = page.getByRole('dialog', { name: 'Importer une liste' });
   await expect(dialog).toBeVisible();
@@ -311,6 +313,8 @@ test('roster import: a person already present is skipped unless « créer quand 
 
   await signIn(page, ACCOUNTS.admin);
   await page.locator('.app-bar').waitFor();
+  await goInApp(page, '/admin/utilisateurs');
+  await page.locator('.app-bar').waitFor();
   const upload = async () => {
     await page.getByRole('button', { name: 'Importer un CSV' }).click();
     const dialog = page.getByRole('dialog', { name: 'Importer une liste' });
@@ -345,6 +349,8 @@ test('roster import: a person already present is skipped unless « créer quand 
 test('graduating a student: confirmation first, then the account cannot sign in', async ({ page, request }) => {
   const student = await createStudent(request, 'bac', 'terminale');
   await signIn(page, ACCOUNTS.admin);
+  await page.locator('.app-bar').waitFor();
+  await goInApp(page, '/admin/utilisateurs');
   await page.locator('.app-bar').waitFor();
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill(student.lastName);
   const row = page.getByRole('row', { name: new RegExp(student.lastName) });
@@ -407,6 +413,8 @@ test('archiving a class asks for confirmation', async ({ page, request }) => {
 test('the users page and the edit dialog are accessible with the new statuses', async ({ page, request }) => {
   const student = await createStudent(request, 'bac', 'seconde');
   await signIn(page, ACCOUNTS.admin);
+  await page.locator('.app-bar').waitFor();
+  await goInApp(page, '/admin/utilisateurs');
   await page.locator('.app-bar').waitFor();
   await page.getByRole('searchbox', { name: 'Rechercher' }).fill(student.lastName);
   await expect(page.getByRole('row', { name: new RegExp(student.lastName) })).toBeVisible();

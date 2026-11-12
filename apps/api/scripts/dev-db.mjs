@@ -13,9 +13,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import EmbeddedPostgres from 'embedded-postgres';
 
-const PORT = 5433;
+const PORT = Number(process.env.DEV_DB_PORT ?? 5433);
 const USER = 'cdls';
-const DATABASE = 'cdls_dev';
+const DATABASE = process.env.DEV_DB_NAME ?? 'cdls_dev';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dir = `${root}.dev-db`;
 const secretFile = `${dir}/password.txt`;

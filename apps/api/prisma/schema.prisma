@@ -133,6 +133,9 @@ model User {
 
   @@index([role])
   @@index([status])
+  /// The admin's « Rôles » block and the « comptes jamais activés » count read these two small sets.
+  @@index([lastName, firstName], where: raw("is_planner"), map: "users_planner_idx")
+  @@index([lastName, firstName], where: raw("must_change_password"), map: "users_temp_password_idx")
   @@map("users")
 }
 
@@ -989,6 +992,7 @@ enum NotificationKind {
   event_room_changed
   grade_published
   homework_assigned
+  grades_reminder
 
   @@map("notification_kind")
 }

@@ -4,7 +4,7 @@
  * Dates are `YYYY-MM-DD` strings, timestamps ISO 8601 strings, decimals plain numbers.
  */
 import type { ActivityColour, ActivityIcon, Attachment } from './calendar.js';
-import type { NotificationKind } from './notifications.js';
+import type { NotificationKind, ReportGapReason } from './notifications.js';
 import type { SectionId } from './space.js';
 import type {
   OccurrenceStatus,
@@ -161,6 +161,10 @@ export interface UserListQuery extends PageQuery {
   readonly status?: UserStatus;
   /** Matches e-mail, first or last name. */
   readonly search?: string;
+  /** true: the Planificateurs only (false: everyone else). */
+  readonly isPlanner?: boolean;
+  /** true: accounts still on their temporary password (never signed in to choose their own). */
+  readonly mustChangePassword?: boolean;
 }
 
 export interface CreateUserRequest {
@@ -1476,6 +1480,75 @@ export interface ReportCardBatchRequest {
 
 export interface ReportCardBatchResponse {
   readonly count: number;
+}
+
+/**
+ * « Préparer les bulletins » (admin): GET /periods/:id/report-preparation says, class by class, which
+ * subjects are not ready for the report cards and who teaches them. A subject is ready when it has
+ * marks for the period, every student the work concerns has one and every mark is published. Works on an
+ * open or a closed period; the reminders (POST …/reminders) only on an open one.
+ */
+export interface ReportGapTeacherDto {
+  readonly teacherId: string;
+  readonly name: string;
+}
+
+export interface ReportGapDto {
+  readonly subjectId: string;
+  readonly subjectName: string;
+  readonly reason: ReportGapReason;
+  /** Marks entered and expected on the unfinished work (0 / 0 when there is none). */
+  readonly entered: number;
+  readonly total: number;
+  /** The teachers of this subject in this class: who a reminder reaches (empty: nobody is assigned). */
+  readonly teachers: readonly ReportGapTeacherDto[];
+}
+
+export interface ReportPreparationClassDto {
+  readonly classId: string;
+  readonly label: string;
+  readonly sectionCode: SectionId;
+  readonly studentCount: number;
+  /** Subjects the class has (its class subjects). */
+  readonly subjectCount: number;
+  readonly complete: boolean;
+  readonly gaps: readonly ReportGapDto[];
+  readonly cardsGenerated: number;
+  readonly cardsPublished: number;
+}
+
+export interface ReportPreparationDto {
+  readonly period: PeriodDto;
+  readonly classes: readonly ReportPreparationClassDto[];
+  readonly classCount: number;
+  readonly completeClassCount: number;
+  readonly subjectCount: number;
+  /** Subjects ready for the report cards, over every class. */
+  readonly readySubjectCount: number;
+  /** Teachers with something to finish. */
+  readonly lateTeacherCount: number;
+}
+
+/** POST /periods/:id/report-preparation/reminders: « Relancer » (admin only). */
+export interface ReportReminderRequest {
+  /** Omit to remind the teachers of every class of the period. */
+  readonly classId?: string;
+}
+
+export interface ReportReminderResponse {
+  /**
+   * Teachers with something to finish in this scope whose account can receive a reminder:
+   * `teachers = notified + alreadyReminded`.
+   */
+  readonly teachers: number;
+  /** Reminders written into their Notes à finir. */
+  readonly notified: number;
+  /** Teachers reminded less than GRADE_REMINDER_COOLDOWN_HOURS ago (for this scope or a wider one): left alone. */
+  readonly alreadyReminded: number;
+  /** Teachers with something to finish whose account is disabled or archived (not in `teachers`). */
+  readonly unreachable: number;
+  /** Subjects to finish that nobody teaches: nobody to remind. */
+  readonly withoutTeacher: number;
 }
 
 /* ------------------------------------------------------------------------------------------------

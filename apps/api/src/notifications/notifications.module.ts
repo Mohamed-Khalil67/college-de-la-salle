@@ -13,6 +13,6 @@ import { NotificationsService } from './notifications.service.js';
   imports: [TargetsModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, ChangeNoticesService, NotificationMailService],
-  exports: [ChangeNoticesService],
+  exports: [ChangeNoticesService, NotificationsService],
 })
 export class NotificationsModule {}

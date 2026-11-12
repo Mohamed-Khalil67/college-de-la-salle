@@ -43,7 +43,7 @@ test('each role lands in its own space and cannot open another', async ({ page }
   for (const [account, home, heading] of [
     [ACCOUNTS.student, '/eleve', /Bonjour/],
     [ACCOUNTS.teacher, '/enseignant', /Bonjour/],
-    [ACCOUNTS.admin, '/admin/utilisateurs', /Utilisateurs/],
+    [ACCOUNTS.admin, '/admin', /Bonjour/],
   ] as const) {
     await page.context().clearCookies();
     await signIn(page, account);

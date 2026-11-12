@@ -104,6 +104,10 @@ export class UsersService {
     const where: Prisma.UserWhereInput = {
       ...(query.role ? { role: query.role } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.isPlanner === undefined ? {} : { isPlanner: query.isPlanner }),
+      ...(query.mustChangePassword === undefined
+        ? {}
+        : { mustChangePassword: query.mustChangePassword }),
       ...(search
         ? {
             OR: [
