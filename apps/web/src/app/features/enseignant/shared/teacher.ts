@@ -7,7 +7,6 @@ import {
   type EventInput,
   GRADING_LIMITS,
   type ActivityTypeSummary,
-  type PostDto,
   round1,
   type SectionDto,
   SECTION_LABELS,
