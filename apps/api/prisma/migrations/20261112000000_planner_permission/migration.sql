@@ -1,5 +1,6 @@
--- Planificateur (docs/workflow-redesign.md, step 1): the coordinator flag of a teacher becomes a permission
--- on the account, so that a non-teaching staff account can hold it too.
+-- Planificateur (the owner's workflow redesign of 12 November 2026, step 1): the coordinator flag of a
+-- teacher becomes a permission on the account, so that a non-teaching staff account can hold it too.
+-- Audit rows written before this change keep their actions teacher.coordinator.grant / .revoke.
 
 -- AlterTable
 ALTER TABLE "users" ADD COLUMN "is_planner" BOOLEAN NOT NULL DEFAULT false;

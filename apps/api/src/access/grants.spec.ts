@@ -28,8 +28,9 @@ describe('grants', () => {
     // The permission is on the account: an admin account may carry it too.
     expect(isPlanner(user('admin', { isPlanner: true }))).toBe(true);
     expect(isPlanner(user('admin'))).toBe(false);
-    // A student never holds it, whatever the flag says.
+    // A student never holds it, whatever the flag says; nor a teacher account without its teacher profile.
     expect(isPlanner(user('student', { isPlanner: true }))).toBe(false);
+    expect(isPlanner(user('teacher', { isPlanner: true, teacherId: null }))).toBe(false);
   });
 
   it('lets the admin and planners edit the structure, nobody else', () => {

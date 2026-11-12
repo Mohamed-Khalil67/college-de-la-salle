@@ -220,7 +220,7 @@ export class UsersService {
     if (id === actor.id && dto.status === 'disabled')
       throw new BadRequestException('Vous ne pouvez pas désactiver votre propre compte.');
     // The permission belongs to staff accounts (the database refuses it too: users_planner_not_student).
-    if (dto.isPlanner !== undefined && current.role === 'student')
+    if (dto.isPlanner === true && current.role === 'student')
       throw new BadRequestException('Un élève ne peut pas être planificateur.');
     const restoring = current.status === 'archived' && dto.status === 'active';
     if (current.status === 'archived' && !restoring) throw new ConflictException(ARCHIVED);

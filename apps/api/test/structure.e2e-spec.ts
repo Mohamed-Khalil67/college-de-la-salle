@@ -503,6 +503,13 @@ describe('Structure permissions (e2e)', () => {
         .send({ isPlanner: true })
         .expect(400);
       expect(String((res.body as ApiError).message)).toMatch(/élève/);
+      // Sending the only valid value back is not an error.
+      await t
+        .http()
+        .patch(`/api/users/${user.userId}`)
+        .set(bearer(tokens.admin))
+        .send({ isPlanner: false })
+        .expect(200);
       // Even a write that skips the API is refused (CHECK users_planner_not_student).
       await expect(
         t.prisma.user.update({ where: { id: user.userId }, data: { isPlanner: true } }),
