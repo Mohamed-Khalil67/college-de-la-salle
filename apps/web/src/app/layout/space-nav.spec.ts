@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { desktopNav, mobileNav, type SpaceNavItem, visibleNav } from './space-nav';
 import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from './space-navs';
 
-type Who = { role: 'student' | 'teacher' | 'admin'; isCoordinator: boolean };
-const student: Who = { role: 'student', isCoordinator: false };
-const teacher: Who = { role: 'teacher', isCoordinator: false };
-const coordinator: Who = { role: 'teacher', isCoordinator: true };
-const admin: Who = { role: 'admin', isCoordinator: false };
+type Who = { role: 'student' | 'teacher' | 'admin'; isPlanner: boolean };
+const student: Who = { role: 'student', isPlanner: false };
+const teacher: Who = { role: 'teacher', isPlanner: false };
+const planner: Who = { role: 'teacher', isPlanner: true };
+const admin: Who = { role: 'admin', isPlanner: false };
+/** Planificateur is a permission on the account: an admin may carry it too. */
+const plannerAdmin: Who = { role: 'admin', isPlanner: true };
 
 const labels = (items: readonly SpaceNavItem[]) => items.map((i) => i.short ?? i.label);
 /** What `MenuPage` lists (« Plus »). */
@@ -17,9 +19,9 @@ describe('the phone bottom bar', () => {
     const cases: [string, readonly SpaceNavItem[], Who, string[]][] = [
       ['student', ELEVE_NAV, student, ['Accueil', 'Horaire', 'Devoirs', 'Notes', 'Plus']],
       ['teacher', ENSEIGNANT_NAV, teacher, ['Classes', 'Horaire', 'Notes', 'Appel', 'Plus']],
-      ['coordinator, teacher space', ENSEIGNANT_NAV, coordinator, ['Classes', 'Horaire', 'Notes', 'Appel', 'Plus']],
+      ['planner, teacher space', ENSEIGNANT_NAV, planner, ['Classes', 'Horaire', 'Notes', 'Appel', 'Plus']],
       ['admin', ADMIN_NAV, admin, ['Utilisateurs', 'Classes', 'Horaire', 'Année', 'Plus']],
-      ['coordinator, administration', ADMIN_NAV, coordinator, ['Classes', 'Horaire', 'Année', 'Plus']],
+      ['planner, administration', ADMIN_NAV, planner, ['Classes', 'Horaire', 'Année', 'Plus']],
     ];
     for (const [, nav, who, expected] of cases) expect(labels(mobileNav(visibleNav(nav, who)))).toEqual(expected);
   });
@@ -44,19 +46,19 @@ describe('« Plus » lists every screen of the area', () => {
     // Notifications and the agenda link belong to students and teachers: the administration has neither.
     expect(ADMIN_NAV.map((i) => i.path)).not.toContain('notifications');
     expect(labels(menu(ENSEIGNANT_NAV, teacher))).toEqual(expect.arrayContaining(['Agenda', 'Groupes', 'Annonces']));
-    expect(menu(ENSEIGNANT_NAV, teacher).map((i) => i.label)).not.toContain('Coordination');
-    expect(menu(ENSEIGNANT_NAV, coordinator).map((i) => i.label)).toContain('Coordination');
+    expect(menu(ENSEIGNANT_NAV, teacher).map((i) => i.label)).not.toContain('Planification');
+    expect(menu(ENSEIGNANT_NAV, planner).map((i) => i.label)).toContain('Planification');
     const adminPages = menu(ADMIN_NAV, admin).map((i) => i.label);
     expect(adminPages).toEqual(
       expect.arrayContaining(['Matières', 'Groupes', 'Salles', 'Types d’activité', 'Nouvelle année', 'Affectations', 'Validations', 'Bulletins', 'Messages']),
     );
-    const coordinatorPages = menu(ADMIN_NAV, coordinator).map((i) => i.label);
-    expect(coordinatorPages).toEqual(
+    const plannerPages = menu(ADMIN_NAV, planner).map((i) => i.label);
+    expect(plannerPages).toEqual(
       expect.arrayContaining(['Matières', 'Groupes', 'Salles', 'Types d’activité', 'Année scolaire', 'Mon espace enseignant']),
     );
-    expect(coordinatorPages).not.toContain('Utilisateurs');
-    expect(coordinatorPages).not.toContain('Nouvelle année');
-    expect(coordinatorPages).not.toContain('Bulletins');
+    expect(plannerPages).not.toContain('Utilisateurs');
+    expect(plannerPages).not.toContain('Nouvelle année');
+    expect(plannerPages).not.toContain('Bulletins');
   });
 
   it('every area reaches its own « Plus » page', () => {
@@ -69,15 +71,29 @@ describe('« Plus » lists every screen of the area', () => {
 describe('the top navigation', () => {
   it('shows everything when it fits, and the overflow moves to « Plus » when it does not', () => {
     expect(labels(desktopNav(visibleNav(ELEVE_NAV, student)))).toContain('Absences');
-    expect(desktopNav(visibleNav(ENSEIGNANT_NAV, coordinator)).map((i) => i.label)).toContain('Coordination');
+    expect(desktopNav(visibleNav(ENSEIGNANT_NAV, planner)).map((i) => i.label)).toContain('Planification');
     const adminTop = desktopNav(visibleNav(ADMIN_NAV, admin)).map((i) => i.label);
     expect(adminTop).toContain('Plus');
     expect(adminTop).not.toContain('Salles');
     // The rollover is run once a year: it sits behind « Plus » in the top bar.
     expect(adminTop).not.toContain('Nouvelle année');
     expect(adminTop.length).toBeLessThanOrEqual(9);
-    const coordinatorTop = desktopNav(visibleNav(ADMIN_NAV, coordinator)).map((i) => i.label);
-    expect(coordinatorTop).toEqual(expect.arrayContaining(['Salles', 'Types d’activité']));
-    expect(coordinatorTop).not.toContain('Plus');
+    const plannerTop = desktopNav(visibleNav(ADMIN_NAV, planner)).map((i) => i.label);
+    expect(plannerTop).toEqual(expect.arrayContaining(['Salles', 'Types d’activité']));
+    expect(plannerTop).not.toContain('Plus');
+  });
+});
+
+describe('the Planificateur permission', () => {
+  it('is labelled « Planification » in the teacher space, nowhere for a plain teacher or a student', () => {
+    expect(ENSEIGNANT_NAV.find((i) => i.access === 'planner')).toMatchObject({ label: 'Planification', href: '/admin/matieres' });
+    expect(visibleNav(ENSEIGNANT_NAV, teacher).some((i) => i.access === 'planner')).toBe(false);
+    // A student never holds it (the API and the database refuse it); the nav does not trust the flag either.
+    expect(visibleNav(ELEVE_NAV, { role: 'student', isPlanner: true })).toEqual(visibleNav(ELEVE_NAV, student));
+  });
+
+  it('changes nothing for an admin account: the same administration, without the way to a teacher space', () => {
+    expect(visibleNav(ADMIN_NAV, plannerAdmin)).toEqual(visibleNav(ADMIN_NAV, admin));
+    expect(visibleNav(ADMIN_NAV, plannerAdmin).map((i) => i.label)).not.toContain('Mon espace enseignant');
   });
 });

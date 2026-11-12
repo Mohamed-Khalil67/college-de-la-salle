@@ -20,7 +20,7 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
 
 /**
  * « Année scolaire »: a resumable checklist (dates, periods, holidays and exam weeks, classes, subjects)
- * and the annual calendar of each section, edited in place. The admin and the coordinators edit; only the
+ * and the annual calendar of each section, edited in place. The admin and the planners edit; only the
  * admin creates years, makes one current, deletes one, and closes or reopens periods.
  */
 @Component({

@@ -30,8 +30,8 @@ interface UserRow {
               <th scope="col">Classe</th>
               <th scope="col">Filière</th>
             }
-            @if (isTeachers()) {
-              <th scope="col">Coordinateur</th>
+            @if (canPlan()) {
+              <th scope="col">Planificateur</th>
             }
             <th scope="col">Statut</th>
             <th scope="col">Dernière connexion</th>
@@ -51,18 +51,18 @@ interface UserRow {
                 <td data-label="Classe :">{{ row.className }}</td>
                 <td data-label="Filière :">{{ row.track }}</td>
               }
-              @if (isTeachers()) {
-                <td data-label="Rôle :">
+              @if (canPlan()) {
+                <td data-label="Droits :">
                   <label class="check">
                     <input
-                      #coordinatorBox
+                      #plannerBox
                       type="checkbox"
-                      [checked]="row.user.isCoordinator"
-                      [attr.data-saved]="row.user.isCoordinator"
+                      [checked]="row.user.isPlanner"
+                      [attr.data-saved]="row.user.isPlanner"
                       [attr.aria-disabled]="row.user.status !== 'active' || busyId() !== null ? 'true' : null"
                       (click)="onBoxClick($event, row.user)"
                     />
-                    <span>Coordinateur<span class="visually-hidden"> : {{ row.name }}</span></span>
+                    <span>Planificateur<span class="visually-hidden"> : {{ row.name }}</span></span>
                   </label>
                 </td>
               }
@@ -107,7 +107,7 @@ export class UsersTable {
   readonly classes = input<ReadonlyMap<string, ClassDto>>(new Map());
   readonly now = input.required<Date>();
   readonly selfId = input<string | null>(null);
-  /** The teacher whose coordinateur flag is being saved. */
+  /** The account whose planificateur permission is being saved. */
   readonly busyId = input<string | null>(null);
   /** Bumped by the page when a change was refused: the rows are drawn again from the data, so a box that flipped goes back. */
   readonly revision = input(0);
@@ -115,8 +115,8 @@ export class UsersTable {
   readonly deactivate = output<UserDto>();
   /** A student who graduated or left the school. */
   readonly archive = output<UserDto>();
-  /** The admin ticked or unticked « Coordinateur » for a teacher; `value` is the new state. */
-  readonly coordinator = output<{ readonly user: UserDto; readonly value: boolean }>();
+  /** The admin ticked or unticked « Planificateur » for a teacher or admin account; `value` is the new state. */
+  readonly planner = output<{ readonly user: UserDto; readonly value: boolean }>();
 
   constructor() {
     // A refused change: every box goes back to the saved state without drawing the rows again (focus stays).
@@ -129,9 +129,10 @@ export class UsersTable {
   }
 
   protected readonly captionId = `users-caption-${++nextId}`;
-  private readonly boxes = viewChildren<ElementRef<HTMLInputElement>>('coordinatorBox');
+  private readonly boxes = viewChildren<ElementRef<HTMLInputElement>>('plannerBox');
   protected readonly isStudents = computed(() => this.role() === 'student');
-  protected readonly isTeachers = computed(() => this.role() === 'teacher');
+  /** Planificateur is a permission of staff accounts (teachers and the administration), never of a student. */
+  protected readonly canPlan = computed(() => this.role() !== 'student');
   /**
    * The box flips at once. While any change is being saved, or for an account that is not active, the click is
    * ignored (`aria-disabled`, not `disabled`: focus stays on the box).
@@ -142,7 +143,7 @@ export class UsersTable {
       event.preventDefault();
       return;
     }
-    this.coordinator.emit({ user, value: box.checked });
+    this.planner.emit({ user, value: box.checked });
   }
 
   protected readonly rows = computed<UserRow[]>(() =>

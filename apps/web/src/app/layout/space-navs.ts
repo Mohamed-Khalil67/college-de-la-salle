@@ -24,7 +24,7 @@ export const ELEVE_NAV: readonly SpaceNavItem[] = [
 
 /**
  * Phone bottom bar (five at most): Classes, Horaire, Notes, Appel, Plus. Agenda, Groupes, Annonces and, for a
- * coordinator, Coordination are one tap away in « Plus ».
+ * planner, Planification are one tap away in « Plus ».
  */
 export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Mes classes', path: '', icon: 'users', short: 'Classes' },
@@ -36,14 +36,14 @@ export const ENSEIGNANT_NAV: readonly SpaceNavItem[] = [
   { label: 'Annonces', path: 'annonces' },
   { label: 'Notifications', path: 'notifications', secondary: true },
   { label: 'Synchroniser mon agenda', path: 'synchroniser', short: 'Agenda en ligne', secondary: true },
-  /** Teachers the admin marked coordinateur edit the year's structure in the administration area. */
-  { label: 'Coordination', path: 'coordination', href: '/admin/matieres', access: 'coordinator' },
+  /** Teachers the admin marked planificateur edit the year's structure in the administration area. */
+  { label: 'Planification', path: 'planification', href: '/admin/matieres', access: 'planner' },
   { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
 ];
 
 /**
- * Navigation of /admin. Entries without `access` are the structure screens: the admin and the coordinators
- * (teachers marked coordinateur) open them. `access: 'admin'` ones are the admin's alone. Items with an icon
+ * Navigation of /admin. Entries without `access` are the structure screens: the admin and the planners
+ * (teachers marked planificateur) open them. `access: 'admin'` ones are the admin's alone. Items with an icon
  * go in the phone's bottom bar (five at most); « Plus » lists every screen there.
  */
 export const ADMIN_NAV: readonly SpaceNavItem[] = [
@@ -60,7 +60,7 @@ export const ADMIN_NAV: readonly SpaceNavItem[] = [
   { label: 'Validations', path: 'validations', access: 'admin' },
   { label: 'Bulletins', path: 'bulletins', access: 'admin' },
   { label: 'Messages', path: 'messages', access: 'admin', secondary: true },
-  /** A coordinator also teaches: the way back to the teacher space. */
-  { label: 'Mon espace enseignant', path: 'enseignant', href: '/enseignant', access: 'coordinator', secondary: true },
+  /** A planner also teaches: the way back to the teacher space. */
+  { label: 'Mon espace enseignant', path: 'enseignant', href: '/enseignant', access: 'planner', secondary: true },
   { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
 ];

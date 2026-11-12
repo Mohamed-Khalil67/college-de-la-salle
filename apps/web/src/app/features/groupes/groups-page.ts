@@ -15,7 +15,7 @@ import { studentName } from '../../shared/utils/targets';
 
 /**
  * « Groupes »: the parts of a class (TP A and TP B, LV2 Allemand and Espagnol), by division. A teacher manages
- * the groups of the classes they teach; the admin and the coordinators those of every class. One page for
+ * the groups of the classes they teach; the admin and the planners those of every class. One page for
  * both spaces: the classes offered follow the role.
  */
 @Component({
@@ -164,8 +164,8 @@ export class GroupsPage {
   readonly #auth = inject(AuthStore);
   readonly #document = inject(DOCUMENT);
 
-  /** The admin and the coordinators manage every class; a teacher the classes they teach. */
-  readonly #staff = computed(() => this.#auth.role() === 'admin' || !!this.#auth.user()?.isCoordinator);
+  /** The admin and the planners manage every class; a teacher the classes they teach. */
+  readonly #staff = computed(() => this.#auth.role() === 'admin' || !!this.#auth.user()?.isPlanner);
   readonly #allClasses = resource({
     params: () => (this.#staffKnown() && this.#staff() ? true : undefined),
     loader: () => this.#api.school.classes(),

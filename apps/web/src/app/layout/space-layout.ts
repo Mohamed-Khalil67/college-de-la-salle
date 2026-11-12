@@ -151,8 +151,8 @@ export type { SpaceNavItem } from './space-nav';
 export class SpaceLayout {
   /** From route data. */
   readonly areaLabel = input('Espace');
-  /** Shown instead of `areaLabel` to a teacher who is a coordinateur (in the administration). */
-  readonly coordinatorAreaLabel = input<string | null>(null);
+  /** Shown instead of `areaLabel` to a teacher who is a planificateur (in the administration). */
+  readonly plannerAreaLabel = input<string | null>(null);
   readonly nav = input<readonly SpaceNavItem[]>([]);
 
   protected readonly auth = inject(AuthStore);
@@ -164,9 +164,9 @@ export class SpaceLayout {
   protected readonly passwordOpen = signal(false);
   protected readonly base = computed(() => '/' + (this.#route.snapshot.pathFromRoot.flatMap((r) => r.url.map((s) => s.path)).join('/') || ''));
   protected readonly area = computed(() =>
-    this.auth.role() === 'teacher' && this.coordinatorAreaLabel() ? (this.coordinatorAreaLabel() ?? '') : this.areaLabel(),
+    this.auth.role() === 'teacher' && this.plannerAreaLabel() ? (this.plannerAreaLabel() ?? '') : this.areaLabel(),
   );
-  /** The items this user may see: admin-only and coordinator-only entries are filtered by role. */
+  /** The items this user may see: admin-only and planner-only entries are filtered by role. */
   protected readonly visibleNav = computed(() => visibleNav(this.nav(), this.auth.user()));
   protected readonly desktopNav = computed(() => desktopNav(this.visibleNav()));
   /** The bell leads to the notifications page of the user's own space (students and teachers only). */

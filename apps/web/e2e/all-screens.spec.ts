@@ -16,17 +16,17 @@ test.beforeEach(({}, testInfo) => {
 interface Who {
   readonly title: string;
   readonly account: Account;
-  readonly user: { role: 'student' | 'teacher' | 'admin'; isCoordinator: boolean };
+  readonly user: { role: 'student' | 'teacher' | 'admin'; isPlanner: boolean };
   readonly area: string;
   readonly nav: readonly SpaceNavItem[];
 }
 
 const ROLES: Who[] = [
-  { title: 'admin', account: ACCOUNTS.admin, user: { role: 'admin', isCoordinator: false }, area: '/admin', nav: ADMIN_NAV },
-  { title: 'coordinator (administration)', account: ACCOUNTS.coordinator, user: { role: 'teacher', isCoordinator: true }, area: '/admin', nav: ADMIN_NAV },
-  { title: 'coordinator (teacher space)', account: ACCOUNTS.coordinator, user: { role: 'teacher', isCoordinator: true }, area: '/enseignant', nav: ENSEIGNANT_NAV },
-  { title: 'teacher', account: ACCOUNTS.teacher, user: { role: 'teacher', isCoordinator: false }, area: '/enseignant', nav: ENSEIGNANT_NAV },
-  { title: 'student', account: ACCOUNTS.student, user: { role: 'student', isCoordinator: false }, area: '/eleve', nav: ELEVE_NAV },
+  { title: 'admin', account: ACCOUNTS.admin, user: { role: 'admin', isPlanner: false }, area: '/admin', nav: ADMIN_NAV },
+  { title: 'planner (administration)', account: ACCOUNTS.planner, user: { role: 'teacher', isPlanner: true }, area: '/admin', nav: ADMIN_NAV },
+  { title: 'planner (teacher space)', account: ACCOUNTS.planner, user: { role: 'teacher', isPlanner: true }, area: '/enseignant', nav: ENSEIGNANT_NAV },
+  { title: 'teacher', account: ACCOUNTS.teacher, user: { role: 'teacher', isPlanner: false }, area: '/enseignant', nav: ENSEIGNANT_NAV },
+  { title: 'student', account: ACCOUNTS.student, user: { role: 'student', isPlanner: false }, area: '/eleve', nav: ELEVE_NAV },
 ];
 
 /** The screens of the area for this role: not the links to other areas, « Plus » included (the shared menu page). */
