@@ -65,7 +65,9 @@ export class WarningsService {
     const facts = {
       examWeeks,
       classSize: new Map(sizes.map((s) => [s.classId, s._count._all])),
-      groupSize: new Map(groupIds.map((id) => [id, groupSizes.find((g) => g.groupId === id)?._count._all ?? 0])),
+      groupSize: new Map(
+        groupIds.map((id) => [id, groupSizes.find((g) => g.groupId === id)?._count._all ?? 0]),
+      ),
       rooms: new Map<string, RoomFacts>(
         rooms.map((r) => [r.id, { name: r.name, capacity: r.capacity, kind: r.kind as RoomKind }]),
       ),

@@ -1126,7 +1126,10 @@ export interface TimetableOccurrenceQuery {
   readonly to: string;
 }
 
-/** GET /timetable/warnings: the soft warnings of the stored timetable in a range, for the « Conflits » panel. */
+/**
+ * GET /timetable/warnings: the soft warnings of the stored timetable in a range, for the « Conflits » panel.
+ * Without a class, a teacher or a room, the whole school's (the planner's page).
+ */
 export type TimetableWarningQuery = TimetableOccurrenceQuery;
 
 /** GET /timetable/free-rooms?date&startTime&endTime: active rooms free during that time. */

@@ -109,9 +109,13 @@ export class TimetableReadService {
     return sessions.map((o) => toOccurrenceDto(o, names, this.canChange(o, user, today, taught)));
   }
 
-  /** The soft warnings of the stored timetable in a range (admin or planner), for the « Conflits » panel. */
+  /**
+   * The soft warnings of the stored timetable in a range (admin or planner), for the « Conflits » panel. Without
+   * a class, a teacher or a room: the whole school (the planner's page).
+   */
   async warningsFor(query: TimetableOccurrenceQueryDto): Promise<TimetableWarningDto[]> {
-    const scope = await this.scope(query, null);
+    const wholeSchool = !query.classId && !query.teacherId && !query.roomId;
+    const scope = wholeSchool ? this.range(query) : await this.scope(query, null);
     const sessions = await this.sessions(this.prisma, scope, query.from, query.to);
     return this.warnings.forSessions(this.prisma, sessions, true);
   }
@@ -149,6 +153,14 @@ export class TimetableReadService {
 
   /* Internals --------------------------------------------------------------------------------- */
 
+  /** The range alone: the whole school. */
+  private range(query: TimetableOccurrenceQueryDto): Record<string, never> {
+    if (query.to < query.from) throw new BadRequestException('« to » doit suivre « from ».');
+    if (daysBetween(query.from, query.to) >= TIMETABLE_LIMITS.maxRangeDays)
+      throw new BadRequestException(`Période limitée à ${TIMETABLE_LIMITS.maxRangeDays} jours.`);
+    return {};
+  }
+
   /** Exactly one of class, teacher, room; a student gets their own class when none is given. */
   private async scope(
     query: TimetableOccurrenceQueryDto,
@@ -182,16 +194,24 @@ export class TimetableReadService {
         { exceptions: { some: { newDate: { gte: fromDay(from), lte: fromDay(to) } } } },
       ],
     };
-    const owner: Prisma.TimetableSlotWhereInput = scope.classId
-      ? { classSubject: { classId: scope.classId } }
-      : scope.teacherId
-        ? {
-            OR: [
-              { teacherId: scope.teacherId },
-              { exceptions: { some: { newTeacherId: scope.teacherId } } },
-            ],
-          }
-        : { OR: [{ roomId: scope.roomId }, { exceptions: { some: { newRoomId: scope.roomId } } }] };
+    const owner: Prisma.TimetableSlotWhereInput =
+      !scope.classId && !scope.teacherId && !scope.roomId
+        ? {}
+        : scope.classId
+          ? { classSubject: { classId: scope.classId } }
+          : scope.teacherId
+            ? {
+                OR: [
+                  { teacherId: scope.teacherId },
+                  { exceptions: { some: { newTeacherId: scope.teacherId } } },
+                ],
+              }
+            : {
+                OR: [
+                  { roomId: scope.roomId },
+                  { exceptions: { some: { newRoomId: scope.roomId } } },
+                ],
+              };
     const rows = await db.timetableSlot.findMany({
       where: { AND: [window, owner] },
       include: slotInclude,

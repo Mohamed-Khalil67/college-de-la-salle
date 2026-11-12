@@ -75,9 +75,7 @@ export function sessionWarnings(
     const first = list[0]!;
     const room = facts.rooms.get(first.current.roomId!);
     const group = first.slot.row.group;
-    const size = group
-      ? facts.groupSize?.get(group.id)
-      : facts.classSize.get(first.slot.classId);
+    const size = group ? facts.groupSize?.get(group.id) : facts.classSize.get(first.slot.classId);
     if (!room || room.capacity === null || size === undefined || room.capacity >= size) continue;
     out.push({
       code: 'room_capacity',
