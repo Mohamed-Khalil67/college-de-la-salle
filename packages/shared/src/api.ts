@@ -1290,6 +1290,49 @@ export interface StudentGradeDto {
   readonly event: Pick<EventDto, 'id' | 'type' | 'title' | 'date' | 'subjectId' | 'coefficient' | 'periodId'>;
 }
 
+/**
+ * POST /grading/assessments (teachers): « Nouvelle note ». Creates, in one step, the gradable event the
+ * grades hang on (today's school date, no time, the whole class, the current open period) and answers its
+ * empty grade sheet (`GradeSheetDto`). The scale (« Sur ») is not stored on the event: it travels with the
+ * marks (`SaveGradesRequest.outOf`).
+ */
+export interface CreateQuickAssessmentRequest {
+  readonly classId: string;
+  /** A subject of that class that the teacher teaches. */
+  readonly subjectId: string;
+  /** 1 to `EVENT_LIMITS.title` characters once trimmed. */
+  readonly title: string;
+  /** Weight of the grades, 0 to 20 (two decimals), 1 by default. */
+  readonly coefficient?: number;
+  /**
+   * A gradable activity type the teacher may use, not a homework one. Omitted: the first assessment type
+   * (gradable, neither homework nor weekly) in the school's order.
+   */
+  readonly activityTypeId?: string;
+}
+
+/** GET /grading/pending?classId=&subjectId= (teachers): the « Noter » picker. */
+export interface PendingGradingQuery {
+  readonly classId: string;
+  readonly subjectId: string;
+}
+
+/**
+ * A gradable event of the class and subject whose grades are not published yet, or not all entered
+ * (drafts, planned exams, half-entered marks), in an open period. Newest first.
+ */
+export interface PendingGradingDto {
+  readonly event: EventDto;
+  /** Grades entered for the students the work concerns. */
+  readonly entered: number;
+  /** Students the work concerns today. */
+  readonly total: number;
+  /** Some grades are already visible to the students (then `entered < total`). */
+  readonly published: boolean;
+  /** The scale of the grades entered so far, null before the first mark. */
+  readonly outOf: number | null;
+}
+
 /** GET /students/:id/grades?periodId= or ?from=&to= */
 export interface StudentGradesQuery {
   /** The grades of a period (by their event's periodId), weighted with that year's class subjects. */
