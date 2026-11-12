@@ -11,7 +11,7 @@ import type {
   StudentGradesDto,
 } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
-import { blockState, bothOf, LOADING } from '../../../shared/utils/block-state';
+import { blockState, bothOf, LOADING, type Snapshot } from '../../../shared/utils/block-state';
 import { absencesView, currentTerm, gradesView, newsView, todoView } from './home-views';
 
 /**
@@ -74,7 +74,8 @@ describe('À faire', () => {
     expect(blockState(bothOf({ error: undefined, value: [hw('a', TODAY)] }, LOADING), view)).toEqual({ status: 'loading' });
   });
   it('shows the error of either list', () => {
-    expect(blockState(bothOf(LOADING, { error: failure, value: undefined }), view)).toEqual({ status: 'error', error: failure });
+    const down: Snapshot<readonly OccurrenceDto[]> = { error: failure, value: undefined };
+    expect(blockState(bothOf<readonly HomeworkDto[], readonly OccurrenceDto[]>(LOADING, down), view)).toEqual({ status: 'error', error: failure });
   });
   it('is empty with nothing due and no test in the next two weeks', () => {
     const later = [hw('far', '2026-12-20')];

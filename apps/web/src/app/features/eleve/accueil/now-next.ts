@@ -126,3 +126,26 @@ export function quietText(reason: QuietReason, label: string): string {
 export function placeLine(session: TimetableOccurrenceDto): string {
   return [session.current.roomName ?? '', session.current.teacherName].filter(Boolean).join(', ');
 }
+
+export interface NowView {
+  readonly state: NowState;
+  /** « En cours · fin à 10 h 00 », « Prochain cours · dans 12 min », « Journée terminée »… */
+  readonly lead: string;
+  /** The calm sentence when there is no class to show; '' otherwise. */
+  readonly quiet: string;
+  /** Today's sessions in a row; empty on a closed day (the holiday says it all). */
+  readonly strip: readonly DaySession[];
+}
+
+/** Everything the « Maintenant » block shows. */
+export function nowView(
+  list: readonly TimetableOccurrenceDto[],
+  days: readonly CalendarDayDto[],
+  today: string,
+  now: string,
+): NowView {
+  const state = nowState(list, today, now, closedDayOf(days, today));
+  const quiet = state.kind === 'quiet' ? quietText(state.reason, state.label) : '';
+  const closed = state.kind === 'quiet' && state.reason === 'closed';
+  return { state, lead: nowLead(state), quiet, strip: closed ? [] : dayStrip(list, today, now) };
+}

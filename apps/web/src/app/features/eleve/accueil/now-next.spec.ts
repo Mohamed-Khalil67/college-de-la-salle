@@ -8,6 +8,7 @@ import {
   nowState,
   phaseOf,
   placeLine,
+  nowView,
   quietText,
   untilLabel,
 } from './now-next';
@@ -32,7 +33,7 @@ function session(start: string, end: string, extra: Partial<TimetableOccurrenceD
     classLabel: 'Seconde B',
     subjectId: 'maths',
     subjectName: 'Mathématiques',
-    activityType: { id: 'a1', code: 'cours', label: 'Cours', colour: '', icon: '', gradable: false, repeatable: true, homework: false },
+    activityType: { id: 'a1', code: 'cours', label: 'Cours', colour: 'navy', icon: 'book', gradable: false, repeatable: true, homework: false },
     division: null,
     groupId: null,
     groupLabel: null,
@@ -161,5 +162,26 @@ describe('placeLine', () => {
   it('gives the room and the teacher, without an empty room', () => {
     expect(placeLine(DAY[0]!)).toBe('Salle 12, Hany Mansour');
     expect(placeLine(session('08:00', '09:00', { current: { ...DAY[0]!.current, roomName: null } }))).toBe('Hany Mansour');
+  });
+});
+
+describe('nowView', () => {
+  it('gives the lead, the class and the row of the day', () => {
+    const view = nowView(DAY, [], TODAY, '10:03');
+    expect(view.lead).toBe('Prochain cours · dans 12 min');
+    expect(view.quiet).toBe('');
+    expect(view.strip.map((d) => d.phase)).toEqual(['past', 'past', 'upcoming']);
+  });
+  it('hides the row on a closed day and says why', () => {
+    const cancelled = DAY.map((s) => ({ ...s, status: 'cancelled' as const }));
+    const view = nowView(cancelled, [holiday], TODAY, '10:00');
+    expect(view.lead).toBe('Pas de cours aujourd’hui');
+    expect(view.quiet).toBe('Vacances d’automne. Bon repos.');
+    expect(view.strip).toEqual([]);
+  });
+  it('keeps the row once the day is over', () => {
+    const view = nowView(DAY, [], TODAY, '17:00');
+    expect(view.quiet).toContain('finis');
+    expect(view.strip).toHaveLength(3);
   });
 });
