@@ -42,7 +42,7 @@ import {
 } from '@cdls/shared';
 import { IsDay } from '../../common/dates.js';
 import { PaginationQueryDto } from '../../common/pagination.js';
-import { lowerTrim, trim } from '../../common/transforms.js';
+import { lowerTrim, queryBoolean, trim } from '../../common/transforms.js';
 
 const SECTIONS: readonly SectionId[] = ['nationale', 'bac'];
 
@@ -84,6 +84,20 @@ export class UserListQueryDto extends PaginationQueryDto implements UserListQuer
   @IsString()
   @MaxLength(100)
   search?: string;
+
+  /** true: the Planificateurs only; false: everyone else. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  isPlanner?: boolean;
+
+  /** true: accounts still on their temporary password. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  mustChangePassword?: boolean;
 }
 
 export class CreateUserDto implements CreateUserRequest {

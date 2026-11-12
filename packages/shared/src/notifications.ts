@@ -16,6 +16,7 @@ export const NOTIFICATION_KINDS = [
   'event_room_changed',
   'grade_published',
   'homework_assigned',
+  'grades_reminder',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -29,6 +30,7 @@ export const NOTIFICATION_KIND_LABELS: Readonly<Record<NotificationKind, string>
   event_room_changed: 'Lieu changé',
   grade_published: 'Note publiée',
   homework_assigned: 'Nouveau devoir',
+  grades_reminder: 'Notes à finir',
 };
 
 /** Session and event changes: what the feed and the timetable show differently now. */
@@ -174,6 +176,53 @@ export function homeworkNotice(f: {
   return clean({
     title: `Nouveau devoir : ${f.title}`,
     body: `${f.subject ? `${f.subject} : ` : ''}« ${f.title} » à rendre le ${longDay(f.dueDay)}${at(f.dueTime)}.`,
+  });
+}
+
+/** Why a subject of a class is not ready for the report cards of a period. */
+export const REPORT_GAP_REASONS = ['no_grades', 'incomplete', 'unpublished'] as const;
+export type ReportGapReason = (typeof REPORT_GAP_REASONS)[number];
+
+/** A teacher may be reminded about the same period once in this many hours (the API refuses to nag). */
+export const GRADE_REMINDER_COOLDOWN_HOURS = 12;
+
+/** One class and subject a teacher still has to finish. */
+export interface GradeReminderItem {
+  readonly className: string;
+  readonly subject: string;
+  readonly reason: ReportGapReason;
+  /** Marks entered and expected on the unfinished work (incomplete only). */
+  readonly entered: number;
+  readonly total: number;
+}
+
+/** Items listed in one reminder before « et N autres » (the body is limited to 600 characters). */
+const REMINDER_ITEMS = 6;
+
+function reminderDetail(item: GradeReminderItem): string {
+  switch (item.reason) {
+    case 'no_grades':
+      return 'aucune note';
+    case 'incomplete':
+      return `${item.entered} / ${item.total} notes saisies`;
+    case 'unpublished':
+      return 'notes à publier';
+  }
+}
+
+/** The administration asks a teacher to finish the grades of a period before the report cards. */
+export function gradesReminderNotice(f: {
+  readonly periodLabel: string;
+  readonly items: readonly GradeReminderItem[];
+}): NotificationText {
+  const shown = f.items.slice(0, REMINDER_ITEMS);
+  const more = f.items.length - shown.length;
+  const list = shown
+    .map((i) => `${i.subject}, ${i.className} (${reminderDetail(i)})`)
+    .join(' ; ');
+  return clean({
+    title: `Notes à finir : ${f.periodLabel}`,
+    body: `L’administration vous demande de finir les notes du ${f.periodLabel} avant les bulletins : ${list}${more > 0 ? ` et ${more} autre${more > 1 ? 's' : ''}` : ''}.`,
   });
 }
 
