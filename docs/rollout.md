@@ -6,14 +6,14 @@ Draft for the school. It assumes the college runs a small pilot first, then open
 
 | Role | Can do | Cannot do (yet) |
 |---|---|---|
-| **Student** | See today's classes and the week's timetable; tick homework as done; read published grades with averages per subject and overall; see absences; read and download report cards (PDF); read announcements for their class | Change their own password; see other students' data |
+| **Student** | See today's classes and the week's timetable; tick homework as done; read published grades with averages per subject and overall; see absences; read and download report cards (PDF); read announcements for their class | See other students' data |
 | **Teacher** | See their classes; add, edit and delete calendar events (course, exam, homework, with links and weekly repeat); enter grades in a grid and publish them; take attendance; post announcements to a class or section | Edit another teacher's class; open the admin area |
 | **Admin / secretariat** | Create accounts one by one or by CSV import; manage classes, enrolments, teaching assignments, school years and terms; generate, edit and publish report cards; read messages from the contact form | n/a |
 
 ## Gaps to close before the school launch
 
-1. **Passwords.** There is no "change my password" screen, and no e-mail reset. Accounts get a temporary password from the admin, and the login page tells people to ask the secretariat. Add a first-login password change before opening the platform to hundreds of students.
-2. **Backups and hosting.** Deployment (Docker on the school's server, nightly backups kept off-site, HTTPS) is not done yet. The school must not rely on the platform for grades until it is.
+1. **Passwords.** Done: everyone changes the temporary password at first sign-in, can change it later from their space, and can reset a forgotten one by e-mail. The reset needs the school's SMTP details (`docs/deployment.md`).
+2. **Backups and hosting.** The Docker deployment with nightly backups and HTTPS is ready (`deploy/`, `docs/deployment.md`) but not live: it waits for the login e-mail domain, SMTP details and a Cloudflare tunnel token or domain. The school must not rely on the platform for grades until it runs on the school's server.
 3. **Real data.** Replace the demo data: import the real classes, teachers and students (CSV).
 4. **Parents.** Not in this version. Say so up front: families see report cards only if the student shows them.
 

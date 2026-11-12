@@ -36,17 +36,18 @@ Put the skill line at the top of every brief you give an agent. The logo and cre
   Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
 - A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
 
-## Status (2026-10-26)
+## Status (2026-11-12)
 
-Everything below is merged on local `main`; nothing is pushed to GitHub yet (`college/main` is behind).
+Everything below is merged on `main` and pushed to `college/main`.
 
 - **Done:** public site in fr/en/ar with accessibility statement; login, first sign-in password change, forgotten
   password by e-mail; student, teacher and admin spaces; timetable with hard/soft conflicts and suggestions; groups and
   « Assigner à »; grades, attendance, report cards (PDF); announcements and contact messages with clean-up; roster
   import with numbered homonym e-mails; section-change approvals; next-year rollover; personal calendar feed and
   notifications; Docker deployment (`deploy/`, `docs/deployment.md`).
-- **Checks on main:** 140 shared, 300 API and 188 web unit tests; 350 API e2e (stable over three runs); Playwright 112
-  passed, 71 phone variants skipped by design.
+- **Checks on main:** 140 shared, 305 API and 195 web unit tests (2026-11-12); 350 API e2e (stable over three runs);
+  Playwright 112 passed, 71 phone variants skipped by design. `npm audit --omit=dev`: 0 vulnerabilities (2026-11-12).
+- **No CI yet:** nothing runs the checks on push; run them by hand before every merge.
 - **Open:** the real login e-mail domain (`SCHOOL_EMAIL_DOMAIN`), SMTP details, a Cloudflare tunnel token or domain for
   going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.
