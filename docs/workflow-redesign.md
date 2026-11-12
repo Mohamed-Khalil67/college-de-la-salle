@@ -1,7 +1,6 @@
 # Workflow redesign: one page per role
 
-Agreed with the owner on 12 November 2026, in a step-by-step brainstorm with drawings. Nothing here is built yet; the build
-order is at the end. Read with `docs/school-year-design.md` (the data model this sits on) and `docs/architecture.md`.
+Agreed with the owner on 12 November 2026, in a step-by-step brainstorm with drawings. Build status is at the end. Read with `docs/school-year-design.md` (the data model this sits on) and `docs/architecture.md`.
 
 ## Decisions
 
@@ -120,6 +119,23 @@ class-council comments; 3. publish (the student's Notes block shows « Bulletin 
 Steps 1, 2 and 3 can run in parallel (different files). UI work follows the owner's kit
 `github.com/Mohamed-Khalil67/frontend-ai-kit-by-Mk` (`frontend-lead` routing, `css-styling`, `my-coding-habits`) on top
 of the skills above; `CLAUDE.md` wins where they differ.
+
+## Built: the Planificateur page and « Professeur absent » (step 5)
+- `/admin/planification` (`features/admin/planification/`), the five blocks of the table above, the two header buttons.
+  « Examen » opens the agenda's event form for a planner who teaches; for an admin account it is hidden, because only
+  a teacher can create an event today (`POST /events`): the exam creation for a planner without a teacher profile is
+  not built.
+- « Professeur absent » end to end (`/admin/planification/professeur-absent`, `POST /planner/absence`): a new
+  `SlotExceptionKind` `study` (migration `20261112100000`), one transaction with the audit rows and the notifications
+  (`session_substituted`, `session_study`, to the class, the lesson's teacher and the covering teacher). A covering
+  teacher is a free teacher of the subject first. The weekly timetable, homework and tests are not touched.
+- « À régler » shows the stored timetable's soft warnings of the next two weeks and the classes that still miss hours
+  (two sessions can never share a room or a teacher: the database refuses it, so nothing else can be red). The class
+  hours come from `ClassSubject.hoursPerWeek`; a subject without hours asks for nothing.
+- Teachers' « Mon emploi du temps » is read-only. Left: the teacher's agenda still creates every event type (homework,
+  exams, meetings) because the grading and homework flows use it; the doc's « teachers lose other event types » is
+  step 2's API change.
+- Naming a substitute from the timetable editor now notifies too (it was silent before).
 
 ## Still to decide
 - Can the Planificateur also edit subjects and classes, or only time and place?

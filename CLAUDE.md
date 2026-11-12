@@ -48,6 +48,7 @@ Everything below is merged on `main` and pushed to `college/main`.
 - **Checks on main:** 140 shared, 305 API and 195 web unit tests (2026-11-12); 350 API e2e (stable over three runs);
   Playwright 112 passed, 71 phone variants skipped by design. `npm audit --omit=dev`: 0 vulnerabilities (2026-11-12).
 - **No CI yet:** nothing runs the checks on push; run them by hand before every merge.
+- **Planner page (12 Nov 2026):** `/admin/planification` and « Professeur absent » (`docs/workflow-redesign.md`, « Built »).
 - **Open:** the real login e-mail domain (`SCHOOL_EMAIL_DOMAIN`), SMTP details, a Cloudflare tunnel token or domain for
   going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.

@@ -114,6 +114,12 @@ pages follow the same pattern). Rules:
   GET /school-years for all blocks; wait on `settled()`, fall back to the whole year when `years.error()`).
 - Ticking, and any write, uses the same component and API call as the detail page (`HomeworkItem`), so both stay in step.
 
+## The planner's page (« Planification »)
+
+`features/admin/planification/`: `/admin/planification` (the home of a planner: `PLANNER_HOME`; the admin has it in the nav too) and `/admin/planification/professeur-absent`. Same block pattern as the student page: `planner-home-page.ts` (`providers: [HomeStatus, PlannerData]`, header buttons « Professeur absent » and « Examen »), one component per block (`fix-block`, `changes-block`, `rooms-block`, `year-block`, `timetables-block`), the pure views and their four-state spec in `planner-views.ts`. `PlannerData` holds the one `planner/timetables` resource that « À régler » (a secondary source: if it fails the alerts still show) and « Emplois du temps » share. Entry links are absolute (`/admin/…`), because the page is not at the root of its area. « Salles maintenant » reloads on the school clock's minute (every five), never its own timer. « Examen » opens `/enseignant/agenda` and shows only to an account with a teacher profile: an admin account without one has no way to create an event yet (`POST /events` is `@Roles('teacher')`).
+
+**« Professeur absent »** (`absence-page.ts`, rules in `absence-logic.ts` with a spec): a Signal Form for the teacher and the days (the teachers are the distinct names of `api.school.assignments()`), then one `<fieldset>` per lesson with native radios (Annuler, Remplacer, Étude surveillée) and a select of the free teachers (same subject first); « Remplacer » proposes the first free teacher of the subject. Every lesson the weekly rule leaves untouched needs a choice; « Enregistrer et prévenir » sends `api.planner.applyAbsence` once. A 409 shows through `app-blocked-notice` (conflicts, or warnings with a reason each). The teacher's own « Mon emploi du temps » is read-only: teachers no longer offered to change a session (the API still allows it); the planner does it.
+
 ## Timetable conflicts
 
 `features/timetable/blocked-notice.ts` shows a refused save: the conflicts (alert), the free places as one-click buttons (`suggestions` input, `apply` output, focus moves to its heading) and the warnings. A dialog that owns a write fills the chosen place into its form with the pure `features/timetable/suggestions.ts` (`applyToSession`, `applyToSeries`) and saves again; keep that file free of Angular.

@@ -377,7 +377,7 @@ interface Request {
 export class AbsencePage {
   readonly #api = inject(ApiClient);
   readonly #clock = inject(SchoolClock);
-  readonly #lessonsHeading = viewChild<ElementRef<HTMLElement>>('lessonsHeading');
+  protected readonly lessonsHeading = viewChild<ElementRef<HTMLElement>>('lessonsHeading');
 
   protected readonly kinds = ABSENCE_CHOICE_KINDS;
   protected readonly labels = ABSENCE_CHOICE_LABELS;
@@ -475,7 +475,7 @@ export class AbsencePage {
       this.result.set(null);
       this.#resetSave();
       this.request.set({ ...this.periodModel() });
-      queueMicrotask(() => this.#lessonsHeading()?.nativeElement.focus());
+      queueMicrotask(() => this.lessonsHeading()?.nativeElement.focus());
       return undefined;
     });
   }
@@ -590,7 +590,7 @@ export class AbsencePage {
     const first = this.check().untreated[0] ?? this.check().incomplete[0]?.session;
     if (!first) return;
     queueMicrotask(() => {
-      const host = this.#lessonsHeading()?.nativeElement.ownerDocument;
+      const host = this.lessonsHeading()?.nativeElement.ownerDocument;
       const target = host?.querySelector<HTMLElement>(
         `fieldset[data-key="${keyOf(first)}"] input, fieldset[data-key="${keyOf(first)}"] select`,
       );
@@ -600,7 +600,7 @@ export class AbsencePage {
 
   #focusResult(): void {
     queueMicrotask(() =>
-      this.#lessonsHeading()?.nativeElement.ownerDocument.querySelector<HTMLElement>('h1')?.focus(),
+      this.lessonsHeading()?.nativeElement.ownerDocument.querySelector<HTMLElement>('h1')?.focus(),
     );
   }
 }

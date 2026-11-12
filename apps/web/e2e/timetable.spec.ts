@@ -202,69 +202,15 @@ test.describe('timetable', () => {
     expect(decoration).toBe('line-through');
   });
 
-  test('a teacher changes the room of one session with the three-scope dialog and a free room', async ({ page }) => {
+  test('a teacher reads their week and is not offered any change: the planner does it', async ({ page }) => {
     await signInTo(page, ACCOUNTS.teacher, '/enseignant/emploi-du-temps');
     await expect(page.getByRole('heading', { level: 1, name: 'Mon emploi du temps' })).toBeVisible();
     await page.getByRole('button', { name: 'Semaine suivante' }).click();
-    const edit = page.getByRole('button', { name: /^Modifier la séance/ }).first();
-    await expect(edit).toBeVisible();
-    await edit.click();
-    const dialog = page.getByRole('dialog', { name: 'Modifier la séance' });
-    await expect(dialog).toBeVisible();
-    // The three scopes; the series ones belong to the administration.
-    await expect(dialog.getByRole('radio', { name: 'Cette séance' })).toBeChecked();
-    await expect(dialog.getByRole('radio', { name: 'Celle-ci et les suivantes' })).toBeDisabled();
-    await expect(dialog.getByRole('radio', { name: 'Toute la série' })).toBeDisabled();
-    await dialog.getByRole('radio', { name: 'Changer de salle' }).check();
-    const rooms = dialog.getByRole('list', { name: 'Salles libres à ce moment-là' });
-    await expect(rooms).toBeVisible();
-    await rooms.getByRole('button').first().click();
-    await dialog.getByLabel('Motif').fill('Test Playwright');
-    await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
-    await expect(page.locator('.alert--success').filter({ hasText: 'La séance a été modifiée' })).toBeVisible();
-    await expect(page.getByText('Salle changée').first()).toBeVisible();
-    // Back to the plan.
-    await page.getByRole('button', { name: /^Rétablir la séance/ }).first().click();
-    await expect(page.locator('.alert--success').filter({ hasText: 'rétablie' })).toBeVisible();
+    await expect(page.locator('.tt-item').first()).toBeVisible();
+    await expect(page.getByText('Demandez-le au planificateur')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Modifier la séance/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Rétablir/ })).toHaveCount(0);
   });
-
-  for (const width of [390, 1440]) {
-    test(`a teacher's room change into a taken room offers free rooms; one click saves (${width} px)`, async ({ page }, info) => {
-      test.skip(info.project.name === 'phone', 'Run from the desktop project at both widths.');
-      await page.setViewportSize({ width, height: 900 });
-      await signInTo(page, ACCOUNTS.teacher, '/enseignant/emploi-du-temps');
-      await page.getByRole('button', { name: 'Semaine suivante' }).click();
-      await page.getByRole('button', { name: /^Modifier la séance/ }).first().click();
-      const dialog = page.getByRole('dialog', { name: 'Modifier la séance' });
-      await dialog.getByRole('radio', { name: 'Changer de salle' }).check();
-      const free = dialog.getByRole('list', { name: 'Salles libres à ce moment-là' });
-      await expect(free.getByRole('button').first()).toBeVisible();
-      // A room someone else holds then: in the list of rooms, not among the free ones.
-      const freeNames = (await free.getByRole('button').allInnerTexts()).map((t) => t.split('\n')[0]!.trim());
-      const select = dialog.getByLabel('Nouvelle salle');
-      const options = (await select.locator('option').allInnerTexts()).map((t) => t.trim()).filter((t) => t !== 'Choisir…');
-      const taken = options.find((name) => !freeNames.some((f) => f.startsWith(name)));
-      expect(taken, 'a room that is taken at that time').toBeTruthy();
-      await select.selectOption({ label: taken! });
-      await dialog.getByLabel('Motif').fill('Test Playwright');
-      await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
-
-      await expect(dialog.getByRole('alert').filter({ hasText: 'est déjà occupée' })).toBeVisible();
-      await expect(dialog.getByRole('heading', { name: 'Choisir une place libre' })).toBeFocused();
-      const ways = dialog.getByRole('list', { name: 'Une autre salle, au même moment' });
-      await expect(ways.getByRole('button').first()).toBeVisible();
-      // A room change only needs another room: no other time is offered.
-      await expect(dialog.getByRole('list', { name: /Un autre moment/ })).toHaveCount(0);
-      await expectNoAxeViolations(page);
-      await page.keyboard.press('Tab');
-      await expect(ways.getByRole('button').first()).toBeFocused();
-      await page.keyboard.press('Enter');
-      const done = page.locator('.alert--success').filter({ hasText: 'La séance a été modifiée' });
-      await afterSuggestion(page, dialog, done);
-      await expect(done).toBeVisible();
-      await expect(page.getByText('Salle changée').first()).toBeVisible();
-    });
-  }
 
   for (const width of [390, 1440]) {
     test(`Axe finds nothing on the timetable screens at ${width} px`, async ({ page }, info) => {
@@ -280,16 +226,8 @@ test.describe('timetable', () => {
       await page.goto('/');
       await signInTo(page, ACCOUNTS.teacher, '/enseignant/emploi-du-temps');
       await page.getByRole('button', { name: 'Semaine suivante' }).click();
-      const edit = page.getByRole('button', { name: /^Modifier la séance/ }).first();
-      await expect(edit).toBeVisible();
+      await expect(page.locator('.tt-item').first()).toBeVisible();
       await expectNoAxeViolations(page);
-      await edit.click();
-      const teacherDialog = page.getByRole('dialog', { name: 'Modifier la séance' });
-      await teacherDialog.getByRole('radio', { name: 'Changer de salle' }).check();
-      await expect(teacherDialog.getByRole('list', { name: 'Salles libres à ce moment-là' })).toBeVisible();
-      await expectNoAxeViolations(page);
-      await page.keyboard.press('Escape');
-      await expect(teacherDialog).toBeHidden();
 
       await page.context().clearCookies();
       await page.goto('/');
