@@ -84,6 +84,10 @@ The three spaces' menus are one model, `layout/space-navs.ts` (`ELEVE_NAV`, `ENS
 - `access: 'admin' | 'coordinator'` filters by role; `href` links to another space; `secondary` items move behind « Plus » in the top bar once there are more than eight entries.
 - A new screen goes in its space's list, in « Plus » at least, and in the spec.
 
+## « Noter » (quick grading)
+
+`features/enseignant/noter/` (`/enseignant/noter?classe=&matiere=`): step 1 « Quelle note ? » (new note via a Signal Form, or a draft or planned exam from `api.grades.pending`), step 2 the SAME `notes/grade-grid.ts` in `[quick]` mode (Enter to the next student, then to « Publier aux élèves »; optional comment; autosave after 800 ms with a polite `role="status"` line from the pure `saveStatus`; « Finir plus tard »; publish behind a confirmation). Do not write a second grid: extend `GradeGrid`. Focus moves to each step's heading. An empty cell is an absent student (no grade row). Signal Forms refuse `min`, `max` and `[maxLength]` attributes on a bound control: the validators set them.
+
 ## Timetable conflicts
 
 `features/timetable/blocked-notice.ts` shows a refused save: the conflicts (alert), the free places as one-click buttons (`suggestions` input, `apply` output, focus moves to its heading) and the warnings. A dialog that owns a write fills the chosen place into its form with the pure `features/timetable/suggestions.ts` (`applyToSession`, `applyToSeries`) and saves again; keep that file free of Angular.
