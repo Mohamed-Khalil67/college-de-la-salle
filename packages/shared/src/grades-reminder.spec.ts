@@ -31,6 +31,12 @@ describe('grades reminder', () => {
     expect(n.body).toContain('SVT, 1re bac (notes à publier)');
   });
 
+  it('asks for the marks to be entered when nothing is expected yet (0 / 0)', () => {
+    const n = gradesReminderNotice({ periodLabel: 'Trimestre 1', items: [item({ entered: 0, total: 0 })] });
+    expect(n.body).toContain('Maths, 1re bac (notes à saisir)');
+    expect(n.body).not.toContain('0 / 0');
+  });
+
   it('lists six items at most, then counts the others, within the body limit', () => {
     const items = Array.from({ length: 9 }, (_, i) => item({ subject: `Matière ${i}` }));
     const n = gradesReminderNotice({ periodLabel: 'Trimestre 1', items });

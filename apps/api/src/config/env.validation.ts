@@ -196,6 +196,13 @@ export class Env {
   @Min(1)
   @Max(10000)
   FEED_THROTTLE_LIMIT = 60;
+
+  /** Requests a minute one client may make to POST /api/periods/:id/report-preparation/reminders (« Relancer »). */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  REMINDER_THROTTLE_LIMIT = 10;
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {

@@ -3,12 +3,15 @@ import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { AuthUser } from '../common/auth-user.js';
 import { CurrentUser, Roles } from '../common/decorators.js';
+import { throttleLimit } from '../config/throttle-limits.js';
 import {
   ReportPreparationDto,
   ReportReminderDto,
   ReportReminderResultDto,
 } from './dto/report-preparation.dto.js';
 import { ReportPreparationService } from './report-preparation.service.js';
+
+const reminderLimit = throttleLimit('REMINDER_THROTTLE_LIMIT');
 
 /** « Préparer les bulletins »: admin only (a planner prepares time and place, not report cards). */
 @ApiTags('report-cards')
@@ -26,11 +29,11 @@ export class ReportPreparationController {
   }
 
   /**
-   * « Relancer »: reminds the teachers who still have grades to finish (one class, or all). At most 10 requests
-   * a minute, and a teacher is reminded once per period every few hours.
+   * « Relancer »: reminds the teachers who still have grades to finish (one class, or all). At most REMINDER_THROTTLE_LIMIT (10)
+   * requests a minute, and a teacher is reminded once per period every few hours.
    */
   @Roles('admin')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: reminderLimit, ttl: 60_000 } })
   @Post('reminders')
   @HttpCode(200)
   @ApiOkResponse({ type: ReportReminderResultDto })

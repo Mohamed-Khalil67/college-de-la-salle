@@ -30,6 +30,8 @@ export const PERIOD_ALREADY_CLOSED =
 interface Preparation {
   readonly dto: ReportPreparationDto;
   readonly userOfTeacher: ReadonlyMap<string, string>;
+  /** Teachers with something to finish whose account is disabled or archived. */
+  readonly unreachable: number;
 }
 
 /**
@@ -85,8 +87,14 @@ export class ReportPreparationService {
 
     const cutoff = new Date(Date.now() - GRADE_REMINDER_COOLDOWN_HOURS * 3_600_000);
     const periodLabel = prep.dto.period.label;
+    const scopeIds = dto.classId ? [dto.classId, periodId] : [periodId, ...prep.dto.classes.map((c) => c.classId)];
     const { notified, alreadyReminded } = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`grades-reminder:${periodId}`}, 0))`;
+      // The term may have been closed since the first look: read it again, locked against its closing.
+      const [locked] = await tx.$queryRaw<{ closed_at: Date | null }[]>`
+        SELECT closed_at FROM periods WHERE id = ${periodId}::uuid FOR SHARE`;
+      if (!locked) throw notFound('Période');
+      if (locked.closed_at) throw new ConflictException(PERIOD_ALREADY_CLOSED);
       const users = [...items.keys()].flatMap((id) => prep.userOfTeacher.get(id) ?? []);
       const recent = new Set(
         (
@@ -94,8 +102,9 @@ export class ReportPreparationService {
             where: {
               userId: { in: users },
               kind: 'grades_reminder',
-              // A reminder for the whole period also covers a class; one for a class only covers that class.
-              entityId: { in: dto.classId ? [dto.classId, periodId] : [periodId] },
+              // A whole-period reminder covers every class, so it also waits for an earlier reminder about any
+              // class of the period; a class reminder waits for that class's and for a whole-period one.
+              entityId: { in: scopeIds },
               createdAt: { gte: cutoff },
             },
             select: { userId: true },
@@ -134,13 +143,16 @@ export class ReportPreparationService {
             teachers: items.size,
             notified: written,
             alreadyReminded: skipped,
+            unreachable: prep.unreachable + Math.max(0, items.size - skipped - written),
             withoutTeacher,
           },
         },
       ]);
       return { notified: written, alreadyReminded: skipped };
     });
-    return { teachers: items.size, notified, alreadyReminded, withoutTeacher };
+    // teachers = notified + alreadyReminded, for the teachers who can be reached; the others are `unreachable`.
+    const unreachable = prep.unreachable + Math.max(0, items.size - notified - alreadyReminded);
+    return { teachers: items.size, notified, alreadyReminded, unreachable, withoutTeacher };
   }
 
   /** The classes of the period's year (its section only, when it has one) with their gaps. */
@@ -180,7 +192,11 @@ export class ReportPreparationService {
           assignments: {
             select: {
               teacher: {
-                select: { id: true, userId: true, user: { select: { firstName: true, lastName: true } } },
+                select: {
+                  id: true,
+                  userId: true,
+                  user: { select: { firstName: true, lastName: true, status: true } },
+                },
               },
             },
           },
@@ -219,6 +235,7 @@ export class ReportPreparationService {
 
     const userOfTeacher = new Map<string, string>();
     const lateTeachers = new Set<string>();
+    const unreachableTeachers = new Set<string>();
     let subjectCount = 0;
     let readySubjectCount = 0;
     const rows: ReportPreparationClassDto[] = classes.map((c) => {
@@ -240,10 +257,15 @@ export class ReportPreparationService {
         gapEvents,
       ).map((g) => {
         const subject = own.find((s) => s.subjectId === g.subjectId);
-        const teachers = (subject?.assignments ?? []).map((a) => {
+        // Only accounts that can receive a reminder are listed: a disabled or archived teacher is counted apart.
+        const teachers = (subject?.assignments ?? []).flatMap((a) => {
+          if (a.teacher.user.status !== 'active') {
+            unreachableTeachers.add(a.teacher.id);
+            return [];
+          }
           userOfTeacher.set(a.teacher.id, a.teacher.userId);
           lateTeachers.add(a.teacher.id);
-          return { teacherId: a.teacher.id, name: `${a.teacher.user.firstName} ${a.teacher.user.lastName}` };
+          return [{ teacherId: a.teacher.id, name: `${a.teacher.user.firstName} ${a.teacher.user.lastName}` }];
         });
         return { ...g, subjectName: subject?.subject.name ?? g.subjectId, teachers };
       });
@@ -274,6 +296,7 @@ export class ReportPreparationService {
         lateTeacherCount: lateTeachers.size,
       },
       userOfTeacher,
+      unreachable: unreachableTeachers.size,
     };
   }
 }

@@ -1526,12 +1526,17 @@ export interface ReportReminderRequest {
 }
 
 export interface ReportReminderResponse {
-  /** Teachers with something to finish in this scope. */
+  /**
+   * Teachers with something to finish in this scope whose account can receive a reminder:
+   * `teachers = notified + alreadyReminded`.
+   */
   readonly teachers: number;
   /** Reminders written into their Notes à finir. */
   readonly notified: number;
-  /** Teachers reminded less than GRADE_REMINDER_COOLDOWN_HOURS ago: left alone. */
+  /** Teachers reminded less than GRADE_REMINDER_COOLDOWN_HOURS ago (for this scope or a wider one): left alone. */
   readonly alreadyReminded: number;
+  /** Teachers with something to finish whose account is disabled or archived (not in `teachers`). */
+  readonly unreachable: number;
   /** Subjects to finish that nobody teaches: nobody to remind. */
   readonly withoutTeacher: number;
 }

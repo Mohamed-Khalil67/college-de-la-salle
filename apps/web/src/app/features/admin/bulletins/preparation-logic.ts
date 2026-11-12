@@ -13,7 +13,7 @@ export function gapDetail(gap: Pick<ReportGapDto, 'reason' | 'entered' | 'total'
     case 'no_grades':
       return 'aucune note saisie';
     case 'incomplete':
-      return gap.total ? `${gap.entered} / ${gap.total} notes saisies` : 'notes à compléter';
+      return gap.total ? `${gap.entered} / ${gap.total} notes saisies` : 'notes à saisir';
     case 'unpublished':
       return 'notes à publier aux élèves';
   }
@@ -42,7 +42,7 @@ export function reminderMessage(r: ReportReminderResponse): string {
         : `Les enseignants concernés ont déjà été relancés il y a moins de ${GRADE_REMINDER_COOLDOWN_HOURS} heures. Réessayez plus tard.`,
     );
   }
-  const unreachable = r.teachers - r.notified - r.alreadyReminded;
+  const unreachable = r.unreachable;
   if (unreachable > 0)
     parts.push(`${many(unreachable, 'enseignant n’a pas pu être joint', 'enseignants n’ont pas pu être joints')} : compte désactivé ou archivé.`);
   if (r.withoutTeacher > 0)

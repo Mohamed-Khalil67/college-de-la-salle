@@ -29,6 +29,8 @@ describe('Report preparation and reminders (e2e)', () => {
   const since = new Date();
 
   beforeAll(async () => {
+    // The spec makes many reminder requests: raise the limit it exercises last.
+    process.env['REMINDER_THROTTLE_LIMIT'] = '40';
     t = await createTestApp();
     admin = await t.token(ADMIN);
     const student = await studentOf(t.prisma, 'bac', 'premiere');
@@ -155,6 +157,31 @@ describe('Report preparation and reminders (e2e)', () => {
     expect(await reminders()).toHaveLength(1);
   });
 
+  it('makes a whole-period reminder wait for an earlier reminder about one class', async () => {
+    // The class reminder above already reached the mathematics teacher: the wider one leaves them alone.
+    const wide = (await remind(admin, {}).expect(200)).body as ReportReminderResponse;
+    expect(wide.alreadyReminded).toBeGreaterThanOrEqual(1);
+    expect(await reminders()).toHaveLength(1);
+    // The invariant of the answer: every reachable teacher is either reminded now or was reminded lately.
+    expect(wide.teachers).toBe(wide.notified + wide.alreadyReminded);
+  });
+
+  it('counts a teacher whose account is disabled apart, and never reminds them', async () => {
+    await t.prisma.user.update({ where: { id: mathsUserId }, data: { status: 'disabled' } });
+    try {
+      const prep = (await get(admin).expect(200)).body as ReportPreparationDto;
+      const maths = prep.classes.find((c) => c.classId === classId)?.gaps.find((g) => g.subjectId === 'mathematiques');
+      expect(maths?.teachers.map((x) => x.name).join(' ') ?? '').not.toMatch(/Mansour/);
+      const before = (await reminders()).length;
+      const res = (await remind(admin).expect(200)).body as ReportReminderResponse;
+      expect(res.unreachable).toBeGreaterThanOrEqual(1);
+      expect(res.teachers).toBe(res.notified + res.alreadyReminded);
+      expect(await reminders()).toHaveLength(before);
+    } finally {
+      await t.prisma.user.update({ where: { id: mathsUserId }, data: { status: 'active' } });
+    }
+  });
+
   it('refuses a reminder once the period is closed', async () => {
     await t.prisma.period.update({ where: { id: periodId }, data: { closedAt: new Date() } });
     try {
@@ -186,8 +213,9 @@ describe('Report preparation and reminders (e2e)', () => {
   });
 
   it('is rate limited: a burst of reminders ends in 429', async () => {
+    const limit = Number(process.env['REMINDER_THROTTLE_LIMIT'] ?? 10);
     let status = 200;
-    for (let i = 0; i < 12 && status !== 429; i += 1) status = (await remind(admin)).status;
+    for (let i = 0; i <= limit && status !== 429; i += 1) status = (await remind(admin)).status;
     expect(status).toBe(429);
   });
 });

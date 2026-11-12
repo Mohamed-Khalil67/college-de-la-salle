@@ -18,39 +18,42 @@ interface AddModel {
   imports: [FormField, Modal, Alert, Button, Field, FieldControl],
   template: `
     <cdls-modal title="Ajouter une matière à la classe" [(open)]="open">
-      <form class="stack" novalidate (submit)="onSubmit($event)">
-        @if (subjects.error()) {
-          <cdls-alert tone="danger">{{ errorText() }}</cdls-alert>
-        } @else if (!subjects.hasValue()) {
-          <p class="loading-line" role="status">Chargement des matières…</p>
-        } @else {
-          <cdls-field
-            label="Matière"
-            [helper]="available().length ? '' : 'Toutes les matières de cette filière sont déjà dans la classe.'"
-            [error]="subjectError()"
-          >
-            <select cdlsControl [formField]="addForm.subjectId">
-              <option value="">Choisir une matière</option>
-              @for (subject of available(); track subject.id) {
-                <option [value]="subject.id">{{ subject.name }}</option>
-              }
-            </select>
-          </cdls-field>
-          <cdls-field label="Coefficient" helper="Poids de la matière dans la moyenne générale, par exemple 2 ou 1,5." [error]="coefficientError()">
-            <input cdlsControl inputmode="decimal" autocomplete="off" [formField]="addForm.coefficient" />
-          </cdls-field>
-          <cdls-field label="Heures par semaine" helper="Facultatif." [error]="hoursError()">
-            <input cdlsControl inputmode="decimal" autocomplete="off" [formField]="addForm.hours" />
-          </cdls-field>
-        }
-        @if (failure()) {
-          <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
-        }
-        <div class="modal__footer">
-          <button cdlsButton variant="secondary" type="button" (click)="open.set(false)">Annuler</button>
-          <button cdlsButton type="submit" [disabled]="busy() || !subjects.hasValue()">{{ busy() ? 'Ajout…' : 'Ajouter la matière' }}</button>
-        </div>
-      </form>
+      <!-- Closed, the dialog holds nothing: its loading line would otherwise sit in the page. -->
+      @if (open()) {
+        <form class="stack" novalidate (submit)="onSubmit($event)">
+          @if (subjects.error()) {
+            <cdls-alert tone="danger">{{ errorText() }}</cdls-alert>
+          } @else if (!subjects.hasValue()) {
+            <p class="loading-line" role="status">Chargement des matières…</p>
+          } @else {
+            <cdls-field
+              label="Matière"
+              [helper]="available().length ? '' : 'Toutes les matières de cette filière sont déjà dans la classe.'"
+              [error]="subjectError()"
+            >
+              <select cdlsControl [formField]="addForm.subjectId">
+                <option value="">Choisir une matière</option>
+                @for (subject of available(); track subject.id) {
+                  <option [value]="subject.id">{{ subject.name }}</option>
+                }
+              </select>
+            </cdls-field>
+            <cdls-field label="Coefficient" helper="Poids de la matière dans la moyenne générale, par exemple 2 ou 1,5." [error]="coefficientError()">
+              <input cdlsControl inputmode="decimal" autocomplete="off" [formField]="addForm.coefficient" />
+            </cdls-field>
+            <cdls-field label="Heures par semaine" helper="Facultatif." [error]="hoursError()">
+              <input cdlsControl inputmode="decimal" autocomplete="off" [formField]="addForm.hours" />
+            </cdls-field>
+          }
+          @if (failure()) {
+            <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
+          }
+          <div class="modal__footer">
+            <button cdlsButton variant="secondary" type="button" (click)="open.set(false)">Annuler</button>
+            <button cdlsButton type="submit" [disabled]="busy() || !subjects.hasValue()">{{ busy() ? 'Ajout…' : 'Ajouter la matière' }}</button>
+          </div>
+        </form>
+      }
     </cdls-modal>
   `,
 })

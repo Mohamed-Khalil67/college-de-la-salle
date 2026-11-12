@@ -17,7 +17,7 @@ describe('gapDetail', () => {
     expect(gapDetail(gap())).toBe('18 / 27 notes saisies');
     expect(gapDetail(gap({ reason: 'no_grades', entered: 0, total: 0 }))).toBe('aucune note saisie');
     expect(gapDetail(gap({ reason: 'unpublished' }))).toBe('notes à publier aux élèves');
-    expect(gapDetail(gap({ total: 0 }))).toBe('notes à compléter');
+    expect(gapDetail(gap({ total: 0 }))).toBe('notes à saisir');
   });
 });
 
@@ -40,7 +40,7 @@ describe('canRemind', () => {
 });
 
 describe('reminderMessage', () => {
-  const result = { teachers: 0, notified: 0, alreadyReminded: 0, withoutTeacher: 0 };
+  const result = { teachers: 0, notified: 0, alreadyReminded: 0, unreachable: 0, withoutTeacher: 0 };
 
   it('counts the teachers reminded', () => {
     expect(reminderMessage({ ...result, teachers: 1, notified: 1 })).toBe('1 enseignant relancé.');
@@ -55,10 +55,10 @@ describe('reminderMessage', () => {
   });
 
   it('says when a teacher could not be reached, instead of « tout est prêt »', () => {
-    expect(reminderMessage({ ...result, teachers: 2, notified: 1 })).toBe(
+    expect(reminderMessage({ ...result, teachers: 1, notified: 1, unreachable: 1 })).toBe(
       '1 enseignant relancé. 1 enseignant n’a pas pu être joint : compte désactivé ou archivé.',
     );
-    expect(reminderMessage({ ...result, teachers: 1 })).toContain('n’a pas pu être joint');
+    expect(reminderMessage({ ...result, unreachable: 1 })).toContain('n’a pas pu être joint');
   });
 
   it('points at subjects nobody teaches', () => {

@@ -65,5 +65,6 @@ export class ReportReminderResultDto implements ReportReminderResponse {
   teachers: number;
   notified: number;
   alreadyReminded: number;
+  unreachable: number;
   withoutTeacher: number;
 }

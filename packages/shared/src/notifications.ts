@@ -204,7 +204,7 @@ function reminderDetail(item: GradeReminderItem): string {
     case 'no_grades':
       return 'aucune note';
     case 'incomplete':
-      return `${item.entered} / ${item.total} notes saisies`;
+      return item.total ? `${item.entered} / ${item.total} notes saisies` : 'notes à saisir';
     case 'unpublished':
       return 'notes à publier';
   }
