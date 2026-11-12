@@ -15,7 +15,7 @@ import { YearBlock } from './year-block';
 /**
  * The planner's one page (« Planification »): what needs deciding, today's changes, the free rooms, the year and
  * the state of the timetables, in blocks that each load their own data and end with one link to their detail
- * page. Two buttons in the header: « Professeur absent » and « Examen ». Phone: one column in this order;
+ * page. Two buttons in the header: « Professeur absent » and « Ajouter un examen ». Phone: one column in this order;
  * from tablet width three columns, with the year and the timetables across the row.
  */
 @Component({
@@ -40,7 +40,7 @@ import { YearBlock } from './year-block';
       <div class="page__actions">
         <a cdlsButton routerLink="/admin/planification/professeur-absent">Professeur absent</a>
         @if (teaches()) {
-          <a cdlsButton variant="secondary" routerLink="/enseignant/agenda">Examen</a>
+          <a cdlsButton variant="secondary" routerLink="/enseignant/agenda">Ajouter un examen</a>
         }
       </div>
     </div>
@@ -71,6 +71,6 @@ export class PlannerHomePage {
   readonly #auth = inject(AuthStore);
   readonly #clock = inject(SchoolClock);
   protected readonly date = computed(() => dayTitle(this.#clock.today()));
-  /** « Examen » opens the agenda's event form, which only a teacher has (an admin account has no teaching profile). */
+  /** « Ajouter un examen » opens the agenda's event form, which only a teacher has (an admin account has no teaching profile). */
   protected readonly teaches = computed(() => !!this.#auth.user()?.teacherId);
 }

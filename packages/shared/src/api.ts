@@ -1780,10 +1780,12 @@ export const ABSENCE_CHOICE_LABELS: Readonly<Record<AbsenceChoiceKind, string>> 
   study: 'Étude surveillée',
 };
 
-/** « Professeur absent » covers at most this many days at once (a school month). */
-export const ABSENCE_MAX_DAYS = 31;
+/** « Professeur absent » covers at most this many days at once (two school weeks: about 60 lessons). */
+export const ABSENCE_MAX_DAYS = 14;
+/** The whole school's warnings (GET /timetable/warnings without a scope) cover at most this many days. */
+export const SCHOOL_WARNINGS_MAX_DAYS = 31;
 /** …and this many lessons in one save. */
-export const ABSENCE_MAX_CHOICES = 200;
+export const ABSENCE_MAX_CHOICES = 60;
 
 /** A teacher free during a lesson. */
 export interface AbsenceTeacherOption {

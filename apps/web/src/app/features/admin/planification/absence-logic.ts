@@ -60,6 +60,12 @@ export function choose(
 
 /** What is missing for this lesson, in words that say how to fix it; null when it is ready. */
 export function decisionProblem(s: AbsenceSessionDto, d: AbsenceDecision): string | null {
+  if (
+    (d.kind === 'substitute' || d.kind === 'study') &&
+    (s.currentKind === 'moved' || s.currentKind === 'room_change')
+  ) {
+    return 'Cette séance a été déplacée ou change de salle : rétablissez-la d’abord dans l’emploi du temps, ou annulez-la.';
+  }
   if (d.kind === 'substitute' && !d.teacherId) {
     return s.freeTeachers.length
       ? 'Choisissez l’enseignant qui remplace.'

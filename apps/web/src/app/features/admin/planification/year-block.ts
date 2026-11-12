@@ -1,11 +1,17 @@
 import { Component, computed, inject, resource } from '@angular/core';
-import { CALENDAR_DAY_TYPE_LABELS } from '@cdls/shared';
+import { CALENDAR_DAY_TYPE_LABELS, type CalendarDayDto, type SchoolYearDto } from '@cdls/shared';
 import { ApiClient } from '../../../core/api/api-client';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { SchoolYears } from '../../../shared/data/school-years';
 import { Badge } from '../../../shared/ui';
-import { blockState } from '../../../shared/utils/block-state';
+import {
+  blockState,
+  bothOf,
+  LOADING,
+  type Snapshot,
+  snapshotOf,
+} from '../../../shared/utils/block-state';
 import { dateRangeText, type TermState, type TermView, yearView } from './planner-views';
 
 const STATE_WORDS: Readonly<Record<TermState, string>> = {
@@ -16,7 +22,7 @@ const STATE_WORDS: Readonly<Record<TermState, string>> = {
 
 /**
  * « L'année »: the terms of the school year, the exam weeks and holidays still to come, and the next key date.
- * The calendar days are a second source: if they fail, the terms still show.
+ * The calendar days are loaded with the years; the block shows loading or the error until both are here.
  */
 @Component({
   selector: 'app-year-block',
@@ -131,13 +137,17 @@ export class YearBlock {
     loader: ({ params: schoolYearId }) => this.#api.school.calendarDays({ schoolYearId }),
   });
 
+  /** The years and the calendar days both have to answer; either failing is the block's error (never a false « nothing to come »). */
   protected readonly state = computed(() => {
     const year = this.#years.year();
-    const days = this.#days.hasValue() ? this.#days.value() : [];
-    const snapshot = this.#years.settled()
-      ? { error: this.#years.years.error(), value: { year, days } }
-      : { error: undefined, value: undefined };
-    return blockState(snapshot, ({ year: y, days: d }) => yearView(y, d, this.#clock.today()));
+    const years: Snapshot<SchoolYearDto | null> = this.#years.settled()
+      ? { error: this.#years.years.error(), value: year }
+      : LOADING;
+    // Without a year there are no days to ask for.
+    const days: Snapshot<readonly CalendarDayDto[]> = year
+      ? snapshotOf(this.#days)
+      : { error: undefined, value: [] };
+    return blockState(bothOf(years, days), ([y, d]) => yearView(y, d, this.#clock.today()));
   });
 
   protected reload(): void {

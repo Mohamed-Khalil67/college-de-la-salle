@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   CLOSED_DAY_TYPES,
   daysBetween,
+  SCHOOL_WARNINGS_MAX_DAYS,
   type Paginated,
   type RoomKind,
   TIMETABLE_LIMITS,
@@ -156,8 +157,10 @@ export class TimetableReadService {
   /** The range alone: the whole school. */
   private range(query: TimetableOccurrenceQueryDto): Record<string, never> {
     if (query.to < query.from) throw new BadRequestException('« to » doit suivre « from ».');
-    if (daysBetween(query.from, query.to) >= TIMETABLE_LIMITS.maxRangeDays)
-      throw new BadRequestException(`Période limitée à ${TIMETABLE_LIMITS.maxRangeDays} jours.`);
+    if (daysBetween(query.from, query.to) >= SCHOOL_WARNINGS_MAX_DAYS)
+      throw new BadRequestException(
+        `Pour toute l’école, la période est limitée à ${SCHOOL_WARNINGS_MAX_DAYS} jours.`,
+      );
     return {};
   }
 

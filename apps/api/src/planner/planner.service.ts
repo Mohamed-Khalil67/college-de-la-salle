@@ -5,6 +5,7 @@ import {
   type PlannerClassCoverageDto,
   daysBetween,
   freeUntil,
+  probeWindow,
   type NotificationKind,
   type RoomKind,
   schoolTimeNow,
@@ -246,13 +247,8 @@ export class PlannerService {
     const date = schoolToday();
     const time = schoolTimeNow();
     const total = await this.prisma.room.count({ where: { active: true } });
-    const ids = await this.occupancy.freeRoomIds(
-      this.prisma,
-      date,
-      time,
-      time === '23:59' ? '23:59' : minuteAfter(time),
-      null,
-    );
+    const window = probeWindow(time);
+    const ids = await this.occupancy.freeRoomIds(this.prisma, date, window.start, window.end, null);
     const rooms = ids.length
       ? await this.prisma.room.findMany({ where: { id: { in: ids } }, orderBy: { name: 'asc' } })
       : [];
@@ -341,11 +337,4 @@ export class PlannerService {
       teachersPlaced: [...assigned].filter((id) => placed.has(id)).length,
     };
   }
-}
-
-/** `HH:MM` one minute later (the caller keeps 23:59 out). */
-function minuteAfter(time: string): string {
-  const [h, m] = time.split(':').map(Number) as [number, number];
-  const total = h * 60 + m + 1;
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classCoverage, freeUntil } from './planner.js';
+import { classCoverage, freeUntil, probeWindow } from './planner.js';
 
 describe('classCoverage', () => {
   it('is complete when every subject with hours has them placed', () => {
@@ -33,6 +33,16 @@ describe('classCoverage', () => {
 
   it('is complete with no subject at all', () => {
     expect(classCoverage('c1', 'A', []).complete).toBe(true);
+  });
+});
+
+describe('probeWindow', () => {
+  it('is one minute from now', () => {
+    expect(probeWindow('09:05')).toEqual({ start: '09:05', end: '09:06' });
+    expect(probeWindow('09:59')).toEqual({ start: '09:59', end: '10:00' });
+  });
+  it('never gives an empty window at the end of the day', () => {
+    expect(probeWindow('23:59')).toEqual({ start: '23:58', end: '23:59' });
   });
 });
 

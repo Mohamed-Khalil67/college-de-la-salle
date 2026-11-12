@@ -1,5 +1,6 @@
 import {
   addDays,
+  ABSENCE_MAX_CHOICES,
   type AbsencePreviewDto,
   type ApplyAbsenceResult,
   type PlannerRoomsNowDto,
@@ -307,6 +308,201 @@ describe('Planner (e2e)', () => {
       }).expect(400);
     });
 
+    it('refuses a cover or a study on a lesson already moved or re-roomed, but still cancels it', async () => {
+      const [first] = (await preview()).sessions;
+      const free = (
+        await t
+          .http()
+          .get('/api/timetable/free-rooms')
+          .query({ date: first!.date, startTime: first!.startTime, endTime: first!.endTime })
+          .set(bearer(admin))
+          .expect(200)
+      ).body as { id: string }[];
+      const room = free.find((r) => r.id !== first!.roomId)!;
+      expect(room).toBeTruthy();
+      await t
+        .http()
+        .post(`/api/timetable/slots/${first!.slotId}/exceptions`)
+        .set(bearer(admin))
+        .send({ date: first!.date, kind: 'room_change', newRoomId: room.id })
+        .expect(201);
+      const supervisor = (await preview()).sessions.find(
+        (x) => x.slotId === first!.slotId && x.date === first!.date,
+      )!.freeTeachers[0]!;
+      const send = (kind: string) =>
+        t
+          .http()
+          .post('/api/planner/absence')
+          .set(bearer(planner))
+          .send({
+            teacherId: mathsTeacherId,
+            from,
+            to,
+            choices: [
+              { slotId: first!.slotId, date: first!.date, kind, teacherId: supervisor.teacherId },
+            ],
+          });
+      for (const kind of ['substitute', 'study']) {
+        const res = await send(kind).expect(400);
+        expect((res.body as { message: string }).message).toContain('rétablissez-la d’abord');
+      }
+      await t
+        .http()
+        .post('/api/planner/absence')
+        .set(bearer(planner))
+        .send({
+          teacherId: mathsTeacherId,
+          from,
+          to,
+          choices: [{ slotId: first!.slotId, date: first!.date, kind: 'cancelled' }],
+        })
+        .expect(200);
+      await restoreAll();
+    });
+
+    it('refuses a cover or supervisor whose account is not active', async () => {
+      const [first] = (await preview()).sessions;
+      const cover = first!.freeTeachers[0]!;
+      const teacher = await t.prisma.teacher.findUniqueOrThrow({ where: { id: cover.teacherId } });
+      await t.prisma.user.update({ where: { id: teacher.userId }, data: { status: 'disabled' } });
+      try {
+        const res = await t
+          .http()
+          .post('/api/planner/absence')
+          .set(bearer(planner))
+          .send({
+            teacherId: mathsTeacherId,
+            from,
+            to,
+            choices: [
+              {
+                slotId: first!.slotId,
+                date: first!.date,
+                kind: 'substitute',
+                teacherId: cover.teacherId,
+              },
+            ],
+          })
+          .expect(400);
+        expect((res.body as { message: string }).message).toContain('plus actif');
+      } finally {
+        await t.prisma.user.update({ where: { id: teacher.userId }, data: { status: 'active' } });
+      }
+    });
+
+    it('a study in a room someone holds is a 409 and writes nothing; taking a study away tells the supervisor', async () => {
+      const [first] = (await preview()).sessions;
+      const busy = await t.prisma.$queryRaw<{ room_id: string }[]>`
+        SELECT o.room_id FROM occupancy o
+        WHERE o.room_id IS NOT NULL AND o.room_id IS DISTINCT FROM ${first!.roomId}::uuid
+          AND o.during && tsrange(${`${first!.date} ${first!.startTime}`}::timestamp, ${`${first!.date} ${first!.endTime}`}::timestamp)
+        LIMIT 1`;
+      expect(busy[0]).toBeTruthy();
+      const supervisor = first!.freeTeachers[0]!;
+      const body = (roomId?: string) => ({
+        teacherId: mathsTeacherId,
+        from,
+        to,
+        choices: [
+          {
+            slotId: first!.slotId,
+            date: first!.date,
+            kind: 'study',
+            teacherId: supervisor.teacherId,
+            roomId,
+          },
+        ],
+      });
+      const before = await t.prisma.slotException.count();
+      const clash = await t
+        .http()
+        .post('/api/planner/absence')
+        .set(bearer(planner))
+        .send(body(busy[0]!.room_id))
+        .expect(409);
+      expect((clash.body as { code: string }).code).toBe('TIMETABLE_CONFLICT');
+      expect(await t.prisma.slotException.count()).toBe(before);
+
+      await t.http().post('/api/planner/absence').set(bearer(planner)).send(body()).expect(200);
+      const supervisorUser = (
+        await t.prisma.teacher.findUniqueOrThrow({ where: { id: supervisor.teacherId } })
+      ).userId;
+      const ex = await t.prisma.slotException.findFirstOrThrow({
+        where: { slotId: first!.slotId, date: day(first!.date), kind: 'study' },
+      });
+      await t.http().delete(`/api/timetable/exceptions/${ex.id}`).set(bearer(admin)).expect(200);
+      const told = await t.prisma.notification.findMany({
+        where: { userId: supervisorUser, kind: 'session_restored', createdAt: { gte: since } },
+      });
+      expect(told.length).toBeGreaterThan(0);
+    });
+
+    it('commits the most choices allowed in one transaction within the timeout, and refuses one more', async () => {
+      // The demo teacher has about a dozen lessons in two weeks: give them evening lessons (12 a day, Sunday to Thursday)
+      // so that two weeks hold well over the limit. Removed in the end, with their exceptions.
+      const classSubject = await t.prisma.classSubject.findFirstOrThrow({
+        where: { assignments: { some: { teacherId: mathsTeacherId } } },
+      });
+      const type = await t.prisma.activityType.findUniqueOrThrow({ where: { code: 'cours' } });
+      const ids: string[] = [];
+      for (let weekday = 0; weekday <= 4; weekday++)
+        for (let k = 0; k < 12; k++) {
+          const start = 18 * 60 + k * 20;
+          const clock = (m: number) =>
+            `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+          ids.push(
+            (
+              await t.prisma.timetableSlot.create({
+                data: {
+                  classSubjectId: classSubject.id,
+                  teacherId: mathsTeacherId,
+                  activityTypeId: type.id,
+                  weekday,
+                  startTime: clock(start),
+                  endTime: clock(start + 20),
+                  validFrom: day(addDays(from, -1)),
+                  validTo: day(addDays(from, 20)),
+                },
+              })
+            ).id,
+          );
+        }
+      const wide = addDays(from, 13);
+      try {
+        const all = (
+          await t
+            .http()
+            .get('/api/planner/absence')
+            .query({ teacherId: mathsTeacherId, from, to: wide })
+            .set(bearer(planner))
+            .expect(200)
+        ).body as AbsencePreviewDto;
+        const choices = all.sessions
+          .slice(0, ABSENCE_MAX_CHOICES)
+          .map((x) => ({ slotId: x.slotId, date: x.date, kind: 'cancelled' }));
+        expect(choices).toHaveLength(ABSENCE_MAX_CHOICES);
+        const started = Date.now();
+        const res = await t
+          .http()
+          .post('/api/planner/absence')
+          .set(bearer(planner))
+          .send({ teacherId: mathsTeacherId, from, to: wide, choices })
+          .expect(200);
+        expect((res.body as ApplyAbsenceResult).cancelled).toBe(ABSENCE_MAX_CHOICES);
+        expect(Date.now() - started).toBeLessThan(20_000);
+        const tooMany = Array.from({ length: ABSENCE_MAX_CHOICES + 1 }, () => choices[0]!);
+        await t
+          .http()
+          .post('/api/planner/absence')
+          .set(bearer(planner))
+          .send({ teacherId: mathsTeacherId, from, to: wide, choices: tooMany })
+          .expect(400);
+      } finally {
+        await t.prisma.timetableSlot.deleteMany({ where: { id: { in: ids } } });
+        await t.prisma.notification.deleteMany({ where: { createdAt: { gte: since } } });
+      }
+    });
+
     it('the database refuses a study without a supervisor', async () => {
       const slot = await t.prisma.timetableSlot.findFirstOrThrow({
         where: { teacherId: mathsTeacherId },
@@ -361,6 +557,12 @@ describe('Planner (e2e)', () => {
         .set(bearer(planner))
         .expect(200);
       expect(Array.isArray(res.body as TimetableWarningDto[])).toBe(true);
+      await t
+        .http()
+        .get('/api/timetable/warnings')
+        .query({ from: TODAY, to: addDays(TODAY, 40) })
+        .set(bearer(planner))
+        .expect(400);
       await t
         .http()
         .get('/api/timetable/warnings')

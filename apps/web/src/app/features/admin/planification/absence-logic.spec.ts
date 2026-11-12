@@ -88,6 +88,21 @@ describe('what stops the save', () => {
     ).toContain('Aucun enseignant');
     expect(decisionProblem(session(), { kind: 'cancelled', teacherId: '', roomId: '' })).toBeNull();
   });
+  it('warns that a moved or re-roomed lesson cannot be covered from here, but can be cancelled', () => {
+    const moved = session({ currentKind: 'moved' });
+    expect(decisionProblem(moved, { kind: 'substitute', teacherId: 'm', roomId: '' })).toContain(
+      'rétablissez-la',
+    );
+    expect(decisionProblem(moved, { kind: 'study', teacherId: 'm', roomId: '' })).toContain(
+      'rétablissez-la',
+    );
+    expect(decisionProblem(moved, { kind: 'cancelled', teacherId: '', roomId: '' })).toBeNull();
+    expect(
+      checkBeforeSave([moved], {
+        [keyOf(moved)]: { kind: 'substitute', teacherId: 'm', roomId: '' },
+      }).ready,
+    ).toBe(false);
+  });
   it('wants every untouched lesson dealt with, and at least one choice', () => {
     const a = session({ slotId: 'a' });
     const b = session({ slotId: 'b' });
@@ -182,6 +197,6 @@ describe('periodProblem', () => {
     expect(periodProblem(ok, '2026-12-02')?.field).toBe('from');
     expect(periodProblem({ ...ok, to: '' }, '2026-12-01')?.field).toBe('to');
     expect(periodProblem({ ...ok, to: '2026-11-30' }, '2026-11-01')?.field).toBe('to');
-    expect(periodProblem({ ...ok, to: '2027-02-01' }, '2026-12-01')?.message).toContain('31 jours');
+    expect(periodProblem({ ...ok, to: '2027-02-01' }, '2026-12-01')?.message).toContain('14 jours');
   });
 });

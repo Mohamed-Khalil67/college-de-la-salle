@@ -55,7 +55,7 @@ marks, Enter goes to the next student, « Abs » does not count, comment optiona
 | L'année (wide) | strip of terms, exam weeks, holidays; next key date | Calendrier de l'année |
 | Emplois du temps (wide) | classes complete / incomplete, teachers placed | Ouvrir la grille (classe, professeur, salle) |
 
-Header buttons « Professeur absent » and « Examen ».
+Header buttons « Professeur absent » and « Ajouter un examen ».
 
 **Professeur absent (detail):** 1. teacher and dates; 2. for each lesson: *Remplacer* (suggests a free teacher of the
 same subject, or says none is free), *Étude surveillée* (a supervisor and room), or *Annuler*; 3. « Enregistrer et
@@ -122,7 +122,7 @@ of the skills above; `CLAUDE.md` wins where they differ.
 
 ## Built: the Planificateur page and « Professeur absent » (step 5)
 - `/admin/planification` (`features/admin/planification/`), the five blocks of the table above, the two header buttons.
-  « Examen » opens the agenda's event form for a planner who teaches; for an admin account it is hidden, because only
+  « Ajouter un examen » opens the agenda's event form for a planner who teaches; for an admin account it is hidden, because only
   a teacher can create an event today (`POST /events`): the exam creation for a planner without a teacher profile is
   not built.
 - « Professeur absent » end to end (`/admin/planification/professeur-absent`, `POST /planner/absence`): a new

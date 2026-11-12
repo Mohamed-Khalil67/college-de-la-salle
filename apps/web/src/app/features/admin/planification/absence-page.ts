@@ -1,4 +1,5 @@
 import {
+  afterRenderEffect,
   Component,
   computed,
   ElementRef,
@@ -6,6 +7,7 @@ import {
   linkedSignal,
   resource,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { form, FormField, submit, validate } from '@angular/forms/signals';
@@ -121,8 +123,15 @@ interface Request {
       </form>
     </section>
 
-    @if (request()) {
-      <section class="absence__step" aria-labelledby="absence-etape-2" aria-live="polite">
+    @if (stale()) {
+      <p class="t-body-s t-muted">
+        Vous avez changé l’enseignant ou les jours : cliquez sur « Voir les séances » pour mettre la
+        liste à jour.
+      </p>
+    }
+
+    @if (request() && !stale()) {
+      <section class="absence__step" aria-labelledby="absence-etape-2">
         <h2 class="t-h3" id="absence-etape-2" tabindex="-1" #lessonsHeading>
           2. Que faire de chaque séance ?
         </h2>
@@ -149,7 +158,7 @@ interface Request {
               "
             />
           } @else {
-            <p class="t-body-s t-muted">
+            <p class="t-body-s t-muted" role="status">
               {{ preview.teacherName }} :
               {{ plural(preview.sessions.length, 'séance', 'séances') }} du
               {{ longDay(preview.from) }} au {{ longDay(preview.to) }}.
@@ -173,13 +182,7 @@ interface Request {
                         <cdls-badge tone="info">{{ currentLabel(s) }}</cdls-badge>
                       }
                     </legend>
-                    <div
-                      class="absence__choices"
-                      role="radiogroup"
-                      [attr.aria-label]="
-                        'Que faire de la séance ' + s.subjectName + ' de ' + span(s) + ' ?'
-                      "
-                    >
+                    <div class="absence__choices">
                       @for (kind of kinds; track kind) {
                         <label class="check">
                           <input
@@ -355,6 +358,11 @@ interface Request {
     .absence__time {
       margin-inline-end: var(--space-2);
     }
+    .absence__choices label {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+    }
     .absence__choices {
       display: flex;
       flex-wrap: wrap;
@@ -378,6 +386,19 @@ export class AbsencePage {
   readonly #api = inject(ApiClient);
   readonly #clock = inject(SchoolClock);
   protected readonly lessonsHeading = viewChild<ElementRef<HTMLElement>>('lessonsHeading');
+  /** Focus moves to the lessons' heading once it is on the page: also at the first lookup, when it did not exist yet. */
+  readonly #focusLessons = signal(false);
+
+  constructor() {
+    afterRenderEffect(() => {
+      const heading = this.lessonsHeading();
+      if (!this.#focusLessons() || !heading) return;
+      untracked(() => {
+        heading.nativeElement.focus();
+        this.#focusLessons.set(false);
+      });
+    });
+  }
 
   protected readonly kinds = ABSENCE_CHOICE_KINDS;
   protected readonly labels = ABSENCE_CHOICE_LABELS;
@@ -418,6 +439,15 @@ export class AbsencePage {
 
   /* Step 2: the lessons and one decision each */
   protected readonly request = signal<Request | null>(null);
+  /** The teacher or the days were changed after the lookup: the lessons shown are no longer the ones asked for. */
+  protected readonly stale = computed(() => {
+    const asked = this.request();
+    const now = this.periodModel();
+    return (
+      !!asked &&
+      (asked.teacherId !== now.teacherId || asked.from !== now.from || asked.to !== now.to)
+    );
+  });
   protected readonly lessons = resource({
     params: () => this.request() ?? undefined,
     loader: ({ params }) => this.#api.planner.absence(params),
@@ -472,7 +502,7 @@ export class AbsencePage {
       this.result.set(null);
       this.#resetSave();
       this.request.set({ ...this.periodModel() });
-      queueMicrotask(() => this.lessonsHeading()?.nativeElement.focus());
+      this.#focusLessons.set(true);
       return undefined;
     });
   }
@@ -482,7 +512,7 @@ export class AbsencePage {
   }
 
   protected problem(s: AbsenceSessionDto, d: AbsenceDecision): string | null {
-    return d.teacherId ? null : decisionProblem(s, d);
+    return decisionProblem(s, d);
   }
 
   protected sameSubject(s: AbsenceSessionDto) {

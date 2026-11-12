@@ -373,6 +373,7 @@ export class TimetableService {
       });
       if (!teacher) throw notFound('Enseignant');
       const seen = new Set<string>();
+      const activeCovers = new Set<string>();
       const parts: Applied[] = [];
       for (const choice of dto.choices) {
         const key = `${choice.slotId}@${choice.date}`;
@@ -394,6 +395,26 @@ export class TimetableService {
         const existing = row.exceptions.find((e) => toDay(e.date) === choice.date);
         if ((existing?.newTeacherId ?? row.teacherId) !== dto.teacherId)
           throw new BadRequestException('Cette séance n’est pas donnée par cet enseignant.');
+        // A lesson already moved or re-roomed keeps its exception: covering it would silently undo that change.
+        if (
+          choice.kind !== 'cancelled' &&
+          (existing?.kind === 'moved' || existing?.kind === 'room_change')
+        )
+          throw new BadRequestException(
+            'Cette séance a été déplacée ou change de salle : rétablissez-la d’abord (emploi du temps), puis remplacez-la ou transformez-la en étude.',
+          );
+        if (choice.teacherId && !activeCovers.has(choice.teacherId)) {
+          const cover = await tx.teacher.findUnique({
+            where: { id: choice.teacherId },
+            include: { user: { select: { status: true } } },
+          });
+          if (!cover) throw notFound('Enseignant');
+          if (cover.user.status !== 'active')
+            throw new BadRequestException(
+              'Cet enseignant n’est plus actif : choisissez-en un autre.',
+            );
+          activeCovers.add(choice.teacherId);
+        }
         const input: SlotExceptionInput =
           choice.kind === 'cancelled'
             ? { kind: 'cancelled', reason: dto.reason }

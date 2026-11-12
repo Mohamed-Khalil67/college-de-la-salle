@@ -4,7 +4,7 @@ import { ApiClient } from '../../../core/api/api-client';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { Badge } from '../../../shared/ui';
-import { blockState, snapshotOf } from '../../../shared/utils/block-state';
+import { blockState, bothOf, snapshotOf } from '../../../shared/utils/block-state';
 import { plural } from '../../../shared/utils/format';
 import { PlannerData } from './planner-data';
 import { FIX_DAYS, fixView, missingTotal } from './planner-views';
@@ -12,8 +12,7 @@ import { FIX_DAYS, fixView, missingTotal } from './planner-views';
 /**
  * « À régler »: what needs the planner in the next two weeks: the stored timetable's warnings and the classes
  * that still miss hours. Two sessions can never share a room or a teacher (the database refuses it), so these
- * are the things left to decide. The class list comes from the timetable summary: if it fails, the warnings
- * still show.
+ * are the things left to decide. The class list comes from the timetable summary; the block waits for both and fails with either.
  */
 @Component({
   selector: 'app-fix-block',
@@ -121,9 +120,11 @@ export class FixBlock {
       this.#api.planner.warnings({ from: today, to: addDays(today, FIX_DAYS - 1) }),
   });
 
+  /** Both sources must have answered: « Rien à régler » is only true when the classes were looked at too. */
   protected readonly state = computed(() =>
-    blockState(snapshotOf(this.#warnings), (warnings) =>
-      fixView(warnings, this.#data.timetables.hasValue() ? this.#data.timetables.value() : null),
+    blockState(
+      bothOf(snapshotOf(this.#warnings), snapshotOf(this.#data.timetables)),
+      ([warnings, timetables]) => fixView(warnings, timetables),
     ),
   );
 

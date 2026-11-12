@@ -76,12 +76,12 @@ test('the five blocks stack in order on a phone, wide ones span the row on deskt
       b.path,
     );
   }
-  // The two header buttons: a planner who teaches has « Examen » too.
+  // The two header buttons: a planner who teaches has « Ajouter un examen » too.
   await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toHaveAttribute(
     'href',
     '/admin/planification/professeur-absent',
   );
-  await expect(page.getByRole('link', { name: 'Examen', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Ajouter un examen', exact: true })).toHaveAttribute(
     'href',
     '/enseignant/agenda',
   );
@@ -112,12 +112,12 @@ test('the five blocks stack in order on a phone, wide ones span the row on deskt
   expect(errors).toEqual([]);
 });
 
-test('the admin has the page too, without « Examen »; a plain teacher and a student are sent away', async ({
+test('the admin has the page too, without « Ajouter un examen »; a plain teacher and a student are sent away', async ({
   page,
 }) => {
   await openPlanner(page, ACCOUNTS.admin);
   await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Examen', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ajouter un examen', exact: true })).toHaveCount(0);
   await axeAtBothWidths(page);
 
   await page.context().clearCookies();
@@ -176,6 +176,32 @@ test('a block that fails shows its own error and « Réessayer »; the page live
   await retry.click();
   await expect(changes.getByRole('alert')).toHaveCount(0);
   await expect(pageStatus(page)).toHaveText('Page chargée.');
+  await axeAtBothWidths(page);
+});
+
+test('a source that fails is the block’s error, never « Rien à régler » or « Aucune semaine… »', async ({
+  page,
+}) => {
+  await signInAs(page, ACCOUNTS.planner);
+  await goInApp(page, '/admin/classes');
+  await page.route(
+    '**/api/planner/timetables*',
+    json({ statusCode: 500, message: 'Les emplois du temps sont indisponibles.' }, 500),
+  );
+  await page.route(
+    '**/api/calendar-days*',
+    json({ statusCode: 500, message: 'Le calendrier est indisponible.' }, 500),
+  );
+  await page.route('**/api/timetable/warnings*', json([]));
+  await goInApp(page, '/admin/planification');
+  await expect(pageStatus(page)).toContainText('n’ont pas pu être chargés');
+  for (const heading of ['À régler', 'L’année', 'Emplois du temps']) {
+    const region = block(page, heading);
+    await expect(region.getByRole('alert')).toBeVisible();
+    await expect(region.getByRole('button', { name: 'Réessayer' })).toBeVisible();
+  }
+  await expect(block(page, 'À régler')).not.toContainText('Rien à régler');
+  await expect(block(page, 'L’année')).not.toContainText('Aucune semaine d’examens');
   await axeAtBothWidths(page);
 });
 
@@ -285,9 +311,34 @@ test('Professeur absent: a teacher and days, one choice per lesson, saved togeth
     await lookUp(page, name, from, to);
     const lessons = page.locator('fieldset.absence__lesson');
     await expect(lessons.first()).toBeVisible();
+    // The first lookup moves focus to the lessons' heading (it did not exist before).
+    await expect(
+      page.getByRole('heading', { level: 2, name: '2. Que faire de chaque séance ?' }),
+    ).toBeFocused();
     const count = await lessons.count();
     expect(count).toBeGreaterThan(2);
+    // The lesson count is the one status line of the step; the section itself is not a live region.
+    await expect(page.locator('section[aria-labelledby="absence-etape-2"]')).not.toHaveAttribute(
+      'aria-live',
+      /.+/,
+    );
+    await expect(
+      page.locator('section[aria-labelledby="absence-etape-2"] [role="status"]'),
+    ).toHaveCount(1);
+    // The fieldset's legend names the choice: no second radiogroup; touch targets are at least 44 px high.
+    await expect(lessons.first().getByRole('radiogroup')).toHaveCount(0);
+    for (const label of await lessons.first().locator('label.check').all()) {
+      expect((await label.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
     await axeAtBothWidths(page);
+
+    // Changing the teacher or the days after a lookup hides the lessons and says so.
+    await page.getByLabel('Dernier jour').fill(addDays(to, 1));
+    await expect(lessons).toHaveCount(0);
+    await expect(page.getByText('Vous avez changé l’enseignant ou les jours')).toBeVisible();
+    await page.getByLabel('Dernier jour').fill(to);
+    await page.getByRole('button', { name: 'Voir les séances' }).click();
+    await expect(lessons.first()).toBeVisible();
 
     // Saving with lessons left open names what is missing and moves focus to the first one.
     await lessons.nth(0).getByRole('radio', { name: 'Annuler' }).check();
