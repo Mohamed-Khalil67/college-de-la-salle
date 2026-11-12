@@ -30,7 +30,7 @@ export function snapshotOf<V>(ref: Resource<V | undefined>): Snapshot<V> {
       <div class="home-block__body">
         @switch (state().status) {
           @case ('loading') {
-            <p class="loading-line">{{ loadingLabel() }}</p>
+            <p class="loading-line" role="status">{{ loadingLabel() }}</p>
           }
           @case ('error') {
             <cdls-alert tone="danger">{{ message() }}</cdls-alert>

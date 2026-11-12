@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { afterNextRender, Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { schoolToday } from '@cdls/shared';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { dayTitle } from '../../../shared/utils/format';
@@ -20,14 +20,14 @@ import { TodoBlock } from './todo-block';
     <div class="page__header">
       <div class="page__header-text">
         <h1 class="t-h1">Bonjour {{ firstName() }}</h1>
-        <p class="t-muted">{{ date }}</p>
+        <p class="t-muted">{{ date() }}</p>
       </div>
     </div>
     <div class="home-grid">
-      <app-now-block [today]="today" />
-      <app-todo-block [today]="today" />
-      <app-grades-block [today]="today" />
-      <app-absences-block [today]="today" />
+      <app-now-block [today]="today()" />
+      <app-todo-block [today]="today()" />
+      <app-grades-block [today]="today()" />
+      <app-absences-block [today]="today()" />
       <app-news-block />
     </div>
   `,
@@ -47,8 +47,19 @@ import { TodoBlock } from './todo-block';
 })
 export class EleveHomePage {
   readonly #auth = inject(AuthStore);
-  /** Today in Cairo, for every block (one date for the whole page). */
-  protected readonly today = schoolToday();
-  protected readonly date = dayTitle(this.today);
+  /**
+   * Today in Cairo, for every block (one date for the whole page). Checked every minute in the browser, so
+   * a page left open past midnight moves on to the new day (the blocks reload for it).
+   */
+  protected readonly today = signal(schoolToday());
+  protected readonly date = computed(() => dayTitle(this.today()));
   protected readonly firstName = computed(() => this.#auth.user()?.firstName ?? '');
+
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const timer = setInterval(() => this.today.set(schoolToday()), 60_000);
+      destroyRef.onDestroy(() => clearInterval(timer));
+    });
+  }
 }

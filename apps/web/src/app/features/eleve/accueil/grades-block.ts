@@ -4,7 +4,7 @@ import { ApiClient } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { HomeBlock, snapshotOf } from '../../../shared/components/home-block';
 import { Badge } from '../../../shared/ui';
-import { blockState } from '../../../shared/utils/block-state';
+import { blockState, bothOf, type Snapshot } from '../../../shared/utils/block-state';
 import { average, mark, subjectName } from '../../../shared/utils/format';
 import { isRecent } from '../shared/grades';
 import { currentTerm, gradesView } from './home-views';
@@ -91,8 +91,11 @@ export class GradesBlock {
   protected readonly state = computed(() => {
     const cards = snapshotOf(this.#reportCards);
     // The « Bulletin publié » line is a bonus: if the report cards cannot be read, the grades still show.
-    const published: readonly ReportCardDto[] = cards.error ? [] : (cards.value ?? []);
-    return blockState(snapshotOf(this.#grades), (data) => gradesView(data, published, this.#term()?.id ?? null));
+    // The block waits until they have settled (a value or an error), so it never flashes its empty state.
+    const settled: Snapshot<readonly ReportCardDto[]> = cards.error ? { error: undefined, value: [] } : cards;
+    return blockState(bothOf(snapshotOf(this.#grades), settled), ([data, published]) =>
+      gradesView(data, published, this.#term()?.id ?? null),
+    );
   });
 
   protected readonly termPhrase = computed(() => {

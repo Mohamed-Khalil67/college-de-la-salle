@@ -1,5 +1,5 @@
 import { Component, computed, input } from '@angular/core';
-import type { PostDto } from '@cdls/shared';
+import { type PostDto, schoolToday } from '@cdls/shared';
 import { longDate, subjectName } from '../../../shared/utils/format';
 
 /** One announcement: title (h3 on the home page, h2 on the full list), who and when, then the text. */
@@ -48,6 +48,6 @@ export class PostItem {
   /** « Direction, Mathématiques, le 9 novembre 2026 » */
   protected readonly meta = computed(() => {
     const p = this.post();
-    return [p.authorName, subjectName(p.subjectId), `le ${longDate(p.createdAt.slice(0, 10))}`].filter(Boolean).join(', ');
+    return [p.authorName, subjectName(p.subjectId), `le ${longDate(schoolToday(new Date(p.createdAt)))}`].filter(Boolean).join(', ');
   });
 }

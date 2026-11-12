@@ -12,7 +12,7 @@ export const SESSION_PHASES = ['past', 'current', 'upcoming'] as const;
 export type SessionPhase = (typeof SESSION_PHASES)[number];
 
 /** Why there is no class to show. */
-export const QUIET_REASONS = ['weekend', 'closed', 'free', 'over'] as const;
+export const QUIET_REASONS = ['weekend', 'closed', 'free', 'over', 'cancelled'] as const;
 export type QuietReason = (typeof QUIET_REASONS)[number];
 
 export type NowState =
@@ -74,6 +74,8 @@ export function nowState(
   if (next) return { kind: 'next', session: next, minutesUntil: minutesOf(next.current.startTime) - minutesOf(now) };
   if (held.length) return { kind: 'quiet', reason: 'over', label: '' };
   if (closed) return { kind: 'quiet', reason: 'closed', label: closed.label };
+  // Classes exist today but none takes place: say so, the row below shows them struck through.
+  if (sessionsOfDay(list, today).length) return { kind: 'quiet', reason: 'cancelled', label: '' };
   // Friday and Saturday: the school week runs Sunday to Thursday.
   const wd = weekday(today);
   if (wd === 5 || wd === 6) return { kind: 'quiet', reason: 'weekend', label: '' };
@@ -103,6 +105,7 @@ export function nowLead(state: NowState): string {
 
 const QUIET_TITLES: Readonly<Record<QuietReason, string>> = {
   over: 'Journée terminée',
+  cancelled: 'Cours annulés aujourd’hui',
   closed: 'Pas de cours aujourd’hui',
   weekend: 'C’est le week-end',
   free: 'Pas de cours aujourd’hui',
@@ -113,6 +116,8 @@ export function quietText(reason: QuietReason, label: string): string {
   switch (reason) {
     case 'over':
       return 'Les cours d’aujourd’hui sont finis. Pensez à jeter un œil à vos devoirs.';
+    case 'cancelled':
+      return 'Les cours de la journée n’ont pas lieu. Le détail est ci-dessous.';
     case 'closed':
       return label ? `${label}. Bon repos.` : 'L’école est fermée aujourd’hui. Bon repos.';
     case 'weekend':

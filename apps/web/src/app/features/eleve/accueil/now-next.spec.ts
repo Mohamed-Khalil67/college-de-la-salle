@@ -112,6 +112,14 @@ describe('nowState', () => {
     expect(nowLead(state)).toBe('Journée terminée');
   });
 
+  it('says classes are cancelled when none of today takes place', () => {
+    const list = DAY.map((s) => ({ ...s, status: 'cancelled' as const }));
+    const state = nowState(list, TODAY, '10:00');
+    expect(state).toEqual({ kind: 'quiet', reason: 'cancelled', label: '' });
+    expect(nowLead(state)).toBe('Cours annulés aujourd’hui');
+    expect(nowView(list, [], TODAY, '10:00').strip).toHaveLength(3);
+  });
+
   it('says the day is over when every class left was cancelled', () => {
     const list = [session('08:00', '09:00'), session('15:00', '16:00', { status: 'cancelled' })];
     expect(nowState(list, TODAY, '10:00')).toMatchObject({ kind: 'quiet', reason: 'over' });
