@@ -18,18 +18,18 @@ export const ELEVE_NAV: readonly SpaceNavItem[] = [
   { label: 'Accueil', path: '', icon: 'home' },
   { label: 'Emploi du temps', path: 'emploi-du-temps', icon: 'clock', short: 'Horaire' },
   { label: 'Devoirs', path: 'devoirs', icon: 'book' },
-  { label: 'Ma section', path: 'section', secondary: true },
   { label: 'Notifications', path: 'notifications', secondary: true },
   { label: 'Synchroniser mon agenda', path: 'synchroniser', short: 'Agenda en ligne', secondary: true },
   { label: 'Plus', path: 'menu', icon: 'more', mobileOnly: true },
 ];
 
-/** Student pages a block of « Accueil » opens (labels as the page's own heading). */
+/** Student pages a block of « Accueil » opens, and « Ma section » (the account menu). Labels as the page's own heading. */
 export const ELEVE_DETAILS: readonly SpaceNavItem[] = [
   { label: 'Examens et devoirs', path: 'agenda' },
   { label: 'Notes', path: 'notes' },
   { label: 'Absences', path: 'absences' },
   { label: 'Bulletins', path: 'bulletins' },
+  { label: 'Ma section', path: 'section' },
   { label: 'Annonces', path: 'annonces' },
 ];
 

@@ -62,7 +62,7 @@ Every role has the same small menu: **Accueil** first (the one page above), then
 
 | Role | Menu (phone bar in bold) | Reached from a block instead |
 |---|---|---|
-| **Student** | **Accueil**, **Emploi du temps**, **Devoirs**; in « Plus »: Ma section, Notifications, Synchroniser mon agenda | Notes, Absences, Bulletins, Examens et devoirs, Annonces |
+| **Student** | **Accueil**, **Emploi du temps**, **Devoirs**; in « Plus »: Notifications, Synchroniser mon agenda | Notes, Absences, Bulletins, Examens et devoirs, Annonces; « Ma section » stays in the account menu |
 | **Teacher** | **Accueil**, **Mon emploi du temps**, **Appel**; in « Plus »: Groupes, Notifications, Synchroniser mon agenda, and Planification for a planner | Mes classes, Noter, Agenda, Annonces |
 | **Planner** (in `/admin`) | **Accueil** (= Planification), **Classes**, **Emploi du temps**; in « Plus »: Matières, Groupes, Salles, Types d’activité, Année scolaire, Mon espace enseignant | Professeur absent |
 | **Admin** | **Accueil**, **Planification**, **Classes**, **Emploi du temps**; Affectations; in « Plus »: Matières, Groupes, Salles, Types d’activité, Année scolaire | Utilisateurs, Validations, Préparer les bulletins, Bulletins, Annonces, Messages, Nouvelle année |

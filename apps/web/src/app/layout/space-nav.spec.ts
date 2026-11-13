@@ -57,7 +57,7 @@ describe('the phone bottom bar', () => {
 
 describe('« Plus » lists every screen of the menu', () => {
   it('has the pages that are not in the bar', () => {
-    expect(labels(menu(ELEVE_NAV, student))).toEqual(expect.arrayContaining(['Ma section', 'Notifications', 'Agenda en ligne']));
+    expect(labels(menu(ELEVE_NAV, student))).toEqual(expect.arrayContaining(['Notifications', 'Agenda en ligne']));
     expect(labels(menu(ENSEIGNANT_NAV, teacher))).toEqual(expect.arrayContaining(['Groupes', 'Notifications', 'Agenda en ligne']));
     // Notifications and the agenda link belong to students and teachers: the administration has neither.
     expect(ADMIN_NAV.map((i) => i.path)).not.toContain('notifications');
@@ -86,7 +86,7 @@ describe('the pages the blocks open', () => {
       const inMenu = new Set(nav.map((i) => i.path));
       for (const page of details) expect(inMenu.has(page.path), page.path).toBe(false);
     }
-    expect(ELEVE_DETAILS.map((i) => i.path)).toEqual(['agenda', 'notes', 'absences', 'bulletins', 'annonces']);
+    expect(ELEVE_DETAILS.map((i) => i.path)).toEqual(['agenda', 'notes', 'absences', 'bulletins', 'section', 'annonces']);
     expect(ENSEIGNANT_DETAILS.map((i) => i.path)).toContain('classes');
     expect(ADMIN_DETAILS.map((i) => i.path)).toEqual(
       expect.arrayContaining(['utilisateurs', 'validations', 'bulletins/preparation', 'messages']),
@@ -97,7 +97,7 @@ describe('the pages the blocks open', () => {
 describe('the top navigation', () => {
   it('shows everything when it fits, and the overflow moves to « Plus » when it does not', () => {
     expect(labels(desktopNav(visibleNav(ELEVE_NAV, student)))).toEqual([
-      'Accueil', 'Horaire', 'Devoirs', 'Ma section', 'Notifications', 'Agenda en ligne',
+      'Accueil', 'Horaire', 'Devoirs', 'Notifications', 'Agenda en ligne',
     ]);
     expect(desktopNav(visibleNav(ENSEIGNANT_NAV, planner)).map((i) => i.label)).toEqual([
       'Accueil', 'Mon emploi du temps', 'Appel', 'Groupes', 'Notifications', 'Synchroniser mon agenda', 'Planification',

@@ -346,10 +346,10 @@ test('Annonces: an empty title is refused with a message that says how to fix it
   await axeAtBothWidths(page);
 });
 
-test('a planner is sent to the structure screens; the API refuses the preparation to a teacher', async ({ page, request }) => {
+test('a planner is sent to their page, Planification; the API refuses the preparation to a teacher', async ({ page, request }) => {
   await signInAs(page, ACCOUNTS.planner);
   await goInApp(page, '/admin').catch(() => undefined);
-  await expect(page).toHaveURL(/\/admin\/matieres$/);
+  await expect(page).toHaveURL(/\/admin\/planification$/);
   await page.context().clearCookies();
   const teacher = await tokenOf(request, ACCOUNTS.teacher);
   // The API refuses the preparation to a teacher too.
