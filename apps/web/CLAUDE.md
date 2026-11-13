@@ -134,6 +134,10 @@ the school's text): never write French text in a public component. Links go thro
 logical properties only (`inline-start/end`, `text-align: start`): the Arabic pages are `dir="rtl"`. Skip links are
 `<a cdlsSkipLink>`. The English and Arabic text is machine-drafted: say so when you touch it.
 
+## Design conformance spec
+
+`e2e/design-conformance.spec.ts` proves the built pages match what the owner agreed (`docs/workflow-redesign.md`, `docs/rollout.md` « What … sees » and « The menus »). A table per role (`ROLES`: blocks in order, entry label and route, header buttons, the three menus, the agreed empty text, the endpoint that fails each block) drives the same checks for student, teacher, planner and admin: order and layout, entry routes, failure isolation, empty and loading states, menus at 1440 and 390 px, Axe, French typography, and a right-to-left smoke (the spaces are French only; it mirrors the document). It also covers Planificateur routing, « Noter » and « Préparer les bulletins ». When you change a block, heading, entry label, header button or menu entry, change the table here too. A known gap is a `test.fail()` with its reason: it turns red the day the gap is closed, so remove `fail` then. Run it: `E2E_BASE_URL=… npx playwright test e2e/design-conformance.spec.ts --project=desktop`.
+
 ## Page checklist (before you commit)
 
 1. One `h1` per page (space pages start with `.page__header`); headings in order. Space pages never add a `<main>`
