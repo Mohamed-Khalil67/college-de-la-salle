@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { daysBetween, occurrences, safeAttachments, toIcs } from '@cdls/shared';
+import { daysBetween, isExamActivityCode, occurrences, safeAttachments, toIcs } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { canSetForAnyClass } from '../access/grants.js';
@@ -85,7 +85,10 @@ export class EventsService {
     return toIcs(toCalendarEvent(row), closures);
   }
 
-  /** Teachers create events for the classes they teach, or section/school-wide ungraded events. */
+  /**
+   * Teachers create events for the classes they teach, or section/school-wide ungraded events. An account
+   * without a teacher profile (the admin) only sets exams and tests (403 otherwise).
+   */
   async create(dto: CreateEventDto, user: AuthUser): Promise<EventDto> {
     // A teacher account needs its teacher profile; an admin account has none and is the author itself.
     if (!user.teacherId && user.role !== 'admin') throw forbidden();
@@ -267,6 +270,11 @@ export class EventsService {
     const own =
       (row.authorId !== null && row.authorId === user.teacherId) || row.createdById === user.id;
     if (user.role !== 'admin' && !own) throw forbidden();
+    // Authorship is not authority: re-check, at write time, the right to set this kind of event for its class.
+    // A planner whose permission was revoked, or a teacher no longer assigned to the class, keeps the event
+    // but can no longer move or delete it (an admin passes: `canSetForAnyClass` / `assertTeachesClass`).
+    if (row.classId)
+      await this.access.assertCanSchedule(user, row.classId, row.subjectId, row.activityType.code);
     return row;
   }
 
@@ -277,6 +285,17 @@ export class EventsService {
     current: EventRow | null,
   ): Promise<EventFields> {
     const type = await this.types.usable(input.activityTypeId, user, current?.activityTypeId);
+    // An account with no teacher profile (the admin) has no author name to show and nothing to audit for
+    // homework, courses or school-wide notices: it may only set exams and tests, through « Ajouter un examen »
+    // (a new event, or an event moved to another type: an exam cannot be turned into homework).
+    if (
+      (!current || current.activityTypeId !== input.activityTypeId) &&
+      !user.teacherId &&
+      !isExamActivityCode(type.code)
+    )
+      throw forbidden(
+        'Ce compte n’a pas de profil enseignant : il ne peut créer que des examens et des contrôles.',
+      );
     // A type that is not graded has no coefficient: moving an event to one resets it.
     const f =
       !type.gradable && current && current.activityTypeId !== input.activityTypeId
@@ -359,7 +378,8 @@ async function auditExam(
   after: EventRow | null,
 ): Promise<void> {
   const row = after ?? before;
-  if (!row || !canSetForAnyClass(user, row.activityType.code)) return;
+  // Audited when the exam grant applied to the event before or after the change (an exam turned into homework too).
+  if (!row || ![before, after].some((e) => e && canSetForAnyClass(user, e.activityType.code))) return;
   const facts = (e: EventRow): Prisma.InputJsonValue => ({
     type: e.activityType.code,
     title: e.title,

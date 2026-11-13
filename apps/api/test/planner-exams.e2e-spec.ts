@@ -194,6 +194,67 @@ describe('Planner exams (e2e)', () => {
     expect(actions).toEqual(['event.exam.create', 'event.exam.update', 'event.exam.update', 'event.exam.delete']);
   });
 
+  it('refuses homework and other non-exam events to an admin account without a teacher profile (403, nothing written)', async () => {
+    const before = await t.prisma.event.count({ where: { createdById: adminPlannerUserId } });
+    for (const body of [
+      exam({ activityTypeId: homeworkType, title: 'Devoir sans auteur' }),
+      // Section-wide and school-wide notices have no class to authorise: still refused without a profile.
+      exam({ activityTypeId: homeworkType, title: 'Annonce de section', classId: null, subjectId: null, sectionId: (await t.prisma.section.findFirstOrThrow()).id }),
+      exam({ activityTypeId: homeworkType, title: 'Annonce générale', classId: null, subjectId: null }),
+    ]) {
+      const res = await create(adminPlanner, body, 403);
+      expect((res.body as { message: string }).message).toMatch(/profil enseignant/);
+      await create(admin, body, 403);
+    }
+    expect(await t.prisma.event.count({ where: { createdById: adminPlannerUserId } })).toBe(before);
+  });
+
+  it('keeps the exam path of the admin, but refuses to turn an exam into homework', async () => {
+    const made = (await create(admin, exam({ title: 'Examen de l’admin', startTime: '07:00', endTime: '07:30' }))).body as EventDto;
+    await t.http().patch(`/api/events/${made.id}`).set(bearer(admin)).send({ activityTypeId: homeworkType, coefficient: 1 }).expect(403);
+    await t.http().patch(`/api/events/${made.id}`).set(bearer(admin)).send({ title: 'Examen renommé' }).expect(200);
+  });
+
+  it('refuses a planner whose permission was revoked the edit and the deletion of the exam they created, unaudited', async () => {
+    const made = (await create(planner, exam({ title: 'Examen d’un ancien planificateur', startTime: '22:00', endTime: '22:30' }))).body as EventDto;
+    const plannerUser = await t.prisma.user.findUniqueOrThrow({ where: { email: PLANNER } });
+    const auditCount = () => t.prisma.auditLog.count({ where: { entityId: made.id } });
+    expect(await auditCount()).toBe(1);
+    await t.prisma.user.update({ where: { id: plannerUser.id }, data: { isPlanner: false } });
+    try {
+      await t.http().patch(`/api/events/${made.id}`).set(bearer(planner)).send({ title: 'Modifié' }).expect(403);
+      await t.http().patch(`/api/events/${made.id}`).set(bearer(planner)).send({ startTime: '22:10', endTime: '22:40' }).expect(403);
+      await t.http().delete(`/api/events/${made.id}`).set(bearer(planner)).expect(403);
+      const kept = await t.prisma.event.findUniqueOrThrow({ where: { id: made.id } });
+      expect(kept.title).toBe('Examen d’un ancien planificateur');
+      expect(await auditCount()).toBe(1);
+    } finally {
+      await t.prisma.user.update({ where: { id: plannerUser.id }, data: { isPlanner: true } });
+    }
+    // The admin still may, and it is audited.
+    await t.http().patch(`/api/events/${made.id}`).set(bearer(admin)).send({ title: 'Repris par l’admin' }).expect(200);
+    expect(await auditCount()).toBe(2);
+    await t.http().delete(`/api/events/${made.id}`).set(bearer(admin)).expect(204);
+    expect(await auditCount()).toBe(3);
+  });
+
+  it('still lets a teacher edit and delete their own event of a class they teach, and audits an admin deleting a teacher’s exam', async () => {
+    const mine = await t.prisma.teachingAssignment.findFirstOrThrow({
+      where: { teacher: { user: { email: MATHS_TEACHER } } },
+      select: { classSubject: { select: { classId: true, subjectId: true } } },
+    });
+    const body = {
+      activityTypeId: homeworkType,
+      title: 'Devoir de mon enseignant',
+      classId: mine.classSubject.classId,
+      subjectId: mine.classSubject.subjectId,
+      date: friday,
+    };
+    const made = (await create(maths, body)).body as EventDto;
+    await t.http().patch(`/api/events/${made.id}`).set(bearer(maths)).send({ title: 'Devoir revu' }).expect(200);
+    await t.http().delete(`/api/events/${made.id}`).set(bearer(maths)).expect(204);
+  });
+
   it('lets the admin enter the marks of an exam that has no teacher author (recorded under a teacher of the class)', async () => {
     const owned = await t.prisma.event.findFirstOrThrow({ where: { id: { in: eventIds }, authorId: null } });
     const teachers = await t.prisma.teachingAssignment.count({

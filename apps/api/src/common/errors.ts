@@ -1,6 +1,6 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
-export const forbidden = () => new ForbiddenException('Action non autorisée.');
+export const forbidden = (message = 'Action non autorisée.') => new ForbiddenException(message);
 export const notFound = (what = 'Élément') => new NotFoundException(`${what} introuvable.`);
 
 /** Does the error (or its cause) name this Postgres constraint? */

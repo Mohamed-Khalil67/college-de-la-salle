@@ -6,15 +6,15 @@ import { LOCALE } from '../../../i18n/locale';
 import { SCHOOL } from '../../../school';
 import { Alert, Button, Field, FieldControl } from '../../../shared/ui';
 import {
+  CONTACT_SUBJECT_IDS,
   CONTACT_SUBJECTS,
+  CONTACT_TRACK_IDS,
   CONTACT_TRACKS,
-  type ContactSubjectId,
-  type ContactTrackId,
   contactMailto,
   type ContactMessage,
   contactRequest,
 } from '../../../school/contact-mail';
-import { shownError } from '../../../shared/utils/forms';
+import { fieldValue, shownError } from '../../../shared/utils/forms';
 
 let nextId = 0;
 
@@ -23,9 +23,6 @@ let nextId = 0;
 function blankMessage(): ContactMessage {
   return { name: '', email: '', phone: '', subject: CONTACT_SUBJECTS.registration, track: '', message: '' };
 }
-
-const SUBJECT_IDS = Object.keys(CONTACT_SUBJECTS) as ContactSubjectId[];
-const TRACK_IDS = Object.keys(CONTACT_TRACKS) as ContactTrackId[];
 
 /** What happened to the last message sent. */
 type SendState =
@@ -160,8 +157,8 @@ export class ContactForm {
   readonly #messages = inject(LOCALE).messages;
   protected readonly t = this.#messages.contactForm;
   protected readonly school = SCHOOL;
-  protected readonly subjects = SUBJECT_IDS.map((id) => ({ value: CONTACT_SUBJECTS[id], label: this.t.subjects[id] }));
-  protected readonly tracks = TRACK_IDS.map((id) => ({ value: CONTACT_TRACKS[id], label: this.t.tracks[id] }));
+  protected readonly subjects = CONTACT_SUBJECT_IDS.map((id) => ({ value: CONTACT_SUBJECTS[id], label: this.t.subjects[id] }));
+  protected readonly tracks = CONTACT_TRACK_IDS.map((id) => ({ value: CONTACT_TRACKS[id], label: this.t.tracks[id] }));
   protected readonly titleId = `contact-form-title-${++nextId}`;
 
   protected readonly model = signal<ContactMessage>(blankMessage());
@@ -204,7 +201,7 @@ export class ContactForm {
   }
 
   protected onTrap(event: Event): void {
-    this.trap.set((event.target as HTMLInputElement).value);
+    this.trap.set(fieldValue(event));
   }
 
   protected onSubmit(event: Event): void {

@@ -71,7 +71,9 @@ export class EventsController {
   /**
    * Teachers: events for their classes (graded kinds need a class), or ungraded section/school events.
    * The admin and a planner (a teacher or an admin account marked « Planificateur ») also set an exam or a
-   * test for any class; the author is then the account itself when it has no teacher profile.
+   * test for any class; the author is then the account itself when it has no teacher profile. An account with
+   * no teacher profile may create only exam types (403 otherwise). Update and delete re-check the right to
+   * set that kind of event for its class.
    */
   @Roles('teacher', 'admin')
   @Post()

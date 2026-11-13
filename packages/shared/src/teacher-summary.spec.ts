@@ -4,6 +4,7 @@ import {
   type AbsenceRecord,
   absenceWindowStart,
   givenHomework,
+  mapWithConcurrency,
   REPEATED_ABSENCE_MIN_DAYS,
   REPEATED_ABSENCE_WINDOW_DAYS,
   repeatedAbsences,
@@ -133,5 +134,40 @@ describe('rollCallDone', () => {
     expect(rollCallDone(session, [{ classId: 'c2', startTime: '09:00', endTime: '10:00' }])).toBe(false);
     expect(rollCallDone(session, [{ classId: 'c1', startTime: '10:00', endTime: '11:00' }])).toBe(false);
     expect(rollCallDone(session, [{ classId: 'c1', startTime: '08:00', endTime: '09:00' }])).toBe(false);
+  });
+});
+
+describe('mapWithConcurrency', () => {
+  it('keeps the order of the items and never runs more than the limit at once', async () => {
+    let running = 0;
+    let peak = 0;
+    const out = await mapWithConcurrency([1, 2, 3, 4, 5, 6, 7, 8, 9], 3, async (n) => {
+      running++;
+      peak = Math.max(peak, running);
+      await new Promise((r) => setTimeout(r, 10 - n));
+      running--;
+      return n * 2;
+    });
+    expect(out).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18]);
+    expect(peak).toBe(3);
+  });
+
+  it('handles no items, a limit above the count and a limit below one', async () => {
+    expect(await mapWithConcurrency([], 4, async (n: number) => n)).toEqual([]);
+    expect(await mapWithConcurrency([1, 2], 10, async (n) => n + 1)).toEqual([2, 3]);
+    expect(await mapWithConcurrency([1, 2, 3], 0, async (n) => n)).toEqual([1, 2, 3]);
+  });
+
+  it('rejects on the first failure and starts nothing new after it', async () => {
+    const started: number[] = [];
+    await expect(
+      mapWithConcurrency([1, 2, 3, 4, 5, 6], 2, async (n) => {
+        started.push(n);
+        if (n === 2) throw new Error('boom');
+        await new Promise((r) => setTimeout(r, 5));
+        return n;
+      }),
+    ).rejects.toThrow('boom');
+    expect(started.length).toBeLessThan(6);
   });
 });

@@ -4,10 +4,12 @@ import {
   absenceWindowStart,
   addDays,
   givenHomework,
+  mapWithConcurrency,
   REPEATED_ABSENCE_MAX,
   repeatedAbsences,
   rollCallDone,
   schoolToday,
+  SUMMARY_PENDING_CONCURRENCY,
   TEACHER_HOMEWORK_DAYS,
   TEACHER_TESTS_DAYS,
   type RepeatedAbsenceDto,
@@ -165,14 +167,13 @@ export class TeacherSummaryService {
 
   /** The notes to finish of every class and subject taught (the same rows « Noter » lists). */
   private async pending(user: AuthUser, taught: readonly Taught[]): Promise<TeacherSummaryPendingDto[]> {
-    const entries = await Promise.all(
-      taught.map(async (t) => ({
-        classId: t.classId,
-        subjectId: t.subjectId,
-        label: `${t.classLabel}, ${t.subjectName}`,
-        pending: await this.grading.pending({ classId: t.classId, subjectId: t.subjectId }, user),
-      })),
-    );
+    // A teacher with many class and subject pairs must not open a burst of queries: a few lanes at a time.
+    const entries = await mapWithConcurrency(taught, SUMMARY_PENDING_CONCURRENCY, async (t) => ({
+      classId: t.classId,
+      subjectId: t.subjectId,
+      label: `${t.classLabel}, ${t.subjectName}`,
+      pending: await this.grading.pending({ classId: t.classId, subjectId: t.subjectId }, user),
+    }));
     return entries.filter((e) => e.pending.length > 0);
   }
 

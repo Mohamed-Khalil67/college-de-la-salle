@@ -257,6 +257,27 @@ describe('EventsService', () => {
       });
     });
 
+    it('refuses homework or a school-wide notice to an account without a teacher profile, and keeps exams', async () => {
+      const admin: AuthUser = { ...TEACHER, id: 'u-a', role: 'admin', teacherId: null };
+      await expect(events.create({ ...dto, activityTypeId: 'ty-hw' }, admin)).rejects.toThrow(/profil enseignant/);
+      await expect(
+        events.create({ ...dto, activityTypeId: 'ty-hw', classId: null, subjectId: null }, admin),
+      ).rejects.toThrow(/profil enseignant/);
+      expect(prisma.event.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses to turn an exam into homework for an account without a teacher profile', async () => {
+      const admin: AuthUser = { ...TEACHER, id: 'u-a', role: 'admin', teacherId: null };
+      prisma.event.findUnique.mockResolvedValue(row({ authorId: null, createdById: 'u-a' }));
+      await expect(events.update('e1', { activityTypeId: 'ty-hw', coefficient: 1 }, admin)).rejects.toThrow(/profil enseignant/);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    });
+
+    it('lets an admin who has a teacher profile set homework, as that teacher', async () => {
+      const admin: AuthUser = { ...TEACHER, id: 'u-a', role: 'admin', teacherId: 't9' };
+      await expect(events.create({ ...dto, activityTypeId: 'ty-hw', coefficient: 1 }, admin)).resolves.toBeDefined();
+    });
+
     it('does not audit a teacher’s own exam, and refuses a teacher account without a profile', async () => {
       await events.create(dto, TEACHER);
       expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
@@ -361,6 +382,17 @@ describe('EventsService', () => {
       // Their own, and any for the admin.
       await expect(events.update('e1', { title: 'x' }, { ...planner2, id: 'u-p' })).resolves.toBeDefined();
       await expect(events.update('e1', { title: 'x' }, { ...planner, id: 'u-z' })).resolves.toBeDefined();
+    });
+
+    it('re-checks at write time the right to set the event for its class (a revoked planner is refused)', async () => {
+      access.assertCanSchedule.mockRejectedValue(new ForbiddenException());
+      prisma.event.findUnique.mockResolvedValue(row({ authorId: null, createdById: 'u-p' }));
+      const revoked: AuthUser = { ...TEACHER, id: 'u-p', teacherId: null, isPlanner: false };
+      await expect(events.update('e1', { title: 'x' }, revoked)).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(events.remove('e1', revoked)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+      expect(prisma.event.delete).not.toHaveBeenCalled();
+      expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
     });
 
     it('does not ask for a room check when the room is unchanged', async () => {

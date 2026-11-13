@@ -1,9 +1,10 @@
-import { Component, computed, effect, inject, linkedSignal, model, output, resource, signal, untracked } from '@angular/core';
+import { Component, computed, inject, linkedSignal, model, output, resource, signal, untracked } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
-import { type ClassDto, type EventDto, isExamActivityCode, SECTION_LABELS, type TimetableBlockedError } from '@cdls/shared';
+import { type ActivityTypeDto, type ClassDto, type EventDto, isExamActivityCode, SECTION_LABELS, type TimetableBlockedError } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { Alert, Button, Field, FieldControl, Modal } from '../../../shared/ui';
+import { fieldValue } from '../../../shared/utils/forms';
 import { BlockedNotice } from '../../timetable/blocked-notice';
 import { blockedOf } from '../../timetable/timetable-api';
 import { emptyExam, type ExamModel, examNotes, examProblem, toExamInput } from './exam-logic';
@@ -28,7 +29,7 @@ import { emptyExam, type ExamModel, examNotes, examProblem, toExamInput } from '
           </select>
         </cdls-field>
         <cdls-field label="Classe">
-          <select cdlsControl [formField]="examForm.classId">
+          <select cdlsControl [formField]="examForm.classId" (change)="pickClass($event)">
             <option value="">Choisir…</option>
             @for (c of classes(); track c.id) {
               <option [value]="c.id">{{ className(c) }}</option>
@@ -90,8 +91,9 @@ export class AddExamDialog {
   readonly #clock = inject(SchoolClock);
 
   protected readonly busy = signal(false);
-  protected readonly failure = signal<string | null>(null);
-  protected readonly conflicts = signal<TimetableBlockedError['conflicts']>([]);
+  /** Cleared each time the dialog opens or closes. */
+  protected readonly failure = linkedSignal<boolean, string | null>({ source: this.open, computation: () => null });
+  protected readonly conflicts = linkedSignal<boolean, TimetableBlockedError['conflicts']>({ source: this.open, computation: () => [] });
 
   /** Loaded once, when the dialog is first opened. */
   readonly #wanted = computed(() => (this.open() ? true : undefined));
@@ -102,7 +104,22 @@ export class AddExamDialog {
   protected readonly classes = computed(() => (this.#classes.hasValue() ? this.#classes.value() : []));
   protected readonly rooms = computed(() => (this.#rooms.hasValue() ? this.#rooms.value().filter((r) => r.active) : []));
 
-  protected readonly model = linkedSignal<ExamModel>(() => emptyExam(this.#clock.today()));
+  /**
+   * A fresh form each time the dialog opens or closes; while it stays open, the types arriving (they load on
+   * the first open) only fix the type: the first one until the person picks one that exists.
+   */
+  protected readonly model = linkedSignal<{ open: boolean; types: readonly ActivityTypeDto[] }, ExamModel>({
+    source: () => ({ open: this.open(), types: this.types() }),
+    computation: ({ open, types }, previous) => {
+      const first = types[0]?.id ?? '';
+      if (previous && previous.source.open === open) {
+        const kept = previous.value;
+        return types.some((t) => t.id === kept.activityTypeId) ? kept : { ...kept, activityTypeId: first };
+      }
+      // The clock ticks at midnight: it must not reset a form being filled in.
+      return { ...emptyExam(untracked(() => this.#clock.today())), activityTypeId: first };
+    },
+  });
   protected readonly examForm = form(this.model);
 
   readonly #classId = computed(() => this.model().classId);
@@ -138,25 +155,9 @@ export class AddExamDialog {
     return toExamInput(m, type?.label ?? 'Examen', this.#subjectName()).title;
   });
 
-  constructor() {
-    // The first type until the person picks one; a new class has its own subjects.
-    effect(() => {
-      const types = this.types();
-      untracked(() => this.model.update((m) => (types.some((t) => t.id === m.activityTypeId) ? m : { ...m, activityTypeId: types[0]?.id ?? '' })));
-    });
-    effect(() => {
-      this.#classId();
-      untracked(() => this.model.update((m) => ({ ...m, subjectId: '' })));
-    });
-    // A fresh form each time the dialog opens.
-    effect(() => {
-      if (this.open())
-        untracked(() => {
-          this.model.set({ ...emptyExam(this.#clock.today()), activityTypeId: this.types()[0]?.id ?? '' });
-          this.failure.set(null);
-          this.conflicts.set([]);
-        });
-    });
+  /** A new class has its own subjects: the subject chosen for the previous one is cleared with the change. */
+  protected pickClass(event: Event): void {
+    this.model.update((m) => ({ ...m, classId: fieldValue(event), subjectId: '' }));
   }
 
   protected className(c: ClassDto): string {

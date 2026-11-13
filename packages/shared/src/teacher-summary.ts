@@ -138,3 +138,35 @@ function overlaps(a: TimedClassSlot, b: TimedClassSlot): boolean {
 export function rollCallDone(session: TimedClassSlot, taken: readonly TimedClassSlot[]): boolean {
   return taken.some((t) => t.classId === session.classId && overlaps(session, t));
 }
+
+/** At most this many class-and-subject lookups run at once for a teacher's « Noter » section of the summary. */
+export const SUMMARY_PENDING_CONCURRENCY = 4;
+
+/**
+ * `items.map(work)` with at most `limit` calls in flight, results in the order of the items. The first failure
+ * rejects the whole call; no new call starts after it. A `limit` below 1 runs one at a time.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const done: Array<readonly [number, R]> = [];
+  // One iterator shared by the lanes: each item is handed out once.
+  const queue = items.entries();
+  let failed = false;
+  const lane = async (): Promise<void> => {
+    for (const [index, item] of queue) {
+      if (failed) return;
+      try {
+        done.push([index, await work(item, index)]);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  };
+  const lanes = Math.max(1, Math.min(Math.floor(limit) || 1, items.length));
+  await Promise.all(Array.from({ length: lanes }, lane));
+  return done.sort((a, b) => a[0] - b[0]).map(([, result]) => result);
+}

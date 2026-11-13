@@ -27,7 +27,7 @@ import {
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { Alert, Badge, Button, EmptyState, Field, FieldControl } from '../../../shared/ui';
-import { shownError } from '../../../shared/utils/forms';
+import { fieldValue, shownError } from '../../../shared/utils/forms';
 import { dayTitle, plural, timeSpan } from '../../../shared/utils/format';
 import { BlockedNotice } from '../../timetable/blocked-notice';
 import { blockedOf } from '../../timetable/timetable-api';
@@ -590,15 +590,15 @@ export class AbsencePage {
   }
 
   protected setTeacher(s: AbsenceSessionDto, event: Event): void {
-    this.#set(s, { ...this.decision(s), teacherId: (event.target as HTMLSelectElement).value });
+    this.#set(s, { ...this.decision(s), teacherId: fieldValue(event) });
   }
 
   protected setRoom(s: AbsenceSessionDto, event: Event): void {
-    this.#set(s, { ...this.decision(s), roomId: (event.target as HTMLSelectElement).value });
+    this.#set(s, { ...this.decision(s), roomId: fieldValue(event) });
   }
 
   protected setReason(event: Event): void {
-    this.reason.set((event.target as HTMLInputElement).value);
+    this.reason.set(fieldValue(event));
   }
 
   #set(s: AbsenceSessionDto, d: AbsenceDecision): void {
