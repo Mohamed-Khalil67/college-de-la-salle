@@ -1,24 +1,19 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { OccurrenceDto } from '@cdls/shared';
+import type { OccurrenceDto, RepeatedAbsenceDto } from '@cdls/shared';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { Button } from '../../../shared/ui';
-import { blockState, type Snapshot } from '../../../shared/utils/block-state';
+import { blockState } from '../../../shared/utils/block-state';
 import { subjectName } from '../../../shared/utils/format';
 import { shortDate } from '../../timetable/timetable-format';
-import { type LateNote, lateLine, lateNotes, type PendingEntry, upcomingTests, watchView } from './home-views';
+import { absenceLine, type LateNote, lateLine, lateNotes, pendingEntries, watchView } from './home-views';
 import { TeacherHomeData } from './teacher-home-data';
-
-interface WatchSource {
-  readonly pending: readonly PendingEntry[];
-  readonly events: readonly OccurrenceDto[];
-}
 
 /**
  * « À surveiller »: the notes still unfinished a week after the work, and the exams and tests planned for the
- * teacher's classes in the next two weeks (including those set by the school). Both lists come from the
- * page's shared data (nothing is fetched twice); if one cannot be read the block says so.
+ * teacher's classes in the next two weeks (including those set by the school), and the students often absent.
+ * All three come from the page's one summary; if one cannot be read the block says so.
  */
 @Component({
   selector: 'app-watch-block',
@@ -32,7 +27,7 @@ interface WatchSource {
       link="classes"
       linkLabel="Mes classes"
       loadingLabel="Chargement des points à surveiller…"
-      emptyText="Rien à signaler : pas de note en retard ni de contrôle prévu d’ici deux semaines."
+      emptyText="Rien à signaler : pas de note en retard, de contrôle prévu d’ici deux semaines ni d’absences répétées."
       (retry)="reload()"
     >
       @if (s.status === 'ready') {
@@ -54,6 +49,22 @@ interface WatchSource {
                     [queryParams]="{ classe: note.classId, matiere: note.subjectId }"
                     >Reprendre<span class="visually-hidden"> la note {{ note.title }}, {{ note.meta }}</span></a
                   >
+                </li>
+              }
+            </ul>
+          </div>
+        }
+        @if (s.data.absences.length) {
+          <div class="watch">
+            <h3 class="watch__title" id="bloc-surveiller-absences">Absences répétées</h3>
+            <ul class="list" role="list" aria-labelledby="bloc-surveiller-absences">
+              @for (absence of s.data.absences; track absence.studentId) {
+                <li>
+                  <div class="list__main">
+                    <p>{{ name(absence) }}</p>
+                    <p class="list__meta">{{ absence.classLabel }}</p>
+                    <p class="list__meta">{{ absenceText(absence) }}</p>
+                  </div>
                 </li>
               }
             </ul>
@@ -111,24 +122,25 @@ export class WatchBlock {
   readonly #today = inject(SchoolClock).today;
   readonly #data = inject(TeacherHomeData);
 
-  /** Any source failing is the block failing (a half-read list would say « nothing to watch » wrongly); it loads until all are in. */
-  protected readonly state = computed(() => {
-    const error = this.#data.assignments.error() ?? this.#data.pending.error() ?? this.#data.events.error();
-    const ready = this.#data.assignments.hasValue() && this.#data.pending.hasValue() && this.#data.events.hasValue();
-    const source: Snapshot<WatchSource> = error
-      ? { error, value: undefined }
-      : { error: undefined, value: ready ? { pending: this.#data.pending.value(), events: this.#data.events.value() } : undefined };
-    const classIds = new Set(this.#data.assignments.hasValue() ? this.#data.assignments.value().map((a) => a.classId) : []);
-    return blockState(source, ({ pending, events }) =>
-      watchView(lateNotes(pending, this.#today()), upcomingTests(events, classIds, this.#today())),
-    );
-  });
+  /** Any of the three sections failing is the block failing (a half-read list would say « nothing to watch » wrongly). */
+  protected readonly state = computed(() =>
+    blockState(
+      this.#data.section(['pending', 'tests', 'absences'], (summary) => summary),
+      (summary) =>
+        watchView(lateNotes(pendingEntries(summary.pending), this.#today()), summary.tests, summary.absences),
+    ),
+  );
 
   protected reload(): void {
     this.#data.reload();
-    this.#data.reloadEvents();
   }
 
+  protected name(absence: RepeatedAbsenceDto): string {
+    return `${absence.firstName} ${absence.lastName}`;
+  }
+  protected absenceText(absence: RepeatedAbsenceDto): string {
+    return absenceLine(absence);
+  }
   protected line(note: LateNote): string {
     return lateLine(note);
   }

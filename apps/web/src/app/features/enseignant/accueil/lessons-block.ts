@@ -1,16 +1,14 @@
-import { Component, computed, inject, resource } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { CalendarDayDto, TimetableOccurrenceDto } from '@cdls/shared';
-import { ApiClient } from '../../../core/api/api-client';
-import { AuthStore } from '../../../core/auth/auth-store';
+import type { TimetableOccurrenceDto } from '@cdls/shared';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { Badge, Button } from '../../../shared/ui';
-import { blockState, bothOf, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
+import { blockState } from '../../../shared/utils/block-state';
 import { clock } from '../../../shared/utils/format';
-import { TimetableApi } from '../../timetable/timetable-api';
 import { sessionTitle, STATUS_LABELS, STATUS_TONES } from '../../timetable/timetable-format';
 import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
+import { TeacherHomeData } from './teacher-home-data';
 
 /**
  * « Mes cours aujourd’hui », the highlighted block: each class of the day with its three actions (Appel,
@@ -56,6 +54,9 @@ import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
                 <p class="lesson__now">En cours</p>
               } @else if (item.phase === 'past' && !item.struck) {
                 <p class="lesson__over">Terminé</p>
+              }
+              @if (item.rollCallDone) {
+                <p class="lesson__roll"><cdls-badge tone="success">Appel fait</cdls-badge></p>
               }
               @if (!item.struck) {
                 <div class="lesson__actions">
@@ -135,6 +136,9 @@ import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
       font-size: var(--text-body-s);
       color: var(--color-muted);
     }
+    .lesson__roll {
+      margin: 0;
+    }
     .lesson__now {
       font-size: var(--text-label-s);
       font-weight: 600;
@@ -165,40 +169,22 @@ import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
   `,
 })
 export class LessonsBlock {
-  readonly #timetable = inject(TimetableApi);
-  readonly #api = inject(ApiClient);
-  readonly #auth = inject(AuthStore);
   readonly #clock = inject(SchoolClock);
+  readonly #data = inject(TeacherHomeData);
 
-  readonly #sessions = resource({
-    params: () => {
-      const teacherId = this.#auth.user()?.teacherId;
-      return teacherId ? { teacherId, from: this.#clock.today(), to: this.#clock.today() } : undefined;
-    },
-    loader: ({ params }) => this.#timetable.occurrences(params),
-  });
-  /** Holidays and days without classes; if they cannot be read, the block still shows the sessions. */
-  readonly #days = resource({
-    params: () => ({ from: this.#clock.today(), to: this.#clock.today() }),
-    loader: ({ params }) => this.#api.school.calendarDays(params),
-  });
-
-  readonly #calendar = computed<Snapshot<readonly CalendarDayDto[]>>(() => {
-    const days = snapshotOf(this.#days);
-    return days.error ? { error: undefined, value: [] } : days;
-  });
-
+  /** Today's sessions and the day's holidays come from the page's one summary. */
   protected readonly state = computed(() =>
-    blockState(bothOf(snapshotOf(this.#sessions), this.#calendar()), ([sessions]) =>
-      lessonsView(sessions, this.#clock.today(), this.#clock.now()),
+    blockState(
+      this.#data.section(['lessons'], (summary) => summary),
+      (summary) => lessonsView(summary.lessons, this.#clock.today(), this.#clock.now()),
     ),
   );
-  protected readonly emptyText = computed(() => lessonsEmptyText(this.#calendar().value ?? [], this.#clock.today()));
+  protected readonly emptyText = computed(() =>
+    lessonsEmptyText(this.#data.summary.hasValue() ? this.#data.summary.value().calendarDays : [], this.#clock.today()),
+  );
 
-  /** Reloads only what failed, and not while it is already loading (two clicks fetch once). */
   protected reload(): void {
-    if (this.#sessions.error() && !this.#sessions.isLoading()) this.#sessions.reload();
-    if (this.#days.error() && !this.#days.isLoading()) this.#days.reload();
+    this.#data.reload();
   }
 
   protected title(session: TimetableOccurrenceDto): string {

@@ -7,6 +7,7 @@ import type {
   ApplyAbsenceRequest,
   ApplyAbsenceResult,
   PlannerRoomsNowDto,
+  TeacherSummaryDto,
   PlannerTeacherDto,
   PlannerTimetablesDto,
   PlannerTodayDto,
@@ -173,6 +174,12 @@ export class ApiClient {
     timetables: () => this.#get<PlannerTimetablesDto>('/planner/timetables'),
     /** The whole school's soft warnings between two days. */
     warnings: (query: { from: string; to: string }) => this.#get<TimetableWarningDto[]>('/timetable/warnings', { ...query }),
+  };
+
+  /* Teacher: the home page in one request */
+  readonly teacher = {
+    /** Today's lessons, notes to finish, homework given, tests and repeated absences of the signed-in teacher. */
+    summary: () => this.#get<TeacherSummaryDto>('/teacher/summary'),
   };
 
   /* School structure */

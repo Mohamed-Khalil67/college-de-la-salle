@@ -53,8 +53,12 @@ export class EventsService {
    * Every day each event happens in [from, to] (weekly events expanded), sorted by day and time. Weekly
    * sessions on a holiday or a « pas de cours » day of their audience are left out.
    */
-  async occurrences(query: EventRangeQueryDto, user: AuthUser): Promise<OccurrenceDto[]> {
-    const rows = await this.rows(query, user);
+  async occurrences(
+    query: EventRangeQueryDto,
+    user: AuthUser,
+    extra?: Prisma.EventWhereInput,
+  ): Promise<OccurrenceDto[]> {
+    const rows = await this.rows(query, user, extra);
     const byId = new Map(
       (await this.targets.annotate(rows.map(toEventDto), user)).map((d) => [d.id, d]),
     );
@@ -200,7 +204,11 @@ export class EventsService {
     return row;
   }
 
-  private async rows(query: EventRangeQueryDto, user: AuthUser): Promise<EventRow[]> {
+  private async rows(
+    query: EventRangeQueryDto,
+    user: AuthUser,
+    extra?: Prisma.EventWhereInput,
+  ): Promise<EventRow[]> {
     if (query.to < query.from) throw new BadRequestException('« to » doit suivre « from ».');
     if (daysBetween(query.from, query.to) > MAX_RANGE_DAYS) {
       throw new BadRequestException(`Période limitée à ${MAX_RANGE_DAYS} jours.`);
@@ -213,7 +221,7 @@ export class EventsService {
       ],
     };
     return this.prisma.event.findMany({
-      where: { AND: [inRange, await this.audience(query, user)] },
+      where: { AND: [inRange, await this.audience(query, user), ...(extra ? [extra] : [])] },
       include: eventInclude,
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });

@@ -1,4 +1,5 @@
 import { addDays, schoolToday } from '@cdls/shared';
+import type { TeacherSummaryDto } from '@cdls/shared';
 import { type APIRequestContext, expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
 import { axeAtBothWidths, expectNoAxeViolations, goInApp, signInAs, tokenOf } from './structure';
@@ -32,6 +33,13 @@ async function openHome(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Bonjour');
   await expect(page.locator('.loading-line')).toHaveCount(0, { timeout: 30_000 });
 }
+
+const SUMMARY = '**/api/teacher/summary';
+/** Answers the page's one summary call with the real answer changed by `change` (the API is real, the data is arranged). */
+const summaryWith = (change: (summary: TeacherSummaryDto) => TeacherSummaryDto) => async (route: Route) => {
+  const real = (await (await route.fetch()).json()) as TeacherSummaryDto;
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(change(real)) });
+};
 
 /** Opens another page and waits for it, so the home page opened next loads again (through the routes set meanwhile). */
 async function leaveHome(page: Page): Promise<void> {
@@ -108,10 +116,36 @@ test('the five blocks stack in order on a phone, three side by side from tablet 
   expect(errors).toEqual([]);
 });
 
+test('the page asks for its data once: one summary call, no call per class or per homework', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.teacher);
+  await leaveHome(page);
+  const urls: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/')) urls.push(new URL(r.url()).pathname);
+  });
+  await goInApp(page, '/enseignant');
+  await expect(page.locator('.loading-line')).toHaveCount(0, { timeout: 30_000 });
+  expect(urls.filter((u) => u === '/api/teacher/summary')).toHaveLength(1);
+  expect(urls.filter((u) => /grading\/pending|completions|timetable\/occurrences|teaching-assignments/.test(u))).toEqual([]);
+  expect(urls.length).toBeLessThanOrEqual(4);
+});
+
 test('each lesson of the day has Appel, Noter and Devoir; the one in progress is marked; a cancelled one has none', async ({ page }) => {
   await signInAs(page, ACCOUNTS.teacher);
   await leaveHome(page);
-  await page.route('**/api/timetable/occurrences*', json(lessons()));
+  const [open, cancelled] = lessons();
+  await page.route(
+    SUMMARY,
+    summaryWith((real) => ({
+      ...real,
+      failed: [],
+      calendarDays: [],
+      lessons: [
+        { session: open, rollCallDone: true },
+        { session: cancelled, rollCallDone: true },
+      ] as unknown as TeacherSummaryDto['lessons'],
+    })),
+  );
   await goInApp(page, '/enseignant');
   await expect(page.locator('.loading-line')).toHaveCount(0, { timeout: 30_000 });
 
@@ -130,6 +164,9 @@ test('each lesson of the day has Appel, Noter and Devoir; the one in progress is
     '/enseignant/noter?classe=11111111-1111-4111-8111-111111111111&matiere=mathematiques',
   );
   await expect(live.getByRole('link', { name: 'Devoir : ouvrir l’agenda', exact: true })).toHaveAttribute('href', '/enseignant/agenda');
+  // « Appel fait » on the lesson whose roll was taken, never on the cancelled one.
+  await expect(live).toContainText('Appel fait');
+  await expect(items.nth(1)).not.toContainText('Appel fait');
   await expect(items.nth(1)).toContainText('Annulée');
   await expect(items.nth(1).getByRole('link')).toHaveCount(0);
   for (const name of ['Appel', 'Noter', 'Devoir']) {
@@ -222,23 +259,21 @@ test('each entry link opens its detail page', async ({ page }) => {
   await axeAtBothWidths(page);
 });
 
-test('a block that fails shows its own error and « Réessayer »; the page lives on; Axe-clean; the retry works', async ({ page }) => {
+test('a section that fails shows its blocks’ error and « Réessayer »; the page lives on; Axe-clean; the retry works', async ({ page }) => {
   await signInAs(page, ACCOUNTS.teacher);
   await leaveHome(page);
   let failing = true;
-  await page.route('**/api/grading/pending*', (route) =>
-    failing
-      ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Les notes sont indisponibles pour le moment.' }) })
-      : route.continue(),
+  await page.route(SUMMARY, (route) =>
+    failing ? summaryWith((real) => ({ ...real, failed: ['pending'], pending: [] }))(route) : route.continue(),
   );
   await goInApp(page, '/enseignant');
 
   const grading = block(page, 'Notes à finir');
-  await expect(grading.getByRole('alert')).toContainText('Les notes sont indisponibles');
+  await expect(grading.getByRole('alert')).toBeVisible();
   const retry = grading.getByRole('button', { name: 'Réessayer' });
   await expect(retry).toBeVisible();
   expect((await retry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
-  // « À surveiller » reads the same notes (fetched once for the page), so it says so too; the other blocks are untouched.
+  // « À surveiller » reads the same notes, so it says so too; the other blocks are untouched.
   await expect(block(page, 'À surveiller').getByRole('alert')).toHaveCount(1);
   for (const heading of ['Mes cours aujourd’hui', 'Devoirs donnés', 'Annonces']) await expect(block(page, heading).getByRole('alert')).toHaveCount(0);
   await expect(pageStatus(page)).toHaveText(/^Page chargée. Ces blocs n’ont pas pu être chargés : .*Notes à finir.*À surveiller|^Page chargée. Ces blocs n’ont pas pu être chargés : .*À surveiller.*Notes à finir/);
@@ -251,6 +286,45 @@ test('a block that fails shows its own error and « Réessayer »; the page live
   await expect(block(page, 'À surveiller').getByRole('alert')).toHaveCount(0);
   await expect(grading.getByRole('link', { name: 'Noter une classe', exact: true })).toBeVisible();
   await expect(pageStatus(page)).toHaveText('Page chargée.');
+  await axeAtBothWidths(page);
+});
+
+test('the whole summary failing: four blocks say so, the announcements live on, « Saisie des notes » stays reachable', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.teacher);
+  await leaveHome(page);
+  await page.route(SUMMARY, (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ statusCode: 500, message: 'Votre page est indisponible pour le moment.' }) }),
+  );
+  // « Mes classes » cannot load its classes either.
+  await page.route('**/api/teaching-assignments*', (route) => route.abort());
+  await goInApp(page, '/enseignant');
+  for (const heading of ['Mes cours aujourd’hui', 'Notes à finir', 'Devoirs donnés', 'À surveiller'])
+    await expect(block(page, heading).getByRole('alert')).toContainText('indisponible');
+  await expect(block(page, 'Annonces').getByRole('alert')).toHaveCount(0);
+  // The header buttons do not depend on any block.
+  await expect(page.getByRole('link', { name: 'Saisie des notes', exact: true })).toHaveAttribute('href', '/enseignant/notes');
+  await expect(page.getByRole('link', { name: 'Nouvelle note' })).toHaveAttribute('href', '/enseignant/noter');
+  await axeAtBothWidths(page);
+});
+
+test('the students often absent show in « À surveiller »', async ({ page }) => {
+  await signInAs(page, ACCOUNTS.teacher);
+  await leaveHome(page);
+  await page.route(
+    SUMMARY,
+    summaryWith((real) => ({
+      ...real,
+      failed: [],
+      absences: [
+        { studentId: 's1', firstName: 'Nour', lastName: 'Haddad', classId: 'c1', classLabel: 'Première A', days: 4, lastDay: addDays(schoolToday(), -1) },
+      ],
+    })),
+  );
+  await goInApp(page, '/enseignant');
+  const watch = block(page, 'À surveiller');
+  await expect(watch.getByRole('heading', { level: 3, name: 'Absences répétées' })).toBeVisible();
+  await expect(watch).toContainText('Nour Haddad');
+  await expect(watch).toContainText('4 jours d’absence sur 30 jours');
   await axeAtBothWidths(page);
 });
 
@@ -271,10 +345,10 @@ test('one block failing alone (the announcements) leaves the other four untouche
 test('empty blocks invite instead of apologising; Axe-clean at 390 and 1440 px', async ({ page }) => {
   await signInAs(page, ACCOUNTS.teacher);
   await leaveHome(page);
-  await page.route('**/api/timetable/occurrences*', json([]));
-  await page.route('**/api/grading/pending*', json([]));
-  await page.route('**/api/events/occurrences*', json([]));
-  await page.route('**/api/calendar-days*', json([]));
+  await page.route(
+    SUMMARY,
+    summaryWith((real) => ({ ...real, failed: [], lessons: [], calendarDays: [], pending: [], homework: [], tests: [], absences: [] })),
+  );
   await page.route('**/api/posts*', json({ items: [], total: 0, page: 1, pageSize: 2 }));
   await goInApp(page, '/enseignant');
 

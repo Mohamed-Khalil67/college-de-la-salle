@@ -26,17 +26,17 @@ Each block loads on its own: if one fails it shows its own message and the rest 
 
 ## What the teacher sees on opening the platform
 
-The teacher lands on one page, `/enseignant`, built like the student's: blocks that load on their own, each ending with one button to its detail page. On a phone the blocks stack in this order; from tablet width the three middle ones sit side by side. The header button « Nouvelle note » grades any class, not only today's. « Mes classes » is `/enseignant/classes` (the button of « À surveiller »).
+The teacher lands on one page, `/enseignant`, built like the student's: blocks that load on their own, each ending with one button to its detail page. On a phone the blocks stack in this order; from tablet width the three middle ones sit side by side. The header buttons « Nouvelle note » (grades any class, not only today's) and « Saisie des notes » (the full grid) do not depend on any block. The whole page is read with ONE request, `GET /teacher/summary` (plus the announcements). « Mes classes » is `/enseignant/classes` (the button of « À surveiller »).
 
 | Block | Shows | Button |
 |---|---|---|
-| **Mes cours aujourd'hui** (full width, navy) | Each class of the day in time order with **Appel**, **Noter** (opens the class and subject in « Noter ») and **Devoir**; the current one outlined and marked « En cours », past ones quieter (« Terminé »), cancelled or moved ones written out without actions; a calm message on a holiday or at the week-end | Mon emploi du temps de la semaine |
+| **Mes cours aujourd'hui** (full width, navy) | Each class of the day in time order with **Appel**, **Noter** (opens the class and subject in « Noter ») and **Devoir**; the current one outlined and marked « En cours », past ones quieter (« Terminé »), « Appel fait » on a class whose roll call the teacher saved today, cancelled or moved ones written out without actions; a calm message on a holiday or at the week-end | Mon emploi du temps de la semaine |
 | **Notes à finir** | Drafts, planned exams and half-entered marks (18 / 27) of every class and subject taught, newest first, each with « Reprendre » | Noter une classe |
 | **Devoirs donnés** | The homework the teacher gave that falls due in two weeks, with how many students ticked it | Tous mes devoirs |
-| **À surveiller** | Notes still unfinished a week after the work, and the exams and tests planned for the teacher's classes in the next two weeks (set by anyone, the school included) | Mes classes |
+| **À surveiller** | Notes still unfinished a week after the work, the exams and tests planned for the teacher's classes in the next two weeks (set by anyone, the school included), and « Absences répétées »: students with 3 or more distinct days of unexcused absence in the last 30 days in the teacher's classes (`REPEATED_ABSENCE_MIN_DAYS`, `REPEATED_ABSENCE_WINDOW_DAYS` in `@cdls/shared`) | Mes classes |
 | **Annonces** (full width) | The two latest announcements | Écrire ou lire les annonces |
 
-Not on the page yet: « Appel fait » on past classes and repeated absences. Both need one call per class session (roll-call sheets), which the school's single address cannot afford (the API limits each address to 120 requests a minute); they wait for a summary endpoint. The menu is described in « The menus ».
+`GET /teacher/summary` (teachers only, their own classes only) answers every block in one request, so the school's single address (120 requests a minute) is not spent per class. Each of its five sections (`lessons`, `pending`, `homework`, `tests`, `absences`) is read on its own: one that fails is named in `failed`, and only the blocks that use it show their error and « Réessayer » (which reads the summary again). « Appel fait » is a close match, not a link: roll calls are saved on agenda events, timetable sessions have none, so a session counts as done when the teacher saved a roll call today for a timed event of the same class that overlaps its hours. The menu is described in « The menus ».
 
 ## What the administration sees on opening the platform
 

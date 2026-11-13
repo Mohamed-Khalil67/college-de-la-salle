@@ -13,5 +13,6 @@ import { QuickGradingService } from './quick-grading.service.js';
   imports: [TargetsModule, ClassesModule, PeriodsModule, NotificationsModule, ActivityTypesModule],
   controllers: [GradesController, QuickGradingController],
   providers: [GradesService, QuickGradingService],
+  exports: [QuickGradingService],
 })
 export class GradesModule {}
