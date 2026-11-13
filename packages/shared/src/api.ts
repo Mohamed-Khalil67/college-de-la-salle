@@ -735,7 +735,11 @@ export interface EventDto {
   readonly coefficient: number;
   /** Who the work concerns (assessments and homework of a class); the whole class for everything else. */
   readonly target: AssessmentTargetDto;
-  readonly authorId: string;
+  /**
+   * The teacher who owns the event. Null when a planner or an admin without a teacher profile set it (an
+   * exam for any class, see `EXAM_ACTIVITY_CODES`): `authorName` then names that account.
+   */
+  readonly authorId: string | null;
   readonly authorName: string;
   readonly createdAt: string;
   readonly updatedAt: string;

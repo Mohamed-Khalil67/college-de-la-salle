@@ -17,6 +17,7 @@ export const eventInclude = {
   activityType: true,
   room: true,
   author: { include: { user: { select: { firstName: true, lastName: true } } } },
+  createdBy: { select: { firstName: true, lastName: true } },
   schoolClass: { include: { section: true } },
   section: true,
   /** Who the work concerns (see TargetsService); no row means the whole class. */
@@ -47,10 +48,16 @@ export function toEventDto(e: EventRow): EventDto {
     coefficient: Number(e.coefficient),
     target: toTargetDto(e.targets),
     authorId: e.authorId,
-    authorName: `${e.author.user.firstName} ${e.author.user.lastName}`,
+    authorName: authorNameOf(e),
     createdAt: e.createdAt.toISOString(),
     updatedAt: e.updatedAt.toISOString(),
   };
+}
+
+/** The owning teacher's name, or the creating account's when no teacher owns it (a planner's exam). */
+function authorNameOf(e: EventRow): string {
+  const who = e.author?.user ?? e.createdBy;
+  return who ? `${who.firstName} ${who.lastName}` : '';
 }
 
 /** A stored attachment: a label and an address. */
@@ -82,7 +89,7 @@ export function toCalendarEvent(e: EventRow): CalendarEvent {
     description: dto.description,
     attachments: dto.attachments,
     coefficient: dto.coefficient,
-    authorUid: dto.authorId,
+    authorUid: dto.authorId ?? '',
     authorName: dto.authorName,
     createdAt: e.createdAt.getTime(),
   };

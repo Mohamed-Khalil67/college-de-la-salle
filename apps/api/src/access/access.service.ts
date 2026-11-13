@@ -5,7 +5,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { forbidden } from '../common/errors.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { concernsStudentNow } from '../targets/target-filters.js';
-import { canEditStructure } from './grants.js';
+import { canEditStructure, canSetForAnyClass } from './grants.js';
 
 export interface StudentPlacement {
   readonly classId: string;
@@ -101,6 +101,47 @@ export class AccessService {
     )
       return;
     throw forbidden();
+  }
+
+  /**
+   * May this user set an event of this type for this class? Whoever may set it for any class (the admin, or a
+   * planner for an exam type: `canSetForAnyClass`), else a teacher of the class and subject (`assertTeachesClass`).
+   */
+  async assertCanSchedule(
+    user: AuthUser,
+    classId: string,
+    subjectId: string | null,
+    typeCode: string,
+  ): Promise<void> {
+    if (canSetForAnyClass(user, typeCode)) return;
+    await this.assertTeachesClass(user, classId, subjectId);
+  }
+
+  /**
+   * The teacher a mark or a roll call is recorded under: the signed-in teacher, else the event's own teacher,
+   * else (an admin grading an exam a planner without a teacher profile set) a teacher of the class and subject.
+   */
+  async recorderFor(
+    user: AuthUser,
+    event: { readonly authorId: string | null; readonly classId: string | null; readonly subjectId: string | null },
+  ): Promise<string> {
+    const known = user.teacherId ?? event.authorId;
+    if (known) return known;
+    const assignment = event.classId
+      ? await this.prisma.teachingAssignment.findFirst({
+          where: {
+            classSubject: {
+              classId: event.classId,
+              ...(event.subjectId ? { subjectId: event.subjectId } : {}),
+            },
+          },
+          orderBy: { id: 'asc' },
+          select: { teacherId: true },
+        })
+      : null;
+    if (!assignment)
+      throw new ConflictException('Aucun enseignant n’est affecté à cette classe et cette matière.');
+    return assignment.teacherId;
   }
 
   /** May this user read this student's records? Themselves, a teacher of their class, or an admin. */

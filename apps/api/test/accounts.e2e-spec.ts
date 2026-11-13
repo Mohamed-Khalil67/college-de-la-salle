@@ -436,7 +436,7 @@ describe('Accounts (e2e)', () => {
       const oldClass = classOf('nationale', 'e2e-nat-a');
       const exam = await t.prisma.event.findFirstOrThrow({ where: { activityType: { code: 'examen' } } });
       gradeId = (await t.prisma.grade.create({
-        data: { eventId: exam.id, studentId, score: 15, gradedById: exam.authorId, published: true },
+        data: { eventId: exam.id, studentId, score: 15, gradedById: exam.authorId!, published: true },
       })).id;
 
       // A class of the old section is refused.

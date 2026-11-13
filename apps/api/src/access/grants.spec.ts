@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AccessService } from './access.service.js';
-import { canEditStructure, hasGrant, isPlanner } from './grants.js';
+import { canEditStructure, canSetForAnyClass, hasGrant, isPlanner } from './grants.js';
 
 const user = (role: AuthUser['role'], over: Partial<AuthUser> = {}): AuthUser => ({
   id: 'u',
@@ -39,6 +39,15 @@ describe('grants', () => {
     expect(canEditStructure(user('teacher'))).toBe(false);
     expect(canEditStructure(user('student'))).toBe(false);
     expect(canEditStructure(user('student', { isPlanner: true }))).toBe(false);
+  });
+
+  it('lets the admin and planners set exams for any class, and only exams', () => {
+    expect(canSetForAnyClass(user('admin'), 'examen')).toBe(true);
+    expect(canSetForAnyClass(user('teacher', { isPlanner: true }), 'controle')).toBe(true);
+    expect(canSetForAnyClass(user('teacher', { isPlanner: true }), 'devoir')).toBe(false);
+    expect(canSetForAnyClass(user('teacher'), 'examen')).toBe(false);
+    expect(canSetForAnyClass(user('student'), 'examen')).toBe(false);
+    expect(canSetForAnyClass(user('student', { isPlanner: true }), 'examen')).toBe(false);
   });
 
   it('matches a role or the planner grant', () => {

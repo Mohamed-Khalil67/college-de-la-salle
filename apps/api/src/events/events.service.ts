@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { daysBetween, occurrences, safeAttachments, toIcs } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
+import { canSetForAnyClass } from '../access/grants.js';
+import { audit } from '../common/audit.js';
 import { ActivityTypesService } from '../activity-types/activity-types.service.js';
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
@@ -81,7 +83,8 @@ export class EventsService {
 
   /** Teachers create events for the classes they teach, or section/school-wide ungraded events. */
   async create(dto: CreateEventDto, user: AuthUser): Promise<EventDto> {
-    if (!user.teacherId) throw forbidden();
+    // A teacher account needs its teacher profile; an admin account has none and is the author itself.
+    if (!user.teacherId && user.role !== 'admin') throw forbidden();
     const input = withDefaults(dto);
     const row = await this.occupancy.guard(
       this.prisma.$transaction(async (tx) => {
@@ -90,7 +93,7 @@ export class EventsService {
         await assertClassWritable(tx, input.classId);
         const fields = await this.check(input, user, null);
         const made = await tx.event.create({
-          data: { ...toData(fields), authorId: user.teacherId! },
+          data: { ...toData(fields), authorId: user.teacherId, createdById: user.id },
           include: eventInclude,
         });
         // Who the work concerns (the whole class unless « Assigner à » says otherwise).
@@ -103,6 +106,7 @@ export class EventsService {
         await this.occupancy.indexEvent(tx, booking(created));
         // A new homework: the students it concerns are told, in this transaction.
         await this.notices.homeworkAssigned(tx, created, user.id);
+        await auditExam(tx, user, 'event.exam.create', null, created);
         return created;
       }),
     );
@@ -165,6 +169,7 @@ export class EventsService {
         await this.occupancy.indexEvent(tx, booking(updated));
         // Moved or in another room: the people it concerns are told, in this transaction.
         await this.notices.eventChanged(tx, eventSchedule(current), updated, user.id);
+        await auditExam(tx, user, 'event.exam.update', current, updated);
         return updated;
       }),
     );
@@ -184,6 +189,7 @@ export class EventsService {
       // Before the delete: the audience is read from the event's targets, which go with it.
       await this.notices.eventCancelled(tx, current, user.id);
       await tx.event.delete({ where: { id } });
+      await auditExam(tx, user, 'event.exam.delete', current, null);
     });
   }
 
@@ -249,7 +255,10 @@ export class EventsService {
   private async editable(id: string, user: AuthUser): Promise<EventRow> {
     const row = await this.prisma.event.findUnique({ where: { id }, include: eventInclude });
     if (!row) throw notFound('Événement');
-    if (user.role !== 'admin' && row.authorId !== user.teacherId) throw forbidden();
+    // Their own: the teacher who owns it, or the account that created it. Null never matches null.
+    const own =
+      (row.authorId !== null && row.authorId === user.teacherId) || row.createdById === user.id;
+    if (user.role !== 'admin' && !own) throw forbidden();
     return row;
   }
 
@@ -295,7 +304,7 @@ export class EventsService {
     if (f.classId) {
       if (!(await this.prisma.schoolClass.findUnique({ where: { id: f.classId } })))
         throw notFound('Classe');
-      await this.access.assertTeachesClass(user, f.classId, f.subjectId);
+      await this.access.assertCanSchedule(user, f.classId, f.subjectId, type.code);
       // A graded event counts in a subject of the class: report cards only weigh the class's subjects.
       if (
         type.gradable &&
@@ -328,6 +337,41 @@ export class EventsService {
         : null;
     return { ...f, attachments, periodId };
   }
+}
+
+/**
+ * The planner's exams are audited (who set, moved or removed an exam for a class, in the same transaction); a
+ * teacher's own homework and tests are not, as before. Only exam types set through the planner/admin grant.
+ */
+async function auditExam(
+  tx: Prisma.TransactionClient,
+  user: AuthUser,
+  action: 'event.exam.create' | 'event.exam.update' | 'event.exam.delete',
+  before: EventRow | null,
+  after: EventRow | null,
+): Promise<void> {
+  const row = after ?? before;
+  if (!row || !canSetForAnyClass(user, row.activityType.code)) return;
+  const facts = (e: EventRow): Prisma.InputJsonValue => ({
+    type: e.activityType.code,
+    title: e.title,
+    classId: e.classId,
+    subjectId: e.subjectId,
+    date: toDay(e.date),
+    startTime: e.startTime,
+    endTime: e.endTime,
+    roomId: e.roomId,
+  });
+  await audit(tx, [
+    {
+      actorId: user.id,
+      action,
+      entity: 'event',
+      entityId: row.id,
+      ...(before ? { before: facts(before) } : {}),
+      ...(after ? { after: facts(after) } : {}),
+    },
+  ]);
 }
 
 /** What the occupancy index needs of an event. */

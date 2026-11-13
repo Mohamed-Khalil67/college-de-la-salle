@@ -148,7 +148,7 @@ describe('School flows (e2e)', () => {
       where: { id: devoir.id },
       include: { author: { include: { user: true } } },
     });
-    expect(physicsTeacher.author.user.email).toBeTruthy();
+    expect(physicsTeacher.author!.user.email).toBeTruthy();
     const admins = await t
       .http()
       .get(`/api/events/${devoir.id}/completions`)

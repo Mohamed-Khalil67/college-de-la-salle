@@ -535,7 +535,7 @@ async function main(): Promise<void> {
           score: mark(),
           outOf: 20,
           published: true,
-          gradedById: exam.authorId,
+          gradedById: exam.authorId!,
         },
         {
           eventId: test.id,
@@ -543,7 +543,7 @@ async function main(): Promise<void> {
           score: Math.round(random() * 20) / 2,
           outOf: 10,
           published: false,
-          gradedById: test.authorId,
+          gradedById: test.authorId!,
         },
       );
       if (i % 2 === 0) completions.push({ eventId: homework.id, studentId });
@@ -553,7 +553,7 @@ async function main(): Promise<void> {
         date: day('2026-10-11'),
         status: i === 0 ? 'absent' : i === 1 ? 'late' : 'present',
         minutesLate: i === 1 ? 10 : null,
-        recordedById: mathsCourse.authorId,
+        recordedById: mathsCourse.authorId!,
       });
     });
   }

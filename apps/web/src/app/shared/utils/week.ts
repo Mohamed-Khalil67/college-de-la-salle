@@ -66,7 +66,7 @@ export function toCalendarEvent(e: EventDto): CalendarEvent {
     description: e.description,
     attachments: e.attachments,
     coefficient: e.coefficient,
-    authorUid: e.authorId,
+    authorUid: e.authorId ?? '',
     authorName: e.authorName,
     createdAt: Date.parse(e.createdAt),
   };

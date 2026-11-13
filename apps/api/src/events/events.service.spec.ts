@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { AccessService } from '../access/access.service.js';
 import { ActivityTypesService } from '../activity-types/activity-types.service.js';
@@ -98,7 +103,8 @@ describe('EventsService', () => {
       findUniqueOrThrow: vi.fn(),
     },
     grade: { count: vi.fn() },
-    subject: { findUnique: vi.fn() },
+    auditLog: { createMany: vi.fn() },
+    subject:{ findUnique: vi.fn() },
     section: { findUnique: vi.fn() },
     schoolClass: { findUnique: vi.fn() },
     room: { findUnique: vi.fn() },
@@ -106,7 +112,7 @@ describe('EventsService', () => {
     // The write transaction runs on the same mocks.
     $transaction: vi.fn(),
   };
-  const access = { assertTeachesClass: vi.fn(), audienceFor: vi.fn(), placement: vi.fn() };
+  const access = { assertTeachesClass: vi.fn(), assertCanSchedule: vi.fn(), audienceFor: vi.fn(), placement: vi.fn() };
   const types = { usable: vi.fn(), lockForEvent: vi.fn() };
   const periods = { resolveFor: vi.fn(), assertOpen: vi.fn(), find: vi.fn() };
   const calendarDays = { closures: vi.fn() };
@@ -234,9 +240,38 @@ describe('EventsService', () => {
       ).resolves.toBeDefined();
     });
 
+    it('lets an admin account without a teacher profile set an exam: the account is the author, and it is audited', async () => {
+      const admin: AuthUser = { ...TEACHER, id: 'u-a', role: 'admin', teacherId: null };
+      prisma.event.create.mockResolvedValue(row({ authorId: null, createdById: 'u-a' }));
+      prisma.event.findUniqueOrThrow.mockResolvedValue(row({ authorId: null, createdById: 'u-a' }));
+      await events.create(dto, admin);
+      expect(prisma.event.create.mock.calls[0]![0].data).toMatchObject({
+        authorId: null,
+        createdById: 'u-a',
+      });
+      expect(access.assertCanSchedule).toHaveBeenCalledWith(admin, 'c1', 'mathematiques', 'examen');
+      expect(prisma.auditLog.createMany.mock.calls[0]![0].data[0]).toMatchObject({
+        actorId: 'u-a',
+        action: 'event.exam.create',
+        entityId: 'e1',
+      });
+    });
+
+    it('does not audit a teacher’s own exam, and refuses a teacher account without a profile', async () => {
+      await events.create(dto, TEACHER);
+      expect(prisma.auditLog.createMany).not.toHaveBeenCalled();
+      await expect(events.create(dto, { ...TEACHER, teacherId: null })).rejects.toThrow(/non autorisée/);
+    });
+
+    it('lets the authorization decide for other classes (a non-planner teacher is refused)', async () => {
+      access.assertCanSchedule.mockRejectedValue(new ForbiddenException());
+      await expect(events.create(dto, TEACHER)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.event.create).not.toHaveBeenCalled();
+    });
+
     it('checks that the teacher teaches the class and the subject', async () => {
       await events.create(dto, TEACHER);
-      expect(access.assertTeachesClass).toHaveBeenCalledWith(TEACHER, 'c1', 'mathematiques');
+      expect(access.assertCanSchedule).toHaveBeenCalledWith(TEACHER, 'c1', 'mathematiques', 'examen');
     });
   });
 
@@ -315,6 +350,17 @@ describe('EventsService', () => {
     it('lets a teacher edit only their own events', async () => {
       prisma.event.findUnique.mockResolvedValue(row({ authorId: 't2' }));
       await expect(events.update('e1', { title: 'x' }, TEACHER)).rejects.toThrow(/non autorisée/);
+    });
+
+    it('lets an account edit the exam it created, never another one with no teacher author', async () => {
+      const planner: AuthUser = { ...TEACHER, id: 'u-p', teacherId: null, role: 'admin', isPlanner: true };
+      const planner2: AuthUser = { ...planner, id: 'u-q', role: 'teacher' };
+      prisma.event.findUnique.mockResolvedValue(row({ authorId: null, createdById: 'u-p' }));
+      await expect(events.update('e1', { title: 'x' }, planner2)).rejects.toThrow(/non autorisée/);
+      await expect(events.remove('e1', planner2)).rejects.toThrow(/non autorisée/);
+      // Their own, and any for the admin.
+      await expect(events.update('e1', { title: 'x' }, { ...planner2, id: 'u-p' })).resolves.toBeDefined();
+      await expect(events.update('e1', { title: 'x' }, { ...planner, id: 'u-z' })).resolves.toBeDefined();
     });
 
     it('does not ask for a room check when the room is unchanged', async () => {

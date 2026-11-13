@@ -102,7 +102,7 @@ describe('GradesService', () => {
     student: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn((fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   };
-  const access = { assertTeachesClass: vi.fn(), assertCanReadStudent: vi.fn(), placement: vi.fn() };
+  const access = { assertTeachesClass: vi.fn(), assertCanReadStudent: vi.fn(), placement: vi.fn(), recorderFor: vi.fn() };
   const classes = {
     roster: vi.fn().mockResolvedValue([
       { id: 's1', userId: 'u1', firstName: 'A', lastName: 'A', studentNumber: null },
@@ -122,6 +122,7 @@ describe('GradesService', () => {
     vi.clearAllMocks();
     prisma.event.findUnique.mockResolvedValue(event());
     access.assertTeachesClass.mockResolvedValue(undefined);
+    access.recorderFor.mockResolvedValue('t1');
     periods.assertOpen.mockResolvedValue(undefined);
     periods.lockOpen.mockResolvedValue(undefined);
     tx.grade.findMany.mockResolvedValue([]);

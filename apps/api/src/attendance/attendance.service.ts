@@ -81,7 +81,7 @@ export class AttendanceService {
       if (r.status !== 'late' && r.minutesLate)
         throw new BadRequestException('Les minutes de retard concernent un retard.');
     }
-    const recordedById = user.teacherId ?? event.authorId;
+    const recordedById = await this.access.recorderFor(user, event);
     const date = fromDay(dto.date);
     await this.prisma.$transaction(async (tx) => {
       // Shared lock on the school year: archiving it waits for this roll call, and a later one is refused.
