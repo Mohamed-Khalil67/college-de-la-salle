@@ -5,7 +5,7 @@ export const ELEVE_ROUTES: Routes = [
   {
     path: '',
     // The one page: Maintenant, À faire, Notes, Absences, Annonces (each block links to its page below).
-    title: 'Tableau de bord',
+    title: 'Accueil',
     loadComponent: () => import('./accueil/home-page').then((m) => m.EleveHomePage),
   },
   {

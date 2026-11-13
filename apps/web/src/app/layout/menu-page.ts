@@ -5,7 +5,7 @@ import { Icon } from '../shared/ui';
 import { type SpaceNavItem, visibleNav } from './space-nav';
 
 /**
- * « Plus »: every screen of the current area in one list, because the phone's bottom bar only has room for
+ * « Plus »: every screen of the area's menu in one list (the pages the home blocks open are not in it), because the phone's bottom bar only has room for
  * five. The same page serves /eleve/menu, /enseignant/menu and /admin/menu; the navigation comes from the
  * area's route data, like the layout's.
  */

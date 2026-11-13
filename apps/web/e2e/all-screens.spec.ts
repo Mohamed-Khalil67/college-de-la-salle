@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs } from './structure';
-import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from '../src/app/layout/space-navs';
+import { ADMIN_DETAILS, ADMIN_NAV, ELEVE_DETAILS, ELEVE_NAV, ENSEIGNANT_DETAILS, ENSEIGNANT_NAV } from '../src/app/layout/space-navs';
 import { mobileNav, type SpaceNavItem, visibleNav } from '../src/app/layout/space-nav';
 
 /**
@@ -19,19 +19,21 @@ interface Who {
   readonly user: { role: 'student' | 'teacher' | 'admin'; isPlanner: boolean };
   readonly area: string;
   readonly nav: readonly SpaceNavItem[];
+  /** The pages the blocks of « Accueil » open: not in the menu, but each must still land on a working page. */
+  readonly details: readonly SpaceNavItem[];
 }
 
 const ROLES: Who[] = [
-  { title: 'admin', account: ACCOUNTS.admin, user: { role: 'admin', isPlanner: false }, area: '/admin', nav: ADMIN_NAV },
-  { title: 'planner (administration)', account: ACCOUNTS.planner, user: { role: 'teacher', isPlanner: true }, area: '/admin', nav: ADMIN_NAV },
-  { title: 'planner (teacher space)', account: ACCOUNTS.planner, user: { role: 'teacher', isPlanner: true }, area: '/enseignant', nav: ENSEIGNANT_NAV },
-  { title: 'teacher', account: ACCOUNTS.teacher, user: { role: 'teacher', isPlanner: false }, area: '/enseignant', nav: ENSEIGNANT_NAV },
-  { title: 'student', account: ACCOUNTS.student, user: { role: 'student', isPlanner: false }, area: '/eleve', nav: ELEVE_NAV },
+  { title: 'admin', account: ACCOUNTS.admin, user: { role: 'admin', isPlanner: false }, area: '/admin', nav: ADMIN_NAV, details: ADMIN_DETAILS },
+  { title: 'planner (administration)', account: ACCOUNTS.planner, user: { role: 'teacher', isPlanner: true }, area: '/admin', nav: ADMIN_NAV, details: ADMIN_DETAILS },
+  { title: 'planner (teacher space)', account: ACCOUNTS.planner, user: { role: 'teacher', isPlanner: true }, area: '/enseignant', nav: ENSEIGNANT_NAV, details: ENSEIGNANT_DETAILS },
+  { title: 'teacher', account: ACCOUNTS.teacher, user: { role: 'teacher', isPlanner: false }, area: '/enseignant', nav: ENSEIGNANT_NAV, details: ENSEIGNANT_DETAILS },
+  { title: 'student', account: ACCOUNTS.student, user: { role: 'student', isPlanner: false }, area: '/eleve', nav: ELEVE_NAV, details: ELEVE_DETAILS },
 ];
 
 /** The screens of the area for this role: not the links to other areas, « Plus » included (the shared menu page). */
 const screens = (who: Who) =>
-  visibleNav(who.nav, who.user)
+  [...visibleNav(who.nav, who.user), ...visibleNav(who.details, who.user)]
     .filter((i) => !i.href)
     .map((i) => ({ label: i.label, path: `${who.area}${i.path ? `/${i.path}` : ''}` }));
 

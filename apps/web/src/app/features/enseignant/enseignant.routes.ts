@@ -5,7 +5,7 @@ export const ENSEIGNANT_ROUTES: Routes = [
   {
     path: '',
     // The one page: Mes cours aujourd’hui, Notes à finir, Devoirs donnés, À surveiller, Annonces.
-    title: 'Tableau de bord',
+    title: 'Accueil',
     loadComponent: () => import('./accueil/home-page').then((m) => m.TeacherHomePage),
   },
   {
