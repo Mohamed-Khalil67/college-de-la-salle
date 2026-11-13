@@ -1,3 +1,4 @@
+import type { TeacherSummaryDto, TeacherSummarySection } from '@cdls/shared';
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs, unique } from './structure';
@@ -30,6 +31,8 @@ interface Block {
   readonly wide?: boolean;
   /** An endpoint that only this block (and `shares`) reads: failing it must fail this block alone. */
   readonly failing: string;
+  /** The teacher's page reads one summary: this section of it failing (`failed`) must fail this block alone. */
+  readonly section?: TeacherSummarySection;
   /** Other blocks that read the same source and fail with it. */
   readonly shares?: readonly string[];
   /** What the block says when it has nothing to show: an invitation, not an apology. */
@@ -65,6 +68,13 @@ const json =
   (route: Route) =>
     route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 const down = json({ statusCode: 500, message: 'Panne de test.' }, 500);
+/** The teacher's home reads ONE call (`GET /teacher/summary`); its sections fail separately (`failed`). */
+const SUMMARY = '**/api/teacher/summary';
+/** Answers the summary call with the real answer changed by `change` (the API is real, the data is arranged). */
+const summaryWith = (change: (summary: TeacherSummaryDto) => TeacherSummaryDto) => async (route: Route) => {
+  const real = (await (await route.fetch()).json()) as TeacherSummaryDto;
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(change(real)) });
+};
 const noPosts = { items: [], total: 0, page: 1, pageSize: 2 };
 const today = new Date().toISOString().slice(0, 10);
 
@@ -107,10 +117,10 @@ const ROLES: readonly Role[] = [
     title: 'Accueil',
     h1: /Bonjour/,
     blocks: [
-      { heading: 'Mes cours aujourd’hui', link: 'Mon emploi du temps de la semaine', path: '/enseignant/emploi-du-temps', h1: 'Mon emploi du temps', wide: true, failing: '**/api/timetable/occurrences*', empty: /Pas de cours aujourd’hui|C’est le week-end/ },
-      { heading: 'Notes à finir', link: 'Noter une classe', path: '/enseignant/noter', h1: 'Noter', failing: '**/api/grading/pending*', shares: ['À surveiller'], empty: /Aucune note à finir/ },
-      { heading: 'Devoirs donnés', link: 'Tous mes devoirs', path: '/enseignant/agenda', h1: 'Agenda', failing: '**/api/events/occurrences*', shares: ['À surveiller'], empty: /Aucun devoir à rendre/ },
-      { heading: 'À surveiller', link: 'Mes classes', path: '/enseignant/classes', h1: 'Mes classes', failing: '**/api/grading/pending*', shares: ['Notes à finir'], empty: /Rien à signaler/ },
+      { heading: 'Mes cours aujourd’hui', link: 'Mon emploi du temps de la semaine', path: '/enseignant/emploi-du-temps', h1: 'Mon emploi du temps', wide: true, failing: SUMMARY, section: 'lessons', empty: /Pas de cours aujourd’hui|C’est le week-end/ },
+      { heading: 'Notes à finir', link: 'Noter une classe', path: '/enseignant/noter', h1: 'Noter', failing: SUMMARY, section: 'pending', shares: ['À surveiller'], empty: /Aucune note à finir/ },
+      { heading: 'Devoirs donnés', link: 'Tous mes devoirs', path: '/enseignant/agenda', h1: 'Agenda', failing: SUMMARY, section: 'homework', empty: /Aucun devoir à rendre/ },
+      { heading: 'À surveiller', link: 'Mes classes', path: '/enseignant/classes', h1: 'Mes classes', failing: SUMMARY, section: 'absences', empty: /Rien à signaler/ },
       { heading: 'Annonces', link: 'Écrire ou lire les annonces', path: '/enseignant/annonces', h1: 'Annonces', wide: true, failing: '**/api/posts*', empty: /Aucune annonce/ },
     ],
     headerLinks: [{ name: 'Nouvelle note', href: '/enseignant/noter' }],
@@ -120,10 +130,7 @@ const ROLES: readonly Role[] = [
       plus: ['Accueil', 'Mon emploi du temps', 'Appel', 'Groupes', 'Notifications', 'Synchroniser mon agenda'],
     },
     emptyRoutes: async (page) => {
-      await page.route('**/api/timetable/occurrences*', json([]));
-      await page.route('**/api/grading/pending*', json([]));
-      await page.route('**/api/events/occurrences*', json([]));
-      await page.route('**/api/calendar-days*', json([]));
+      await page.route(SUMMARY, summaryWith((real) => ({ ...real, failed: [], lessons: [], calendarDays: [], pending: [], homework: [], tests: [], absences: [] })));
       await page.route('**/api/posts*', json(noPosts));
     },
   },
@@ -143,7 +150,6 @@ const ROLES: readonly Role[] = [
     ],
     headerLinks: [
       { name: 'Professeur absent', href: '/admin/planification/professeur-absent' },
-      { name: 'Ajouter un examen', href: '/enseignant/agenda' },
     ],
     menu: {
       desktop: ['Accueil', 'Classes', 'Emploi du temps', 'Plus'],
@@ -252,11 +258,6 @@ for (const role of ROLES) {
         await settled(page);
         for (const h of role.headerLinks) {
           const link = page.locator('.page__header').getByRole('link', { name: h.name, exact: true });
-          if (id === 'P' && h.name === 'Ajouter un examen') {
-            // Teacher-planner: the agenda's event form.
-            await expect(link).toHaveAttribute('href', h.href);
-            continue;
-          }
           await expect(link, h.name).toHaveAttribute('href', h.href);
           await link.click();
           await expect(page).toHaveURL(h.href instanceof RegExp ? h.href : (url) => `${url.pathname}${url.search}` === h.href);
@@ -306,7 +307,8 @@ for (const role of ROLES) {
         let broken = true;
         await page.context().clearCookies();
         await page.goto('/');
-        const handler = (route: Route) => (broken ? down(route) : route.continue());
+        const handler = (route: Route) =>
+          !broken ? route.continue() : failing.section ? summaryWith((real) => ({ ...real, failed: [failing.section!], [failing.section!]: [] }))(route) : down(route);
         await page.route(failing.failing, handler);
         await signInAs(page, role.account);
         if (new URL(page.url()).pathname !== role.home) await goInApp(page, role.home);
@@ -514,13 +516,20 @@ test.describe('Routing of the Planificateur permission', () => {
     await axeAtBothWidths(page);
   });
 
-  // The agreement (workflow-redesign.md, « Planificateur ») gives every planner « Ajouter un examen » in the
-  // header. An administration account has no teacher profile and `POST /events` is for teachers only, so the button
-  // is hidden for them (documented in workflow-redesign.md « Built »). Remove `test.fail` when it is built.
-  test.fail('R5 an administration account that plans also has « Ajouter un examen » (agreed header button)', async ({ page }) => {
-    await signInAs(page, ACCOUNTS.admin);
-    await goInApp(page, '/admin/planification');
-    await expect(page.getByRole('link', { name: 'Ajouter un examen', exact: true })).toBeVisible({ timeout: 5_000 });
+  // « Ajouter un examen » is a header button (a dialog) for the administration and for every planner.
+  test('R5 « Ajouter un examen » is a header button on the planner page, for an administration account and for a teacher who plans; it opens a dialog', async ({ page }) => {
+    for (const account of [ACCOUNTS.admin, ACCOUNTS.planner]) {
+      await page.context().clearCookies();
+      await page.goto('/');
+      await signInAs(page, account);
+      await goInApp(page, '/admin/planification');
+      const button = page.locator('.page__header').getByRole('button', { name: 'Ajouter un examen', exact: true });
+      await expect(button).toBeVisible();
+      await button.click();
+      await expect(page.getByRole('dialog', { name: 'Ajouter un examen' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
   });
 });
 
