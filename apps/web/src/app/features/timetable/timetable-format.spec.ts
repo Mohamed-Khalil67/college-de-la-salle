@@ -7,6 +7,7 @@ import {
   isStruck,
   sessionSummary,
   sessionTitle,
+  statusLabel,
   timeBands,
   weekWindow,
 } from './timetable-format';
@@ -143,5 +144,15 @@ describe('week layout', () => {
 
   it('gives the Sunday-first week of any day', () => {
     expect(weekWindow('2026-11-04')).toEqual({ from: '2026-11-01', to: '2026-11-07' });
+  });
+});
+
+describe('statusLabel', () => {
+  const now = values({ date: '2026-11-03', startTime: '14:00', endTime: '15:30' });
+  it('shows a moved session as « Déplacée » and its old day as a trace saying where it went', () => {
+    expect(statusLabel(session())).toBe('');
+    expect(statusLabel(session({ status: 'moved', current: now }))).toBe('Déplacée');
+    expect(statusLabel(session({ status: 'moved_from', movedTo: now }))).toBe('Déplacée au Mar. 3 nov.');
+    expect(statusLabel(session({ status: 'cancelled' }))).toBe('Annulée');
   });
 });

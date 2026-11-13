@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessmentLoadNote,
+  changeDay,
   classCoverage,
   examTitle,
   freeUntil,
@@ -25,6 +26,13 @@ describe('exam helpers', () => {
     expect(assessmentLoadNote(1, 2, '1ère A')).toBeNull();
     expect(assessmentLoadNote(2, 2, '1ère A')).toContain('2 évaluations');
     expect(assessmentLoadNote(3, 2, '1ère A')).toContain('3 évaluations');
+  });
+});
+
+describe('changeDay', () => {
+  it('puts a moved session on its new day and the others on their own', () => {
+    expect(changeDay({ date: '2026-12-01', newDate: '2026-12-03' })).toBe('2026-12-03');
+    expect(changeDay({ date: '2026-12-01', newDate: null })).toBe('2026-12-01');
   });
 });
 

@@ -10,6 +10,7 @@ import {
   TIMETABLE_WARNING_LABELS,
   type TimetableWarningDto,
 } from '@cdls/shared';
+import { rangeOf, shortDate } from '../../timetable/timetable-format';
 
 /**
  * What each block of the planner's page shows, from the API's data: plain functions (Vitest checks them).
@@ -110,7 +111,10 @@ export function changeSummary(c: PlannerChangeDto): string {
     case 'room_change':
       return `Salle changée${c.roomName ? `, ${c.roomName}` : ''}`;
     case 'moved':
-      return 'Déplacée';
+      // The same words as the week views (changeLines): « Avant : Mar. 3 nov., 8 h 00 – 9 h 00. »
+      return c.movedFrom
+        ? `Déplacée. Avant : ${shortDate(c.movedFrom.date)}, ${rangeOf(c.movedFrom)}`
+        : 'Déplacée';
   }
 }
 

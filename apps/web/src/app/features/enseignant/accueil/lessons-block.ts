@@ -6,7 +6,7 @@ import { HomeBlock } from '../../../shared/components/home-block';
 import { Badge, Button } from '../../../shared/ui';
 import { blockState } from '../../../shared/utils/block-state';
 import { clock } from '../../../shared/utils/format';
-import { sessionTitle, STATUS_LABELS, STATUS_TONES } from '../../timetable/timetable-format';
+import { sessionTitle, statusLabel, STATUS_TONES } from '../../timetable/timetable-format';
 import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
 import { TeacherHomeData } from './teacher-home-data';
 
@@ -198,7 +198,7 @@ export class LessonsBlock {
     return [session.classLabel, session.groupLabel ?? '', session.current.roomName ?? ''].filter(Boolean).join(', ');
   }
   protected label(session: TimetableOccurrenceDto): string {
-    return STATUS_LABELS[session.status];
+    return statusLabel(session);
   }
   protected tone(session: TimetableOccurrenceDto) {
     return STATUS_TONES[session.status];

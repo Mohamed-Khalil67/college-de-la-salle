@@ -11,3 +11,4 @@ export * from './notifications.js';
 export * from './suggestions.js';
 export * from './planner.js';
 export * from './teacher-summary.js';
+export * from './absence-cover.js';

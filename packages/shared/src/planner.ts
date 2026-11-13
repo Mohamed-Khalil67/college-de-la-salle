@@ -4,6 +4,15 @@
  */
 import type { PlannerClassCoverageDto, PlannerMissingSubjectDto } from './api.js';
 
+/**
+ * The day an exception takes effect on: a moved session lives on the day it moved to, every other kind on
+ * the session's own day. A day's list of changes keeps a session only there, so a moved one is never listed
+ * under both its old and its new day (the week views keep the trace of the old one).
+ */
+export function changeDay(ex: { readonly date: string; readonly newDate: string | null }): string {
+  return ex.newDate ?? ex.date;
+}
+
 /** One subject of a class: the hours per week it should have and the hours placed (null: not set). */
 export interface SubjectHours {
   readonly subjectName: string;

@@ -1942,9 +1942,20 @@ export interface ApplyAbsenceResult {
   readonly warnings: readonly TimetableWarningDto[];
 }
 
-/** A session of the day that differs from the weekly rule. */
+/** Where and when a moved session was before: shown on the day it moved to. */
+export interface PlannerMovedFromDto {
+  readonly date: string;
+  readonly startTime: string;
+  readonly endTime: string;
+}
+
+/**
+ * A session of the day that differs from the weekly rule. A moved session is listed once, on the day it
+ * moved to (never also on the day it left: the week views keep that trace).
+ */
 export interface PlannerChangeDto {
   readonly slotId: string;
+  /** The session's original day (with `slotId`, its identity). */
   readonly date: string;
   readonly kind: SlotExceptionKind;
   readonly classLabel: string;
@@ -1957,6 +1968,8 @@ export interface PlannerChangeDto {
   readonly coverName: string | null;
   readonly roomName: string | null;
   readonly reason: string;
+  /** `moved` only: what the session was before. */
+  readonly movedFrom: PlannerMovedFromDto | null;
   /** The students were notified of this change. */
   readonly notified: boolean;
 }

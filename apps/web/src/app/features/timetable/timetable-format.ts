@@ -36,6 +36,17 @@ export const STATUS_TONES: Readonly<Record<OccurrenceStatus, BadgeTone>> = {
   study: 'info',
 };
 
+/**
+ * The label of a session in a one-line place (grid cell, today's row). A moved session is shown ONCE as a
+ * real session, on the day it moved to (« Déplacée »); its old day only keeps a struck-through trace that
+ * says where it went (« Déplacée au Jeu. 5 nov. »). Same words in the student, teacher and planner views.
+ */
+export function statusLabel(o: Pick<TimetableOccurrenceDto, 'status' | 'movedTo'>): string {
+  return o.status === 'moved_from' && o.movedTo
+    ? `Déplacée au ${shortDate(o.movedTo.date)}`
+    : STATUS_LABELS[o.status];
+}
+
 /** A session that no longer takes place where the rule puts it: shown struck through. */
 export const isStruck = (o: Pick<TimetableOccurrenceDto, 'status'>): boolean =>
   o.status === 'cancelled' || o.status === 'moved_from';

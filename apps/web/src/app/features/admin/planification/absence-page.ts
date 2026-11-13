@@ -17,6 +17,7 @@ import {
   ABSENCE_CHOICE_LABELS,
   type AbsenceChoiceKind,
   type AbsenceSessionDto,
+  type AbsenceTeacherOption,
   type ApplyAbsenceResult,
   SLOT_EXCEPTION_LABELS,
   type TimetableConflictDto,
@@ -41,7 +42,11 @@ import {
   decisionProblem,
   groupByDay,
   keyOf,
+  offeredFor,
   periodProblem,
+  refreshDecisions,
+  replacedText,
+  teacherNames,
   toChoices,
 } from './absence-logic';
 
@@ -283,6 +288,22 @@ interface Request {
               @if (failure()) {
                 <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
               }
+              @if (refreshed().length) {
+                <cdls-alert tone="danger">
+                  <p class="t-body-s" id="absence-refresh" tabindex="-1" #refreshNotice>
+                    <strong>Rien n’a été enregistré : la disponibilité des enseignants a changé.</strong>
+                  </p>
+                  <ul class="issues">
+                    @for (text of refreshed(); track $index) {
+                      <li>{{ text }}</li>
+                    }
+                  </ul>
+                  <p class="t-body-s">
+                    La liste est à jour et vos autres choix sont gardés. Vérifiez, puis enregistrez de
+                    nouveau.
+                  </p>
+                </cdls-alert>
+              }
               @if (showMissing() && !check().ready) {
                 <cdls-alert tone="danger">
                   <p>
@@ -380,6 +401,10 @@ interface Request {
     p {
       margin: 0;
     }
+    .issues {
+      margin: var(--space-2) 0;
+      padding-inline-start: var(--space-5);
+    }
   `,
 })
 export class AbsencePage {
@@ -389,7 +414,19 @@ export class AbsencePage {
   /** Focus moves to the lessons' heading once it is on the page: also at the first lookup, when it did not exist yet. */
   readonly #focusLessons = signal(false);
 
+  protected readonly refreshNotice = viewChild<ElementRef<HTMLElement>>('refreshNotice');
+  /** Focus moves to the message once it is on the page, after a refused save refreshed the lists. */
+  readonly #focusNotice = signal(false);
+
   constructor() {
+    afterRenderEffect(() => {
+      const notice = this.refreshNotice();
+      if (!this.#focusNotice() || !notice) return;
+      untracked(() => {
+        notice.nativeElement.focus();
+        this.#focusNotice.set(false);
+      });
+    });
     afterRenderEffect(() => {
       const heading = this.lessonsHeading();
       if (!this.#focusLessons() || !heading) return;
@@ -483,6 +520,8 @@ export class AbsencePage {
   protected readonly warnings = signal<readonly TimetableWarningDto[]>([]);
   protected readonly result = signal<ApplyAbsenceResult | null>(null);
   protected readonly showMissing = signal(false);
+  /** After a refused save: what changed behind the planner's back (a covering teacher no longer free). */
+  protected readonly refreshed = signal<readonly string[]>([]);
 
   #problemOn(field: 'teacherId' | 'from' | 'to', value: Request) {
     const problem = periodProblem(value, this.#clock.today());
@@ -511,24 +550,35 @@ export class AbsencePage {
     return decisionOf(this.decisions(), s);
   }
 
+  /** The free teachers still offered per lesson: never one that a lesson at the same time already holds. */
+  readonly #offered = computed(() => {
+    const sessions = this.sessions();
+    const decisions = this.decisions();
+    return new Map(sessions.map((s) => [keyOf(s), offeredFor(s, sessions, decisions)]));
+  });
+
+  protected offered(s: AbsenceSessionDto): readonly AbsenceTeacherOption[] {
+    return this.#offered().get(keyOf(s)) ?? s.freeTeachers;
+  }
+
   protected problem(s: AbsenceSessionDto, d: AbsenceDecision): string | null {
-    return decisionProblem(s, d);
+    return decisionProblem(s, d, this.offered(s));
   }
 
   protected sameSubject(s: AbsenceSessionDto) {
-    return s.freeTeachers.filter((t) => t.sameSubject);
+    return this.offered(s).filter((t) => t.sameSubject);
   }
 
   protected others(s: AbsenceSessionDto) {
-    return s.freeTeachers.filter((t) => !t.sameSubject);
+    return this.offered(s).filter((t) => !t.sameSubject);
   }
 
   protected whoHelper(s: AbsenceSessionDto, d: AbsenceDecision): string {
     if (d.kind === 'substitute' && !this.sameSubject(s).length)
-      return s.freeTeachers.length
+      return this.offered(s).length
         ? 'Aucun enseignant de la matière n’est libre : voici les autres enseignants libres.'
         : '';
-    return 'Seuls les enseignants libres à ce moment sont proposés.';
+    return 'Seuls les enseignants libres à ce moment sont proposés, et jamais le même pour deux séances en même temps.';
   }
 
   protected currentLabel(s: AbsenceSessionDto): string {
@@ -536,7 +586,7 @@ export class AbsencePage {
   }
 
   protected pick(s: AbsenceSessionDto, kind: AbsenceChoiceKind): void {
-    this.#set(s, choose(s, kind, this.decision(s)));
+    this.#set(s, choose(s, kind, this.decision(s), this.offered(s)));
   }
 
   protected setTeacher(s: AbsenceSessionDto, event: Event): void {
@@ -557,6 +607,7 @@ export class AbsencePage {
   }
 
   #resetSave(): void {
+    this.refreshed.set([]);
     this.failure.set(null);
     this.conflicts.set([]);
     this.warnings.set([]);
@@ -600,15 +651,44 @@ export class AbsencePage {
     } catch (error) {
       const blocked = blockedOf(error);
       if (blocked) {
-        this.conflicts.set(blocked.conflicts);
-        this.warnings.set(blocked.warnings);
-        if (!blocked.conflicts.length && !blocked.warnings.length)
-          this.failure.set(apiMessage(error));
+        // A conflict is most often a covering teacher taken since the lookup: refresh the lists and say what moved.
+        const refreshed = blocked.conflicts.length ? await this.#refreshAfterConflict(request) : false;
+        if (!refreshed) {
+          this.conflicts.set(blocked.conflicts);
+          this.warnings.set(blocked.warnings);
+          if (!blocked.conflicts.length && !blocked.warnings.length)
+            this.failure.set(apiMessage(error));
+        }
       } else {
         this.failure.set(`Rien n’a été enregistré. ${apiMessage(error)}`);
       }
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  /**
+   * Reads the lessons again (the free teachers changed), keeps every choice that still holds, replaces the
+   * covering teachers who are no longer free with a fresh proposal, and says so. False when nothing was replaced
+   * (the conflict is something else: the page then shows it as the API sent it) or when the lookup failed.
+   */
+  async #refreshAfterConflict(request: Request): Promise<boolean> {
+    try {
+      const fresh = await this.#api.planner.absence(request);
+      const names = new Map([...teacherNames(this.sessions()), ...teacherNames(fresh.sessions)]);
+      const next = refreshDecisions(fresh.sessions, this.decisions(), names);
+      if (!next.replaced.length) return false;
+      this.lessons.set(fresh);
+      this.decisions.set(next.decisions);
+      this.refreshed.set(
+        next.replaced.map((r) =>
+          replacedText(r, `le ${this.longDay(r.session.date)}, ${this.span(r.session)}`),
+        ),
+      );
+      this.#focusNotice.set(true);
+      return true;
+    } catch {
+      return false;
     }
   }
 

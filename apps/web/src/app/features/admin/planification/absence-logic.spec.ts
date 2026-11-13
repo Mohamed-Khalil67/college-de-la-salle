@@ -9,6 +9,10 @@ import {
   groupByDay,
   keyOf,
   NO_DECISION,
+  offeredFor,
+  refreshDecisions,
+  replacedText,
+  teacherNames,
   periodProblem,
   suggestedCover,
   toChoices,
@@ -198,5 +202,45 @@ describe('periodProblem', () => {
     expect(periodProblem({ ...ok, to: '' }, '2026-12-01')?.field).toBe('to');
     expect(periodProblem({ ...ok, to: '2026-11-30' }, '2026-11-01')?.field).toBe('to');
     expect(periodProblem({ ...ok, to: '2027-02-01' }, '2026-12-01')?.message).toContain('14 jours');
+  });
+});
+
+describe('simultaneous lessons never share a teacher', () => {
+  const a = session({ slotId: 'a', startTime: '08:00', endTime: '09:00' });
+  const b = session({ slotId: 'b', startTime: '08:30', endTime: '09:30', classLabel: '1ère B' });
+  const later = session({ slotId: 'c', startTime: '09:00', endTime: '10:00' });
+  const cover = (teacherId: string) => ({ kind: 'substitute' as const, teacherId, roomId: '' });
+
+  it('does not offer, for a lesson, the teacher another lesson at the same time already holds', () => {
+    const decisions: Decisions = { [keyOf(a)]: cover('m') };
+    expect(offeredFor(b, [a, b, later], decisions).map((t) => t.teacherId)).toEqual(['o']);
+    expect(offeredFor(later, [a, b, later], decisions).map((t) => t.teacherId)).toEqual(['o', 'm']);
+    expect(offeredFor(a, [a, b, later], decisions)).toHaveLength(2);
+  });
+  it('proposes the next teacher, or nobody, when picking « Remplacer » on the second lesson', () => {
+    const offered = offeredFor(b, [a, b], { [keyOf(a)]: cover('m') });
+    expect(choose(b, 'substitute', NO_DECISION, offered).teacherId).toBe('');
+  });
+  it('blocks the save when the same teacher is picked on both', () => {
+    const decisions: Decisions = { [keyOf(a)]: cover('m'), [keyOf(b)]: cover('m') };
+    const check = checkBeforeSave([a, b], decisions);
+    expect(check.ready).toBe(false);
+    expect(check.incomplete.map((i) => i.session.slotId)).toEqual(['b']);
+  });
+  it('after a refused save: replaces a teacher who is no longer free and says who stands there now', () => {
+    const names = teacherNames([a]);
+    const decisions: Decisions = { [keyOf(a)]: cover('m') };
+    const fresh = session({ slotId: 'a', freeTeachers: [{ teacherId: 'o', name: 'Omar Autre', sameSubject: false }, { teacherId: 'n', name: 'Nour Nabil', sameSubject: true }] });
+    names.set('n', 'Nour Nabil');
+    const out = refreshDecisions([fresh], decisions, names);
+    expect(out.decisions[keyOf(a)]).toEqual(cover('n'));
+    expect(out.replaced).toHaveLength(1);
+    expect(replacedText(out.replaced[0]!, 'le 1 déc.')).toBe('Mona Maths n’est plus libre pour Maths (1ère A) le 1 déc. : Nour Nabil est proposé à sa place.');
+  });
+  it('leaves nobody when no teacher of the subject remains, and drops lessons that vanished', () => {
+    const fresh = session({ slotId: 'a', freeTeachers: [] });
+    const out = refreshDecisions([fresh], { [keyOf(a)]: cover('m'), gone: cover('o') }, teacherNames([a]));
+    expect(out.decisions).toEqual({ [keyOf(a)]: cover('') });
+    expect(replacedText(out.replaced[0]!, 'le 1 déc.')).toContain('choisissez quelqu’un d’autre');
   });
 });
