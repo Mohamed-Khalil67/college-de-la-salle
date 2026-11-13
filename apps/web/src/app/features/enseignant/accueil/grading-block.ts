@@ -3,8 +3,8 @@ import { RouterLink } from '@angular/router';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { Badge, type BadgeTone, Button } from '../../../shared/ui';
-import { blockState, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
-import { type GradingItem, gradingView, type PendingEntry } from './home-views';
+import { blockState } from '../../../shared/utils/block-state';
+import { type GradingItem, gradingView, pendingEntries } from './home-views';
 import { TeacherHomeData } from './teacher-home-data';
 
 /**
@@ -85,12 +85,11 @@ export class GradingBlock {
   readonly #today = inject(SchoolClock).today;
   readonly #data = inject(TeacherHomeData);
 
-  /** The assignments failing is the block failing; while they load, so does the block. */
-  protected readonly state = computed(() => {
-    const error = this.#data.assignments.error();
-    const source: Snapshot<PendingEntry[]> = error ? { error, value: undefined } : snapshotOf(this.#data.pending);
-    return blockState(source, (entries) => gradingView(entries, this.#today()));
-  });
+  protected readonly state = computed(() =>
+    blockState(this.#data.section(['pending'], (summary) => pendingEntries(summary.pending)), (entries) =>
+      gradingView(entries, this.#today()),
+    ),
+  );
 
   protected reload(): void {
     this.#data.reload();

@@ -2005,3 +2005,82 @@ export interface PlannerTimetablesDto {
   readonly teachersPlaced: number;
   readonly teachersTotal: number;
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Teacher summary: GET /teacher/summary. What the teacher's home page shows, in ONE request (the school
+ * shares one address and the API allows 120 requests a minute per address).
+ * ---------------------------------------------------------------------------------------------- */
+
+/** The parts of the summary that are read separately, so one can fail while the others are shown. */
+export const TEACHER_SUMMARY_SECTIONS = [
+  'lessons',
+  'pending',
+  'homework',
+  'tests',
+  'absences',
+] as const;
+export type TeacherSummarySection = (typeof TEACHER_SUMMARY_SECTIONS)[number];
+
+/** One class the teacher teaches this year (labels for the blocks). */
+export interface TeacherSummaryClassDto {
+  readonly classId: string;
+  readonly classLabel: string;
+}
+
+/** A session of today with whether the teacher already took the roll for it. */
+export interface TeacherSummaryLessonDto {
+  readonly session: TimetableOccurrenceDto;
+  /**
+   * The teacher saved a roll call today for a timed event of this class that overlaps the session (the roll
+   * is taken on agenda events, not on timetable slots, so this is the closest match). False when not.
+   */
+  readonly rollCallDone: boolean;
+}
+
+/** The work still to grade for one class and subject the teacher grades (same rows as GET /grading/pending). */
+export interface TeacherSummaryPendingDto {
+  readonly classId: string;
+  readonly subjectId: string;
+  /** « Première, Mathématiques ». */
+  readonly label: string;
+  readonly pending: readonly PendingGradingDto[];
+}
+
+/** A homework the teacher gave, due from today on, with how many of the students it concerns ticked it. */
+export interface TeacherSummaryHomeworkDto {
+  readonly occurrence: OccurrenceDto;
+  readonly done: number;
+}
+
+/** A student absent on several days lately in the teacher's classes. */
+export interface RepeatedAbsenceDto {
+  readonly studentId: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly classId: string;
+  readonly classLabel: string;
+  /** Distinct days of absence (not excused, not late) in the window. */
+  readonly days: number;
+  /** The latest of them. */
+  readonly lastDay: string;
+}
+
+export interface TeacherSummaryDto {
+  /** The school day (Cairo) the summary is about. */
+  readonly today: string;
+  /** The sections that could not be read; their lists below are empty and the page says so for their blocks. */
+  readonly failed: readonly TeacherSummarySection[];
+  readonly classes: readonly TeacherSummaryClassDto[];
+  /** `lessons`: today's sessions of the teacher in time order. */
+  readonly lessons: readonly TeacherSummaryLessonDto[];
+  /** `lessons`: the holidays and days without classes of today (for the empty message). */
+  readonly calendarDays: readonly CalendarDayDto[];
+  /** `pending`: every class and subject taught, with its notes to finish (the late ones too). */
+  readonly pending: readonly TeacherSummaryPendingDto[];
+  /** `homework`: the next ones (at most TEACHER_HOMEWORK_SHOWN), soonest first. */
+  readonly homework: readonly TeacherSummaryHomeworkDto[];
+  /** `tests`: exams and tests of the teacher's classes in the next two weeks (at most TEACHER_TESTS_SHOWN), soonest first. */
+  readonly tests: readonly OccurrenceDto[];
+  /** `absences`: students at or above REPEATED_ABSENCE_MIN_DAYS, worst first (at most REPEATED_ABSENCE_MAX). */
+  readonly absences: readonly RepeatedAbsenceDto[];
+}

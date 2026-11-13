@@ -4,6 +4,7 @@ import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { Alert, Button, EmptyState, Modal, Pagination } from '../../../shared/ui';
 import { longDate, subjectName } from '../../../shared/utils/format';
+import { postDay } from '../../../shared/utils/posts';
 import { LoadState } from '../../../shared/components/load-state';
 import { audienceLabel, audienceOptions } from '../shared/teacher';
 import { schoolClasses, teacherAssignments } from '../../../shared/data/teacher-data';
@@ -124,7 +125,7 @@ export class PostsPage {
   }
   protected meta(p: PostDto): string {
     const who = audienceLabel(p, this.#classList(), this.#sectionList());
-    return [p.authorName, `pour ${who}`, subjectName(p.subjectId), `le ${longDate(p.createdAt.slice(0, 10))}`].filter(Boolean).join(', ');
+    return [p.authorName, `pour ${who}`, subjectName(p.subjectId), `le ${longDate(postDay(p.createdAt))}`].filter(Boolean).join(', ');
   }
 
   /** The deleted post's button is gone: focus moves to the list heading instead. */

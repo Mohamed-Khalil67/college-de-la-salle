@@ -1,16 +1,43 @@
 import {
   addDays,
   type CalendarDayDto,
-  isAssessment,
   type OccurrenceDto,
   type PendingGradingDto,
+  type RepeatedAbsenceDto,
+  REPEATED_ABSENCE_WINDOW_DAYS,
+  type TeacherSummaryDto,
+  type TeacherSummaryHomeworkDto,
+  type TeacherSummaryLessonDto,
+  type TeacherSummaryPendingDto,
+  type TeacherSummarySection,
   type TimetableOccurrenceDto,
   weekday,
 } from '@cdls/shared';
+import type { Snapshot } from '../../../shared/utils/block-state';
 import { plural } from '../../../shared/utils/format';
 import { closedDayOf, phaseOf, type SessionPhase, sessionsOfDay } from '../../timetable/day-sessions';
 import { isStruck, shortDate } from '../../timetable/timetable-format';
-import type { ClassSubjectChoice } from '../noter/noter-logic';
+
+/* ------------------------------------------------------------------------------------------------
+ * The one summary call: what each block reads of it
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * What a block reads of the page's one summary: the request's error (the whole answer failed), else an error
+ * when any of the block's sections is named in `failed` (a half-read list would say « nothing to show »
+ * wrongly), else its value while it is there.
+ */
+export function sectionSnapshot<T>(
+  summary: Snapshot<TeacherSummaryDto>,
+  sections: readonly TeacherSummarySection[],
+  pick: (summary: TeacherSummaryDto) => T,
+): Snapshot<T> {
+  if (summary.error) return { error: summary.error, value: undefined };
+  const value = summary.value;
+  if (value === undefined) return { error: undefined, value: undefined };
+  if (sections.some((s) => value.failed.includes(s))) return { error: new Error('Section failed'), value: undefined };
+  return { error: undefined, value: pick(value) };
+}
 
 /**
  * What each block of the teacher's home shows, from the API's data: plain functions (Vitest checks them).
@@ -28,6 +55,8 @@ export interface LessonItem {
   readonly struck: boolean;
   /** The class in progress (highlighted). */
   readonly live: boolean;
+  /** The teacher already saved the roll call for it (« Appel fait »). */
+  readonly rollCallDone: boolean;
 }
 
 export interface LessonsView {
@@ -37,11 +66,15 @@ export interface LessonsView {
 }
 
 /** Today's lessons of the teacher in time order, each with where it stands against the clock; null without any. */
-export function lessonsView(list: readonly TimetableOccurrenceDto[], today: string, now: string): LessonsView | null {
-  const lessons = sessionsOfDay(list, today).map((session): LessonItem => {
+export function lessonsView(list: readonly TeacherSummaryLessonDto[], today: string, now: string): LessonsView | null {
+  const done = new Map(list.map((l) => [l.session.key, l.rollCallDone]));
+  const lessons = sessionsOfDay(
+    list.map((l) => l.session),
+    today,
+  ).map((session): LessonItem => {
     const struck = isStruck(session);
     const phase = phaseOf(session, now);
-    return { session, phase, struck, live: !struck && phase === 'current' };
+    return { session, phase, struck, live: !struck && phase === 'current', rollCallDone: !struck && (done.get(session.key) ?? false) };
   });
   if (!lessons.length) return null;
   const held = lessons.filter((l) => !l.struck).length;
@@ -65,8 +98,13 @@ export const GRADING_SHOWN = 4;
 
 /** One class and subject the teacher grades, with its drafts, planned exams and half-entered marks. */
 export interface PendingEntry {
-  readonly choice: ClassSubjectChoice;
+  readonly choice: { readonly classId: string; readonly subjectId: string; readonly label: string };
   readonly pending: readonly PendingGradingDto[];
+}
+
+/** The summary's pending lists as the views read them. */
+export function pendingEntries(list: readonly TeacherSummaryPendingDto[]): PendingEntry[] {
+  return list.map((e) => ({ choice: { classId: e.classId, subjectId: e.subjectId, label: e.label }, pending: e.pending }));
 }
 
 export interface GradingItem {
@@ -125,27 +163,8 @@ export function gradingView(entries: readonly PendingEntry[], today: string, cou
  * Devoirs donnés
  * ---------------------------------------------------------------------------------------------- */
 
-export const HOMEWORK_DAYS = 14;
-export const HOMEWORK_SHOWN = 4;
-
-/** The homework the teacher gave that falls due from today on, soonest first. */
-export function givenHomework(
-  list: readonly OccurrenceDto[],
-  teacherId: string,
-  today: string,
-  count = HOMEWORK_SHOWN,
-): OccurrenceDto[] {
-  return list
-    .filter((o) => o.event.type.homework && o.event.authorId === teacherId && o.day >= today && o.day <= addDays(today, HOMEWORK_DAYS))
-    .sort((a, b) => a.day.localeCompare(b.day) || a.key.localeCompare(b.key))
-    .slice(0, count);
-}
-
-export interface HomeworkRow {
-  readonly occurrence: OccurrenceDto;
-  /** Students who ticked it; null when the count could not be read. */
-  readonly done: number | null;
-}
+/** The homework the teacher gave that falls due soon, with the students who ticked it (chosen by the API). */
+export type HomeworkRow = TeacherSummaryHomeworkDto;
 
 /** « 12 élèves sur 27 l’ont fait » (or just the count when the class size is unknown). */
 export function ticksLine(done: number, concerned: number | null): string {
@@ -171,8 +190,6 @@ export function dueLabel(day: string, today: string): string {
 
 /** A note still unfinished after this many days is worth a look. */
 export const LATE_AFTER_DAYS = 7;
-export const TESTS_DAYS = 14;
-export const TESTS_SHOWN = 3;
 export const LATE_SHOWN = 3;
 
 export interface LateNote {
@@ -211,34 +228,26 @@ export function lateNotes(entries: readonly PendingEntry[], today: string, count
     }));
 }
 
-/** Exams and tests of the teacher's classes in the next two weeks (planned by anyone), soonest first. */
-export function upcomingTests(
-  list: readonly OccurrenceDto[],
-  classIds: ReadonlySet<string>,
-  today: string,
-  count = TESTS_SHOWN,
-): OccurrenceDto[] {
-  return list
-    .filter(
-      (o) =>
-        isAssessment(o.event.type) &&
-        o.day >= today &&
-        o.day <= addDays(today, TESTS_DAYS) &&
-        o.event.classId !== null &&
-        classIds.has(o.event.classId),
-    )
-    .sort((a, b) => a.day.localeCompare(b.day) || a.key.localeCompare(b.key))
-    .slice(0, count);
-}
-
 export interface WatchView {
   readonly late: readonly LateNote[];
   readonly tests: readonly OccurrenceDto[];
+  readonly absences: readonly RepeatedAbsenceDto[];
 }
 
-/** Late notes and planned tests; null when there is nothing to watch. */
-export function watchView(late: readonly LateNote[], tests: readonly OccurrenceDto[]): WatchView | null {
-  return late.length || tests.length ? { late, tests } : null;
+/** Late notes, planned tests and students often absent; null when there is nothing to watch. */
+export function watchView(
+  late: readonly LateNote[],
+  tests: readonly OccurrenceDto[],
+  absences: readonly RepeatedAbsenceDto[] = [],
+): WatchView | null {
+  return late.length || tests.length || absences.length ? { late, tests, absences: absences.slice(0, ABSENCES_SHOWN) } : null;
+}
+
+export const ABSENCES_SHOWN = 3;
+
+/** « 3 jours d’absence sur 30 jours, dernière le jeu. 12 nov. » */
+export function absenceLine(a: Pick<RepeatedAbsenceDto, 'days' | 'lastDay'>): string {
+  return `${plural(a.days, 'jour')} d’absence sur ${REPEATED_ABSENCE_WINDOW_DAYS} jours, dernière le ${shortDate(a.lastDay)}`;
 }
 
 /** « 18 / 27, donnée il y a 21 jours ». */

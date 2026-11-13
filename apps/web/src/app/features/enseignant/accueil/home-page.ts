@@ -16,7 +16,8 @@ import { WatchBlock } from './watch-block';
  * The teacher's one page: today's classes with their actions, then what is left to do, in blocks that each
  * load their own data and end with one link to their detail page. Phone: the blocks stack in this order.
  * From 64rem (1024 px): Mes cours across the top, three blocks side by side, Annonces across the bottom.
- * « Nouvelle note » grades any class, not only today's. One permanent live region says when the page has
+ * « Nouvelle note » grades any class, not only today's; « Saisie des notes » (the full grid) sits in the header
+ * too, so it stays one click away whatever a block does. The blocks share ONE GET /teacher/summary. One permanent live region says when the page has
  * loaded and which block failed.
  */
 @Component({
@@ -31,6 +32,7 @@ import { WatchBlock } from './watch-block';
       </div>
       <div class="page__actions">
         <a cdlsButton routerLink="noter"><cdls-icon name="plus" />Nouvelle note</a>
+        <a cdlsButton variant="secondary" routerLink="notes">Saisie des notes</a>
       </div>
     </div>
     <app-home-status />

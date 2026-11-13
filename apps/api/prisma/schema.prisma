@@ -745,7 +745,7 @@ model Attendance {
   @@unique([eventId, studentId, date])
   @@index([studentId, date])
   @@index([eventId, date])
-  @@index([recordedById])
+  @@index([recordedById, date])
   @@map("attendance")
 }
 

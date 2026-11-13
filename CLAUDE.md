@@ -51,7 +51,7 @@ Everything below is merged on local `main`; `college/main` (9710335) is 61 commi
   going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.
 - Diagrams (system, web layers, database groups, school year): `docs/architecture-map.html`; where things live: `docs/architecture.md`.
-- **One page per role (built):** student `/eleve`, teacher `/enseignant`, planner `/admin/planification` (with « Professeur absent »), admin `/admin` (« Préparer les bulletins », « Relancer »), « Noter » quick grading, the Planificateur permission and the nav clean-up (`docs/workflow-redesign.md`). Follow-ups: a teacher summary endpoint (the page costs about 9 requests plus one per class and subject; the school address is limited to 120 a minute), « Ajouter un examen » for admin-only planners, the contact-form hydration race, UTC vs Cairo announcement dates on the student and teacher pages.
+- **One page per role (built):** student `/eleve`, teacher `/enseignant`, planner `/admin/planification` (with « Professeur absent »), admin `/admin` (« Préparer les bulletins », « Relancer »), « Noter » quick grading, the Planificateur permission and the nav clean-up (`docs/workflow-redesign.md`). The teacher page now reads `GET /teacher/summary` (one request; « Appel fait », repeated absences, Cairo announcement dates: branch `feat/teacher-summary`). Follow-ups: « Ajouter un examen » for admin-only planners, the contact-form hydration race.
 - More detail: `docs/school-year-design.md` (design, decisions, leftovers), `docs/deployment.md`, `docs/i18n.md`,
   `docs/accessibility.md`, `docs/calendar-feed-notifications.md`.
 
