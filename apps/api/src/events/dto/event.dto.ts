@@ -99,7 +99,8 @@ export class EventDto implements EventContract {
   attachments: AttachmentDto[];
   coefficient: number;
   target: AssessmentTargetDto;
-  authorId: string;
+  @ApiProperty({ type: String, nullable: true })
+  authorId: string | null;
   authorName: string;
   createdAt: string;
   updatedAt: string;

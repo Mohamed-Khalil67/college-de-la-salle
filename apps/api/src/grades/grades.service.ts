@@ -96,7 +96,7 @@ export class GradesService {
         throw new BadRequestException(`L'élève ${entry.studentId} apparaît deux fois.`);
       seen.add(entry.studentId);
     }
-    const graderId = user.teacherId ?? event.authorId;
+    const graderId = await this.access.recorderFor(user, event);
 
     await this.prisma.$transaction(async (tx) => {
       await assertClassWritable(tx, event.classId);

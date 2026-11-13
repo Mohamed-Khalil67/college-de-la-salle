@@ -130,6 +130,8 @@ model User {
   contactMessagesHandled  ContactMessage[]
   sectionChangesRequested SectionChangeRequest[] @relation("SectionChangeRequestedBy")
   sectionChangesDecided   SectionChangeRequest[] @relation("SectionChangeDecidedBy")
+  /// Events this account created (exams set by a planner or an admin have no teacher author).
+  eventsCreated           Event[]                @relation("EventCreatedBy")
 
   @@index([role])
   @@index([status])
@@ -658,7 +660,11 @@ model Event {
   attachments    Json      @default("[]")
   /// Weight of the grades given for it (gradable types).
   coefficient    Decimal   @default(1) @db.Decimal(4, 2)
-  authorId       String    @map("author_id") @db.Uuid
+  /// The teacher who owns it. Null when a planner or an admin without a teacher profile set the exam: then
+  /// `createdById` names them (CHECK events_has_author in the migration: one of the two is always set).
+  authorId       String?   @map("author_id") @db.Uuid
+  /// The account that created it (every event since the planner's « Ajouter un examen »; older ones have none).
+  createdById    String?   @map("created_by_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -668,7 +674,8 @@ model Event {
   subject             Subject?             @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   schoolClass         SchoolClass?         @relation(fields: [classId], references: [id], onDelete: Cascade)
   section             Section?             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  author              Teacher              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  author              Teacher?             @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdBy           User?                @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   grades              Grade[]
   homeworkCompletions HomeworkCompletion[]
   attendance          Attendance[]
@@ -680,6 +687,7 @@ model Event {
   @@index([sectionId, date])
   @@index([date])
   @@index([authorId])
+  @@index([createdById])
   @@index([subjectId])
   @@index([activityTypeId, date])
   @@index([roomId, date])

@@ -122,9 +122,8 @@ of the skills above; `CLAUDE.md` wins where they differ.
 
 ## Built: the Planificateur page and « Professeur absent » (step 5)
 - `/admin/planification` (`features/admin/planification/`), the five blocks of the table above, the two header buttons.
-  « Ajouter un examen » opens the agenda's event form for a planner who teaches; for an admin account it is hidden, because only
-  a teacher can create an event today (`POST /events`): the exam creation for a planner without a teacher profile is
-  not built.
+  « Ajouter un examen » opens a dialog (class, subject, date, hours, room) for the admin and every planner, with or without a
+  teacher profile (`feat/planner-add-exam`: `POST /events` accepts the exam types for any class from them; see `docs/rollout.md`).
 - « Professeur absent » end to end (`/admin/planification/professeur-absent`, `POST /planner/absence`): a new
   `SlotExceptionKind` `study` (migration `20261112100000`), one transaction with the audit rows and the notifications
   (`session_substituted`, `session_study`, to the class, the lesson's teacher and the covering teacher). A covering

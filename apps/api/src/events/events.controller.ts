@@ -68,8 +68,12 @@ export class EventsController {
     return this.events.ics(id, user);
   }
 
-  /** Teachers: events for their classes (graded kinds need a class), or ungraded section/school events. */
-  @Roles('teacher')
+  /**
+   * Teachers: events for their classes (graded kinds need a class), or ungraded section/school events.
+   * The admin and a planner (a teacher or an admin account marked « Planificateur ») also set an exam or a
+   * test for any class; the author is then the account itself when it has no teacher profile.
+   */
+  @Roles('teacher', 'admin')
   @Post()
   @ApiCreatedResponse({ type: EventDto })
   create(@Body() body: CreateEventDto, @CurrentUser() user: AuthUser): Promise<EventDto> {

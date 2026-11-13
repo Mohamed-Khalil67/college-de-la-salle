@@ -76,15 +76,12 @@ test('the five blocks stack in order on a phone, wide ones span the row on deskt
       b.path,
     );
   }
-  // The two header buttons: a planner who teaches has « Ajouter un examen » too.
+  // The two header buttons; « Ajouter un examen » opens a dialog (planner-add-exam.spec.ts), for every planner.
   await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toHaveAttribute(
     'href',
     '/admin/planification/professeur-absent',
   );
-  await expect(page.getByRole('link', { name: 'Ajouter un examen', exact: true })).toHaveAttribute(
-    'href',
-    '/enseignant/agenda',
-  );
+  await expect(page.getByRole('button', { name: 'Ajouter un examen', exact: true })).toBeVisible();
 
   const boxes = async () => Promise.all(BLOCKS.map((b) => block(page, b.heading).boundingBox()));
   await page.setViewportSize({ width: 390, height: 844 });
@@ -112,12 +109,12 @@ test('the five blocks stack in order on a phone, wide ones span the row on deskt
   expect(errors).toEqual([]);
 });
 
-test('the admin has the page too, without « Ajouter un examen »; a plain teacher and a student are sent away', async ({
+test('the admin has the page too, with « Ajouter un examen »; a plain teacher and a student are sent away', async ({
   page,
 }) => {
   await openPlanner(page, ACCOUNTS.admin);
   await expect(page.getByRole('link', { name: 'Professeur absent', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Ajouter un examen', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Ajouter un examen', exact: true })).toBeVisible();
   await axeAtBothWidths(page);
 
   await page.context().clearCookies();

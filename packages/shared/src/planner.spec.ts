@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { classCoverage, freeUntil, probeWindow } from './planner.js';
+import {
+  assessmentLoadNote,
+  classCoverage,
+  examTitle,
+  freeUntil,
+  isExamActivityCode,
+  probeWindow,
+} from './planner.js';
+
+describe('exam helpers', () => {
+  it('knows the two exam types and nothing else', () => {
+    expect(isExamActivityCode('examen')).toBe(true);
+    expect(isExamActivityCode('controle')).toBe(true);
+    expect(isExamActivityCode('devoir')).toBe(false);
+    expect(isExamActivityCode('cours')).toBe(false);
+  });
+
+  it('proposes a title from the type and the subject', () => {
+    expect(examTitle('Examen', 'Mathématiques')).toBe('Examen de Mathématiques');
+    expect(examTitle('Contrôle', '')).toBe('Contrôle');
+  });
+
+  it('notes an overloaded day only at the limit', () => {
+    expect(assessmentLoadNote(1, 2, '1ère A')).toBeNull();
+    expect(assessmentLoadNote(2, 2, '1ère A')).toContain('2 évaluations');
+    expect(assessmentLoadNote(3, 2, '1ère A')).toContain('3 évaluations');
+  });
+});
 
 describe('classCoverage', () => {
   it('is complete when every subject with hours has them placed', () => {

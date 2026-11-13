@@ -285,10 +285,9 @@ export class ChangeNoticesService {
             select: { student: { select: { userId: true } } },
           })
         ).map((e) => ({ userId: e.student.userId, role: 'student' as const }));
-    const author = await tx.teacher.findUnique({
-      where: { id: row.authorId },
-      select: { userId: true },
-    });
+    const author = row.authorId
+      ? await tx.teacher.findUnique({ where: { id: row.authorId }, select: { userId: true } })
+      : null;
     return [...students, ...(author ? [{ userId: author.userId, role: 'teacher' as const }] : [])];
   }
 

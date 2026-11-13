@@ -65,3 +65,37 @@ export function freeUntil(busyStarts: readonly string[], now: string): string | 
   const next = busyStarts.filter((s) => s > now).sort();
   return next[0] ?? null;
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * « Ajouter un examen »
+ * ---------------------------------------------------------------------------------------------- */
+
+/**
+ * The activity types a planner or an admin may set for ANY class (the system types « Examen » and « Contrôle »).
+ * Every other event stays with the teachers of the class: `POST /events` refuses a planner who does not teach it.
+ */
+export const EXAM_ACTIVITY_CODES = ['examen', 'controle'] as const;
+export type ExamActivityCode = (typeof EXAM_ACTIVITY_CODES)[number];
+
+export function isExamActivityCode(code: string): code is ExamActivityCode {
+  return (EXAM_ACTIVITY_CODES as readonly string[]).includes(code);
+}
+
+/** « Examen de Mathématiques »: the title the form proposes (the person may change it). */
+export function examTitle(typeLabel: string, subjectName: string): string {
+  return subjectName ? `${typeLabel} de ${subjectName}` : typeLabel;
+}
+
+/**
+ * A soft note when the class already has as many assessments that day as the school allows (`maxPerDay`, the
+ * timetable's « Trop d’évaluations le même jour » rule). It informs, it never blocks: the planner decides.
+ * `already` counts the class's assessments of the day before this one.
+ */
+export function assessmentLoadNote(
+  already: number,
+  maxPerDay: number,
+  className: string,
+): string | null {
+  if (already < maxPerDay) return null;
+  return `${className} a déjà ${already} évaluation${already > 1 ? 's' : ''} ce jour-là : en ajoutant celle-ci, la classe dépasse ${maxPerDay} par jour.`;
+}
