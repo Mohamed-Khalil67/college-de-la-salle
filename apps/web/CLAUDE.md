@@ -127,6 +127,10 @@ pages follow the same pattern). Rules:
 
 `features/timetable/blocked-notice.ts` shows a refused save: the conflicts (alert), the free places as one-click buttons (`suggestions` input, `apply` output, focus moves to its heading) and the warnings. A dialog that owns a write fills the chosen place into its form with the pure `features/timetable/suggestions.ts` (`applyToSession`, `applyToSeries`) and saves again; keep that file free of Angular.
 
+## Prerendered forms
+
+A form on a prerendered page (today the contact form) has no handler until Angular hydrates it, and a click or Enter before that submits it natively (page reload, message lost). Its submit button is therefore `[disabled]` until a `ready` signal set in `afterNextRender` (never runs on the server). Playwright waits on `toBeEnabled()` of that button before typing: it is the readiness signal, never a sleep. `public-site.spec.ts` holds the scripts back to prove the button is disabled until then.
+
 ## Public site languages
 
 Public pages and the login entry read their words from `inject(LOCALE)` (`messages` for the interface, `content` for

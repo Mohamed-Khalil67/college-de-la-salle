@@ -94,6 +94,7 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 ## Config
 
 - All environment variables are declared and validated in `src/config/env.validation.ts`; add new ones there and to `.env.example` (placeholders only, never real secrets). Read them with `ConfigService<Env, true>`.
+- Roster imports have their own limit, `IMPORT_THROTTLE_LIMIT` (10 a minute, preview twice that); repeated e2e runs of the import tests need it raised.
 - The one exception is a `@Throttle()` limit, which is evaluated where nothing is injected: use `throttleLimit('NAME')` (`config/throttle-limits.ts`), which reads the environment per request and takes its default from `Env`. Never write `process.env[...]` or a second default in a controller.
 
 ## Deployment (Docker)

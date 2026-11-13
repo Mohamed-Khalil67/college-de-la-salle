@@ -128,7 +128,7 @@ type SendState =
 
     <p class="t-body-s t-muted">{{ t.note }}</p>
     <p>
-      <button cdlsButton type="submit" [disabled]="sending()">{{ sending() ? t.sending : t.send }}</button>
+      <button cdlsButton type="submit" [disabled]="sending() || !ready()">{{ sending() ? t.sending : t.send }}</button>
     </p>
   `,
   styles: `
@@ -182,6 +182,13 @@ export class ContactForm {
   protected readonly state = signal<SendState>({ kind: 'idle' });
   /** The honeypot's value: stays empty for people. */
   protected readonly trap = signal('');
+  /**
+   * False in the prerendered HTML and until the browser has hydrated the page. The prerendered form has no
+   * handler yet, so a click or an Enter before this point would submit it natively (a page reload that drops the
+   * message). A disabled submit button blocks both, and Playwright waits for it to be enabled: `ready` is the
+   * readiness signal of the form. `afterNextRender` never runs on the server.
+   */
+  protected readonly ready = signal(false);
   protected readonly sending = computed(() => this.contactForm().submitting());
   protected readonly sentTo = computed(() => {
     const state = this.state();
@@ -191,6 +198,10 @@ export class ContactForm {
     const state = this.state();
     return state.kind === 'failed' ? state : null;
   });
+
+  constructor() {
+    afterNextRender(() => this.ready.set(true));
+  }
 
   protected onTrap(event: Event): void {
     this.trap.set((event.target as HTMLInputElement).value);
