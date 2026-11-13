@@ -173,6 +173,8 @@ test('the contact form speaks the page’s language but sends the French subject
   await page.goto('/en/contact');
   const t = MESSAGES_EN.contactForm;
   const form = page.getByRole('form', { name: t.title });
+  // The prerendered form is inert until Angular has hydrated it: its send button is disabled until then.
+  await expect(form.getByRole('button', { name: t.send })).toBeEnabled();
   await form.getByRole('button', { name: t.send }).click();
   await expect(form.getByText(t.errors.nameRequired)).toBeVisible();
   await form.getByLabel(t.name).fill('Test Parent');
@@ -182,6 +184,36 @@ test('the contact form speaks the page’s language but sends the French subject
   await form.getByRole('button', { name: t.send }).click();
   await expect(form.getByText(t.sent.before)).toBeVisible();
   expect(sent).toMatchObject({ subject: 'Scolarité d’un élève', name: 'Test Parent' });
+});
+
+/**
+ * The prerendered form must not be submittable before Angular has hydrated it: with the scripts held back, the
+ * send button is disabled, so neither a click nor Enter in a field can submit the form natively (which would
+ * reload the page with the typed text in the address and lose the message).
+ */
+test('the contact form cannot be submitted before the page is hydrated', async ({ page }) => {
+  let release = () => {};
+  const scriptsHeld = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/*.js', async (route) => {
+    await scriptsHeld;
+    await route.continue();
+  });
+  let navigations = 0;
+  page.on('request', (request) => {
+    if (request.isNavigationRequest()) navigations++;
+  });
+  await page.goto('/en/contact', { waitUntil: 'commit' });
+  const t = MESSAGES_EN.contactForm;
+  const form = page.getByRole('form', { name: t.title });
+  const send = form.getByRole('button', { name: t.send });
+  await expect(send).toBeDisabled();
+  await form.getByLabel(t.name).focus();
+  await page.keyboard.press('Enter');
+  release();
+  await expect(send).toBeEnabled();
+  // A native submit would have reloaded the page, and the address would carry the form's fields.
+  expect(new URL(page.url()).search).toBe('');
+  expect(navigations).toBe(1);
 });
 
 /** Page ids are typed: a page added to PUBLIC_PAGES without a route fails here. */

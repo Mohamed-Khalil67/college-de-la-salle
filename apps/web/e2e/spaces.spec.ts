@@ -102,6 +102,8 @@ test('a teacher picks the type of a new event from the school’s activity types
 test('a visitor writes to the secretariat; an admin reads the message and marks it handled', async ({ page }, info) => {
   const email = `parent.${info.project.name}.${Date.now()}@example.com`;
   await page.goto('/contact');
+  // Hydration resets the fields: wait until the form is live (its send button enabled) before typing.
+  await expect(page.getByRole('button', { name: 'Envoyer le message' })).toBeEnabled();
   await page.getByLabel('Nom du parent ou de l’élève').fill('Mariam Saad');
   await page.getByLabel('Adresse e-mail').fill(email);
   await page.getByLabel('Message').fill('Bonjour, je souhaite inscrire mon fils en Seconde.');
