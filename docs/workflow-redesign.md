@@ -137,6 +137,23 @@ of the skills above; `CLAUDE.md` wins where they differ.
   step 2's API change.
 - Naming a substitute from the timetable editor now notifies too (it was silent before).
 
+## Fixed after the first build: suggestions and moved lessons (branch `fix/planner-gaps`)
+- **One teacher, one lesson at a time.** The free-teacher lists of « Professeur absent » are computed lesson by
+  lesson, so the same teacher could be proposed for two lessons at the same time and the save then failed with a 409.
+  The pure rules are `packages/shared/src/absence-cover.ts` (`offerable`, `proposeCover`, `reconcileCovers`, spec next
+  to it): a teacher held by a lesson is not offered for an overlapping one (touching lessons do not overlap), and the
+  « Remplacer » proposal skips them. The page (`absence-logic.ts`, `absence-page.ts`) offers only what is left and
+  flags a double pick on the later lesson.
+- **A late 409** (the teacher was given another lesson meanwhile): the page reads the lessons again, keeps every other
+  choice, replaces the teacher who is no longer free with a new proposal (or nobody) and says so in a message
+  (« … n’est plus libre pour … : … est proposé à sa place. », focus on it), instead of the generic conflict box. A
+  conflict that is not about a covering teacher still shows as before.
+- **A moved lesson shows once.** In the week views (student, teacher, planner grid, today's rows) it is a real session
+  on the day it moved to (« Déplacée », with « Avant : … »); its old day keeps only the struck-through trace
+  « Déplacée au Jeu. 5 nov. » (the agreed design: `moved_from`, `statusLabel` in `timetable-format.ts`, the same words
+  everywhere). « Changements aujourd’hui » no longer lists it on both days: only on the day it moved to
+  (`changeDay` in `planner.ts`), with « Déplacée. Avant : Mar. 3 nov., 8 h 00 – 9 h 00 » (`PlannerChangeDto.movedFrom`).
+
 ## Still to decide
 - Can the Planificateur also edit subjects and classes, or only time and place?
 - Does « Étude surveillée » count as an absence-free session for attendance (no roll call by the absent teacher)?

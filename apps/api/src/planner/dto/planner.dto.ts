@@ -24,6 +24,7 @@ import {
   type ApplyAbsenceRequest,
   type ApplyAbsenceResult as ApplyAbsenceResultContract,
   type PlannerChangeDto as ChangeContract,
+  type PlannerMovedFromDto as MovedFromContract,
   type PlannerClassCoverageDto as CoverageContract,
   type PlannerMissingSubjectDto as MissingContract,
   type PlannerRoomNowDto as RoomNowContract,
@@ -174,6 +175,12 @@ export class ApplyAbsenceResultDto implements ApplyAbsenceResultContract {
   warnings: readonly TimetableWarningDto[];
 }
 
+export class PlannerMovedFromDto implements MovedFromContract {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
 export class PlannerChangeDto implements ChangeContract {
   slotId: string;
   date: string;
@@ -189,6 +196,8 @@ export class PlannerChangeDto implements ChangeContract {
   @ApiProperty({ type: String, nullable: true })
   roomName: string | null;
   reason: string;
+  @ApiProperty({ type: PlannerMovedFromDto, nullable: true })
+  movedFrom: PlannerMovedFromDto | null;
   notified: boolean;
 }
 

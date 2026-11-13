@@ -8,7 +8,7 @@ import {
   sessionSummary,
   sessionTitle,
   shortDate,
-  STATUS_LABELS,
+  statusLabel,
   type TimeBand,
 } from '../../timetable/timetable-format';
 import { type GridPosition, nextPosition } from './grid-nav';
@@ -241,7 +241,7 @@ export class WeekGrid {
     return isStruck(s);
   }
   protected statusLabel(s: TimetableOccurrenceDto): string {
-    return s.status === 'moved_from' && s.movedTo ? `Déplacée au ${shortDate(s.movedTo.date)}` : STATUS_LABELS[s.status];
+    return statusLabel(s);
   }
   /** What the grid says about a session, by what the view already tells (class, teacher or room). */
   protected meta(s: TimetableOccurrenceDto): string {

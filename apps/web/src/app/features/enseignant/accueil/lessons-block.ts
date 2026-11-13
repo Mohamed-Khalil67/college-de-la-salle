@@ -9,7 +9,7 @@ import { Badge, Button } from '../../../shared/ui';
 import { blockState, bothOf, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
 import { clock } from '../../../shared/utils/format';
 import { TimetableApi } from '../../timetable/timetable-api';
-import { sessionTitle, STATUS_LABELS, STATUS_TONES } from '../../timetable/timetable-format';
+import { sessionTitle, statusLabel, STATUS_TONES } from '../../timetable/timetable-format';
 import { type LessonItem, lessonsEmptyText, lessonsView } from './home-views';
 
 /**
@@ -212,7 +212,7 @@ export class LessonsBlock {
     return [session.classLabel, session.groupLabel ?? '', session.current.roomName ?? ''].filter(Boolean).join(', ');
   }
   protected label(session: TimetableOccurrenceDto): string {
-    return STATUS_LABELS[session.status];
+    return statusLabel(session);
   }
   protected tone(session: TimetableOccurrenceDto) {
     return STATUS_TONES[session.status];

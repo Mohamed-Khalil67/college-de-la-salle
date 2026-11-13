@@ -51,6 +51,7 @@ const change = (over: Partial<PlannerChangeDto>): PlannerChangeDto => ({
   coverName: null,
   roomName: 'B12',
   reason: '',
+  movedFrom: null,
   notified: true,
   ...over,
 });
@@ -123,6 +124,15 @@ describe('changesView', () => {
       'Étude surveillée par Ingy Samir',
     );
     expect(changeSummary(change({ kind: 'room_change' }))).toBe('Salle changée, B12');
+    expect(changeSummary(change({ kind: 'moved' }))).toBe('Déplacée');
+    expect(
+      changeSummary(
+        change({
+          kind: 'moved',
+          movedFrom: { date: '2026-11-03', startTime: '08:00', endTime: '09:00' },
+        }),
+      ),
+    ).toBe('Déplacée. Avant : Mar. 3 nov., 8 h 00 – 9 h 00');
   });
 });
 

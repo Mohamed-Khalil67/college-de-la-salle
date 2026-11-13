@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   ABSENCE_MAX_DAYS,
+  changeDay,
   classCoverage,
   type PlannerClassCoverageDto,
   daysBetween,
@@ -218,6 +219,8 @@ export class PlannerService {
     return {
       date: day,
       changes: rows
+        // A moved session is listed once, on the day it moved to (the query also finds the day it left).
+        .filter((r) => changeDay({ date: toDay(r.date), newDate: r.newDate ? toDay(r.newDate) : null }) === day)
         .map((r) => ({
           slotId: r.slotId,
           date: toDay(r.date),
@@ -232,6 +235,10 @@ export class PlannerService {
           coverName: r.newTeacher ? personName(r.newTeacher.user) : null,
           roomName: r.newRoom?.name ?? r.slot.room?.name ?? null,
           reason: r.reason,
+          movedFrom:
+            r.kind === 'moved'
+              ? { date: toDay(r.date), startTime: r.slot.startTime, endTime: r.slot.endTime }
+              : null,
           notified: told.has(`${r.slotId}@${toDay(r.date)}#${NOTICE_KIND[r.kind]}`),
         }))
         .sort(

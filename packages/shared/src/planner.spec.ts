@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { classCoverage, freeUntil, probeWindow } from './planner.js';
+import { changeDay, classCoverage, freeUntil, probeWindow } from './planner.js';
+
+describe('changeDay', () => {
+  it('puts a moved session on its new day and the others on their own', () => {
+    expect(changeDay({ date: '2026-12-01', newDate: '2026-12-03' })).toBe('2026-12-03');
+    expect(changeDay({ date: '2026-12-01', newDate: null })).toBe('2026-12-01');
+  });
+});
 
 describe('classCoverage', () => {
   it('is complete when every subject with hours has them placed', () => {

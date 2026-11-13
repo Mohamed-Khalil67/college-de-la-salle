@@ -7,7 +7,7 @@ import { Badge } from '../../../shared/ui';
 import { blockState, bothOf, type Snapshot, snapshotOf } from '../../../shared/utils/block-state';
 import { clock } from '../../../shared/utils/format';
 import { TimetableApi } from '../../timetable/timetable-api';
-import { isStruck, sessionTitle, STATUS_LABELS, STATUS_TONES } from '../../timetable/timetable-format';
+import { isStruck, sessionTitle, statusLabel, STATUS_TONES } from '../../timetable/timetable-format';
 import { nowView, placeLine } from './now-next';
 
 /**
@@ -244,7 +244,7 @@ export class NowBlock {
     return clock(session.status === 'moved_from' ? session.original.startTime : session.current.startTime);
   }
   protected label(session: TimetableOccurrenceDto): string {
-    return STATUS_LABELS[session.status];
+    return statusLabel(session);
   }
   protected tone(session: TimetableOccurrenceDto) {
     return STATUS_TONES[session.status];

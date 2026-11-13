@@ -8,6 +8,7 @@ import {
   type PlannerTimetablesDto,
   type PlannerTodayDto,
   type TimetableWarningDto,
+  weekday,
 } from '@cdls/shared';
 import { schoolToday } from '../src/common/dates.js';
 import {
@@ -569,6 +570,49 @@ describe('Planner (e2e)', () => {
         .query({ from: TODAY, to: addDays(TODAY, 13) })
         .set(bearer(maths))
         .expect(403);
+    });
+  });
+
+  describe('a moved lesson in the changes of a day', () => {
+    it('is listed once, on the day it moved to, with what it was before', async () => {
+      await restoreAll();
+      const lesson = (await preview()).sessions.find((s) => s.currentKind === null)!;
+      // Another school day of the following fortnight, in the evening, long after the school day: nothing clashes.
+      // (A holiday refuses the move; the next day is tried.)
+      let target = '';
+      for (let i = 1; i <= 13 && !target; i++) {
+        const candidate = addDays(lesson.date, i);
+        if (weekday(candidate) > 4) continue;
+        const res = await t
+          .http()
+          .post(`/api/timetable/slots/${lesson.slotId}/exceptions`)
+          .set(bearer(admin))
+          .send({ date: lesson.date, kind: 'moved', newDate: candidate, newStart: '21:30', newEnd: '22:30' });
+        if (res.status === 201) target = candidate;
+      }
+      expect(target).not.toBe('');
+      const on = async (date: string) =>
+        (
+          (
+            await t
+              .http()
+              .get('/api/planner/today')
+              .query({ date })
+              .set(bearer(planner))
+              .expect(200)
+          ).body as PlannerTodayDto
+        ).changes.filter((c) => c.slotId === lesson.slotId);
+
+      const there = await on(target);
+      expect(there).toHaveLength(1);
+      expect(there[0]).toMatchObject({
+        kind: 'moved',
+        startTime: '21:30',
+        endTime: '22:30',
+        movedFrom: { date: lesson.date, startTime: lesson.startTime, endTime: lesson.endTime },
+      });
+      expect(await on(lesson.date)).toHaveLength(0);
+      await restoreAll();
     });
   });
 });

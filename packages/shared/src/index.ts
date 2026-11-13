@@ -10,3 +10,4 @@ export * from './feed.js';
 export * from './notifications.js';
 export * from './suggestions.js';
 export * from './planner.js';
+export * from './absence-cover.js';

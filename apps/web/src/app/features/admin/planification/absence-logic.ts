@@ -4,7 +4,11 @@ import {
   type AbsenceChoiceKind,
   type AbsenceSessionDto,
   type AbsenceTeacherOption,
+  type CoverLesson,
+  type CoverPick,
   daysBetween,
+  offerable,
+  reconcileCovers,
   type TimetableWarningCode,
   type TimetableWarningDto,
   type AcknowledgedWarning,
@@ -43,36 +47,86 @@ export function suggestedCover(
   return s.freeTeachers.find((t) => t.sameSubject) ?? null;
 }
 
-/** The choice made for a lesson: picking « Remplacer » proposes the free teacher of the subject, if there is one. */
+/** The lesson as the shared cover rules (`@cdls/shared` absence-cover) see it. */
+export function toCoverLesson(s: AbsenceSessionDto): CoverLesson {
+  return {
+    key: keyOf(s),
+    date: s.date,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    free: s.freeTeachers,
+  };
+}
+
+/** Who is picked (cover or supervisor) on each lesson, by key. */
+export function pickedTeachers(decisions: Decisions): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, d] of Object.entries(decisions))
+    if ((d.kind === 'substitute' || d.kind === 'study') && d.teacherId) out[key] = d.teacherId;
+  return out;
+}
+
+/**
+ * The free teachers to offer for a lesson: none that another lesson at the same time already holds, so the
+ * same person is never proposed for two simultaneous lessons (the save would be refused with a conflict).
+ */
+export function offeredFor(
+  session: AbsenceSessionDto,
+  sessions: readonly AbsenceSessionDto[],
+  decisions: Decisions,
+): AbsenceTeacherOption[] {
+  const offered = new Set(
+    offerable(toCoverLesson(session), sessions.map(toCoverLesson), pickedTeachers(decisions)).map(
+      (t) => t.teacherId,
+    ),
+  );
+  return session.freeTeachers.filter((t) => offered.has(t.teacherId));
+}
+
+/** The choice made for a lesson: picking « Remplacer » proposes the offered teacher of the subject, if there is one. */
 export function choose(
   session: AbsenceSessionDto,
   kind: AbsenceChoiceKind,
   previous: AbsenceDecision,
+  offered: readonly AbsenceTeacherOption[] = session.freeTeachers,
 ): AbsenceDecision {
   if (kind === 'cancelled') return { kind, teacherId: '', roomId: '' };
-  const keep = session.freeTeachers.some((t) => t.teacherId === previous.teacherId)
-    ? previous.teacherId
-    : '';
+  const keep = offered.some((t) => t.teacherId === previous.teacherId) ? previous.teacherId : '';
   if (kind === 'substitute')
-    return { kind, teacherId: keep || suggestedCover(session)?.teacherId || '', roomId: '' };
+    return {
+      kind,
+      teacherId: keep || suggestedCover({ freeTeachers: offered })?.teacherId || '',
+      roomId: '',
+    };
   return { kind, teacherId: keep, roomId: previous.roomId };
 }
 
 /** What is missing for this lesson, in words that say how to fix it; null when it is ready. */
-export function decisionProblem(s: AbsenceSessionDto, d: AbsenceDecision): string | null {
+export function decisionProblem(
+  s: AbsenceSessionDto,
+  d: AbsenceDecision,
+  offered: readonly AbsenceTeacherOption[] = s.freeTeachers,
+): string | null {
   if (
     (d.kind === 'substitute' || d.kind === 'study') &&
     (s.currentKind === 'moved' || s.currentKind === 'room_change')
   ) {
     return 'Cette séance a été déplacée ou change de salle : rétablissez-la d’abord dans l’emploi du temps, ou annulez-la.';
   }
+  if (
+    (d.kind === 'substitute' || d.kind === 'study') &&
+    d.teacherId &&
+    !offered.some((t) => t.teacherId === d.teacherId)
+  ) {
+    return 'Cette personne n’est plus libre à ce moment : choisissez-en une autre.';
+  }
   if (d.kind === 'substitute' && !d.teacherId) {
-    return s.freeTeachers.length
+    return offered.length
       ? 'Choisissez l’enseignant qui remplace.'
       : 'Aucun enseignant n’est libre à ce moment : annulez la séance ou changez l’horaire.';
   }
   if (d.kind === 'study' && !d.teacherId) {
-    return s.freeTeachers.length
+    return offered.length
       ? 'Choisissez la personne qui surveille l’étude.'
       : 'Personne n’est libre pour surveiller : annulez la séance.';
   }
@@ -90,6 +144,72 @@ export function untreated(
   );
 }
 
+const inOrder = (a: AbsenceSessionDto, b: AbsenceSessionDto): number =>
+  a.date.localeCompare(b.date) ||
+  a.startTime.localeCompare(b.startTime) ||
+  keyOf(a).localeCompare(keyOf(b));
+
+/** A cover the planner had picked that the fresh lists no longer allow, and what stands there now. */
+export interface ReplacedCover {
+  readonly session: AbsenceSessionDto;
+  /** Name of the teacher who was picked; '' when unknown. */
+  readonly was: string;
+  /** Name of the new proposal; '' when nobody is proposed (the planner must choose). */
+  readonly now: string;
+}
+
+/**
+ * The decisions made against an earlier list of lessons, kept against a fresh one (after a refused save the
+ * free teachers changed): lessons that are still there keep their choice; a covering teacher who is not free
+ * any more, or who a lesson at the same time holds, is replaced by a new proposal (or by nobody), and each
+ * replacement is reported so the page can say so. `names` maps teacher ids to names (from the old lists).
+ */
+export function refreshDecisions(
+  sessions: readonly AbsenceSessionDto[],
+  decisions: Decisions,
+  names: ReadonlyMap<string, string>,
+): { decisions: Decisions; replaced: ReplacedCover[] } {
+  const present = new Set(sessions.map(keyOf));
+  const kept: Record<string, AbsenceDecision> = {};
+  const picks: Record<string, CoverPick> = {};
+  for (const [key, d] of Object.entries(decisions)) {
+    if (!present.has(key)) continue;
+    kept[key] = d;
+    if (d.kind === 'substitute' || d.kind === 'study') picks[key] = { kind: d.kind, teacherId: d.teacherId };
+  }
+  const { teachers, replaced } = reconcileCovers(sessions.map(toCoverLesson), picks);
+  for (const key of Object.keys(picks)) {
+    const d = kept[key];
+    if (d) kept[key] = { ...d, teacherId: teachers[key] ?? '' };
+  }
+  const bySession = new Map(sessions.map((s) => [keyOf(s), s]));
+  return {
+    decisions: kept,
+    replaced: replaced.flatMap((r) => {
+      const session = bySession.get(r.key);
+      return session
+        ? [{ session, was: names.get(r.was) ?? '', now: names.get(r.now) ?? '' }]
+        : [];
+    }),
+  };
+}
+
+/** The names of the teachers listed on these lessons, by id. */
+export function teacherNames(sessions: readonly AbsenceSessionDto[]): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const s of sessions) for (const t of s.freeTeachers) names.set(t.teacherId, t.name);
+  return names;
+}
+
+/** « Mona Maths ne peut plus prendre Maths (1ère A) du … : Nour Nabil la remplace. », for the refreshed page. */
+export function replacedText(r: ReplacedCover, when: string): string {
+  const lesson = `${r.session.subjectName} (${r.session.classLabel}) ${when}`;
+  const who = r.was || 'La personne choisie';
+  return r.now
+    ? `${who} n’est plus libre pour ${lesson} : ${r.now} est proposé à sa place.`
+    : `${who} n’est plus libre pour ${lesson} : choisissez quelqu’un d’autre.`;
+}
+
 /** Everything that stops the save: lessons with no choice, and choices that lack their teacher. */
 export interface SaveCheck {
   readonly untreated: readonly AbsenceSessionDto[];
@@ -103,7 +223,18 @@ export function checkBeforeSave(
 ): SaveCheck {
   const open = untreated(sessions, decisions);
   const incomplete = sessions.flatMap((session) => {
-    const message = decisionProblem(session, decisionOf(decisions, session));
+    // Two lessons at the same time that hold the same teacher: the earlier one keeps them, the later one is flagged.
+    const earlier = Object.fromEntries(
+      Object.entries(decisions).filter(([key]) => {
+        const other = sessions.find((o) => keyOf(o) === key);
+        return !!other && inOrder(other, session) < 0;
+      }),
+    );
+    const message = decisionProblem(
+      session,
+      decisionOf(decisions, session),
+      offeredFor(session, sessions, earlier),
+    );
     return message ? [{ session, message }] : [];
   });
   const decided = sessions.some((s) => decisionOf(decisions, s).kind !== '');
