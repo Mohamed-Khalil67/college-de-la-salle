@@ -36,24 +36,22 @@ Put the skill line at the top of every brief you give an agent. The logo and cre
   Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
 - A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
 
-## Status (2026-11-12)
+## Status (2026-11-13)
 
-Everything below is merged on `main` and pushed to `college/main`.
+Everything below is merged on local `main`; `college/main` (9710335) is 61 commits behind, nothing of the one-page redesign is pushed yet.
 
 - **Done:** public site in fr/en/ar with accessibility statement; login, first sign-in password change, forgotten
   password by e-mail; student, teacher and admin spaces; timetable with hard/soft conflicts and suggestions; groups and
   « Assigner à »; grades, attendance, report cards (PDF); announcements and contact messages with clean-up; roster
   import with numbered homonym e-mails; section-change approvals; next-year rollover; personal calendar feed and
   notifications; Docker deployment (`deploy/`, `docs/deployment.md`).
-- **Checks on main:** 140 shared, 305 API and 195 web unit tests (2026-11-12); 350 API e2e (stable over three runs);
-  Playwright 112 passed, 71 phone variants skipped by design. `npm audit --omit=dev`: 0 vulnerabilities (2026-11-12).
+- **Checks on main (2026-11-13, merged redesign):** 153 shared, 331 API and 341 web unit tests; 381 of 385 API e2e (3 date-dependent: `timetable` x2, `calendar-feed` x1, until 2027-01-02; plus `password-reset`, which needs `PUBLIC_WEB_URL=http://localhost:4200`); Playwright 148 passed, 105 phone variants skipped, 3 flakes that pass alone (English contact form hydration race in `public-site.spec.ts`, roster import, visitor message). `npm audit --omit=dev`: 0 vulnerabilities.
 - **No CI yet:** nothing runs the checks on push; run them by hand before every merge.
-- **Planner page (12 Nov 2026):** `/admin/planification` and « Professeur absent » (`docs/workflow-redesign.md`, « Built »).
 - **Open:** the real login e-mail domain (`SCHOOL_EMAIL_DOMAIN`), SMTP details, a Cloudflare tunnel token or domain for
   going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.
 - Diagrams (system, web layers, database groups, school year): `docs/architecture-map.html`; where things live: `docs/architecture.md`.
-- Next: the one-page-per-role redesign, `docs/workflow-redesign.md`. Built: Planificateur permission, quick grading, student page and the admin page (`/admin`, « Préparer les bulletins », « Relancer »); teacher and planner pages and the nav clean-up (step 7) are still to come.
+- **One page per role (built):** student `/eleve`, teacher `/enseignant`, planner `/admin/planification` (with « Professeur absent »), admin `/admin` (« Préparer les bulletins », « Relancer »), « Noter » quick grading, the Planificateur permission and the nav clean-up (`docs/workflow-redesign.md`). Follow-ups: a teacher summary endpoint (the page costs about 9 requests plus one per class and subject; the school address is limited to 120 a minute), « Ajouter un examen » for admin-only planners, the contact-form hydration race, UTC vs Cairo announcement dates on the student and teacher pages.
 - More detail: `docs/school-year-design.md` (design, decisions, leftovers), `docs/deployment.md`, `docs/i18n.md`,
   `docs/accessibility.md`, `docs/calendar-feed-notifications.md`.
 
