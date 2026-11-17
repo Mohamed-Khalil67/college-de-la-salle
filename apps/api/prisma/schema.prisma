@@ -911,6 +911,7 @@ model Post {
   @@index([classId, createdAt])
   @@index([sectionId, createdAt])
   @@index([authorId])
+  @@index([subjectId])
   @@map("posts")
 }
 
