@@ -147,8 +147,9 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(204)
   @ApiNoContentResponse({ description: 'Accepted (whether or not an account matches).' })
-  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<void> {
-    await this.passwordReset.request(body.identifier);
+  forgotPassword(@Body() body: ForgotPasswordDto): void {
+    // Answers before any lookup: the account is looked up and mailed afterwards.
+    this.passwordReset.request(body.identifier);
   }
 
   /**
