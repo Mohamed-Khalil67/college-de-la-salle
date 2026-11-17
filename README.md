@@ -42,7 +42,7 @@ the app's role and database once, as `postgres`, with [apps/api/prisma/setup-dat
 a password of your choice, and put that password in `DATABASE_URL`; `db:dev` then leaves `.env` alone.
 
 Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
-health: `/api/health` (process) and `/api/health/db` (database).
+health: `/api/health` (process) and `/api/health/db` (database; rate-limited, and a 404 when the request came through a reverse proxy, so only callers inside the stack can make the database work).
 
 Migrations: `npm run db:migrate` (`prisma migrate dev`) on a development database; `npx prisma migrate deploy`
 (from `apps/api`) applies the committed ones to any other database, from empty or as an upgrade (it never resets

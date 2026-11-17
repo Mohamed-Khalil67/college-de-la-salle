@@ -111,7 +111,7 @@ NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-prac
 
 ## Deployment (Docker)
 
-- `Dockerfile` here, the stack in `deploy/` (`docs/deployment.md`). The image runs `prisma migrate deploy` in `docker-entrypoint.sh`, then `node dist/main.js`, as the non-root `node` user, with a healthcheck on `/api/health`. `prisma`, `tsx` and `dotenv` are regular dependencies because the image needs them (migrations, `seed:demo`).
+- `Dockerfile` here, the stack in `deploy/` (`docs/deployment.md`). The image runs `prisma migrate deploy` in `docker-entrypoint.sh`, then `node dist/main.js`, as the non-root `node` user, with a healthcheck on `/api/health` (public, never rate-limited, no database). `/api/health/db` is for callers inside the stack only: it counts against the rate limit and answers 404 to a request carrying `X-Forwarded-For`, `X-Real-IP` or `Forwarded` (`health/proxied.ts`), which nginx adds to everything it forwards. `prisma`, `tsx` and `dotenv` are regular dependencies because the image needs them (migrations, `seed:demo`).
 - A fresh production database has no admin and no sections or subjects: `src/cli/create-admin.ts` (`node dist/cli/create-admin.js --email … --first … --last … [--reset]`) creates the first admin (temporary password, change forced) and upserts the reference data. Never use `db:seed` on a real database: it wipes it.
 - `COOKIE_SECURE` (optional) overrides the refresh cookie's `Secure` flag, which defaults to `NODE_ENV === 'production'`. Behind the web container's nginx, `TRUST_PROXY=1`.
 

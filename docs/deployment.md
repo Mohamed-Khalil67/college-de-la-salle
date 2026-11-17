@@ -118,7 +118,7 @@ docker compose -f deploy/compose.yaml exec api cat demo-credentials.local.md    
 | Status | `docker compose -f deploy/compose.yaml ps` |
 | Logs (rotated: 3 × 10 MB per container) | `docker compose -f deploy/compose.yaml logs -f --tail 100 api` |
 | Stop / start | `docker compose -f deploy/compose.yaml --profile tunnel stop` / `… up -d` |
-| Health | `curl http://127.0.0.1:8080/api/health` and `/api/health/db` |
+| Health | `curl http://127.0.0.1:8080/api/health` (process, public); database: `docker compose -f deploy/compose.yaml exec api node -e "fetch('http://127.0.0.1:3000/api/health/db').then(r=>r.text()).then(console.log)"` (only from inside the stack: through nginx `/api/health/db` is a 404) |
 | Back up now | `docker compose -f deploy/compose.yaml run --rm -e BACKUP_ONCE=true backup` |
 | Restore | [`deploy/restore.md`](../deploy/restore.md) |
 

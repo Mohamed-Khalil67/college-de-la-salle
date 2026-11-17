@@ -34,7 +34,7 @@ docker compose -f deploy/compose.yaml run --rm -e BACKUP_ONCE=true backup
    ```bash
    docker compose -f deploy/compose.yaml --profile tunnel up -d
    ```
-5. Check: `curl http://127.0.0.1:8080/api/health/db` answers `{"status":"ok"}`, then sign in.
+5. Check: `docker compose -f deploy/compose.yaml exec api node -e "fetch('http://127.0.0.1:3000/api/health/db').then(r=>r.text()).then(console.log)"` prints `{"status":"ok"}`, then sign in. (The database check answers only from inside the stack: through the web container it is a 404.)
 
 Restoring onto a **new machine**: install Docker, clone the repository, copy your `deploy/.env` (keep the same
 `JWT_*` secrets if you want sessions to survive; otherwise everybody just signs in again), start only the database
