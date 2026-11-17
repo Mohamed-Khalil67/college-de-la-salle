@@ -75,6 +75,13 @@ characters, not the e-mail) every other route answers 403 `PASSWORD_CHANGE_REQUI
 Sign-in returns a 15-minute access token (send it as
 `Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
 
+**Rate limits.** The whole school shares one public address, so signed-in requests count per account (`THROTTLE_LIMIT`, 120
+a minute per route) and anonymous ones per address. Sign-in, `POST /auth/password` and « mot de passe oublié » allow
+`LOGIN_THROTTLE_LIMIT` (5) a minute per address and account; a refresh is limited per refresh token (`REFRESH_THROTTLE_LIMIT`, 10)
+and per address for all tokens together (`REFRESH_IP_THROTTLE_LIMIT`, 1200). The web app keeps the session on a 429, a 5xx or a
+network error (it waits, honouring `Retry-After`, tries three more times, then says the server is busy) and signs out only when the
+API refuses the refresh token (401 or 403).
+
 **Forgotten password.** `/connexion/oubli` asks for the login e-mail (`POST /auth/forgot-password`, always 204: nothing
 says whether the account exists; only `active` accounts get a mail). The mail holds a single-use link
 `<PUBLIC_WEB_URL>/connexion/reinitialiser?token=…`, valid `PASSWORD_RESET_TTL_MINUTES` (60); that page chooses the new

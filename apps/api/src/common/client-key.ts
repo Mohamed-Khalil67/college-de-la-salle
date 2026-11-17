@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { isIPv6 } from 'node:net';
 
 /**
@@ -62,4 +63,47 @@ export function passwordTracker(req: RequestLike): string {
     }
   }
   return `${clientKey(req['ip'] as string | undefined)}|${sub}`;
+}
+
+/** The account id of an access token whose signature checks out (expired or not), or null. */
+export type AccessTokenSubject = (token: string) => string | null;
+
+/**
+ * Key of the general rate limit. A request with a signed access token counts against its account: the
+ * whole school reaches the site from one address, so counting by address would let one busy class block
+ * everybody. Anything else (no token, a forged one) counts against its address. The signature is checked
+ * so nobody can spend another account's budget; an expired token still names its account (the
+ * authentication guard refuses it right after, with the 401 the web app answers by refreshing).
+ */
+export function trafficTracker(subjectOf: AccessTokenSubject): (req: RequestLike) => string {
+  return (req) => {
+    const header = (req['headers'] as Record<string, unknown> | undefined)?.['authorization'];
+    if (typeof header === 'string' && header.startsWith('Bearer ')) {
+      const sub = subjectOf(header.slice('Bearer '.length).trim());
+      if (sub) return `account:${sub.slice(0, 64)}`;
+    }
+    return clientKey(req['ip'] as string | undefined);
+  };
+}
+
+/** Does the request carry a non-empty cookie of this name? */
+export function hasCookie(req: RequestLike, name: string): boolean {
+  return cookieValue(req, name) !== '';
+}
+
+/**
+ * Key of a limit counted per cookie value (the refresh token): a SHA-256 of the value, never the value
+ * itself, so the throttler's memory holds nothing usable. Without the cookie, the client address.
+ */
+export function cookieTracker(name: string): (req: RequestLike) => string {
+  return (req) => {
+    const value = cookieValue(req, name);
+    if (!value) return `${name}:none|${clientKey(req['ip'] as string | undefined)}`;
+    return `${name}:${createHash('sha256').update(value).digest('base64url')}`;
+  };
+}
+
+function cookieValue(req: RequestLike, name: string): string {
+  const value = (req['cookies'] as Record<string, unknown> | undefined)?.[name];
+  return typeof value === 'string' ? value : '';
 }

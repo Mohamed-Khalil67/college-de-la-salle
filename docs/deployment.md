@@ -180,3 +180,6 @@ Details and the restore procedure: [`deploy/restore.md`](../deploy/restore.md).
   you browse over plain HTTP while the cookie is `Secure`.
 - Tunnel shows « Bad gateway »: the public hostname service must be `http://web:8080` and `web` must be healthy.
 - Too many sign-in attempts from the school: limits are per account and per address; see `LOGIN_THROTTLE_LIMIT`.
+- Many « 429 » from the school once people are signed in: signed-in requests count per account (`THROTTLE_LIMIT`), refreshes per
+  token (`REFRESH_THROTTLE_LIMIT`) and per address (`REFRESH_IP_THROTTLE_LIMIT`, 1200 a minute for the whole school). Raise the
+  last one in `deploy/.env` if the school grows; a 429 never signs anybody out.
