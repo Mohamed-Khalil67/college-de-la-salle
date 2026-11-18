@@ -17,6 +17,26 @@ the details of each side.
 
 Put the skill line at the top of every brief you give an agent. The logo and crest are final: never change or fetch one.
 
+## School packs (one install per school)
+
+The platform is not multi-tenant: each school gets its own deployment and database. Everything that makes a school
+itself is a **school pack**, `schools/<id>/` (`docs/new-school.md`): `profile.json` (the `SchoolProfile` type and
+validator in `packages/shared/src/school-profile.ts`), `site/` (public text per language, photos, `SITE` config) and
+`public/` (crest, icons, images). `SCHOOL` picks it: the API reads it at start (`env.validation.ts`, unknown pack refuses
+to boot; `activeSchool()` in `apps/api/src/school/`), the web build wires it in with `apps/web/scripts/select-school.mjs`
+(generated, gitignored files in `src/app/school/active/`, `src/app/core/school/profile.generated.ts`, `src/generated/`),
+the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/example` is a fictional second school.
+
+- Never write a school's name, address, phone, e-mail, domain, time zone or section name in code: read `PROFILE`
+  (`core/school/school-profile.ts`) in the web, the injected `SCHOOL_PROFILE` or `activeSchool()` in the API.
+  `schoolToday()`/`schoolTimeNow()` take the profile's zone (`dayInZone`/`timeInZone` in `@cdls/shared` stay pure and take
+  the zone as an argument). Section names come from `SECTION_LABELS` (web) / `sectionLabels(profile)`; the section codes
+  `nationale` and `bac` are still fixed (docs/new-school.md says what making them free would take).
+- Spec expectations that depend on the school (Cairo time, `Bac français`) read the profile or `it.skipIf` another zone.
+- A pack is checked by `apps/web/src/app/school/pack.spec.ts`, `SCHOOL=<id> npm run e2e:smoke -w @cdls/web` (every public
+  page, Axe at 390 and 1440 px) and the API's `school-profile.spec.ts`. CI-less: run both packs before a merge:
+  `SCHOOL=example npm run build` and `npm run build`.
+
 ## Type safety (not optional)
 
 - Contract first: a new endpoint starts as request/response interfaces in `packages/shared/src/api.ts`; the API DTO
@@ -35,6 +55,13 @@ Put the skill line at the top of every brief you give an agent. The logo and cre
 - Done means: `npm run build`, `npm run lint` (0 warnings), `npm test`, `npm run test:e2e`, and for UI the Playwright +
   Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
 - A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
+
+## Status (2026-11-18)
+
+- **School packs (branch `feat/school-profile`, not merged):** the school is a pack in `schools/<id>/` selected by `SCHOOL`;
+  `cdls-daher` holds everything the site had (the prerendered text and images are unchanged, the crest sprite is now
+  `/crest.svg`), `example` is a fictional school. Time zone, names in mails, PDF and calendar files, and section names come
+  from the profile; section codes are still the two fixed ones. See `docs/new-school.md`.
 
 ## Status (2026-11-13)
 

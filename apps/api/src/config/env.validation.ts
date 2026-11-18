@@ -130,11 +130,13 @@ export class Env {
    * The school pack this install serves (`schools/<SCHOOL>/profile.json`): names in mails and report cards,
    * time zone, section names. Checked at start: an unknown or invalid pack stops the API.
    */
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? DEFAULT_SCHOOL : value))
   @IsString()
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'SCHOOL must be a pack folder name such as cdls-daher' })
   SCHOOL = DEFAULT_SCHOOL;
 
   /** Folder of the school packs; unset: the repository's `schools/` (or `/app/schools` in the image). */
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @IsOptional()
   @IsString()
   SCHOOLS_DIR?: string;
@@ -162,6 +164,7 @@ export class Env {
    * Sender of every mail, e.g. `Collège de la Salle <no-reply@lasalle-daher.eg>`. Unset: the school's name (profile)
    * and `no-reply@<SCHOOL_EMAIL_DOMAIN>`.
    */
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @IsOptional()
   @IsString()
   @IsNotEmpty()

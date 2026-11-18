@@ -25,9 +25,9 @@ and how to use what already exists.
 | `shared/utils/` | Pure, decorator-free helpers with a spec next to each: `block-state.ts` (`BlockState` union, `blockState`, `snapshotOf`, `bothOf`, `pageStatusMessage`), `format.ts` (French labels, times, plurals), `week.ts`, `targets.ts` (« Assigner à », reuses `targetedStudentIds` of `@cdls/shared`), `forms.ts` (`shownError`, `fieldValue(event)`: the value of a change or input event, narrowed without an `as` cast), `audience.ts` (announcement audiences: `audienceFromValue`, `audienceLabel`), `download.ts`, `focus.ts` | n/a |
 | `shared/data/` | Shared resources: `teacher-data.ts` (the teacher's assignments and classes), `school-years.ts` (`SchoolYears` root service: the years and the term of today, loaded once) | n/a |
 | `layout/` | `PublicLayout`, `SpaceLayout` (app bar, account menu, bottom nav), `space-navs.ts`, `PagePlaceholder` | n/a |
-| `core/` | `ApiClient`, `AuthStore`, `SchoolClock` (`clock/`: Cairo `today` and `now` signals, one browser-only timer), interceptor, role guards | n/a |
-| `i18n/` | Languages of the public site: typed `SiteMessages` per language, page addresses, `LOCALE`, `SiteHead` (lang/dir/hreflang). See `docs/i18n.md` | n/a |
-| `school/` | Static content of the public site (facts, milestones, photos with credits); `content.fr/en/ar.ts` give it per language; `contact-mail.ts` | n/a |
+| `core/` | `ApiClient`, `AuthStore`, `SchoolClock` (`clock/`: the school's `today` and `now` signals, one browser-only timer), `school/` (`PROFILE`, `SECTION_LABELS`, `schoolToday()`: the school's profile of this build), interceptor, role guards | n/a |
+| `i18n/` | Languages of the public site: typed `SiteMessages` per language (`messages-base.<lang>.ts` shared words + the pack's `SchoolMessages`, joined by `composeMessages`), page addresses, `LOCALE`, `SiteHead` (lang/dir/hreflang). See `docs/i18n.md` | n/a |
+| `school/` | The types of the school pack (`content.model.ts`, `school-content.ts`, `site-config.ts`), `school-info.ts` (`SCHOOL`, `CONTACTS`, `localizedPhoto()` from the profile), `matieres-text.ts`, `contact-mail.ts`; `active/` is GENERATED and points at the pack. The school's own text and photos are NOT here: they are `schools/<id>/site/` | n/a |
 | `src/styles.css`, `src/styles/` | Tokens as a Tailwind 4 theme, prototype component classes, fonts | n/a |
 
 **Import rules** (checked by `architecture.spec.ts`):
@@ -130,6 +130,19 @@ pages follow the same pattern). Rules:
 ## Prerendered forms
 
 A form on a prerendered page (today the contact form) has no handler until Angular hydrates it, and a click or Enter before that submits it natively (page reload, message lost). Its submit button is therefore `[disabled]` until a `ready` signal set in `afterNextRender` (never runs on the server). Playwright waits on `toBeEnabled()` of that button before typing: it is the readiness signal, never a sleep. `public-site.spec.ts` holds the scripts back to prove the button is disabled until then.
+
+(`e2e/school.ts` gives the Playwright specs the profile and `schoolToday()` of the school under test, `SCHOOL` or `cdls-daher`.)
+
+## School packs
+
+The public text, photos, crest and icons of the school are `schools/<SCHOOL>/` at the repository root, not in `src/`.
+`scripts/select-school.mjs` (run by the `pre*` npm scripts of build, start, test, lint) validates `profile.json`, writes the
+generated files (all gitignored) and copies the pack's `public/` into `src/generated/public/`, which `angular.json` serves
+next to `public/`. Read the profile through `PROFILE` (`core/school/school-profile.ts`), the pack's `SITE` and `PACK`
+through `school/index.ts`; never import `schools/` or a generated file directly. Never write a school's name, contact,
+zone or section name in a component. A string that used to be a CDLS id (`PhotoId`, `ContactId`) is a plain `string` checked by
+`school/pack.spec.ts`. `src/index.template.html` is the page shell: edit it, not `src/generated/index.html`.
+To check a school: `SCHOOL=<id> npm run build`, then `SCHOOL=<id> npm run e2e:smoke`. Docs: `docs/new-school.md`.
 
 ## Public site languages
 

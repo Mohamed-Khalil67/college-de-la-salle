@@ -44,6 +44,9 @@ describe('school profile of the install', () => {
     expect(() => validateEnv({ ...BASE_ENV, SCHOOL: 'Not A Pack' })).toThrow(/SCHOOL must be a pack folder name/);
     expect(validateEnv({ ...BASE_ENV, SCHOOL: 'example' }).MAIL_FROM).toBe('École Exemple <no-reply@demo.cdls.test>');
     expect(validateEnv({ ...BASE_ENV, MAIL_FROM: 'X <x@y.test>' }).MAIL_FROM).toBe('X <x@y.test>');
+    // compose passes unset variables as empty strings: they mean « use the default ».
+    const empty = validateEnv({ ...BASE_ENV, SCHOOL: '', SCHOOLS_DIR: '', MAIL_FROM: '' });
+    expect([empty.SCHOOL, empty.SCHOOLS_DIR, empty.MAIL_FROM]).toEqual([DEFAULT_SCHOOL, undefined, 'Collège de la Salle <no-reply@demo.cdls.test>']);
   });
 
   it('writes the reset mail with the name of the school it serves', async () => {

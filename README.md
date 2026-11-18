@@ -11,7 +11,10 @@ signed-in spaces run the school year:
 | **Espace enseignant** `/enseignant` | Teachers | One page of blocks (today's classes with Appel / Noter / Devoir, notes to finish, homework given, what to watch, announcements), their classes (`/enseignant/classes`), the shared calendar, « Noter » (a new note, marks typed with Enter, autosave, finish later, publish) and the grade entry of agenda events, attendance, announcements |
 | **Administration** `/admin` | School staff | Accounts (one by one or roster CSV with generated school e-mails), section-change validations, graduation, classes and enrolments, teaching assignments, school years, periods and calendar days, **the next-year wizard** (« Nouvelle année »: preview, promotions, archive), subjects and the subjects of each class, rooms, activity types, report cards, messages from the contact form |
 
-Accounts are created by the college; there is no open sign-up. Built with **Angular 22** (standalone, zoneless,
+Accounts are created by the college; there is no open sign-up. **One install per school**: the school (its name, contacts,
+time zone, section names, public text and pictures, crest) is a *school pack* in `schools/<id>/`, chosen with `SCHOOL`
+(default `cdls-daher`, this college). To set up another school without touching the code, see
+[docs/new-school.md](docs/new-school.md); `schools/example` is a fictional school that proves it. Built with **Angular 22** (standalone, zoneless,
 signals, Signal Forms, prerendering with hydration), **Tailwind CSS v4**, **NestJS 12**, **Prisma 7** and
 **PostgreSQL 18**. The visual design (navy, antique gold, ivory; Cormorant Garamond and Inter) is documented in
 [docs/brand.md](docs/brand.md) and prototyped in [design/prototypes/](design/prototypes/README.md).
@@ -113,8 +116,10 @@ and subjects they are assigned; admins manage everything. The request and respon
 a translation (the English and Arabic text is machine-drafted and awaits the school's review). The accessibility
 statement (`/accessibilite`) and what we test are in [docs/accessibility.md](docs/accessibility.md).
 
-Typed data in `apps/web/src/app/school/`: `school-info.ts` (name, milestones, directors, phones),
-`tracks.ts` (the two track pages), `photos.ts` (26 photos: file, size, alt, credit, source) and
+The school's own content is its pack, `schools/<id>/` (docs/new-school.md): `profile.json` (names, contacts, time zone,
+sections, languages, brand), `site/` (`school-info.ts` milestones, directors; `tracks.ts` the two track pages; `photos.ts`
+the photos with file, size, alt, credit and source; the messages and content per language) and `public/` (crest, icons,
+images). `apps/web/scripts/select-school.mjs` wires the pack named by `SCHOOL` into the build. Shared by every school:
 **the subject catalogue** (`packages/shared/src/subjects.ts`, shared with the API): one entry per
 subject plus its illustration in `apps/web/public/images/matieres/` (`node scripts/subject-images.mjs`,
 run from `apps/web`, regenerates the illustrations). The
@@ -131,11 +136,12 @@ apps/web/src/app/
   shared/        ui/ (UI kit cdls-*), components/, utils/ (pure helpers), data/: used by several features
   layout/        Public layout, space layout (app bar, bottom nav)
   core/          ApiClient (every endpoint), AuthStore, interceptor, role guards
-  i18n/, school/ Languages and static content of the public site
+  i18n/, school/ Languages of the public site; the school pack's content is wired in at build time (school/active/, generated)
 apps/web/src/styles.css   Design tokens as a Tailwind 4 theme + component classes from the prototypes
 apps/api/src/             One NestJS module per area (auth, users, classes, events, grades, attendance…)
 apps/api/prisma/          Schema, migrations, seed
-packages/shared/src/      Domain logic and the API contract (api.ts) used by both apps
+packages/shared/src/      Domain logic and the API contract (api.ts) used by both apps; school-profile.ts (the SchoolProfile type and validator)
+schools/<id>/             One school pack per school: profile.json, site/ (public text), public/ (crest, images); cdls-daher and example
 design/prototypes/        Approved HTML/CSS screens (the design source)
 docs/                     architecture-map.html (diagrams), architecture.md (where things live), brainstorm.md, brand.md, legacy/
 ```
@@ -146,7 +152,7 @@ session. Public pages are prerendered; the spaces are client-rendered and lazy-l
 ## Deployment
 
 The whole stack (site, API, PostgreSQL 18, nightly backups, HTTPS from anywhere through a Cloudflare Tunnel or Caddy) runs
-with Docker Compose from `deploy/`. Step by step for a Windows laptop or a Linux VM: [docs/deployment.md](docs/deployment.md);
+with Docker Compose from `deploy/` (`SCHOOL` in `deploy/.env` picks the school pack, for the API and the web image alike). Step by step for a Windows laptop or a Linux VM: [docs/deployment.md](docs/deployment.md);
 backup and restore: [deploy/restore.md](deploy/restore.md).
 
 ## History of this repository

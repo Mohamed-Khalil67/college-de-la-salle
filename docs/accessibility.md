@@ -2,7 +2,7 @@
 
 The public statement is the page **Déclaration d'accessibilité** (`/accessibilite`, `/en/accessibility`,
 `/ar/accessibility`, linked in every footer). Its text is in the `accessibility` section of
-`apps/web/src/app/i18n/messages.<lang>.ts`, in the shape of an RGAA statement: status, what is tested, known
+`schools/<id>/site/messages.<lang>.ts` (each school writes its own), in the shape of an RGAA statement: status, what is tested, known
 limitations, test environment, contact, remedies.
 
 ## Why the status says « non conforme »

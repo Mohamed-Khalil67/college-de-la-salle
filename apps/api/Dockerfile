@@ -14,6 +14,10 @@ COPY apps/web/package.json apps/web/
 RUN npm ci --workspace=@cdls/shared --workspace=@cdls/api
 COPY packages/shared packages/shared
 COPY apps/api apps/api
+# The school packs: the API reads only profile.json (names, time zone, sections, calendar ids); the text and
+# pictures of the site are the web image's.
+COPY schools schools
+RUN find schools -type f ! -name profile.json -delete
 RUN npm run build -w @cdls/shared && npm run build -w @cdls/api
 
 # --- deps: production dependencies only (prisma CLI and tsx are regular dependencies of the API) -----
@@ -39,6 +43,8 @@ COPY --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/apps/api/package.json apps/api/package.json
 COPY --from=build /app/apps/api/dist apps/api/dist
+# SCHOOL (compose) names one folder of it; /app/schools is found by walking up from dist/ (SCHOOLS_DIR overrides).
+COPY --from=build /app/schools schools
 COPY --from=build /app/apps/api/prisma apps/api/prisma
 COPY --from=build /app/apps/api/prisma.config.ts apps/api/prisma.config.ts
 # prisma/seed.ts (optional demo data, run with tsx) imports the TypeScript sources and the generated client.

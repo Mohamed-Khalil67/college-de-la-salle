@@ -13,6 +13,11 @@ COPY apps/web/package.json apps/web/
 RUN npm ci --workspace=@cdls/shared --workspace=@cdls/web
 COPY packages/shared packages/shared
 COPY apps/web apps/web
+# The school packs (text, photos, crest): the one named by SCHOOL is built in (scripts/select-school.mjs).
+COPY schools schools
+# The school this image is for (deploy/.env SCHOOL), a folder of schools/. The API container must use the same value.
+ARG SCHOOL=cdls-daher
+ENV SCHOOL=${SCHOOL}
 # The site's public address (deploy/.env PUBLIC_WEB_URL): absolute hreflang and canonical links in the
 # prerendered pages. Empty: root-relative links.
 ARG PUBLIC_WEB_URL=
