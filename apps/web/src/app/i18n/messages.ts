@@ -194,6 +194,10 @@ export interface SiteMessages {
     readonly noEmail: string;
     readonly noSignUp: string;
     readonly backToSite: string;
+    /** The session could not be restored because the server was busy (it may still be valid). */
+    readonly sessionUnavailable: string;
+    readonly retry: string;
+    readonly retrying: string;
     readonly errors: {
       readonly emailRequired: string;
       readonly emailInvalid: string;

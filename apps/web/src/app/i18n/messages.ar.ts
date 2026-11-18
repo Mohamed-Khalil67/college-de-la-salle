@@ -263,6 +263,9 @@ export const MESSAGES_AR: SiteMessages = {
     noEmail: 'لم يصلك بريد؟ يمكن لسكرتارية مرحلتك إعادة تعيين كلمة مرورك.',
     noSignUp: 'تنشئ الكلية الحسابات: لا يوجد تسجيل عبر الإنترنت.',
     backToSite: 'العودة إلى موقع الكلية',
+    sessionUnavailable: 'الخادم مشغول جدًا ولم يتمكن من استعادة جلستك. قد تكون جلستك ما زالت صالحة: حاول مرة أخرى بعد قليل.',
+    retry: 'إعادة المحاولة',
+    retrying: 'جارٍ إعادة المحاولة…',
     errors: {
       emailRequired: 'اكتب بريدك الإلكتروني.',
       emailInvalid: 'اكتب بريدًا إلكترونيًا كاملًا، مثل firstname.lastname@lasalle-daher.eg.',

@@ -11,6 +11,9 @@ import type {
   SessionResponse,
   SessionUser,
 } from '@cdls/shared';
+import { type RefreshOutcome, refreshWithRetry } from './refresh-retry';
+
+export type { RefreshOutcome } from './refresh-retry';
 
 export type AuthStatus = 'unknown' | 'anonymous' | 'authenticated';
 
@@ -41,11 +44,18 @@ export class AuthStore {
   readonly #user = signal<SessionUser | null>(null);
   readonly #status = signal<AuthStatus>('unknown');
   #accessToken: string | null = null;
-  #refreshing: Promise<boolean> | null = null;
+  #refreshing: Promise<RefreshOutcome> | null = null;
   #restored: Promise<void> | null = null;
+  /** The last refresh got no usable answer (429, 5xx, network): the session is kept, the server is busy. */
+  readonly #unavailable = signal(false);
 
   readonly user = this.#user.asReadonly();
   readonly status = this.#status.asReadonly();
+  /**
+   * The session could not be renewed because the server was busy or out of reach (not because it ended).
+   * Shown by the space layout and the login page; cleared by the next successful refresh or sign-in.
+   */
+  readonly sessionUnavailable = this.#unavailable.asReadonly();
   readonly role = computed(() => this.#user()?.role ?? null);
   readonly displayName = computed(() => {
     const user = this.#user();
@@ -70,6 +80,13 @@ export class AuthStore {
   restore(): Promise<void> {
     if (!this.#browser) return Promise.resolve();
     this.#restored ??= this.refresh().then(() => undefined);
+    return this.#restored;
+  }
+
+  /** Tries the restore again after it found the server unavailable (the login page's « Réessayer »). */
+  retryRestore(): Promise<void> {
+    if (!this.#browser) return Promise.resolve();
+    this.#restored = this.refresh().then(() => undefined);
     return this.#restored;
   }
 
@@ -137,18 +154,24 @@ export class AuthStore {
     await this.reloadUser();
   }
 
-  /** Exchanges the refresh cookie for a new access token. Concurrent callers share one request. */
-  refresh(): Promise<boolean> {
-    this.#refreshing ??= firstValueFrom(
-      this.#http.post<SessionResponse>('/api/auth/refresh', {}, { withCredentials: true }),
+  /**
+   * Exchanges the refresh cookie for a new access token. Concurrent callers share one attempt. Only a 401
+   * or 403 (the API refused the token) signs out; a 429, a 5xx or a network error is retried a few times
+   * (honouring Retry-After), then reported as `unavailable` with the session left as it was.
+   */
+  refresh(): Promise<RefreshOutcome> {
+    this.#refreshing ??= refreshWithRetry(
+      () =>
+        firstValueFrom(
+          this.#http.post<SessionResponse>('/api/auth/refresh', {}, { withCredentials: true }),
+        ),
+      (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
     )
-      .then((session) => {
-        this.#accept(session);
-        return true;
-      })
-      .catch(() => {
-        this.#clear();
-        return false;
+      .then((result) => {
+        if (result.outcome === 'ok') this.#accept(result.session);
+        else if (result.outcome === 'signed-out') this.#clear();
+        else this.#unavailable.set(true);
+        return result.outcome;
       })
       .finally(() => (this.#refreshing = null));
     return this.#refreshing;
@@ -159,11 +182,13 @@ export class AuthStore {
     this.#user.set(session.user);
     this.#profileLoadedAt = Date.now();
     this.#status.set('authenticated');
+    this.#unavailable.set(false);
   }
 
   #clear(): void {
     this.#accessToken = null;
     this.#user.set(null);
     this.#status.set('anonymous');
+    this.#unavailable.set(false);
   }
 }

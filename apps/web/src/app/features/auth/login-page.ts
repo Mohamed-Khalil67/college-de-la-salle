@@ -3,6 +3,7 @@ import { email, form, FormField, required, submit } from '@angular/forms/signals
 import { Router, RouterLink } from '@angular/router';
 import { NgOptimizedImage } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
+import type { SessionUser } from '@cdls/shared';
 import { AuthStore, HOME_BY_ROLE, landingFor } from '../../core/auth/auth-store';
 import { LanguageSwitcher } from '../../layout/language-switcher';
 import { LOCALE } from '../../i18n/locale';
@@ -43,6 +44,14 @@ import { shownError } from '../../shared/utils/forms';
             }
           </div>
 
+          @if (sessionUnavailable()) {
+            <cdls-alert tone="warning">
+              <p>{{ t.sessionUnavailable }}</p>
+              <button cdlsButton variant="secondary" type="button" [disabled]="retrying()" (click)="retrySession()">
+                {{ retrying() ? t.retrying : t.retry }}
+              </button>
+            </cdls-alert>
+          }
           @if (failure()) {
             <cdls-alert tone="danger">{{ failure() }}</cdls-alert>
           }
@@ -101,6 +110,27 @@ export class LoginPage {
   protected readonly showPassword = signal(false);
   protected readonly busy = signal(false);
   protected readonly failure = signal<string | null>(null);
+  protected readonly sessionUnavailable = this.#auth.sessionUnavailable;
+  protected readonly retrying = signal(false);
+
+  /** The session may still be valid: try to restore it again, and go on to the page asked for if it works. */
+  protected async retrySession(): Promise<void> {
+    this.retrying.set(true);
+    try {
+      await this.#auth.retryRestore();
+      const user = this.#auth.user();
+      if (user) await this.#go(user);
+    } finally {
+      this.retrying.set(false);
+    }
+  }
+
+  async #go(user: SessionUser): Promise<void> {
+    const home = HOME_BY_ROLE[user.role];
+    const suite = this.suite();
+    if (user.mustChangePassword) await this.#router.navigateByUrl(landingFor(user));
+    else await this.#router.navigateByUrl(suite?.startsWith(home) ? suite : home);
+  }
 
   protected onSubmit(event: Event): void {
     event.preventDefault();
@@ -108,11 +138,7 @@ export class LoginPage {
       this.busy.set(true);
       this.failure.set(null);
       try {
-        const user = await this.#auth.login(this.model());
-        const home = HOME_BY_ROLE[user.role];
-        const suite = this.suite();
-        if (user.mustChangePassword) await this.#router.navigateByUrl(landingFor(user));
-        else await this.#router.navigateByUrl(suite?.startsWith(home) ? suite : home);
+        await this.#go(await this.#auth.login(this.model()));
       } catch (error) {
         const status = (error as HttpErrorResponse).status;
         const errors = this.t.errors;
