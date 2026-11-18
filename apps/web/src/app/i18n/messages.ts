@@ -216,3 +216,59 @@ export interface SiteMessages {
     readonly sections: readonly StatementSection[];
   };
 }
+
+/**
+ * The words that name the school, in one language: the part of `SiteMessages` a school pack writes
+ * (`schools/<id>/site/messages.<lang>.ts`). The section names (« Bac nationale ») are the profile's, not repeated here.
+ */
+export interface SchoolMessages {
+  /** Meta description of each page. */
+  readonly pageDescriptions: Readonly<Record<PublicPageId, string>>;
+  readonly layout: Pick<SiteMessages['layout'], 'footerAbout' | 'copyright' | 'photoCredits'>;
+  /** The motto and what it means, in a sentence (`common.motto`). */
+  readonly motto: string;
+  readonly home: Pick<
+    SiteMessages['home'],
+    | 'heroTitle'
+    | 'heroLead'
+    | 'heroCredit'
+    | 'historyTitle'
+    | 'historyLead'
+    | 'tracksTitle'
+    | 'tracksLead'
+    | 'features'
+    | 'contactLead'
+  >;
+  readonly history: Pick<
+    SiteMessages['history'],
+    'anchors' | 'stepsLead' | 'directorsLead' | 'brothersTable' | 'layTable' | 'archivesTitle' | 'archivesLead'
+  >;
+  readonly contact: Pick<SiteMessages['contact'], 'registrationNationale' | 'registrationNationaleLink' | 'registrationBac'>;
+  /** The label of each `SITE.contactTracks` entry, by its id. */
+  readonly contactTracks: Readonly<Record<string, string>>;
+  readonly login: {
+    readonly mottoMeaning: string;
+    /** « Saisissez une adresse e-mail complète, par exemple prenom.nom@<domain>. » */
+    readonly emailInvalid: string;
+  };
+  /** The school's own accessibility statement. */
+  readonly accessibility: SiteMessages['accessibility'];
+}
+
+/** The words every school shares in one language (`i18n/messages-base.<lang>.ts`): `SiteMessages` less `SchoolMessages`. */
+export interface BaseMessages {
+  /** Page titles; the two section pages take the profile's section names instead. */
+  readonly pageTitles: Readonly<Record<PublicPageId, string>>;
+  readonly layout: Omit<SiteMessages['layout'], keyof SchoolMessages['layout'] | 'nav'> & {
+    readonly nav: Readonly<Record<'home' | 'history' | 'contact', string>>;
+  };
+  readonly common: Omit<SiteMessages['common'], 'motto'>;
+  readonly home: Omit<SiteMessages['home'], keyof SchoolMessages['home']>;
+  readonly history: Omit<SiteMessages['history'], keyof SchoolMessages['history']>;
+  readonly section: SiteMessages['section'];
+  readonly contact: Omit<SiteMessages['contact'], keyof SchoolMessages['contact']>;
+  readonly contactForm: Omit<SiteMessages['contactForm'], 'tracks'>;
+  readonly login: Omit<SiteMessages['login'], 'mottoMeaning' | 'errors'> & {
+    readonly errors: Omit<SiteMessages['login']['errors'], 'emailInvalid'>;
+  };
+}

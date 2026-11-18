@@ -45,7 +45,7 @@ describe('the school pack of this build', () => {
     it(`${lang}: words every photo, department and contact track the pack names`, () => {
       expect(Object.keys(pack.content.photos).sort()).toEqual([...photoIds].sort());
       expect(Object.keys(pack.content.contactLabels).sort()).toEqual([...departmentIds].sort());
-      expect(Object.keys(pack.messages.contactForm.tracks).sort()).toEqual(SITE.contactTracks.map((t) => t.id).sort());
+      expect(Object.keys(pack.messages.contactTracks).sort()).toEqual(SITE.contactTracks.map((t) => t.id).sort());
       for (const id of photoIds) expect(() => localizedPhoto(id, pack.content.photos, pack.content.photoCredits)).not.toThrow();
     });
   }

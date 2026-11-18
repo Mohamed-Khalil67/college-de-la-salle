@@ -2,9 +2,9 @@ import type { ActivatedRouteSnapshot } from '@angular/router';
 import { MATIERES } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
 import { PROFILE } from '../core/school/school-profile';
-import { PACK as PACK_AR } from '../school/active/ar';
-import { PACK as PACK_EN } from '../school/active/en';
-import { PACK as PACK_FR } from '../school/active/fr';
+import { AR } from './ar';
+import { EN } from './en';
+import { FR } from './fr';
 import { DIRECTORS } from '../school/active/archive';
 import { directorPeriod, MATIERE_IDS, type SchoolContent } from '../school/school-content';
 import { isLang, LANG_META, LANGS } from './lang';
@@ -18,8 +18,8 @@ import { alternates, childPath, pageUrl, PRERENDERED_PAGES, PUBLIC_PAGES, routeP
  */
 
 const TRANSLATIONS = [
-  { lang: 'en', content: PACK_EN.content, messages: PACK_EN.messages },
-  { lang: 'ar', content: PACK_AR.content, messages: PACK_AR.messages },
+  { lang: 'en', content: EN.content, messages: EN.messages },
+  { lang: 'ar', content: AR.content, messages: AR.messages },
 ] as const;
 
 /** Every string reachable in a value (functions are called with a sample argument). */
@@ -121,11 +121,11 @@ describe('route data', () => {
 describe('translations', () => {
   for (const t of TRANSLATIONS) {
     it(`${t.lang}: keeps the French facts`, () => {
-      expect(facts(t.content)).toEqual(facts(PACK_FR.content));
+      expect(facts(t.content)).toEqual(facts(FR.content));
     });
 
     it(`${t.lang}: keeps the shape of the interface (audiences, cards, statement)`, () => {
-      expect(shape(t.messages)).toEqual(shape(PACK_FR.messages));
+      expect(shape(t.messages)).toEqual(shape(FR.messages));
     });
 
     it(`${t.lang}: leaves no text empty`, () => {
@@ -137,19 +137,19 @@ describe('translations', () => {
   }
 
   it('ar: writes the interface in Arabic script', () => {
-    const latinOnly = strings(PACK_AR.messages.layout).filter((s) => !/[؀-ۿ]/.test(s.text) && /[a-z]{4}/i.test(s.text));
+    const latinOnly = strings(AR.messages.layout).filter((s) => !/[؀-ۿ]/.test(s.text) && /[a-z]{4}/i.test(s.text));
     expect(latinOnly).toEqual([]);
   });
 
   it('the home page has no title of its own in any language (the site name is used)', () => {
-    expect([PACK_FR.messages, PACK_EN.messages, PACK_AR.messages].map((m) => m.pages.home.title)).toEqual(['', '', '']);
+    expect([FR.messages, EN.messages, AR.messages].map((m) => m.pages.home.title)).toEqual(['', '', '']);
   });
 });
 
 describe('school content', () => {
   it('translates every subject of the catalogue', () => {
     expect([...MATIERE_IDS].sort()).toEqual(MATIERES.map((m) => m.id).sort());
-    for (const content of [PACK_FR.content, PACK_EN.content, PACK_AR.content]) {
+    for (const content of [FR.content, EN.content, AR.content]) {
       expect(Object.keys(content.matieres).sort()).toEqual([...MATIERE_IDS].sort());
     }
   });
@@ -157,9 +157,9 @@ describe('school content', () => {
   it.skipIf(PROFILE.id !== 'cdls-daher')('writes the directors’ terms in each language', () => {
     const louis = DIRECTORS.find((d) => d.name === 'Louis-Antonin')!;
     const absi = DIRECTORS.find((d) => d.name === 'Georges Absi')!;
-    expect(directorPeriod(louis, PACK_FR.content.directors)).toBe('1956 – 1961 et 1968 – 1969');
-    expect(directorPeriod(absi, PACK_FR.content.directors)).toBe('2011 – aujourd’hui');
-    expect(directorPeriod(louis, PACK_EN.content.directors)).toBe('1956 – 1961 and 1968 – 1969');
-    expect(directorPeriod(absi, PACK_AR.content.directors)).toBe('2011 – حتى اليوم');
+    expect(directorPeriod(louis, FR.content.directors)).toBe('1956 – 1961 et 1968 – 1969');
+    expect(directorPeriod(absi, FR.content.directors)).toBe('2011 – aujourd’hui');
+    expect(directorPeriod(louis, EN.content.directors)).toBe('1956 – 1961 and 1968 – 1969');
+    expect(directorPeriod(absi, AR.content.directors)).toBe('2011 – حتى اليوم');
   });
 });

@@ -1,5 +1,5 @@
 import type { Lang } from '../i18n/lang';
-import type { SiteMessages } from '../i18n/messages';
+import type { SchoolMessages } from '../i18n/messages';
 import type { PublicPageId } from '../i18n/pages';
 import type { ContactId, PhotoId, SectionSlug } from './content.model';
 import type { SchoolContent } from './school-content';
@@ -65,8 +65,8 @@ export interface SiteConfig {
   readonly contactTracks: readonly ContactTrack[];
 }
 
-/** The two files of a language of a pack: the school's content and the site's interface words. */
+/** The two files of a language of a pack: the school's content and the words that name the school. */
 export interface SchoolPack {
   readonly content: SchoolContent;
-  readonly messages: SiteMessages;
+  readonly messages: SchoolMessages;
 }
