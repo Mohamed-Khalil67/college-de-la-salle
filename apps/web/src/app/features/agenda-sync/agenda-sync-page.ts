@@ -1,6 +1,7 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { webcalUrl } from '@cdls/shared';
+import { PROFILE } from '../../core/school/school-profile';
 import { apiMessage, ApiClient } from '../../core/api/api-client';
 import { LoadState } from '../../shared/components/load-state';
 import { feedStatus } from '../notifications/notification-view';
@@ -126,7 +127,7 @@ import { Alert, Button, Icon, Modal } from '../../shared/ui';
               S’abonner à partir du web ».
             </li>
             <li>
-              Collez le lien, donnez un nom à l’agenda (par exemple « Collège de la Salle »), puis «
+              Collez le lien, donnez un nom à l’agenda (par exemple « {{ schoolName }} »), puis «
               Importer ».
             </li>
             <li>
@@ -213,6 +214,7 @@ import { Alert, Button, Icon, Modal } from '../../shared/ui';
   `,
 })
 export class AgendaSyncPage {
+  protected readonly schoolName = PROFILE.names.fr.full;
   readonly #api = inject(ApiClient);
   protected readonly feed = resource({ loader: () => this.#api.calendarFeed.status() });
   protected readonly busy = signal(false);

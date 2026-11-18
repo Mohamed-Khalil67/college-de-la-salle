@@ -30,7 +30,7 @@ import { telHref } from '../../../school/contact-mail';
               <li>
                 <cdls-icon name="map-pin" />
                 <span
-                  ><span lang="fr">{{ school.name }}</span>, {{ content.school.address }}.
+                  ><span [attr.lang]="school.nameLang">{{ school.name }}</span>, {{ content.school.address }}.
                   <a [href]="mapUrl">{{ t.contact.seeOnMap }}</a></span
                 >
               </li>
@@ -104,5 +104,5 @@ export class ContactPage {
   protected readonly bacForms = this.content.sections.bac.links.filter((l) => l.registration);
   protected readonly tel = telHref;
   protected readonly mapUrl =
-    'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Collège De La Salle, El-Zaher, Cairo');
+    'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(SCHOOL.mapQuery);
 }

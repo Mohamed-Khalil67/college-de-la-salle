@@ -1,4 +1,4 @@
-import type { SiteMessages } from './messages';
+import type { SiteMessages } from '../../../apps/web/src/app/i18n/messages';
 
 /** The interface in English. MACHINE-DRAFTED from messages.fr.ts: to be reviewed by the school (docs/i18n.md). */
 export const MESSAGES_EN: SiteMessages = {

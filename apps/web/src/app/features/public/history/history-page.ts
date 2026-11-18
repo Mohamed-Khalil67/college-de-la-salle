@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LOCALE } from '../../../i18n/locale';
-import { DIRECTORS, localizedPhoto, PHOTOS, type PhotoId } from '../../../school';
+import { DIRECTORS, localizedPhoto, PHOTOS, type PhotoId, SITE } from '../../../school';
 import { directorPeriod } from '../../../school/school-content';
 import { Breadcrumb } from '../shared/breadcrumb';
 import { Facts } from '../shared/facts';
@@ -136,10 +136,14 @@ const ANCHORS = ['etapes', 'fondateur', 'freres', 'directeurs', 'archives'] as c
           <div class="section__intro">
             <h2 id="archives-title" class="t-h1">{{ h.archivesTitle }}</h2>
             <p class="t-body-l t-muted">
-              {{ h.archivesLead.before }}<a href="https://lasalle-po.org/">lasalle-po.org</a>{{ h.archivesLead.middle }}<a
-                [href]="albumUrl"
-                >lasalle-eg.net</a
-              >{{ h.archivesLead.after }}
+              @if (credits; as c) {
+                {{ h.archivesLead.before }}<a [href]="c.archive.url">{{ c.archive.label }}</a>{{ h.archivesLead.middle }}<a
+                  [href]="albumUrl"
+                  >{{ c.college.label }}</a
+                >{{ h.archivesLead.after }}
+              } @else {
+                {{ h.archivesLead.before }}
+              }
             </p>
           </div>
         </div>
@@ -172,8 +176,9 @@ export class HistoryPage {
   protected readonly founder = this.content.founder;
   readonly #photo = (id: PhotoId) => localizedPhoto(id, this.content.photos, this.content.photoCredits);
   protected readonly gallery = (Object.keys(PHOTOS) as PhotoId[]).map(this.#photo);
-  protected readonly introPhoto = this.#photo('campus-1907');
-  protected readonly albumUrl = PHOTOS['campus-1907'].sourceUrl;
+  protected readonly introPhoto = this.#photo(SITE.historyPhoto);
+  protected readonly credits = SITE.creditLinks;
+  protected readonly albumUrl =PHOTOS[SITE.historyPhoto]?.sourceUrl ?? '';
   protected readonly anchors = ANCHORS.map((id) => ({ id, label: this.h.anchors[id] }));
   protected readonly directorGroups = (['frere', 'laic'] as const).map((kind) => ({
     id: kind === 'frere' ? 'freres' : 'laics',

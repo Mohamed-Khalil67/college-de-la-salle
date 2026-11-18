@@ -3,13 +3,11 @@ import { email, form, FormField, maxLength, required, submit } from '@angular/fo
 import { CONTACT_LIMITS } from '@cdls/shared';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { LOCALE } from '../../../i18n/locale';
-import { SCHOOL } from '../../../school';
+import { SCHOOL, SITE } from '../../../school';
 import { Alert, Button, Field, FieldControl } from '../../../shared/ui';
 import {
   CONTACT_SUBJECT_IDS,
   CONTACT_SUBJECTS,
-  CONTACT_TRACK_IDS,
-  CONTACT_TRACKS,
   contactMailto,
   type ContactMessage,
   contactRequest,
@@ -35,7 +33,7 @@ type SendState =
  * (POST /api/contact) and read by the secretariat in the administration. If it cannot be sent, the
  * visitor gets a link that opens their e-mail app with the message ready to send to the college's
  * address. `full` adds the phone and subject fields (contact page). Labels follow the page's language; the
- * subject and track sent are the French wording the secretariat reads (CONTACT_SUBJECTS, CONTACT_TRACKS).
+ * subject and track sent are the French wording the secretariat reads (CONTACT_SUBJECTS, SITE.contactTracks).
  */
 @Component({
   selector: 'form[siteContactForm]',
@@ -158,7 +156,7 @@ export class ContactForm {
   protected readonly t = this.#messages.contactForm;
   protected readonly school = SCHOOL;
   protected readonly subjects = CONTACT_SUBJECT_IDS.map((id) => ({ value: CONTACT_SUBJECTS[id], label: this.t.subjects[id] }));
-  protected readonly tracks = CONTACT_TRACK_IDS.map((id) => ({ value: CONTACT_TRACKS[id], label: this.t.tracks[id] }));
+  protected readonly tracks = SITE.contactTracks.map((track) => ({ value: track.value, label: this.t.tracks[track.id] ?? track.value }));
   protected readonly titleId = `contact-form-title-${++nextId}`;
 
   protected readonly model = signal<ContactMessage>(blankMessage());

@@ -3,7 +3,7 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LOCALE } from '../../../i18n/locale';
 import { pageUrl } from '../../../i18n/pages';
-import { localizedPhoto } from '../../../school';
+import { localizedPhoto, SITE } from '../../../school';
 import { Button } from '../../../shared/ui';
 
 /** `<section siteHero>`: the campus from the air under a navy scrim, with the page's h1. */
@@ -32,5 +32,5 @@ export class Hero {
   protected readonly t = this.#locale.messages.home;
   protected readonly prepare = this.#locale.messages.common.prepareRegistration;
   protected readonly links = { contact: pageUrl(this.#locale.lang, 'contact'), history: pageUrl(this.#locale.lang, 'history') };
-  protected readonly campus = localizedPhoto('campus-aerien', this.#locale.content.photos, this.#locale.content.photoCredits);
+  protected readonly campus = localizedPhoto(SITE.heroPhoto, this.#locale.content.photos, this.#locale.content.photoCredits);
 }

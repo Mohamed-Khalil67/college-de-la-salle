@@ -1,5 +1,6 @@
-import { CONTACT_SUBJECTS, CONTACT_TRACKS } from '../school/contact-mail';
-import type { SiteMessages } from './messages';
+import { CONTACT_SUBJECTS } from '../../../apps/web/src/app/school/contact-mail';
+import { SITE } from './index';
+import type { SiteMessages } from '../../../apps/web/src/app/i18n/messages';
 
 /** The interface in French: the source of messages.en.ts and messages.ar.ts. */
 export const MESSAGES_FR: SiteMessages = {
@@ -212,7 +213,7 @@ export const MESSAGES_FR: SiteMessages = {
     subjects: CONTACT_SUBJECTS,
     track: 'Filière et classe',
     trackNone: 'Non précisée',
-    tracks: CONTACT_TRACKS,
+    tracks: Object.fromEntries(SITE.contactTracks.map((t) => [t.id, t.value])),
     trap: 'Site web',
     message: 'Message',
     messageHelp: '1 000 caractères au plus.',

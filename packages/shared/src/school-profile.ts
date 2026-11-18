@@ -75,6 +75,8 @@ export interface SchoolBrand {
   readonly crest: string;
   /** The same on navy backgrounds (`/crest.svg#crest-on-dark`). */
   readonly crestOnDark: string;
+  /** `<use href>` of the round marker of the history timeline (the Lasallian star for CDLS). */
+  readonly marker: string;
   readonly icons: readonly SchoolIcon[];
   /** `<meta name="theme-color">`. */
   readonly themeColor: string;
@@ -280,6 +282,7 @@ export function schoolProfileProblems(value: unknown): string[] {
   const brand = c.object(p['brand'], 'brand');
   c.sitePath(brand['crest'], 'brand.crest');
   c.sitePath(brand['crestOnDark'], 'brand.crestOnDark');
+  c.sitePath(brand['marker'], 'brand.marker');
   c.text(brand['themeColor'], 'brand.themeColor', HEX, 'couleur #rrggbb attendue');
   c.list(brand['icons'], 'brand.icons').forEach((item, i) => {
     const icon = c.object(item, `brand.icons[${i}]`);

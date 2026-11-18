@@ -1,4 +1,4 @@
-import type { SchoolContent } from './school-content';
+import type { SchoolContent } from '../../../apps/web/src/app/school/school-content';
 
 /*
  * Arabic content. MACHINE-DRAFTED from the French source (content.fr.ts): the school must review it before it

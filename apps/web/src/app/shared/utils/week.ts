@@ -7,6 +7,7 @@ import {
   weekday,
   weekDays,
 } from '@cdls/shared';
+import { PROFILE } from '../../core/school/school-profile';
 
 /** One column of the week view. */
 export interface DayColumn {
@@ -74,7 +75,7 @@ export function toCalendarEvent(e: EventDto): CalendarEvent {
 
 /** « Ajouter à mon agenda »: the event as an iCalendar file. */
 export function eventIcs(e: EventDto): string {
-  return toIcs(toCalendarEvent(e));
+  return toIcs(toCalendarEvent(e), PROFILE.calendar);
 }
 
 /** A safe file name from a title: « controle-n-3-fonctions.ics ». */

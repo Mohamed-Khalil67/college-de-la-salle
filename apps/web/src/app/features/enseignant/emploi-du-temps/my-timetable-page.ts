@@ -1,5 +1,5 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
-import { schoolToday } from '@cdls/shared';
+import { schoolToday } from '../../../core/school/school-profile';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { Button, EmptyState, Icon } from '../../../shared/ui';
 import { LoadState } from '../../../shared/components/load-state';

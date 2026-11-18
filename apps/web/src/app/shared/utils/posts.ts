@@ -1,4 +1,5 @@
-import { type PostDto, schoolToday } from '@cdls/shared';
+import { type PostDto } from '@cdls/shared';
+import { schoolToday } from '../../core/school/school-profile';
 
 /** The latest announcements, newest first; null when there are none (the block's empty state). */
 export function newsView(posts: readonly PostDto[], count = 2): readonly PostDto[] | null {

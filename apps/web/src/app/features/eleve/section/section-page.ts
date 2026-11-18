@@ -1,6 +1,7 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { form, FormField, maxLength, required, submit } from '@angular/forms/signals';
-import { SECTION_CHANGE_LIMITS, SECTION_LABELS, type SectionChangeStatus, type SectionId } from '@cdls/shared';
+import { SECTION_CHANGE_LIMITS, type SectionChangeStatus, type SectionId } from '@cdls/shared';
+import { SCHOOL_TIME_ZONE, SECTION_LABELS } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { AuthStore } from '../../../core/auth/auth-store';
 import { Alert, Badge, type BadgeTone, Button, EmptyState, Field, FieldControl } from '../../../shared/ui';
@@ -12,7 +13,7 @@ const STATUS: Readonly<Record<SectionChangeStatus, { label: string; tone: BadgeT
   rejected: { label: 'Refusée', tone: 'neutral' },
 };
 
-const DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Africa/Cairo' });
+const DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: SCHOOL_TIME_ZONE });
 
 /** « Ma section »: the registered section and class, and a request to change section (decided by the administration). */
 @Component({

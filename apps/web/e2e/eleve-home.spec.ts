@@ -1,4 +1,5 @@
-import { addDays, schoolToday } from '@cdls/shared';
+import { addDays } from '@cdls/shared';
+import { schoolToday } from './school';
 import { type APIRequestContext, expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';

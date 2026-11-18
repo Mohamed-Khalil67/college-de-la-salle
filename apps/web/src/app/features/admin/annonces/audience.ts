@@ -1,4 +1,5 @@
-import { type ClassDto, SECTION_LABELS, type SectionDto } from '@cdls/shared';
+import { type ClassDto, type SectionDto } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { type AudienceOption, WHOLE_SCHOOL } from '../../../shared/utils/audience';
 
 /**

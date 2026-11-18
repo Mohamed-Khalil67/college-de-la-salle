@@ -41,6 +41,7 @@
   "brand": {
     "crest": "/crest.svg#crest",
     "crestOnDark": "/crest.svg#crest-on-dark",
+    "marker": "/crest.svg#star-marker",
     "themeColor": "#0A192F",
     "icons": [{ "rel": "icon", "type": "image/svg+xml", "href": "icon.svg" }],
     "colors": {}

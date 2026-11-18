@@ -1,6 +1,5 @@
-import { CONTENT_EN } from '../school/content.en';
+import { PACK } from '../school/active/en';
 import type { SiteLocale } from './locale';
-import { MESSAGES_EN } from './messages.en';
 
-/** English, loaded with the /en routes only (app.routes.ts). */
-export const EN: SiteLocale = { lang: 'en', messages: MESSAGES_EN, content: CONTENT_EN };
+/** English, loaded with the English routes only (app.routes.ts). The words are the school pack's (schools/<SCHOOL>/site/). */
+export const EN: SiteLocale = { lang: 'en', ...PACK };

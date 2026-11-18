@@ -1,5 +1,5 @@
 import { afterNextRender, DestroyRef, inject, Injectable, signal } from '@angular/core';
-import { schoolTimeNow, schoolToday } from '@cdls/shared';
+import { schoolTimeNow, schoolToday } from '../school/school-profile';
 
 /** How often the clock looks at the time (the display moves by the minute; a midnight is caught within it). */
 export const CLOCK_TICK_MS = 30_000;

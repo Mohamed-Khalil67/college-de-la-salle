@@ -1,14 +1,6 @@
 import { Component, computed, effect, inject, resource, signal, untracked } from '@angular/core';
-import {
-  minutesOf,
-  SECTION_LABELS,
-  shiftTime,
-  schoolToday,
-  type ClassDto,
-  type TimetableBlockedError,
-  type TimetableOccurrenceDto,
-  type TimetableWriteResult,
-} from '@cdls/shared';
+import { minutesOf, shiftTime, type ClassDto, type TimetableBlockedError, type TimetableOccurrenceDto, type TimetableWriteResult } from '@cdls/shared';
+import { SECTION_LABELS, schoolToday } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Button, EmptyState, Icon, Modal, Segmented, type SegmentOption } from '../../../shared/ui';
 import { dayTitle } from '../../../shared/utils/format';

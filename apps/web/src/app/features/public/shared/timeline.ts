@@ -1,5 +1,6 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component, inject, input } from '@angular/core';
+import { PROFILE } from '../../../core/school/school-profile';
 import { LOCALE } from '../../../i18n/locale';
 import { localizedPhoto, type Milestone, type PhotoId } from '../../../school';
 
@@ -19,7 +20,7 @@ import { localizedPhoto, type Milestone, type PhotoId } from '../../../school';
   template: `
     @for (m of milestones(); track m.year) {
       <li class="timeline__item" [id]="variant() === 'full' ? 'annee-' + m.year : null">
-        <svg class="timeline__star" aria-hidden="true" focusable="false"><use href="/icons.svg#star-marker" /></svg>
+        <svg class="timeline__star" aria-hidden="true" focusable="false"><use [attr.href]="marker" /></svg>
         <p class="timeline__year">{{ m.year }}</p>
         <h3 class="t-h3">{{ m.title }}</h3>
         <p class="t-body-s t-muted">{{ m.text }}</p>
@@ -102,5 +103,6 @@ export class Timeline {
   readonly sizes = input('(max-width: 56rem) 100vw, 25vw');
   readonly #locale = inject(LOCALE);
   protected readonly sourceLabel = this.#locale.messages.common.source;
-  protected readonly photoOf = (id: PhotoId) => localizedPhoto(id, this.#locale.content.photos, this.#locale.content.photoCredits);
+  protected readonly marker = PROFILE.brand.marker;
+  protected readonly photoOf =(id: PhotoId) => localizedPhoto(id, this.#locale.content.photos, this.#locale.content.photoCredits);
 }

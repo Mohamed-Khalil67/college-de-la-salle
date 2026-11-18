@@ -1,8 +1,8 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LOCALE } from '../../../i18n/locale';
-import { pageUrl, type PublicPageId } from '../../../i18n/pages';
-import { type ContactId, CONTACTS, type PhotoId, SCHOOL } from '../../../school';
+import { pageUrl } from '../../../i18n/pages';
+import { CONTACTS, SCHOOL, SITE } from '../../../school';
 import { Icon } from '../../../shared/ui';
 import { ContactForm } from '../shared/contact-form';
 import { telHref } from '../../../school/contact-mail';
@@ -11,16 +11,6 @@ import { AudienceLinks } from './audience-links';
 import { type Feature, FeatureCard } from './feature-card';
 import { Hero } from './hero';
 import { TrackCard } from './track-card';
-
-const TEASER_YEARS = ['1898', '1905', '1955', '2013'];
-const HOME_PHONES: readonly ContactId[] = ['standard', 'bac', 'secondaire'];
-
-/** Photo and link of each « À découvrir » card, in the order of the messages' `home.features`. */
-const FEATURE_TARGETS: readonly { readonly photo: PhotoId; readonly page: PublicPageId; readonly fragment: string }[] = [
-  { photo: 'chapelle-coupole', page: 'history', fragment: 'annee-1958' },
-  { photo: 'entree-1', page: 'bac', fragment: 'inscription' },
-  { photo: 'freres-1926', page: 'history', fragment: 'annee-1926' },
-];
 
 /** `/`, `/en`, `/ar`: the home page. */
 @Component({
@@ -102,12 +92,12 @@ export class HomePage {
   protected readonly school = SCHOOL;
   protected readonly links = { history: pageUrl(this.#locale.lang, 'history'), contact: pageUrl(this.#locale.lang, 'contact') };
   protected readonly sections = [this.content.sections.nationale, this.content.sections.bac];
-  protected readonly features: readonly Feature[] = FEATURE_TARGETS.flatMap((target, i) => {
+  protected readonly features: readonly Feature[] = SITE.featureTargets.flatMap((target, i) => {
     const words = this.t.features[i];
     if (!words) return [];
     return [{ ...words, photo: target.photo, link: pageUrl(this.#locale.lang, target.page), fragment: target.fragment }];
   });
-  protected readonly milestones = this.content.milestones.filter((m) => TEASER_YEARS.includes(m.year));
-  protected readonly phones = CONTACTS.filter((c) => HOME_PHONES.includes(c.id));
+  protected readonly milestones = this.content.milestones.filter((m) => SITE.teaserYears.includes(m.year));
+  protected readonly phones = CONTACTS.filter((c) => SITE.homePhones.includes(c.id));
   protected readonly tel = telHref;
 }

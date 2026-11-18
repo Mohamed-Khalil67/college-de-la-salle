@@ -1,4 +1,4 @@
-import type { ContactSubjectId, ContactTrackId } from '../school/contact-mail';
+import type { ContactSubjectId } from '../school/contact-mail';
 import type { PublicPageId } from './pages';
 
 /**
@@ -156,7 +156,7 @@ export interface SiteMessages {
     readonly subjects: Readonly<Record<ContactSubjectId, string>>;
     readonly track: string;
     readonly trackNone: string;
-    readonly tracks: Readonly<Record<ContactTrackId, string>>;
+    readonly tracks: Readonly<Record<string, string>>;
     readonly trap: string;
     readonly message: string;
     readonly messageHelp: string;

@@ -5,7 +5,7 @@ import { filter } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
 import { LOCALE, readPublicRoute } from '../i18n/locale';
 import { pageUrl, type PublicPageId } from '../i18n/pages';
-import { SCHOOL } from '../school';
+import { SCHOOL, SITE } from '../school';
 import { Button, Icon, SkipLink, Wordmark } from '../shared/ui';
 import { LanguageSwitcher } from './language-switcher';
 
@@ -17,7 +17,6 @@ interface NavItem {
   readonly exact: boolean;
 }
 
-const PHONE = '+20 2 2590 47 40';
 const NAV_PAGES: readonly NavPage[] = ['home', 'history', 'nationale', 'bac', 'contact'];
 
 /**
@@ -117,11 +116,13 @@ const NAV_PAGES: readonly NavPage[] = ['home', 'history', 'nationale', 'bac', 'c
         </div>
         <div class="site-footer__legal">
           <p>{{ t.layout.copyright(year) }}</p>
-          <p>
-            {{ t.layout.photoCredits.before }}<a href="https://lasalle-po.org/" rel="noopener noreferrer">lasalle-po.org</a
-            >{{ t.layout.photoCredits.middle }}<a [href]="school.officialSite" rel="noopener noreferrer">lasalle-eg.net</a
-            >{{ t.layout.photoCredits.after }}
-          </p>
+          @if (credits; as c) {
+            <p>
+              {{ t.layout.photoCredits.before }}<a [href]="c.archive.url" rel="noopener noreferrer">{{ c.archive.label }}</a
+              >{{ t.layout.photoCredits.middle }}<a [href]="c.college.url" rel="noopener noreferrer">{{ c.college.label }}</a
+              >{{ t.layout.photoCredits.after }}
+            </p>
+          }
           <p><a [routerLink]="accessibilityLink">{{ t.layout.accessibility }}</a></p>
         </div>
       </div>
@@ -145,8 +146,9 @@ export class PublicLayout {
   protected readonly t = this.#locale.messages;
   protected readonly content = this.#locale.content;
   protected readonly school = SCHOOL;
-  protected readonly phone = PHONE;
-  protected readonly phoneHref = PHONE.replace(/\s/g, '');
+  protected readonly credits = SITE.creditLinks;
+  protected readonly phone = SCHOOL.switchboard;
+  protected readonly phoneHref = SCHOOL.switchboard.replace(/\s/g, '');
   protected readonly year = 2026;
   protected readonly homeLink = pageUrl(this.lang, 'home');
   protected readonly loginLink = pageUrl(this.lang, 'login');

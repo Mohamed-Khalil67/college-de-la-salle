@@ -3,6 +3,7 @@
  * Vitest (messages-format.spec.ts).
  */
 import type { ContactMessageDto } from '@cdls/shared';
+import { SCHOOL_TIME_ZONE } from '../../../core/school/school-profile';
 
 /** Tabs of the page: waiting messages first. */
 export type MessageFilter = 'waiting' | 'handled' | 'all';
@@ -44,7 +45,7 @@ const RECEIVED = new Intl.DateTimeFormat('fr-FR', {
   year: 'numeric',
   hour: 'numeric',
   minute: '2-digit',
-  timeZone: 'Africa/Cairo',
+  timeZone: SCHOOL_TIME_ZONE,
 });
 
 /** « 20 octobre 2026 à 9 h 14 » (Cairo time). */

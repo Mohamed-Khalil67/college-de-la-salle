@@ -1,4 +1,4 @@
-import type { SectionPage } from './content.model';
+import type { SectionPage } from '../../../apps/web/src/app/school/content.model';
 
 /**
  * The two tracks of the college. Facts come from the college's official site (lasalle-eg.net) and

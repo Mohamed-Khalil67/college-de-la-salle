@@ -1,6 +1,6 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { schoolToday } from '@cdls/shared';
+import { schoolToday } from '../../../core/school/school-profile';
 import { ApiClient } from '../../../core/api/api-client';
 import { Button, EmptyState, Icon } from '../../../shared/ui';
 import { SessionItem } from '../../timetable/session-item';

@@ -1,5 +1,6 @@
 import { Component, DOCUMENT, ElementRef, Injector, afterNextRender, computed, effect, inject, model, output, signal, untracked, viewChild } from '@angular/core';
-import { SECTION_LABELS, type ImportPreviewResponse, type ImportRole, type ImportUsersError, type ImportUsersResponse } from '@cdls/shared';
+import { type ImportPreviewResponse, type ImportRole, type ImportUsersError, type ImportUsersResponse } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Button, Icon, Modal, Segmented, type SegmentOption } from '../../../shared/ui';
 import { createdAccountsCsv, formatDay, importErrors, importTemplate, plural, ROLE_LABELS } from '../shared/admin-format';

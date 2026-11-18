@@ -3,7 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "select-school": "node scripts/select-school.mjs",
     "ng": "ng",
+    "prestart": "node scripts/select-school.mjs",
+    "prebuild": "node scripts/select-school.mjs",
+    "prewatch": "node scripts/select-school.mjs",
+    "prelint": "node scripts/select-school.mjs",
+    "pretest": "node scripts/select-school.mjs",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",

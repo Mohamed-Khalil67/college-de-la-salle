@@ -19,7 +19,7 @@ export interface ContactMessage {
 export const DEFAULT_CONTACT_SUBJECT = 'Message depuis le site';
 
 /**
- * The subjects and tracks a visitor can choose. The secretariat reads messages in French, so the value sent
+ * The subjects a visitor can choose (the tracks and classes are the school pack's, `SITE.contactTracks`). The secretariat reads messages in French, so the value sent
  * is always the French wording below, whatever the page's language (the form shows the translation).
  */
 export const CONTACT_SUBJECT_IDS = ['registration', 'schooling', 'student-space', 'other'] as const;
@@ -31,27 +31,6 @@ export const CONTACT_SUBJECTS = {
   'student-space': 'Accès à l’espace élève',
   other: 'Autre question',
 } as const satisfies Record<ContactSubjectId, string>;
-
-export const CONTACT_TRACK_IDS = [
-  'nationale-kg',
-  'nationale-primary',
-  'nationale-prep',
-  'nationale-secondary',
-  'bac-primary',
-  'bac-college',
-  'bac-lycee',
-] as const;
-export type ContactTrackId = (typeof CONTACT_TRACK_IDS)[number];
-
-export const CONTACT_TRACKS = {
-  'nationale-kg': 'Bac nationale, jardin d’enfants',
-  'nationale-primary': 'Bac nationale, primaire',
-  'nationale-prep': 'Bac nationale, préparatoire',
-  'nationale-secondary': 'Bac nationale, secondaire',
-  'bac-primary': 'Bac français, maternelle ou élémentaire',
-  'bac-college': 'Bac français, collège',
-  'bac-lycee': 'Bac français, lycée',
-} as const satisfies Record<ContactTrackId, string>;
 
 /**
  * The body of POST /api/contact: trimmed, without the empty optional fields. `website` is the hidden

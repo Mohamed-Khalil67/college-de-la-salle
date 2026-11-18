@@ -1,17 +1,5 @@
-import {
-  type AssessmentTargetInput,
-  type AttendanceStatus,
-  averageOnTwenty,
-  type ClassDto,
-  type EventDto,
-  type EventInput,
-  GRADING_LIMITS,
-  type ActivityTypeSummary,
-  round1,
-  type SectionDto,
-  SECTION_LABELS,
-  type TeachingAssignmentDto,
-} from '@cdls/shared';
+import { type AssessmentTargetInput, type AttendanceStatus, averageOnTwenty, type ClassDto, type EventDto, type EventInput, GRADING_LIMITS, type ActivityTypeSummary, round1, type SectionDto, type TeachingAssignmentDto } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import type { AudienceOption } from '../../../shared/utils/audience';
 import { average } from '../../../shared/utils/format';
 

@@ -6,16 +6,15 @@ import {
   FRERES_EGYPTE,
   KEY_FIGURES,
   MILESTONES,
-  SCHOOL,
   SCHOOL_HISTORY_INTRO,
   SCHOOL_LINKS,
 } from './school-info';
-import type { MatiereId, MatiereText, SchoolContent } from './school-content';
+import type { MatiereId, MatiereText, SchoolContent } from '../../../apps/web/src/app/school/school-content';
 import { BAC, NATIONALE } from './tracks';
 
 /** The French content: the source the other languages translate. It only gathers school-info.ts, tracks.ts and photos.ts. */
 export const CONTENT_FR: SchoolContent = {
-  school: { place: 'Daher, Le Caire, depuis 1898', tagline: SCHOOL.tagline, address: SCHOOL.address },
+  school: { place: 'Daher, Le Caire, depuis 1898', tagline: 'Un collège lasallien au cœur du Caire depuis 1898.', address: '6 El Beshnini St., El-Zaher, Le Caire' },
   keyFigures: KEY_FIGURES,
   milestones: MILESTONES,
   historyIntro: SCHOOL_HISTORY_INTRO,

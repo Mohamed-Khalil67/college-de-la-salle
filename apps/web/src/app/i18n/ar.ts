@@ -1,6 +1,5 @@
-import { CONTENT_AR } from '../school/content.ar';
+import { PACK } from '../school/active/ar';
 import type { SiteLocale } from './locale';
-import { MESSAGES_AR } from './messages.ar';
 
-/** Arabic, loaded with the /ar routes only (app.routes.ts). */
-export const AR: SiteLocale = { lang: 'ar', messages: MESSAGES_AR, content: CONTENT_AR };
+/** Arabic, loaded with the Arabic routes only (app.routes.ts). The words are the school pack's (schools/<SCHOOL>/site/). */
+export const AR: SiteLocale = { lang: 'ar', ...PACK };
