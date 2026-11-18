@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { LANG_META, LANGS, type Lang } from '../src/app/i18n/lang';
+import { LANG_META, LANGS, type Lang, siteTitle } from '../src/app/i18n/lang';
+import { SITE } from '../src/app/school/active/index';
 import { AR } from '../src/app/i18n/ar';
 import { EN } from '../src/app/i18n/en';
 import { FR } from '../src/app/i18n/fr';
@@ -64,7 +65,7 @@ for (const lang of LANGS) {
       await expectLanguage(page, lang);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
       const title = t.pages[id].title;
-      await expect(page).toHaveTitle(title ? `${title} — ${LANG_META[lang].siteTitle}` : LANG_META[lang].homeTitle);
+      await expect(page).toHaveTitle(title ? `${title} — ${siteTitle(lang)}` : SITE.homeTitle[lang]);
       await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', t.pages[id].description);
       await axeAtBothWidths(page, url);
       if (id === 'login') {
