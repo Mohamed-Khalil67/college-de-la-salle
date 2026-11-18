@@ -1,9 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { LANG_META, LANGS, type Lang } from '../src/app/i18n/lang';
-import { MESSAGES_AR } from '../src/app/i18n/messages.ar';
-import { MESSAGES_EN } from '../src/app/i18n/messages.en';
-import { MESSAGES_FR } from '../src/app/i18n/messages.fr';
+import { AR } from '../src/app/i18n/ar';
+import { EN } from '../src/app/i18n/en';
+import { FR } from '../src/app/i18n/fr';
 import { pageUrl, PRERENDERED_PAGES, PUBLIC_PAGES, type PublicPageId } from '../src/app/i18n/pages';
 
 /**
@@ -16,6 +16,9 @@ test.beforeEach(({}, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'checked at both widths inside each test');
 });
 
+const MESSAGES_FR = FR.messages;
+const MESSAGES_EN = EN.messages;
+const MESSAGES_AR = AR.messages;
 const MESSAGES = { fr: MESSAGES_FR, en: MESSAGES_EN, ar: MESSAGES_AR } as const;
 const VIEWPORTS = [
   { width: 390, height: 844 },

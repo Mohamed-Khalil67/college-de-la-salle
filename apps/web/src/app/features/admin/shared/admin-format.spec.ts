@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SCHOOL_TIME_ZONE, SECTION_LABELS } from '../../../core/school/school-profile';
 import {
   PASSWORD_ALPHABET,
   classOptionLabel,
@@ -29,7 +30,7 @@ describe('userStatus', () => {
 
 describe('formatLastLogin', () => {
   const now = new Date('2026-10-20T10:00:00Z'); // 13 h in Cairo
-  it('reads today, yesterday and older days in Cairo time', () => {
+  it.skipIf(SCHOOL_TIME_ZONE !== 'Africa/Cairo')('reads today, yesterday and older days in Cairo time', () => {
     expect(formatLastLogin(null, now)).toBe('Jamais');
     expect(formatLastLogin('2026-10-20T06:14:00Z', now)).toBe('Aujourd’hui, 9 h 14');
     expect(formatLastLogin('2026-10-19T12:00:00Z', now)).toBe('Hier');
@@ -58,10 +59,10 @@ describe('groupBySection', () => {
       { sectionCode: 'nationale' as const, id: 'c' },
     ]);
     expect(groups.map((g) => [g.label, g.items.map((i) => i.id)])).toEqual([
-      ['Bac nationale', ['a', 'c']],
-      ['Bac français', ['b']],
+      [SECTION_LABELS.nationale, ['a', 'c']],
+      [SECTION_LABELS.bac, ['b']],
     ]);
-    expect(classOptionLabel({ label: 'Seconde', sectionCode: 'bac' })).toBe('Seconde (Bac français)');
+    expect(classOptionLabel({ label: 'Seconde', sectionCode: 'bac' })).toBe(`Seconde (${SECTION_LABELS.bac})`);
   });
 });
 

@@ -16,7 +16,8 @@
     "lint": "oxlint src",
     "test": "tsc -p tsconfig.node.json && vitest run",
     "e2e": "playwright test",
-    "e2e:public": "playwright test -c playwright.public.config.ts"
+    "e2e:public": "playwright test -c playwright.public.config.ts",
+    "e2e:smoke": "playwright test -c playwright.smoke.config.ts"
   },
   "dependencies": {
     "@angular/common": "^22.2.0",

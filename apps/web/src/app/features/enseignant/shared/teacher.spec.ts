@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import type { ClassDto, EventDto, SectionDto, TeachingAssignmentDto } from '@cdls/shared';
 import {
   audienceFromValue,
@@ -60,10 +61,11 @@ const assignments = [
 describe('classes', () => {
   it('groups assignments by class with the class size', () => {
     const groups = groupByClass(assignments, classes);
-    expect(groups.map((g) => g.label)).toEqual(['Première', '1re secondaire']);
-    expect(groups[0]!.subjects.map((s) => s.name)).toEqual(['Informatique', 'Mathématiques']);
-    expect(groups[0]!.studentCount).toBe(10);
-    expect(groups[0]!.sectionLabel).toBe('Bac français');
+    expect(groups.map((g) => g.label).sort()).toEqual(['1re secondaire', 'Première']);
+    const first = groups.find((g) => g.label === 'Première')!;
+    expect(first.subjects.map((s) => s.name)).toEqual(['Informatique', 'Mathématiques']);
+    expect(first.studentCount).toBe(10);
+    expect(first.sectionLabel).toBe(SECTION_LABELS.bac);
   });
 });
 

@@ -1,4 +1,5 @@
 import type { SchoolContent } from '../../../apps/web/src/app/school/school-content';
+import { MATIERES_EN } from '../../../apps/web/src/app/school/matieres-text';
 
 /*
  * English content. MACHINE-DRAFTED from the French source (content.fr.ts): the school must review it before
@@ -373,29 +374,5 @@ export const CONTENT_EN: SchoolContent = {
     po: 'Photo: Brothers of the Christian Schools – Middle East',
     eg: 'Photo: Collège De La Salle – Egypt (archives, lasalle-eg.net)',
   },
-  matieres: {
-    arabe: { name: 'Arabic', blurb: 'Grammar, rhetoric, literature and writing.', alt: 'Illustration: an open book with Arabic calligraphy above it' },
-    francais: { name: 'French', blurb: 'Language, reading and French-language literature.', alt: 'Illustration: an open book and the letter F' },
-    anglais: { name: 'English', blurb: 'Understanding and expressing oneself in English.', alt: 'Illustration: an open book and the letter A' },
-    espagnol: { name: 'Spanish', blurb: 'Additional modern language.', alt: 'Illustration: an open book and the letter Ñ' },
-    mathematiques: { name: 'Mathematics', blurb: 'Analysis, algebra, geometry and reasoning.', alt: 'Illustration: axes, a parabola and a triangle' },
-    'physique-chimie': { name: 'Physics and chemistry', blurb: 'Electricity, mechanics, reactions and matter.', alt: 'Illustration: an atom and a flask' },
-    svt: { name: 'Life and earth sciences', blurb: 'Biology, geology and the environment.', alt: 'Illustration: a leaf and its veins' },
-    informatique: { name: 'Computer science', blurb: 'Algorithms, programming and digital skills.', alt: 'Illustration: a screen showing code' },
-    ses: { name: 'Economics and social sciences', blurb: 'Economics, sociology and political science.', alt: 'Illustration: a bar chart and a coin' },
-    'histoire-geographie': { name: 'History and geography', blurb: 'The world, its territories and its history.', alt: 'Illustration: a globe and a columned temple' },
-    philosophie: { name: 'Philosophy', blurb: 'Reflection, argument and logic.', alt: 'Illustration: a lit light bulb' },
-    psychologie: { name: 'Psychology and sociology', blurb: 'Understanding the person and society.', alt: 'Illustration: a head in profile and a magnifying glass' },
-    humanites: { name: 'Humanities, literature and philosophy', blurb: 'Great texts and questions of culture.', alt: 'Illustration: a scroll' },
-    'education-civique': { name: 'Civic education', blurb: 'Rights, duties and life in society.', alt: 'Illustration: the scales of justice' },
-    'education-religieuse': { name: 'Religious education', blurb: 'Religious values and culture.', alt: 'Illustration: a crescent, a star and a cross' },
-    eps: { name: 'Physical education and sport', blurb: 'Sport, health and team spirit.', alt: 'Illustration: a basketball' },
-    arts: { name: 'Art', blurb: 'Visual arts and artistic expression.', alt: 'Illustration: a painter’s palette' },
-  },
-  matiereGroups: {
-    Langues: 'Languages',
-    Sciences: 'Sciences',
-    'Lettres et sciences humaines': 'Humanities and social sciences',
-    'Éducation et culture': 'Education and culture',
-  },
+  ...MATIERES_EN,
 };

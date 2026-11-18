@@ -1,4 +1,5 @@
 import type { SchoolContent } from '../../../apps/web/src/app/school/school-content';
+import { MATIERES_AR } from '../../../apps/web/src/app/school/matieres-text';
 
 /*
  * Arabic content. MACHINE-DRAFTED from the French source (content.fr.ts): the school must review it before it
@@ -374,29 +375,5 @@ export const CONTENT_AR: SchoolContent = {
     po: 'صورة: إخوة المدارس المسيحية – الشرق الأوسط',
     eg: 'صورة: كلية دي لا سال – مصر (الأرشيف، lasalle-eg.net)',
   },
-  matieres: {
-    arabe: { name: 'اللغة العربية', blurb: 'النحو والبلاغة والأدب والتعبير الكتابي.', alt: 'رسم: كتاب مفتوح يعلوه خط عربي' },
-    francais: { name: 'اللغة الفرنسية', blurb: 'اللغة والقراءة والأدب الناطق بالفرنسية.', alt: 'رسم: كتاب مفتوح وحرف F' },
-    anglais: { name: 'اللغة الإنجليزية', blurb: 'الفهم والتعبير باللغة الإنجليزية.', alt: 'رسم: كتاب مفتوح وحرف A' },
-    espagnol: { name: 'اللغة الإسبانية', blurb: 'لغة حية إضافية.', alt: 'رسم: كتاب مفتوح وحرف Ñ' },
-    mathematiques: { name: 'الرياضيات', blurb: 'التحليل والجبر والهندسة والاستدلال.', alt: 'رسم: محاور وقطع مكافئ ومثلث' },
-    'physique-chimie': { name: 'الفيزياء والكيمياء', blurb: 'الكهرباء والميكانيكا والتفاعلات والمادة.', alt: 'رسم: ذرة وقارورة' },
-    svt: { name: 'علوم الحياة والأرض', blurb: 'الأحياء والجيولوجيا والبيئة.', alt: 'رسم: ورقة نبات وعروقها' },
-    informatique: { name: 'الحاسب الآلي', blurb: 'الخوارزميات والبرمجة والمهارات الرقمية.', alt: 'رسم: شاشة تعرض شيفرة برمجية' },
-    ses: { name: 'العلوم الاقتصادية والاجتماعية', blurb: 'الاقتصاد وعلم الاجتماع والعلوم السياسية.', alt: 'رسم: رسم بياني بالأعمدة وعملة معدنية' },
-    'histoire-geographie': { name: 'التاريخ والجغرافيا', blurb: 'العالم وأقاليمه وتاريخه.', alt: 'رسم: كرة أرضية ومعبد ذو أعمدة' },
-    philosophie: { name: 'الفلسفة', blurb: 'التفكير والحِجاج والمنطق.', alt: 'رسم: مصباح مضيء' },
-    psychologie: { name: 'علم النفس والاجتماع', blurb: 'فهم الإنسان والمجتمع.', alt: 'رسم: رأس من الجانب وعدسة مكبرة' },
-    humanites: { name: 'الإنسانيات والأدب والفلسفة', blurb: 'النصوص الكبرى وقضايا الثقافة.', alt: 'رسم: مخطوطة ملفوفة' },
-    'education-civique': { name: 'التربية الوطنية', blurb: 'الحقوق والواجبات والحياة في المجتمع.', alt: 'رسم: ميزان العدالة' },
-    'education-religieuse': { name: 'التربية الدينية', blurb: 'القيم والثقافة الدينية.', alt: 'رسم: هلال ونجمة وصليب' },
-    eps: { name: 'التربية البدنية والرياضية', blurb: 'الرياضة والصحة وروح الفريق.', alt: 'رسم: كرة سلة' },
-    arts: { name: 'الفنون', blurb: 'الفنون التشكيلية والتعبير الفني.', alt: 'رسم: لوحة ألوان رسام' },
-  },
-  matiereGroups: {
-    Langues: 'اللغات',
-    Sciences: 'العلوم',
-    'Lettres et sciences humaines': 'الآداب والعلوم الإنسانية',
-    'Éducation et culture': 'التربية والثقافة',
-  },
+  ...MATIERES_AR,
 };
