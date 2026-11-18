@@ -35,20 +35,26 @@ export class PasswordResetService {
   }
 
   /**
-   * Mails a reset link to an active account. Resolves the same way for every identifier: the mail is sent
-   * in the background (its outcome never reaches the caller) and a failure is only logged.
+   * Mails a reset link to an active account. Returns at once, before reading anything: the lookup, the
+   * token row and the mail happen after the answer, so the caller sees the same 204 at the same speed
+   * whether the account exists, is active or not. A failure is only logged (never the token or the address).
    */
-  async request(identifier: string): Promise<void> {
+  request(identifier: string): void {
     const email = identifier.trim().toLowerCase();
+    void this.issue(email).catch((error: unknown) => {
+      this.logger.error(
+        `Password reset request could not be processed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    });
+  }
+
+  /** The work behind `request`: a new link for an active account, nothing for any other identifier. */
+  private async issue(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { email },
       select: { id: true, email: true, firstName: true, status: true },
     });
-    if (!user || user.status !== 'active') {
-      // Same hashing work as a real request, so the two cases cost about the same.
-      this.digest(randomBytes(32).toString('base64url'));
-      return;
-    }
+    if (!user || user.status !== 'active') return;
 
     const token = randomBytes(32).toString('base64url');
     const now = new Date();
@@ -66,14 +72,14 @@ export class PasswordResetService {
       });
     });
 
-    void this.mail
-      .sendPasswordReset(user.email, user.firstName, token, this.ttlMs / 60_000)
-      .catch((error: unknown) => {
-        // Never the token or the address in the log.
-        this.logger.error(
-          `Password reset mail for user ${user.id} could not be sent: ${error instanceof Error ? error.message : 'unknown error'}`,
-        );
-      });
+    try {
+      await this.mail.sendPasswordReset(user.email, user.firstName, token, this.ttlMs / 60_000);
+    } catch (error: unknown) {
+      // Never the token or the address in the log.
+      this.logger.error(
+        `Password reset mail for user ${user.id} could not be sent: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
   }
 
   /** Chooses the new password with the token of a link. The token works once, and only while valid. */

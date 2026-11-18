@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { JwtService } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AccessModule } from './access/access.module.js';
 import { ActivityTypesModule } from './activity-types/activity-types.module.js';
@@ -9,7 +10,7 @@ import { CalendarDaysModule } from './calendar-days/calendar-days.module.js';
 import { CalendarFeedModule } from './calendar-feed/calendar-feed.module.js';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
-import { clientKey } from './common/client-key.js';
+import { clientKey, trafficTracker } from './common/client-key.js';
 import { RolesGuard } from './common/roles.guard.js';
 import { validateEnv, type Env } from './config/env.validation.js';
 import { MailModule } from './mail/mail.module.js';
@@ -37,37 +38,57 @@ import { TimetableModule } from './timetable/timetable.module.js';
 import { TeachingAssignmentsModule } from './teaching-assignments/teaching-assignments.module.js';
 import { UsersModule } from './users/users.module.js';
 
+/** Routes whose `default` limit does not count by address: the `ip` throttler caps the address as a whole. */
+const IP_CEILING_ROUTES = ['/auth/login', '/auth/password', '/auth/forgot-password', '/auth/refresh'];
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, cache: true, validate: validateEnv }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) => ({
-        throttlers: [
-          {
-            ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
-            limit: config.get('THROTTLE_LIMIT', { infer: true }),
-          },
-          // Counts by address alone on every route; sign-in routes override `default` to count by address
-          // and account (see AuthController) and keep this one as the ceiling per address.
-          {
-            name: 'ip',
-            ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
-            limit: config.get('THROTTLE_LIMIT', { infer: true }),
-            // Only the sign-in routes need it (they override its limit); elsewhere `default` already counts by address.
-            skipIf: (context) => {
-              const path = String(
-                context.switchToHttp().getRequest<{ path?: string }>().path ?? '',
-              );
-              return !['/auth/login', '/auth/password', '/auth/forgot-password'].some((route) =>
-                path.endsWith(route),
-              );
-            },
-          },
-        ],
+      useFactory: (config: ConfigService<Env, true>) => {
+        // Only reads the account id for the rate-limit key; the authentication guard checks the token for real.
+        const jwt = new JwtService({
+          secret: config.get('JWT_ACCESS_SECRET', { infer: true }),
+          verifyOptions: { algorithms: ['HS256'], issuer: 'cdls-api', ignoreExpiration: true },
+        });
+        const subjectOf = (token: string): string | null => {
+          try {
+            const { sub } = jwt.verify<{ sub?: unknown }>(token);
+            return typeof sub === 'string' ? sub : null;
+          } catch {
+            return null;
+          }
+        };
         // One counter per IPv4 address or IPv6 /64 (a client could rotate through its /64).
-        getTracker: (req: Record<string, unknown>) => clientKey(req['ip'] as string | undefined),
-      }),
+        const byAddress = (req: Record<string, unknown>) => clientKey(req['ip'] as string | undefined);
+        return {
+          throttlers: [
+            {
+              ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
+              limit: config.get('THROTTLE_LIMIT', { infer: true }),
+              // Per account when a signed access token comes with the request, per address otherwise:
+              // the school's one public address must not cap every class together.
+              getTracker: trafficTracker(subjectOf),
+            },
+            // Counts by address alone. Only the sign-in and refresh routes use it (they override its limit
+            // and count `default` by e-mail, account or refresh token): it is their ceiling per address.
+            {
+              name: 'ip',
+              ttl: config.get('THROTTLE_TTL_MS', { infer: true }),
+              limit: config.get('THROTTLE_LIMIT', { infer: true }),
+              getTracker: byAddress,
+              skipIf: (context) => {
+                const path = String(
+                  context.switchToHttp().getRequest<{ path?: string }>().path ?? '',
+                );
+                return !IP_CEILING_ROUTES.some((route) => path.endsWith(route));
+              },
+            },
+          ],
+          getTracker: byAddress,
+        };
+      },
     }),
     PrismaModule,
     MailModule,

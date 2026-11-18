@@ -161,7 +161,7 @@ export const weekdayName = (wd: number): string => WEEKDAY_LABELS[wd] ?? '';
 /** The Sunday-first week containing `day`, as the range the API takes. */
 export function weekWindow(day: string): { readonly from: string; readonly to: string } {
   const days = weekDays(day);
-  return { from: days[0]!, to: days[6]! };
+  return { from: days[0] ?? day, to: days[6] ?? day };
 }
 
 export const shiftDays = addDays;

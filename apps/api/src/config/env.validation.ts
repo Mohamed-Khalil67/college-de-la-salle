@@ -61,6 +61,10 @@ export class Env {
   @Min(1000)
   THROTTLE_TTL_MS = 60_000;
 
+  /**
+   * Requests per THROTTLE_TTL_MS and route, counted per account for a request with a signed access token
+   * and per client address otherwise (sign-in, refresh, contact… have their own limits).
+   */
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(1)
@@ -71,6 +75,27 @@ export class Env {
   @IsInt()
   @Min(1)
   LOGIN_THROTTLE_LIMIT = 5;
+
+  /**
+   * POST /auth/refresh a minute per refresh token (counted on a hash of the cookie). A page load refreshes
+   * once and every refresh rotates the cookie, so a real browser never comes close; replaying one token
+   * is what this stops.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  REFRESH_THROTTLE_LIMIT = 10;
+
+  /**
+   * POST /auth/refresh a minute per client address, all tokens together. The whole school shares one
+   * public address (about 600 students and their teachers), so this is a generous ceiling, not a per-user limit.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(10)
+  @Max(100000)
+  REFRESH_IP_THROTTLE_LIMIT = 1200;
 
   /** Contact-form messages per minute and client (public POST /contact). */
   @Transform(({ value }) => Number(value))

@@ -37,7 +37,7 @@ const ROLE_OPTIONS: readonly SegmentOption[] = [
                   <tr><th scope="col">Nom</th><th scope="col">Adresse e-mail</th><th scope="col">Mot de passe</th></tr>
                 </thead>
                 <tbody>
-                  @for (account of result()!.created; track account.email) {
+                  @for (account of result()?.created ?? []; track account.email) {
                     <tr>
                       <th scope="row">{{ account.lastName }} {{ account.firstName }}</th>
                       <td data-label="Adresse e-mail :">{{ account.email }}</td>

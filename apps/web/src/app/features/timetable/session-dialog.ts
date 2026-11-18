@@ -282,7 +282,7 @@ export class SessionDialog {
 
   protected readonly uid = `session-dialog-${++nextId}`;
   protected readonly scopes = (['this', 'following', 'all'] as const).map((value) => ({ value, label: SLOT_SCOPE_LABELS[value] }));
-  protected readonly weekdays = SCHOOL_WEEKDAYS.map((value) => ({ value: String(value), label: WEEKDAY_LABELS[value]! }));
+  protected readonly weekdays = SCHOOL_WEEKDAYS.map((value) => ({ value: String(value), label: WEEKDAY_LABELS[value] ?? String(value) }));
   protected readonly parities = WEEK_PARITIES;
 
   readonly #api = inject(TimetableApi);
@@ -474,9 +474,9 @@ export class SessionDialog {
     if (scope === 'this') {
       const exception = this.exceptionOf(action, m, s);
       if (!exception) return null;
-      const problems = exceptionProblems(exception);
-      if (problems.length) {
-        this.failure.set(problems[0]!);
+      const [problem] = exceptionProblems(exception);
+      if (problem) {
+        this.failure.set(problem);
         return null;
       }
       return this.#api.addException(s.slotId, { ...exception, date: s.originalDate, acknowledgedWarnings });
@@ -492,9 +492,9 @@ export class SessionDialog {
       this.failure.set('Rien n’a changé : modifiez au moins un champ.');
       return null;
     }
-    const problems = slotProblems({ ...slot, ...changes });
-    if (problems.length) {
-      this.failure.set(problems[0]!);
+    const [problem] = slotProblems({ ...slot, ...changes });
+    if (problem) {
+      this.failure.set(problem);
       return null;
     }
     return this.#api.updateSlot(s.slotId, { scope, date: scope === 'following' ? s.originalDate : undefined, changes, acknowledgedWarnings });

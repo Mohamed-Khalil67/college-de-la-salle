@@ -4,7 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, Ro
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
 import { NotificationBell } from '../features/notifications/notification-bell';
-import { Avatar, Icon, SkipLink, Wordmark } from '../shared/ui';
+import { Alert, Avatar, Icon, SkipLink, Wordmark } from '../shared/ui';
 import { ChangePasswordModal } from './change-password-modal';
 import { desktopNav, mobileNav, type SpaceNavItem, visibleNav } from './space-nav';
 
@@ -16,7 +16,7 @@ export type { SpaceNavItem } from './space-nav';
  */
 @Component({
   selector: 'app-space-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, ChangePasswordModal, NotificationBell, SkipLink],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Avatar, Alert, ChangePasswordModal, NotificationBell, SkipLink],
   template: `
     <div class="has-bottom-nav">
       <a cdlsSkipLink>Aller au contenu</a>
@@ -77,6 +77,11 @@ export type { SpaceNavItem } from './space-nav';
       </header>
 
       <main id="contenu" class="page" tabindex="-1">
+        @if (auth.sessionUnavailable()) {
+          <cdls-alert tone="warning">
+            Le serveur est très sollicité : la page n’a pas pu se mettre à jour. Vous restez connecté ; réessayez dans un instant.
+          </cdls-alert>
+        }
         <router-outlet />
       </main>
 

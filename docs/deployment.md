@@ -118,7 +118,7 @@ docker compose -f deploy/compose.yaml exec api cat demo-credentials.local.md    
 | Status | `docker compose -f deploy/compose.yaml ps` |
 | Logs (rotated: 3 × 10 MB per container) | `docker compose -f deploy/compose.yaml logs -f --tail 100 api` |
 | Stop / start | `docker compose -f deploy/compose.yaml --profile tunnel stop` / `… up -d` |
-| Health | `curl http://127.0.0.1:8080/api/health` and `/api/health/db` |
+| Health | `curl http://127.0.0.1:8080/api/health` (process, public); database: `docker compose -f deploy/compose.yaml exec api node -e "fetch('http://127.0.0.1:3000/api/health/db').then(r=>r.text()).then(console.log)"` (only from inside the stack: through nginx `/api/health/db` is a 404) |
 | Back up now | `docker compose -f deploy/compose.yaml run --rm -e BACKUP_ONCE=true backup` |
 | Restore | [`deploy/restore.md`](../deploy/restore.md) |
 
@@ -180,3 +180,6 @@ Details and the restore procedure: [`deploy/restore.md`](../deploy/restore.md).
   you browse over plain HTTP while the cookie is `Secure`.
 - Tunnel shows « Bad gateway »: the public hostname service must be `http://web:8080` and `web` must be healthy.
 - Too many sign-in attempts from the school: limits are per account and per address; see `LOGIN_THROTTLE_LIMIT`.
+- Many « 429 » from the school once people are signed in: signed-in requests count per account (`THROTTLE_LIMIT`), refreshes per
+  token (`REFRESH_THROTTLE_LIMIT`) and per address (`REFRESH_IP_THROTTLE_LIMIT`, 1200 a minute for the whole school). Raise the
+  last one in `deploy/.env` if the school grows; a 429 never signs anybody out.

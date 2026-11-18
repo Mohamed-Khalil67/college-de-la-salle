@@ -9,7 +9,9 @@ const AUTH_PATHS = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
 
 /**
  * Adds the access token to every /api call. On a 401 it refreshes the session once and replays the
- * request; if the refresh fails too, the user goes back to the login page. A 403 PASSWORD_CHANGE_REQUIRED
+ * request. Only when the API refuses the refresh token does the user go back to the login page; when the
+ * server is busy or out of reach (429, 5xx, network), the session stays and the request fails with its
+ * error (the space layout says the server is busy). A 403 PASSWORD_CHANGE_REQUIRED
  * (temporary password still in use) sends the user to the first-access page.
  */
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
@@ -32,9 +34,11 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
       }
       if (error.status !== 401) return throwError(() => error);
       return from(store.refresh()).pipe(
-        switchMap((ok) => {
-          if (ok) return next(withToken());
-          void router.navigate(['/connexion'], { queryParams: { suite: router.url } });
+        switchMap((outcome) => {
+          if (outcome === 'ok') return next(withToken());
+          if (outcome === 'signed-out') {
+            void router.navigate(['/connexion'], { queryParams: { suite: router.url } });
+          }
           return throwError(() => error);
         }),
       );

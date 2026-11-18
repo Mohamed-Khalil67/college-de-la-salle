@@ -129,9 +129,10 @@ export class GradeEntryPage {
       .reverse();
   });
 
-  protected readonly subtitle = computed(() =>
-    this.selected() ? `${this.className()}, ${kindLabel(this.selected()!.type).toLowerCase()}` : 'Choisissez une classe puis une évaluation.',
-  );
+  protected readonly subtitle = computed(() => {
+    const selected = this.selected();
+    return selected ? `${this.className()}, ${kindLabel(selected.type).toLowerCase()}` : 'Choisissez une classe puis une évaluation.';
+  });
 
   protected optionLabel(e: EventDto): string {
     const who = e.target.whole ? '' : ` (${e.target.groups.map((g) => g.label).join(', ') || 'élèves nommés'})`;

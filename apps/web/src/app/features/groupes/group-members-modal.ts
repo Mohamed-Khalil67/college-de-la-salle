@@ -14,7 +14,7 @@ import { studentName } from '../../shared/utils/targets';
   selector: 'app-group-members-modal',
   imports: [Modal, Alert, Button],
   template: `
-    <cdls-modal [title]="group() ? 'Élèves du groupe ' + group()!.label : 'Élèves du groupe'" [(open)]="open" (closed)="reset()">
+    <cdls-modal [title]="'Élèves du groupe' + (group() ? ' ' + group()?.label : '')" [(open)]="open" (closed)="reset()">
       @if (group(); as g) {
         <div class="stack">
           <p class="t-body-s t-muted">

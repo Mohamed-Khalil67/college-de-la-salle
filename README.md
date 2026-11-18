@@ -42,7 +42,7 @@ the app's role and database once, as `postgres`, with [apps/api/prisma/setup-dat
 a password of your choice, and put that password in `DATABASE_URL`; `db:dev` then leaves `.env` alone.
 
 Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
-health: `/api/health` (process) and `/api/health/db` (database).
+health: `/api/health` (process) and `/api/health/db` (database; rate-limited, and a 404 when the request came through a reverse proxy, so only callers inside the stack can make the database work).
 
 Migrations: `npm run db:migrate` (`prisma migrate dev`) on a development database; `npx prisma migrate deploy`
 (from `apps/api`) applies the committed ones to any other database, from empty or as an upgrade (it never resets
@@ -74,6 +74,13 @@ characters, not the e-mail) every other route answers 403 `PASSWORD_CHANGE_REQUI
 « Premier accès » page. Accounts are `active`, `disabled` or `archived` (graduated or left: no sign-in, read-only).
 Sign-in returns a 15-minute access token (send it as
 `Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
+
+**Rate limits.** The whole school shares one public address, so signed-in requests count per account (`THROTTLE_LIMIT`, 120
+a minute per route) and anonymous ones per address. Sign-in, `POST /auth/password` and « mot de passe oublié » allow
+`LOGIN_THROTTLE_LIMIT` (5) a minute per address and account; a refresh is limited per refresh token (`REFRESH_THROTTLE_LIMIT`, 10)
+and per address for all tokens together (`REFRESH_IP_THROTTLE_LIMIT`, 1200). The web app keeps the session on a 429, a 5xx or a
+network error (it waits, honouring `Retry-After`, tries three more times, then says the server is busy) and signs out only when the
+API refuses the refresh token (401 or 403).
 
 **Forgotten password.** `/connexion/oubli` asks for the login e-mail (`POST /auth/forgot-password`, always 204: nothing
 says whether the account exists; only `active` accounts get a mail). The mail holds a single-use link

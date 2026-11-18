@@ -14,7 +14,13 @@ import type { Request, Response } from 'express';
 import { API_PREFIX } from '../app.prefix.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { AllowDuringPasswordChange, CurrentUser, Public } from '../common/decorators.js';
-import { forgotPasswordTracker, loginTracker, passwordTracker } from '../common/client-key.js';
+import {
+  cookieTracker,
+  forgotPasswordTracker,
+  hasCookie,
+  loginTracker,
+  passwordTracker,
+} from '../common/client-key.js';
 import type { Env } from '../config/env.validation.js';
 import { AuthService, type IssuedSession, toSessionUser } from './auth.service.js';
 import {
@@ -31,6 +37,8 @@ import { PasswordResetService } from './password-reset.service.js';
 export const REFRESH_COOKIE = 'cdls_refresh';
 
 const loginLimit = throttleLimit('LOGIN_THROTTLE_LIMIT');
+const refreshLimit = throttleLimit('REFRESH_THROTTLE_LIMIT');
+const refreshIpLimit = throttleLimit('REFRESH_IP_THROTTLE_LIMIT');
 
 /**
  * Per address and account, so a class behind one school address can sign in together; the address as a
@@ -74,10 +82,25 @@ export class AuthController {
     return this.send(res, await this.auth.login(body.email, body.password, req.get('user-agent')));
   }
 
-  /** New access token from the refresh cookie; the cookie is rotated. */
+  /**
+   * New access token from the refresh cookie; the cookie is rotated. Limited to REFRESH_THROTTLE_LIMIT (10)
+   * a minute per refresh token and REFRESH_IP_THROTTLE_LIMIT (1200) a minute per address: every page load
+   * refreshes once, and the whole school shares one address.
+   */
   @Public()
-  // Every page load refreshes once: 30 a minute, or LOGIN_THROTTLE_LIMIT when that is raised for the browser e2e run.
-  @Throttle({ default: { limit: () => Math.max(30, loginLimit()), ttl: 60_000 } })
+  @Throttle({
+    default: {
+      // Per token (a hash of the cookie). A request without the cookie does no work (401 before any
+      // query), so only the address ceiling counts it: a class opening the login page stays far below it.
+      limit: (context) =>
+        hasCookie(context.switchToHttp().getRequest<Record<string, unknown>>(), REFRESH_COOKIE)
+          ? refreshLimit()
+          : refreshIpLimit(),
+      ttl: 60_000,
+      getTracker: cookieTracker(REFRESH_COOKIE),
+    },
+    ip: { limit: refreshIpLimit, ttl: 60_000 },
+  })
   @Post('refresh')
   @HttpCode(200)
   @ApiCookieAuth(REFRESH_COOKIE)
@@ -147,8 +170,9 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(204)
   @ApiNoContentResponse({ description: 'Accepted (whether or not an account matches).' })
-  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<void> {
-    await this.passwordReset.request(body.identifier);
+  forgotPassword(@Body() body: ForgotPasswordDto): void {
+    // Answers before any lookup: the account is looked up and mailed afterwards.
+    this.passwordReset.request(body.identifier);
   }
 
   /**

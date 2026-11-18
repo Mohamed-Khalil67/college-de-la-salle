@@ -46,9 +46,19 @@ describe('PasswordResetService', () => {
   const activeUser = { id: 'u1', email: 'prof@demo.cdls.test', firstName: 'Prof', status: 'active' };
 
   describe('request', () => {
-    it('stores only a hash, replaces earlier links and mails the token', async () => {
+    /** Lets the background work of `request` run to its end. */
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    it('answers before touching the database', () => {
+      prisma.user.findUnique.mockReturnValue(new Promise(() => undefined));
+      expect(service.request('prof@demo.cdls.test')).toBeUndefined();
+      expect(tx.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('then stores only a hash, replaces earlier links and mails the token', async () => {
       prisma.user.findUnique.mockResolvedValue(activeUser);
-      await service.request(' PROF@demo.cdls.test ');
+      service.request(' PROF@demo.cdls.test ');
+      await vi.waitFor(() => expect(mail.sendPasswordReset).toHaveBeenCalled());
       expect(prisma.user.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { email: 'prof@demo.cdls.test' } }),
       );
@@ -68,16 +78,22 @@ describe('PasswordResetService', () => {
       'sends nothing for %j',
       async (user) => {
         prisma.user.findUnique.mockResolvedValue(user);
-        await expect(service.request('x@demo.cdls.test')).resolves.toBeUndefined();
+        expect(service.request('x@demo.cdls.test')).toBeUndefined();
+        await settle();
+        expect(prisma.user.findUnique).toHaveBeenCalled();
         expect(mail.sendPasswordReset).not.toHaveBeenCalled();
         expect(tx.passwordResetToken.create).not.toHaveBeenCalled();
       },
     );
 
-    it('does not fail when the mail cannot be sent', async () => {
-      prisma.user.findUnique.mockResolvedValue(activeUser);
+    it('only logs when the mail cannot be sent or the database fails', async () => {
+      prisma.user.findUnique.mockResolvedValueOnce(activeUser);
       mail.sendPasswordReset.mockRejectedValue(new Error('smtp down'));
-      await expect(service.request('prof@demo.cdls.test')).resolves.toBeUndefined();
+      expect(() => service.request('prof@demo.cdls.test')).not.toThrow();
+      prisma.user.findUnique.mockRejectedValueOnce(new Error('db down'));
+      expect(() => service.request('prof@demo.cdls.test')).not.toThrow();
+      await vi.waitFor(() => expect(mail.sendPasswordReset).toHaveBeenCalledTimes(1));
+      await settle();
     });
   });
 

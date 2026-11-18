@@ -261,6 +261,10 @@ export const MESSAGES_EN: SiteMessages = {
     noEmail: 'No e-mail received? Your school stage’s office can reset your password.',
     noSignUp: 'Accounts are created by the college: there is no online sign-up.',
     backToSite: 'Back to the college website',
+    sessionUnavailable:
+      'The server is very busy and could not reopen your session. It may still be valid: try again in a moment.',
+    retry: 'Try again',
+    retrying: 'Trying again…',
     errors: {
       emailRequired: 'Enter your e-mail address.',
       emailInvalid: 'Enter a full e-mail address, for example firstname.lastname@lasalle-daher.eg.',

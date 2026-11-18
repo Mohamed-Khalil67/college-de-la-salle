@@ -97,7 +97,8 @@ export class RequestCreateModal {
     effect(() => {
       const list = this.candidates();
       if (!list.length) return;
-      untracked(() => this.#seen.update((seen) => new Map([...seen, ...list.map((u) => [u.studentId!, u] as const)])));
+      const found = list.flatMap((u) => (u.studentId ? [[u.studentId, u] as const] : []));
+      untracked(() => this.#seen.update((seen) => new Map([...seen, ...found])));
     });
     effect(() => {
       if (!this.open()) return;
@@ -110,14 +111,15 @@ export class RequestCreateModal {
   }
 
   protected label(user: UserDto): string {
-    return `${fullName(user)} (${user.email}), ${sectionLabel(user.sectionCode!)}`;
+    const section = user.sectionCode ? `, ${sectionLabel(user.sectionCode)}` : '';
+    return `${fullName(user)} (${user.email})${section}`;
   }
 
   protected onSubmit(event: Event): void {
     event.preventDefault();
     void submit(this.requestForm, async () => {
       const chosen = this.#seen().get(this.model().studentId);
-      if (!chosen?.sectionCode) {
+      if (!chosen?.sectionCode || !chosen.studentId) {
         this.failure.set('Choisissez l’élève dans la liste des résultats.');
         return;
       }
@@ -125,7 +127,7 @@ export class RequestCreateModal {
       this.failure.set(null);
       try {
         const request = await this.#api.sectionChanges.create({
-          studentId: chosen.studentId!,
+          studentId: chosen.studentId,
           toSection: otherSection(chosen.sectionCode),
           reason: this.model().reason.trim(),
         });

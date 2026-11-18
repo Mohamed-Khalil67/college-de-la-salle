@@ -15,6 +15,13 @@ describe('App (e2e)', () => {
   it('GET /api/health/db reaches the database', () =>
     t.http().get('/api/health/db').expect(200, { status: 'ok' }));
 
+  it('GET /api/health/db is not reachable through the reverse proxy', async () => {
+    await t.http().get('/api/health/db').set('X-Forwarded-For', '203.0.113.7').expect(404);
+    await t.http().get('/api/health/db').set('X-Real-IP', '203.0.113.7').expect(404);
+    // The liveness check stays public behind the proxy.
+    await t.http().get('/api/health').set('X-Forwarded-For', '203.0.113.7').expect(200);
+  });
+
   it('every other route needs a token', () => t.http().get('/api/classes').expect(401));
 
   it('sets security headers', async () => {

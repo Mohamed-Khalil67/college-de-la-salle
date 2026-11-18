@@ -166,7 +166,7 @@ export class NewSlotDialog {
   readonly saved = output<TimetableWriteResult>();
   readonly blocked = output<TimetableBlockedError>();
 
-  protected readonly weekdays = SCHOOL_WEEKDAYS.map((value) => ({ value: String(value), label: WEEKDAY_LABELS[value]! }));
+  protected readonly weekdays = SCHOOL_WEEKDAYS.map((value) => ({ value: String(value), label: WEEKDAY_LABELS[value] ?? String(value) }));
   protected readonly parities = WEEK_PARITIES;
 
   readonly #client = inject(ApiClient);

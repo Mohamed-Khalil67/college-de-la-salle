@@ -249,6 +249,10 @@ export const MESSAGES_FR: SiteMessages = {
     noEmail: 'Pas d’e-mail reçu ? Le secrétariat de votre cycle peut réinitialiser votre mot de passe.',
     noSignUp: 'Les comptes sont créés par le collège : il n’y a pas d’inscription en ligne.',
     backToSite: 'Retour au site du collège',
+    sessionUnavailable:
+      'Le serveur est très sollicité et n’a pas pu rouvrir votre session. Elle est peut-être toujours valable : réessayez dans un instant.',
+    retry: 'Réessayer',
+    retrying: 'Nouvel essai…',
     errors: {
       emailRequired: 'Saisissez votre adresse e-mail.',
       emailInvalid: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg.',
