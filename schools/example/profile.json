@@ -1,0 +1,48 @@
+{
+  "id": "example",
+  "placeholder": true,
+  "names": {
+    "fr": { "full": "École Exemple", "short": "EE", "place": "Quartier des Tilleuls", "city": "Villeneuve", "of": "de l’École Exemple" },
+    "en": { "full": "École Exemple", "short": "EE", "place": "Quartier des Tilleuls", "city": "Villeneuve", "of": "of École Exemple" },
+    "ar": { "full": "مدرسة المثال", "short": "EE", "place": "حي الزيزفون", "city": "فيلنوف", "of": "مدرسة المثال" }
+  },
+  "nameLang": "fr",
+  "foundingYear": 1950,
+  "affiliation": {
+    "fr": "Établissement fictif de démonstration",
+    "en": "Fictional demonstration school",
+    "ar": "مدرسة وهمية للعرض"
+  },
+  "contacts": {
+    "address": {
+      "fr": "1 rue de l’Exemple, Villeneuve",
+      "en": "1 Example Street, Villeneuve",
+      "ar": "1 شارع المثال، فيلنوف"
+    },
+    "mapQuery": "Villeneuve",
+    "email": "secretariat@ecole-exemple.example",
+    "switchboard": "+33 1 00 00 00 00",
+    "departments": [
+      { "id": "standard", "phones": ["+33 1 00 00 00 00"] },
+      { "id": "generale", "phones": ["+33 1 00 00 00 01"] },
+      { "id": "internationale", "phones": ["+33 1 00 00 00 02"] }
+    ]
+  },
+  "websites": [],
+  "loginEmailDomain": "ecole-exemple.example",
+  "timeZone": "Europe/Paris",
+  "defaultLanguage": "fr",
+  "languages": ["fr", "en", "ar"],
+  "sections": [
+    { "code": "nationale", "labels": { "fr": "Filière générale", "en": "General track", "ar": "المسار العام" } },
+    { "code": "bac", "labels": { "fr": "Filière internationale", "en": "International track", "ar": "المسار الدولي" } }
+  ],
+  "calendar": { "uidDomain": "ecole-exemple", "productName": "Ecole Exemple" },
+  "brand": {
+    "crest": "/crest.svg#crest",
+    "crestOnDark": "/crest.svg#crest-on-dark",
+    "themeColor": "#0A192F",
+    "icons": [{ "rel": "icon", "type": "image/svg+xml", "href": "icon.svg" }],
+    "colors": {}
+  }
+}

@@ -249,11 +249,12 @@ export function gradesReminderNotice(f: {
   });
 }
 
-/** The e-mail digest of several notifications (plain text, French). */
+/** The e-mail digest of several notifications (plain text, French), signed with the school's name. */
 export function digestText(
   firstName: string,
   items: readonly NotificationText[],
   link: string,
+  signature: string,
 ): { readonly subject: string; readonly text: string } {
   const shown = items.slice(0, NOTIFICATION_LIMITS.digestItems);
   const more = items.length - shown.length;
@@ -274,7 +275,7 @@ export function digestText(
     '',
     'Vous recevez ce message parce que vous avez activé les notifications par e-mail. Vous pouvez les désactiver depuis la page Notifications de votre espace.',
     '',
-    'Collège de la Salle',
+    signature,
   ].join('\n');
   // One line, whatever a teacher typed in a title.
   return { subject: cut(subject.replace(/\s+/g, ' ').trim(), NOTIFICATION_LIMITS.title), text };

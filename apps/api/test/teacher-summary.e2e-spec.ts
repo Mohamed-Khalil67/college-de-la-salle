@@ -1,10 +1,9 @@
 import {
   addDays,
   REPEATED_ABSENCE_MIN_DAYS,
-  schoolToday,
   type TeacherSummaryDto,
 } from '@cdls/shared';
-import { fromDay } from '../src/common/dates.js';
+import { fromDay, schoolToday } from '../src/common/dates.js';
 import {
   activityTypeId,
   ADMIN,

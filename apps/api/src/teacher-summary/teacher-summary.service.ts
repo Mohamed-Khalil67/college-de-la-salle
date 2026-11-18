@@ -8,7 +8,6 @@ import {
   REPEATED_ABSENCE_MAX,
   repeatedAbsences,
   rollCallDone,
-  schoolToday,
   SUMMARY_PENDING_CONCURRENCY,
   TEACHER_HOMEWORK_DAYS,
   TEACHER_TESTS_DAYS,
@@ -24,7 +23,7 @@ import {
 } from '@cdls/shared';
 import { CalendarDaysService } from '../calendar-days/calendar-days.service.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { fromDay, toDay } from '../common/dates.js';
+import { fromDay, schoolToday, toDay } from '../common/dates.js';
 import { forbidden } from '../common/errors.js';
 import { EventsService } from '../events/events.service.js';
 import { QuickGradingService } from '../grades/quick-grading.service.js';

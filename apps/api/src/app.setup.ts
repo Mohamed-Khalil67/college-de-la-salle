@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { API_PREFIX } from './app.prefix.js';
 import type { Env } from './config/env.validation.js';
+import { activeSchool } from './school/school-profile.js';
 
 export { API_PREFIX };
 export const DOCS_PATH = `${API_PREFIX}/docs`;
@@ -45,7 +46,7 @@ export function configureApp(app: INestApplication): void {
       app,
       new DocumentBuilder()
         .setTitle('CDLS API')
-        .setDescription('Collège de la Salle, Daher: school space API.')
+        .setDescription(`${activeSchool().names.fr.full}, ${activeSchool().names.fr.place}: school space API.`)
         .setVersion('0.1.0')
         .addBearerAuth()
         .addCookieAuth('cdls_refresh')

@@ -5,12 +5,12 @@
 
 export type SectionId = 'nationale' | 'bac';
 
+/**
+ * The section codes the platform knows. Their names come from the school profile (`sectionLabels(profile)` in
+ * school-profile.ts, seeded into the `sections` table); the codes themselves are still fixed
+ * (docs/new-school.md, « Sections »).
+ */
 export const SECTION_IDS: readonly SectionId[] = ['nationale', 'bac'];
-
-export const SECTION_LABELS: Readonly<Record<SectionId, string>> = {
-  nationale: 'Bac nationale',
-  bac: 'Bac français',
-};
 
 export interface ClassOption {
   readonly value: string;

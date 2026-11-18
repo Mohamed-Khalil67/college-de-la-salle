@@ -5,11 +5,10 @@ import {
   homeworkNotice,
   type NotificationText,
   type Role,
-  schoolToday,
   type SessionChangeFacts,
   sessionNotice,
 } from '@cdls/shared';
-import { toDay } from '../common/dates.js';
+import { schoolToday, toDay } from '../common/dates.js';
 import type { EventRow } from '../events/event.mapper.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { slotInclude } from '../occupancy/slot-data.js';

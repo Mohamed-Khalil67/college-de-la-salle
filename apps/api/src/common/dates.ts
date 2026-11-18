@@ -1,5 +1,6 @@
-import { isCalendarDay } from '@cdls/shared';
+import { dayInZone, isCalendarDay, timeInZone } from '@cdls/shared';
 import { registerDecorator, type ValidationOptions } from 'class-validator';
+import { activeSchool } from '../school/school-profile.js';
 
 /** A `@db.Date` column value as `YYYY-MM-DD`. */
 export function toDay(date: Date): string {
@@ -27,5 +28,17 @@ export function IsDay(options?: ValidationOptions): PropertyDecorator {
     });
 }
 
-/** The school's « today » (Cairo), shared with the web: sessions already held are never rewritten. */
-export { SCHOOL_TIME_ZONE, schoolToday } from '@cdls/shared';
+/** The school's IANA time zone (profile `timeZone`, Africa/Cairo for CDLS). */
+export function schoolTimeZone(): string {
+  return activeSchool().timeZone;
+}
+
+/** The school's « today » (`YYYY-MM-DD` in its time zone), as the web reads it: sessions already held are never rewritten. */
+export function schoolToday(now: Date = new Date()): string {
+  return dayInZone(schoolTimeZone(), now);
+}
+
+/** The time now at the school (`HH:MM`). */
+export function schoolTimeNow(now: Date = new Date()): string {
+  return timeInZone(schoolTimeZone(), now);
+}

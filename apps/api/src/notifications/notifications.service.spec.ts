@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { addDays, schoolToday } from '@cdls/shared';
+import { addDays } from '@cdls/shared';
+import { schoolToday } from '../common/dates.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { type NotificationDraft, NotificationsService } from './notifications.service.js';

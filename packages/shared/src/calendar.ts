@@ -1,3 +1,4 @@
+import type { SchoolCalendarIds } from './school-profile.js';
 import { audienceMatches, isHttpsUrl, type SectionId, type Target } from './space.js';
 
 /**
@@ -471,15 +472,15 @@ const icsDate = (day: string) => day.replace(/-/g, '');
 
 /**
  * An .ics file for the event (weekly events keep their repetition, minus the sessions cancelled by
- * `closures`, as EXDATE lines). Times are local (floating).
+ * `closures`, as EXDATE lines). Times are local (floating). `calendar` is the school profile's `calendar`.
  */
-export function toIcs(event: CalendarEvent, closures: readonly Closure[] = []): string {
+export function toIcs(event: CalendarEvent, calendar: SchoolCalendarIds, closures: readonly Closure[] = []): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//College de la Salle Daher//Espace eleve//FR',
+    `PRODID:-//${calendar.productName}//Espace eleve//FR`,
     'BEGIN:VEVENT',
-    `UID:${event.id}@college-de-la-salle-daher`,
+    `UID:${event.id}@${calendar.uidDomain}`,
   ];
   if (event.start) {
     const t = (hhmm: string) => `${hhmm.replace(':', '')}00`;

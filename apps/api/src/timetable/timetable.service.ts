@@ -105,7 +105,7 @@ export class TimetableService {
     private readonly suggestions: TimetableSuggestionsService,
   ) {}
 
-  /** Today in Cairo; the clock of « sessions already held ». */
+  /** Today in the school's time zone; the clock of « sessions already held ». */
   today(): string {
     return schoolToday();
   }

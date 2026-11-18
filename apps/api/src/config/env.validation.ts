@@ -15,6 +15,7 @@ import {
   validateSync,
 } from 'class-validator';
 import { DURATION } from '../common/duration.js';
+import { DEFAULT_SCHOOL, loadSchoolProfile, schoolsDir } from '../school/school-profile.js';
 
 const PLACEHOLDER = /^replace-with-/;
 /** The demo domain of the seed and the tests; production must set the school's own. */
@@ -125,6 +126,19 @@ export class Env {
   )
   SCHOOL_EMAIL_DOMAIN = DEMO_EMAIL_DOMAIN;
 
+  /**
+   * The school pack this install serves (`schools/<SCHOOL>/profile.json`): names in mails and report cards,
+   * time zone, section names. Checked at start: an unknown or invalid pack stops the API.
+   */
+  @IsString()
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'SCHOOL must be a pack folder name such as cdls-daher' })
+  SCHOOL = DEFAULT_SCHOOL;
+
+  /** Folder of the school packs; unset: the repository's `schools/` (or `/app/schools` in the image). */
+  @IsOptional()
+  @IsString()
+  SCHOOLS_DIR?: string;
+
   /** Minutes a « mot de passe oublié » link stays valid. */
   @Transform(({ value }) => Number(value))
   @IsInt()
@@ -144,10 +158,14 @@ export class Env {
   @IsIn(['log', 'smtp'], { message: 'MAIL_TRANSPORT must be log or smtp' })
   MAIL_TRANSPORT: 'log' | 'smtp' = 'log';
 
-  /** Sender of every mail, e.g. `Collège de la Salle <no-reply@lasalle-daher.eg>`. */
+  /**
+   * Sender of every mail, e.g. `Collège de la Salle <no-reply@lasalle-daher.eg>`. Unset: the school's name (profile)
+   * and `no-reply@<SCHOOL_EMAIL_DOMAIN>`.
+   */
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  MAIL_FROM = `Collège de la Salle <no-reply@${DEMO_EMAIL_DOMAIN}>`;
+  MAIL_FROM: string;
 
   /** SMTP server (required when MAIL_TRANSPORT=smtp). */
   @IsOptional()
@@ -232,6 +250,9 @@ export function validateEnv(raw: Record<string, unknown>): Env {
       'SCHOOL_EMAIL_DOMAIN is the demo domain; set the login domain of the school in production.',
     );
   }
+  // Fail fast on an unknown or invalid school pack (the error lists the known ones).
+  const school = loadSchoolProfile(env.SCHOOL, schoolsDir(env.SCHOOLS_DIR));
+  env.MAIL_FROM ||= `${school.names.fr.full} <no-reply@${env.SCHOOL_EMAIL_DOMAIN}>`;
   if (env.MAIL_TRANSPORT === 'smtp' && !env.SMTP_HOST) {
     throw new Error(
       'MAIL_TRANSPORT=smtp needs SMTP_HOST (and usually SMTP_USER and SMTP_PASSWORD).',

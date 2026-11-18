@@ -14,6 +14,8 @@ pdfmake.setLocalAccessPolicy((path) => path.startsWith(fontDir));
 
 export interface ReportCardPdfContext {
   readonly schoolName: string;
+  /** The school's IANA zone (profile), for the « Édité le » date. */
+  readonly timeZone: string;
   readonly termLabel: string;
   readonly yearLabel: string;
   readonly classLabel: string;
@@ -77,7 +79,7 @@ export function reportCardPdf(card: ReportCardDto, ctx: ReportCardPdfContext): P
       { text: 'Appréciation', style: 'h2' },
       { text: card.appreciation || '—', italics: !card.appreciation },
       {
-        text: `Édité le ${new Date(card.generatedAt).toLocaleDateString('fr-FR', { timeZone: 'Africa/Cairo' })}`,
+        text: `Édité le ${new Date(card.generatedAt).toLocaleDateString('fr-FR', { timeZone: ctx.timeZone })}`,
         style: 'small',
       },
     ],

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
 import { LogMailTransport } from './log-mail-transport.js';
+import { activeSchool } from '../school/school-profile.js';
 import { MailService } from './mail.service.js';
 import { SmtpMailTransport } from './smtp-mail-transport.js';
 
@@ -17,7 +18,7 @@ describe('MailService', () => {
     const mail = new MailService({ send }, { get: (k: string) => ENV[k] } as ConfigService<
       never,
       true
-    >);
+    >, activeSchool());
     await mail.sendPasswordReset('eleve@demo.cdls.test', 'Léa <b>', 'tok-en_1', 60);
     const [message, from] = send.mock.calls[0] as [
       { to: string; text: string; html: string; subject: string },
@@ -76,7 +77,7 @@ describe('MailService digest', () => {
     const mail = new MailService({ send }, { get: (k: string) => ENV[k] } as ConfigService<
       never,
       true
-    >);
+    >, activeSchool());
     await mail.sendNotificationDigest(
       'eleve@demo.cdls.test',
       'Léa',

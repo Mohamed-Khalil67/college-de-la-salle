@@ -20,6 +20,8 @@ import {
 } from './space.js';
 import { MATIERES, matieresFor } from './subjects.js';
 
+const IDS = { uidDomain: 'college-de-la-salle-daher', productName: 'College de la Salle Daher' };
+
 const grade = (
   subject: string,
   score: number,
@@ -113,7 +115,7 @@ describe('calendar', () => {
   });
 
   it('exports a weekly .ics event with its rule', () => {
-    const ics = toIcs(event({ repeatUntil: '2026-12-20' }));
+    const ics = toIcs(event({ repeatUntil: '2026-12-20' }), IDS);
     expect(ics).toContain('DTSTART:20261004T083000');
     expect(ics).toContain('RRULE:FREQ=WEEKLY;UNTIL=20261220T235959');
     expect(ics).toContain('SUMMARY:Cours — Mathématiques');
@@ -159,9 +161,9 @@ describe('calendar', () => {
     const weekly = event({ repeatUntil: '2026-12-20' });
     const closures = [{ ...autumn, targets: ['all'] }];
     expect(skippedDays(weekly, closures)).toEqual(['2026-10-18']);
-    expect(toIcs(weekly, closures)).toContain('EXDATE:20261018T083000\r\n');
+    expect(toIcs(weekly, IDS, closures)).toContain('EXDATE:20261018T083000\r\n');
     const allDay = event({ start: '', end: '', repeatUntil: '2026-12-20' });
-    expect(toIcs(allDay, closures)).toContain('EXDATE;VALUE=DATE:20261018\r\n');
+    expect(toIcs(allDay, IDS, closures)).toContain('EXDATE;VALUE=DATE:20261018\r\n');
   });
 
   it('finds the next assessment by its flags', () => {

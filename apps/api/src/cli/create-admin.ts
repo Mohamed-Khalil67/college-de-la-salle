@@ -3,7 +3,8 @@
  *
  *   node dist/cli/create-admin.js --email direction@lasalle-daher.eg --first Prénom --last Nom [--reset]
  *
- * - Also makes sure the reference data exists (the two sections and the subject catalogue); safe to re-run.
+ * - Also makes sure the reference data exists (the two sections, named by the school profile of SCHOOL, and the
+ *   subject catalogue); safe to re-run.
  * - The password comes from CREATE_ADMIN_PASSWORD, or is generated and printed once. Either way the account
  *   must choose its own password at the first sign-in (`mustChangePassword`).
  * - `--reset` sets a new password on an existing administrator (use it if the password was lost).
@@ -12,9 +13,10 @@
 import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { MATIERES, passwordProblems, SECTION_LABELS, type SectionId } from '@cdls/shared';
+import { MATIERES, passwordProblems, SECTION_IDS, sectionLabels } from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role } from '../generated/prisma/client.js';
+import { activeSchool } from '../school/school-profile.js';
 
 const { values } = parseArgs({
   options: {
@@ -91,11 +93,13 @@ try {
 
 /** Sections and subjects are not created by migrations; a new school needs them before the first class. */
 async function ensureReferenceData(): Promise<void> {
-  for (const code of Object.keys(SECTION_LABELS) as SectionId[]) {
+  const labels = sectionLabels(activeSchool());
+  for (const code of SECTION_IDS) {
     await prisma.section.upsert({
       where: { code },
-      update: {},
-      create: { code, label: SECTION_LABELS[code] },
+      // The names follow the school profile (schools/<SCHOOL>/profile.json), also on a re-run.
+      update: { label: labels[code] },
+      create: { code, label: labels[code] },
     });
   }
   for (const m of MATIERES) {
