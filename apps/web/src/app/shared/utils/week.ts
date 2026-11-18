@@ -27,7 +27,7 @@ export function weekColumns(day: string, list: readonly OccurrenceDto[]): DayCol
 /** First and last day of the week containing `day` (the range sent to the API). */
 export function weekRange(day: string): { readonly from: string; readonly to: string } {
   const days = weekDays(day);
-  return { from: days[0]!, to: days[6]! };
+  return { from: days[0] ?? day, to: days[6] ?? day };
 }
 
 /** `day` moved by whole weeks. */
@@ -42,8 +42,8 @@ const at = (d: string) => new Date(`${d}T12:00:00Z`);
 /** « Semaine du 18 au 22 octobre 2026 » (school days), across months when needed. */
 export function weekLabel(day: string): string {
   const days = weekDays(day);
-  const first = days[0]!;
-  const last = days[4]!;
+  const first = days[0] ?? day;
+  const last = days[4] ?? day;
   const sameMonth = first.slice(0, 7) === last.slice(0, 7);
   const dayNumber = Number(first.slice(8));
   const start = sameMonth ? (dayNumber === 1 ? '1er' : String(dayNumber)) : DAY_MONTH.format(at(first));

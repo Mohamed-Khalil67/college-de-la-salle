@@ -50,5 +50,6 @@ export function desktopNav(visible: readonly SpaceNavItem[]): SpaceNavItem[] {
 /** At most five icons in the phone's bottom bar; if there are more, the last entry (« Plus ») keeps its place. */
 export function mobileNav(visible: readonly SpaceNavItem[]): SpaceNavItem[] {
   const items = visible.filter((item) => item.icon);
-  return items.length > 5 ? [...items.slice(0, 4), items[items.length - 1]!] : items;
+  const last = items.at(-1);
+  return items.length > 5 && last ? [...items.slice(0, 4), last] : items;
 }

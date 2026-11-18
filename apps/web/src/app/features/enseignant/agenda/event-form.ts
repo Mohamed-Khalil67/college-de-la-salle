@@ -102,7 +102,7 @@ export class EventForm {
   protected readonly model = linkedSignal<EventFormModel>(() => {
     const e = this.event();
     const list = this.sorted();
-    return e ? modelFromEvent(e, list) : emptyEventModel(this.day(), list.length === 1 ? list[0]!.id : '');
+    return e ? modelFromEvent(e, list) : emptyEventModel(this.day(), list.length === 1 ? (list[0]?.id ?? '') : '');
   });
   protected readonly eventForm = form(this.model, (p) => {
     required(p.title, { message: 'Donnez un titre, par exemple « Contrôle n° 3 : fonctions affines ».' });

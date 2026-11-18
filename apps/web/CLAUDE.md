@@ -51,7 +51,9 @@ shared: change them only when that is your task, and say so in your report.
   `T | undefined`: narrow it, or give the type a shape that says it is never empty (`NonEmptyList<T>` in
   `school/content.model.ts`). In specs, `!` on an index is fine.
 - Never `any`, and no `!` or `as` cast in application code to silence the compiler: narrow with `unknown`, type guards
-  or `satisfies`. API types come from `@cdls/shared` only; a string union has an exported const array next to it.
+  or `satisfies`. `npm run lint` enforces it: `typescript/no-non-null-assertion` is an error in `.oxlintrc.json` (off
+  for `*.spec.ts`), and `src/app/non-null-templates.spec.ts` fails on a `value!` inside a template (oxlint does not read
+  those): narrow with `@if (value(); as v)` or `?.`. API types come from `@cdls/shared` only; a string union has an exported const array next to it.
 - Use `inject(DOCUMENT)` rather than the global `document`, and never `new Date()` in code that also runs on the
   server (public pages are prerendered).
 - `ng g c` is configured for an inline template and styles, CSS and no spec; move a template to a `.html` file only
@@ -74,6 +76,11 @@ a colour; gold (`--color-accent`) is never text on light surfaces (use `--color-
   Read with `resource({ params, loader })`; write in async handlers. Show errors with `apiMessage(error)`.
 - `AuthStore` (`core/auth/auth-store.ts`): `user()` (with `studentId`/`teacherId`, and `classId` for students), `role()`, `displayName()`.
   The access token is memory-only; the interceptor adds it and refreshes once on a 401.
+  **A failed refresh signs out only on 401/403** (the API refused the token). On a 429, a 5xx or a network error
+  `AuthStore.refresh()` retries up to three times (`core/auth/refresh-retry.ts`, pure, with a spec: 1 s, 2 s, 4 s plus
+  jitter, `Retry-After` honoured, 8 s cap), keeps the session, resolves `'unavailable'` and sets `sessionUnavailable()`,
+  which `SpaceLayout` and the login page show (« Réessayer » there). The whole school shares one address and a busy
+  minute answers 429: never call `#clear()` or send the user to `/connexion` for anything but `'signed-out'`.
 - Guards: `roleGuard('student' | 'teacher')` on those areas; `/admin` uses `structureGuard` (the admin and teachers with the Planificateur permission) and its admin-only pages `adminOnlyGuard`; nav entries carry `access: 'admin' | 'planner'`; `anonymousGuard` on `/connexion`, `firstAccessGuard` on `/premier-acces`. While `user().mustChangePassword` is true every guard sends the user to `/premier-acces`, and the interceptor does the same on a 403 `PASSWORD_CHANGE_REQUIRED`. The account menu of `SpaceLayout` has « Changer mon mot de passe » (`layout/change-password-modal.ts`, same `shared/components/password-form.ts` as the first-access page).
 
 ## Navigation

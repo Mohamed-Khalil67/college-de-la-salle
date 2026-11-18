@@ -121,8 +121,10 @@ function isPeriodType(type: EntryType): type is PeriodKind {
         }
 
         <div class="panel__footer">
-          @if (draft().entry && !locked()) {
-            <button cdlsButton variant="danger" type="button" (click)="remove.emit(draft().entry!)">Supprimer</button>
+          @if (!locked()) {
+            @if (draft().entry; as entry) {
+              <button cdlsButton variant="danger" type="button" (click)="remove.emit(entry)">Supprimer</button>
+            }
           }
           <span class="panel__spacer"></span>
           <button cdlsButton variant="secondary" type="button" (click)="closed.emit()">{{ locked() ? 'Fermer' : 'Annuler' }}</button>

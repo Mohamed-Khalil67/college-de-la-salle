@@ -243,7 +243,8 @@ export class NewYearPage {
       if (saved.step === 'review') void this.runPreview(true);
       return;
     }
-    const from = years.find((y) => y.status === 'current') ?? years[0]!;
+    const from = years.find((y) => y.status === 'current') ?? years[0];
+    if (!from) return;
     this.source.set({ sourceYearId: from.id, ...suggestNewYear(from) });
   }
 
@@ -255,7 +256,8 @@ export class NewYearPage {
 
   protected back(): void {
     const index = STEPS.findIndex((s) => s.id === this.step());
-    if (index > 0) this.#move(STEPS[index - 1]!.id);
+    const previous = index > 0 ? STEPS[index - 1] : undefined;
+    if (previous) this.#move(previous.id);
   }
 
   protected async next(): Promise<void> {
@@ -270,11 +272,13 @@ export class NewYearPage {
         this.#move('copy');
         return;
       }
-      case 'copy':
+      case 'copy': {
         // The decisions are about the students of one source year: another source starts with none.
-        if (this.preview() && this.preview()!.sourceYear.id !== this.source().sourceYearId) this.choices.set(new Map());
+        const previewed = this.preview()?.sourceYear.id;
+        if (previewed !== undefined && previewed !== this.source().sourceYearId) this.choices.set(new Map());
         if (await this.runPreview()) this.#move('review');
         return;
+      }
       case 'review':
         // Decisions changed since the last preview: the confirmation needs the hash of the current ones.
         if (this.stale() && !(await this.runPreview())) return;

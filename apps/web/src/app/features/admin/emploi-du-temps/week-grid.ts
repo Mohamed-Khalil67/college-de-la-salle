@@ -272,8 +272,9 @@ export class WeekGrid {
     const at = this.active();
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      const day = this.days()[at.col]!;
-      const band = this.rows()[at.row]!;
+      const day = this.days()[at.col];
+      const band = this.rows()[at.row];
+      if (day === undefined || band === undefined) return;
       this.activate.emit({ day, band, sessions: this.cell(day, band) });
       return;
     }

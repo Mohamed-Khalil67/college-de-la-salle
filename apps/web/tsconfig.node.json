@@ -5,5 +5,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vitest.config.ts", "src/app/architecture.spec.ts"]
+  "include": ["vitest.config.ts", "src/app/architecture.spec.ts", "src/app/non-null-templates.spec.ts"]
 }
