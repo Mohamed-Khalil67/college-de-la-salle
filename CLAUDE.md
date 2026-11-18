@@ -38,7 +38,7 @@ Put the skill line at the top of every brief you give an agent. The logo and cre
 
 ## Status (2026-11-13)
 
-Everything below is merged on local `main`; `college/main` (9710335) is 61 commits behind, nothing of the one-page redesign is pushed yet.
+Everything below is merged on `main` and pushed: `college/main` is at 9e41612 (checked 2026-11-18). The 7 open Dependabot PRs on GitHub (#1–#7) predate the rebuild and are obsolete: workflow and Firebase bumps target files that no longer exist, TypeScript 7 is outside Angular 22's `>=6.0 <6.1` peer range, and `@types/node` stays on ^22 to match the Node 22 runtime.
 
 - **Done:** public site in fr/en/ar with accessibility statement; login, first sign-in password change, forgotten
   password by e-mail; student, teacher and admin spaces; timetable with hard/soft conflicts and suggestions; groups and
