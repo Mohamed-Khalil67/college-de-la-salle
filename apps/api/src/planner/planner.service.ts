@@ -9,14 +9,12 @@ import {
   probeWindow,
   type NotificationKind,
   type RoomKind,
-  schoolTimeNow,
-  schoolToday,
   type SlotExceptionKind,
   type SubjectHours,
   weeklyHours,
 } from '@cdls/shared';
 import type { AuthUser } from '../common/auth-user.js';
-import { fromDay, toDay } from '../common/dates.js';
+import { fromDay, schoolTimeNow, schoolToday, toDay } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';

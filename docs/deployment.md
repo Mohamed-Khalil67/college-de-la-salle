@@ -17,6 +17,7 @@ Only `web` is reachable from outside (through the tunnel or Caddy). `db` and `ap
 
 | What | Why | Where it goes |
 |---|---|---|
+| The school pack: the folder of `schools/` that describes the school (`schools/cdls-daher`, or your own: docs/new-school.md) | names in the site, the e-mails and the report cards, time zone, section names; built into the web image | `SCHOOL` |
 | A way to be reached: a **Cloudflare tunnel token** (laptop, free) **or** a **domain + a server with ports 80/443 open** | HTTPS from anywhere | `TUNNEL_TOKEN` or `DOMAIN` |
 | The public address, e.g. `https://ecole.example.org` | links in e-mails, allowed origin | `PUBLIC_WEB_URL` |
 | The school's real e-mail domain (accounts become `prenom.nom@<domain>`) | the demo domain is refused in production | `SCHOOL_EMAIL_DOMAIN` |
@@ -143,6 +144,7 @@ Details and the restore procedure: [`deploy/restore.md`](../deploy/restore.md).
 
 `deploy/.env.example` documents every variable. Highlights:
 
+- **`SCHOOL`** is the school pack. The API reads it when it starts (`schools/<SCHOOL>/profile.json`, refused if unknown or invalid) and the web image is built with it (the public pages are prerendered for that school), so change it only with a rebuild (`up -d --build`). The default is `cdls-daher`. One install is one school: a second school gets its own stack, database and `.env`.
 - `NODE_ENV=production` is fixed by the compose file. In production the API refuses to start with placeholder JWT secrets,
   the demo e-mail domain, or `MAIL_TRANSPORT=log` (`apps/api/src/config/env.validation.ts`).
 - **Cookies.** The refresh token is an httpOnly, `Secure`, `SameSite=Strict` cookie on path `/api/auth`. The site and the

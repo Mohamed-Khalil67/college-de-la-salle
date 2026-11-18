@@ -135,7 +135,7 @@ describe('notification texts', () => {
 describe('e-mail digest', () => {
   it('uses the title as the subject of a single notification', () => {
     const one = gradeNotice({ title: 'Contrôle 2', subject: null });
-    const mail = digestText('Nadia', [one], 'https://ecole.eg/eleve/notifications');
+    const mail = digestText('Nadia', [one], 'https://ecole.eg/eleve/notifications', 'Collège de la Salle');
     expect(mail.subject).toBe(one.title);
     expect(mail.text).toContain('Bonjour Nadia,');
     expect(mail.text).toContain('Tout voir : https://ecole.eg/eleve/notifications');
@@ -145,7 +145,7 @@ describe('e-mail digest', () => {
     const many = Array.from({ length: NOTIFICATION_LIMITS.digestItems + 3 }, (_, i) =>
       gradeNotice({ title: `Contrôle ${i}`, subject: null }),
     );
-    const mail = digestText('Nadia', many, 'https://ecole.eg');
+    const mail = digestText('Nadia', many, 'https://ecole.eg', 'Collège de la Salle');
     expect(mail.subject).toBe(
       `${many.length} changements dans votre emploi du temps et vos devoirs`,
     );
@@ -157,7 +157,7 @@ describe('e-mail digest', () => {
 describe('digest subject', () => {
   it('stays on one line whatever a title contains', () => {
     const one = gradeNotice({ title: 'Contrôle\nBcc: x@y.z\r\n2', subject: null });
-    expect(digestText('Nadia', [one], 'https://ecole.eg').subject).not.toMatch(/[\r\n]/);
+    expect(digestText('Nadia', [one], 'https://ecole.eg', 'Collège de la Salle').subject).not.toMatch(/[\r\n]/);
   });
 });
 

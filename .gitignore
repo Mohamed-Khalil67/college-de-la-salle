@@ -80,3 +80,8 @@ apps/api/.dev-mail/
 # Deployment (deploy/): real settings and database dumps never go to git.
 deploy/.env
 deploy/backups/
+
+# Web build: written by apps/web/scripts/select-school.mjs for the school named by SCHOOL (schools/<id>/).
+apps/web/src/generated/
+apps/web/src/app/school/active/
+apps/web/src/app/core/school/profile.generated.ts

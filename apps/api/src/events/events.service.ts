@@ -1,5 +1,5 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { daysBetween, isExamActivityCode, occurrences, safeAttachments, toIcs } from '@cdls/shared';
+import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import { daysBetween, isExamActivityCode, occurrences, safeAttachments, type SchoolProfile, toIcs } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { canSetForAnyClass } from '../access/grants.js';
@@ -10,6 +10,7 @@ import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
 import { ChangeNoticesService, eventSchedule } from '../notifications/change-notices.service.js';
+import { SCHOOL_PROFILE } from '../school/school.module.js';
 import { groupHold } from '../occupancy/event-hold.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
@@ -44,6 +45,7 @@ export class EventsService {
     private readonly occupancy: OccupancyService,
     private readonly targets: TargetsService,
     private readonly notices: ChangeNoticesService,
+    @Inject(SCHOOL_PROFILE) private readonly school: SchoolProfile,
   ) {}
 
   /** Events that take place in [from, to] and that the user may see. */
@@ -82,7 +84,7 @@ export class EventsService {
     const row = await this.visible(id, user);
     const until = row.repeatUntil ? toDay(row.repeatUntil) : toDay(row.date);
     const closures = await this.calendarDays.closures(toDay(row.date), until);
-    return toIcs(toCalendarEvent(row), closures);
+    return toIcs(toCalendarEvent(row), this.school.calendar, closures);
   }
 
   /**

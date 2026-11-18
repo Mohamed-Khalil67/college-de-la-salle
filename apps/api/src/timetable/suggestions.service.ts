@@ -17,7 +17,6 @@ import {
   seriesCandidates,
   type SessionPlace,
   sessionCandidates,
-  schoolTimeNow,
   stamp,
   type TimetableConflictDto,
   type TimetableSuggestionDto,
@@ -27,7 +26,7 @@ import {
 } from '@cdls/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 import { loadClosures } from '../calendar-days/closures.js';
-import { schoolToday, toDay } from '../common/dates.js';
+import { schoolTimeNow, schoolToday, toDay } from '../common/dates.js';
 import { type IndexRow, OccupancyService } from '../occupancy/occupancy.service.js';
 import { expandSlots, slotInclude, type SlotRow, toSlotData } from '../occupancy/slot-data.js';
 

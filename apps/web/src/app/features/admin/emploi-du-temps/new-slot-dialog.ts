@@ -1,21 +1,7 @@
 import { Component, computed, effect, inject, input, linkedSignal, model, output, resource, signal, untracked } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
-import {
-  type AcknowledgedWarning,
-  type ClassDto,
-  type CreateTimetableSlotRequest,
-  type SchoolYearDto,
-  SCHOOL_WEEKDAYS,
-  SECTION_LABELS,
-  schoolToday,
-  slotProblems,
-  type TimetableBlockedError,
-  type TimetableSuggestionDto,
-  type TimetableWarningCode,
-  type TimetableWriteResult,
-  WEEK_PARITIES,
-  WEEKDAY_LABELS,
-} from '@cdls/shared';
+import { type AcknowledgedWarning, type ClassDto, type CreateTimetableSlotRequest, type SchoolYearDto, SCHOOL_WEEKDAYS, slotProblems, type TimetableBlockedError, type TimetableSuggestionDto, type TimetableWarningCode, type TimetableWriteResult, WEEK_PARITIES, WEEKDAY_LABELS } from '@cdls/shared';
+import { SECTION_LABELS, schoolToday } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../../shared/ui';
 import { BlockedNotice } from '../../timetable/blocked-notice';

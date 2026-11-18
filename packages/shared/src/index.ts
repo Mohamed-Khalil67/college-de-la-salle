@@ -12,3 +12,4 @@ export * from './suggestions.js';
 export * from './planner.js';
 export * from './teacher-summary.js';
 export * from './absence-cover.js';
+export * from './school-profile.js';

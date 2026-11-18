@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
-import { SECTION_LABELS, type SubjectDto } from '@cdls/shared';
+import { type SubjectDto } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Badge, Button, EmptyState, Icon } from '../../../shared/ui';
 import { ConfirmModal } from '../../../shared/components/confirm-modal';

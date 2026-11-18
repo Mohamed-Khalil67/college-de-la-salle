@@ -1,3 +1,4 @@
+import { SCHOOL_TIME_ZONE } from '../../core/school/school-profile';
 import type { PostDto } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
 import { newsView, postDay } from './posts';
@@ -31,7 +32,7 @@ describe('newsView', () => {
 });
 
 describe('postDay', () => {
-  it('reads the day in Cairo, not in UTC', () => {
+  it.skipIf(SCHOOL_TIME_ZONE !== 'Africa/Cairo')('reads the day in Cairo, not in UTC', () => {
     // Cairo is UTC+2 in November: 22:30 UTC on the 12th is 00:30 on the 13th.
     expect(postDay('2026-11-12T22:30:00Z')).toBe('2026-11-13');
     expect(postDay('2026-11-12T21:59:00Z')).toBe('2026-11-12');

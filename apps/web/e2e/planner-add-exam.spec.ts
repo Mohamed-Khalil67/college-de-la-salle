@@ -1,4 +1,5 @@
-import { addDays, type EventDto, type SchoolYearDto, schoolToday } from '@cdls/shared';
+import { addDays, type EventDto, type SchoolYearDto } from '@cdls/shared';
+import { schoolToday } from './school';
 import { expect, type Page, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
 import { expectNoAxeViolations, goInApp, signInAs, tokenOf, unique } from './structure';

@@ -1,3 +1,4 @@
+import { SCHOOL_TIME_ZONE } from '../../core/school/school-profile';
 import { describe, expect, it } from 'vitest';
 import { NOTIFICATION_KINDS } from '@cdls/shared';
 import { bellLabel, feedStatus, kindLabel, kindTone, receivedAt } from './notification-view';
@@ -19,7 +20,7 @@ describe('notification display', () => {
     expect(kindTone('grade_published')).toBe('success');
   });
 
-  it('dates a notification relative to now, then in Cairo time', () => {
+  it.skipIf(SCHOOL_TIME_ZONE !== 'Africa/Cairo')('dates a notification relative to now, then in Cairo time', () => {
     const now = new Date('2026-10-23T10:00:00Z');
     expect(receivedAt('2026-10-23T09:59:40Z', now)).toBe('à l’instant');
     expect(receivedAt('2026-10-23T09:48:00Z', now)).toBe('il y a 12 min');

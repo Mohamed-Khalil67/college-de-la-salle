@@ -20,12 +20,14 @@ import {
   MATIERES,
   matieresFor,
   schoolEmailLocalPart,
-  SECTION_LABELS,
+  SECTION_IDS,
+  sectionLabels,
   type SectionId,
   SYSTEM_ACTIVITY_TYPES,
 } from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role, type Prisma } from '../src/generated/prisma/client.js';
+import { activeSchool } from '../src/school/school-profile.js';
 import { seedGroups } from './seed-groups.js';
 import { hoursPerWeek, seedTimetable, type TimetableClassSubject } from './seed-timetable.js';
 
@@ -221,7 +223,8 @@ async function main(): Promise<void> {
   );
 
   const sections = new Map<SectionId, string>();
-  for (const code of Object.keys(SECTION_LABELS) as SectionId[]) {
+  const SECTION_LABELS = sectionLabels(activeSchool());
+  for (const code of SECTION_IDS) {
     const section = await prisma.section.create({ data: { code, label: SECTION_LABELS[code] } });
     sections.set(code, section.id);
   }

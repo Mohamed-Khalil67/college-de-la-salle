@@ -1,113 +1,45 @@
-import type { SiteMessages } from './messages';
+import type { SchoolMessages } from '../../../apps/web/src/app/i18n/messages';
 
-/** The interface in English. MACHINE-DRAFTED from messages.fr.ts: to be reviewed by the school (docs/i18n.md). */
-export const MESSAGES_EN: SiteMessages = {
-  pages: {
-    home: {
-      title: '',
-      description:
-        'Collège de la Salle, Daher (Cairo, founded in 1898): Egyptian and French baccalaureates. History, heritage, subjects, student and teacher spaces.',
-    },
-    history: {
-      title: 'History & Heritage',
-      description:
-        'History of the Collège de la Salle in Daher since 1898: the red-brick building, the new buildings of 1955 and the 1958 chapel, in archive photographs.',
-    },
-    nationale: {
-      title: 'Egyptian Bac',
-      description:
-        'The Egyptian national track (Thanaweya Amma) at the Collège de la Salle, Daher: Ministry of Education programme, subjects, student space and admissions.',
-    },
-    bac: {
-      title: 'French Bac',
-      description:
-        'The French baccalaureate at the Collège de la Salle, Daher: AEFE accreditation, teaching, guidance, student numbers and admissions.',
-    },
-    contact: {
-      title: 'Contact',
-      description: 'Address, e-mail and phone numbers of the Collège de la Salle, Daher, by department and school stage.',
-    },
-    accessibility: {
-      title: 'Accessibility statement',
-      description:
-        'Accessibility statement of the Collège de la Salle, Daher website: what we test, known limitations, how to report a problem.',
-    },
-    login: {
-      title: 'Sign in',
-      description: 'Sign in to the student space, the teacher space and the administration of the Collège de la Salle, Daher.',
-    },
+/**
+ * What the English pages say about Collège de la Salle. MACHINE-DRAFTED from messages.fr.ts: to be reviewed by the
+ * school (docs/i18n.md). The shared words are the platform's (i18n/messages-base.en.ts).
+ */
+export const MESSAGES_EN: SchoolMessages = {
+  pageDescriptions: {
+    home: 'Collège de la Salle, Daher (Cairo, founded in 1898): Egyptian and French baccalaureates. History, heritage, subjects, student and teacher spaces.',
+    history:
+      'History of the Collège de la Salle in Daher since 1898: the red-brick building, the new buildings of 1955 and the 1958 chapel, in archive photographs.',
+    nationale:
+      'The Egyptian national track (Thanaweya Amma) at the Collège de la Salle, Daher: Ministry of Education programme, subjects, student space and admissions.',
+    bac: 'The French baccalaureate at the Collège de la Salle, Daher: AEFE accreditation, teaching, guidance, student numbers and admissions.',
+    contact: 'Address, e-mail and phone numbers of the Collège de la Salle, Daher, by department and school stage.',
+    accessibility:
+      'Accessibility statement of the Collège de la Salle, Daher website: what we test, known limitations, how to report a problem.',
+    login: 'Sign in to the student space, the teacher space and the administration of the Collège de la Salle, Daher.',
   },
 
   layout: {
-    skipToContent: 'Skip to content',
-    switchboard: 'Switchboard',
-    menu: 'Menu',
-    mainNav: 'Main navigation',
-    nav: { home: 'Home', history: 'History', nationale: 'Egyptian Bac', bac: 'French Bac', contact: 'Contact' },
-    signIn: 'Sign in',
-    mySpace: 'My space',
-    languages: 'Site language',
     footerAbout: 'Egyptian and French baccalaureates, from kindergarten to the final year.',
-    footerCollege: 'The college',
-    footerSpaces: 'Spaces',
-    studentSpace: 'Student space',
-    teacherSpace: 'Teacher space',
-    administration: 'Administration',
-    findUs: 'Find us',
     copyright: (year) => `© ${year} Collège de la Salle, Daher. Brothers of the Christian Schools.`,
     photoCredits: {
       before: 'Photographs: Lasallian archives (',
       middle: ') and the college (',
       after: '), with the college’s permission.',
     },
-    accessibility: 'Accessibility: not compliant',
   },
 
-  common: {
-    breadcrumb: 'Breadcrumb',
-    home: 'Home',
-    source: 'Source:',
-    motto: '“Signum Fidei”, sign of faith: the motto of the Brothers of the Christian Schools.',
-    prepareRegistration: 'Enquire about admission',
-    colon: ': ',
-    showServerMessages: false,
-  },
+  motto: '“Signum Fidei”, sign of faith: the motto of the Brothers of the Christian Schools.',
 
   home: {
     heroTitle: 'A Lasallian school in the heart of Cairo, since 1898',
     heroLead:
       'From kindergarten to the final year, 2,400 students prepare the Thanaweya Amma or the French baccalaureate, within one educational project.',
-    heroHistory: 'Discover our history',
     heroCredit: 'The Daher campus from the air.',
-    audienceTitle: 'You are…',
-    audiences: [
-      {
-        id: 'family',
-        title: 'A future student or family',
-        text: 'The two tracks, admissions and the office to contact.',
-        page: 'contact',
-      },
-      {
-        id: 'student',
-        title: 'A student at the college',
-        text: 'Your grades, homework, timetable and report cards, in the student space.',
-        page: 'login',
-      },
-      {
-        id: 'teacher',
-        title: 'A teacher',
-        text: 'Roll call, grade entry, homework and your timetable.',
-        page: 'login',
-      },
-    ],
     historyTitle: 'More than a century in Daher',
     historyLead:
       'Founded by the Brothers of the Christian Schools, the institute created by Saint John Baptist de La Salle, the college belongs to the Lasallian network of Egypt and its 900 schools worldwide.',
-    historyLink: 'Read the college’s history',
     tracksTitle: 'Two baccalaureates, one educational project',
     tracksLead: 'Both tracks share the same Lasallian values, the same courtyard and the same high standards.',
-    discoverTrack: (track) => `Discover the ${track}`,
-    featuresTitle: 'Worth discovering',
     features: [
       {
         meta: 'History, 1958',
@@ -125,15 +57,11 @@ export const MESSAGES_EN: SiteMessages = {
         text: 'Nearly 190 Brothers from every school in the country meet at the college for their annual retreat.',
       },
     ],
-    contactTitle: 'Admissions and contact',
     contactLead:
       'The college publishes admission periods and the list of documents to provide. Write to the school office or call the relevant school stage directly.',
-    allNumbers: 'All numbers by department',
   },
 
   history: {
-    title: 'History and heritage',
-    onThisPage: 'On this page',
     anchors: {
       etapes: 'Milestones',
       fondateur: 'The founder',
@@ -141,17 +69,11 @@ export const MESSAGES_EN: SiteMessages = {
       directeurs: 'The directors',
       archives: 'The archives',
     },
-    atAGlance: 'The college at a glance',
-    stepsTitle: 'Milestones',
     stepsLead:
       'Each date gives its source: the college administration, its website or the Lasallian archives. Where they differ, the page gives both.',
-    keyDates: 'Key dates',
-    directorsTitle: 'Those who led the college',
     directorsLead: 'List published on the college’s website, since the 1905 inauguration.',
     brothersTable: 'Brother directors and coordinators',
     layTable: 'Lay directors',
-    name: 'Name',
-    period: 'Period',
     archivesTitle: 'Photographic archives',
     archivesLead: {
       before: 'Photographs from the archives of the Brothers of the Christian Schools, Middle East (',
@@ -160,119 +82,26 @@ export const MESSAGES_EN: SiteMessages = {
     },
   },
 
-  section: {
-    atAGlance: (track) => `${track} at a glance`,
-    headcount: 'Student numbers',
-    cycle: 'Stage',
-    level: 'Year group',
-    students: 'Students',
-    total: 'Total',
-    practical: 'Practical information',
-    office: 'School office',
-    writeToOffice: 'Write to the school office',
-    landmarks: 'Landmarks',
-    collegeHistory: 'The college’s history',
-    usefulLinks: 'Useful links',
-    subjectsTitle: 'Subjects',
-    subjectsLead: {
-      before:
-        'The subjects teachers publish in their class space: homework, resources and grades. Students find their class’s subjects by signing in to the ',
-      link: 'student space',
-      after: '.',
-    },
-  },
-
   contact: {
-    title: 'Contact and admissions',
-    lead: 'A question about schooling or an application? Write to the school office or call the relevant school stage directly.',
-    details: 'Contact details',
-    office: 'School office',
-    seeOnMap: 'See on the map',
-    phonesTitle: 'Phone numbers by department',
-    registrationTitle: 'Admissions',
     registrationNationale:
       'Egyptian Bac: admission periods, the list of documents and the application form are published in Arabic on the college’s website.',
     registrationNationaleLink: 'See the announcements on lasalle-eg.net',
     registrationBac: 'French Bac: applications are made online, on the section’s website (in French).',
-    sitesTitle: 'The college’s websites',
   },
 
-  contactForm: {
-    title: 'Write to the school office',
-    sent: { before: 'Thank you, your message has been sent to the school office. The reply will be sent to', after: '.' },
-    notSent: 'Your message could not be sent right now.',
-    sendFromMail: 'Send from my e-mail app',
-    orWriteTo: 'or write to',
-    name: 'Name of the parent or student',
-    phone: 'Phone (optional)',
-    email: 'E-mail address',
-    emailHelp: 'So the school office can reply to you.',
-    subject: 'Subject',
-    subjects: {
-      registration: 'Application',
-      schooling: 'A student’s schooling',
-      'student-space': 'Access to the student space',
-      other: 'Other question',
-    },
-    track: 'Track and class',
-    trackNone: 'Not specified',
-    tracks: {
-      'nationale-kg': 'Egyptian Bac, kindergarten',
-      'nationale-primary': 'Egyptian Bac, primary',
-      'nationale-prep': 'Egyptian Bac, preparatory',
-      'nationale-secondary': 'Egyptian Bac, secondary',
-      'bac-primary': 'French Bac, nursery or primary',
-      'bac-college': 'French Bac, collège (ages 11–15)',
-      'bac-lycee': 'French Bac, lycée (ages 15–18)',
-    },
-    trap: 'Website',
-    message: 'Message',
-    messageHelp: '1,000 characters at most. You can write in English or Arabic.',
-    note: 'The college’s school office reads every message and replies by e-mail.',
-    send: 'Send the message',
-    sending: 'Sending…',
-    errors: {
-      nameRequired: 'Enter your name.',
-      emailRequired: 'Enter your e-mail address.',
-      emailInvalid: 'Enter a full address, for example name@domain.com.',
-      messageRequired: 'Write your message.',
-      messageTooLong: 'Shorten the message to 1,000 characters at most.',
-      nameTooLong: 'Shorten the name to 120 characters at most.',
-      phoneTooLong: 'Enter a single phone number.',
-    },
+  contactTracks: {
+    'nationale-kg': 'Egyptian Bac, kindergarten',
+    'nationale-primary': 'Egyptian Bac, primary',
+    'nationale-prep': 'Egyptian Bac, preparatory',
+    'nationale-secondary': 'Egyptian Bac, secondary',
+    'bac-primary': 'French Bac, nursery or primary',
+    'bac-college': 'French Bac, collège (ages 11–15)',
+    'bac-lycee': 'French Bac, lycée (ages 15–18)',
   },
 
   login: {
-    skip: 'Skip to the sign-in form',
-    college: 'The college',
     mottoMeaning: 'Sign of faith: the motto of the Brothers of the Christian Schools, who founded the college.',
-    title: 'Sign in to your space',
-    lead: 'Students, teachers and college staff.',
-    spacesLanguage: 'Once you are signed in, your space is in French.',
-    identifier: 'Username',
-    identifierHelp: 'The e-mail address the college gave you.',
-    password: 'Password',
-    show: 'Show',
-    hide: 'Hide',
-    thePassword: ' password',
-    forgot: 'Forgot your password? (French page)',
-    submit: 'Sign in',
-    submitting: 'Signing in…',
-    noEmail: 'No e-mail received? Your school stage’s office can reset your password.',
-    noSignUp: 'Accounts are created by the college: there is no online sign-up.',
-    backToSite: 'Back to the college website',
-    sessionUnavailable:
-      'The server is very busy and could not reopen your session. It may still be valid: try again in a moment.',
-    retry: 'Try again',
-    retrying: 'Trying again…',
-    errors: {
-      emailRequired: 'Enter your e-mail address.',
-      emailInvalid: 'Enter a full e-mail address, for example firstname.lastname@lasalle-daher.eg.',
-      passwordRequired: 'Enter your password.',
-      wrongCredentials: 'Wrong username or password. Check what you typed or contact your school stage’s office.',
-      tooManyAttempts: 'Too many attempts. Wait a minute before trying again.',
-      other: 'Sign-in did not go through. Try again in a moment.',
-    },
+    emailInvalid: 'Enter a full e-mail address, for example firstname.lastname@lasalle-daher.eg.',
   },
 
   accessibility: {

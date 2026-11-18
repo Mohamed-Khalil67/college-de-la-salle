@@ -3,9 +3,8 @@ import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LOCALE } from '../../../i18n/locale';
 import { pageUrl } from '../../../i18n/pages';
-import { localizedPhoto, type SectionPage } from '../../../school';
+import { localizedPhoto, SITE, type SectionPage } from '../../../school';
 import { Button } from '../../../shared/ui';
-import { TRACK_SUMMARY } from '../shared/track-summary';
 
 /** `<article siteTrackCard [track]="…">`: one of the two baccalauréats on the home page. */
 @Component({
@@ -38,7 +37,7 @@ export class TrackCard {
 
   readonly #locale = inject(LOCALE);
   protected readonly discover = this.#locale.messages.home.discoverTrack;
-  protected readonly summary = computed(() => TRACK_SUMMARY[this.track().slug]);
+  protected readonly summary = computed(() => SITE.trackSummary[this.track().slug]);
   protected readonly words = computed(() => this.#locale.content.tracks[this.track().slug]);
   protected readonly link = computed(() => pageUrl(this.#locale.lang, this.summary().page));
   protected readonly image = computed(() =>

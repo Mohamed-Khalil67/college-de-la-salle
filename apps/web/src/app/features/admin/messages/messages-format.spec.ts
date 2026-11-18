@@ -1,3 +1,4 @@
+import { SCHOOL_TIME_ZONE } from '../../../core/school/school-profile';
 import { describe, expect, it } from 'vitest';
 import {
   bulkHandledNotice,
@@ -34,7 +35,7 @@ describe('messages page helpers', () => {
     expect(mailtoAddress('mariam.saad+cdls@example.com')).toBe('mariam.saad%2Bcdls@example.com');
   });
 
-  it('dates a message in Cairo time', () => {
+  it.skipIf(SCHOOL_TIME_ZONE !== 'Africa/Cairo')('dates a message in Cairo time', () => {
     // 07:14 UTC is 10:14 in Cairo (summer time, UTC+3).
     expect(formatReceived('2026-07-20T07:14:00.000Z')).toBe('20 juillet 2026 à 10 h 14');
     expect(formatReceived('2026-12-01T22:05:00.000Z')).toBe('2 décembre 2026 à 0 h 05');

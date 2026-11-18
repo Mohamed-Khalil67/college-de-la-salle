@@ -1,11 +1,10 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { schoolToday } from '@cdls/shared';
 import type { ActivityType, Period, Prisma } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { ActivityTypesService } from '../activity-types/activity-types.service.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { fromDay } from '../common/dates.js';
+import { fromDay, schoolToday } from '../common/dates.js';
 import { forbidden } from '../common/errors.js';
 import { eventInclude, toEventDto } from '../events/event.mapper.js';
 import { PeriodsService } from '../periods/periods.service.js';

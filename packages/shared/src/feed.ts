@@ -7,7 +7,8 @@ import {
   occurrences,
   isWeekly,
 } from './calendar.js';
-import { SCHOOL_TIME_ZONE, type TimetableOccurrence } from './timetable.js';
+import type { SchoolCalendarIds } from './school-profile.js';
+import type { TimetableOccurrence } from './timetable.js';
 
 /**
  * « Synchroniser mon agenda »: a personal iCalendar feed that Google Agenda, Apple Calendrier and Outlook
@@ -56,7 +57,7 @@ export interface FeedItem {
   readonly day: string;
   /** All-day entries over several days: the last day, included. */
   readonly lastDay?: string;
-  /** HH:MM wall-clock time in Cairo; null for an all-day entry. */
+  /** HH:MM wall-clock time in the school's zone; null for an all-day entry. */
   readonly start: string | null;
   /** HH:MM; null: same as `start` (a deadline). */
   readonly end: string | null;
@@ -67,7 +68,6 @@ export interface FeedItem {
   readonly updatedAt: string;
 }
 
-const DOMAIN = 'college-de-la-salle-daher';
 /**
  * SEQUENCE counts seconds from this instant: it grows with every change saved a second apart and fits
  * RFC 5545’s signed 32-bit integer until 2094.
@@ -226,8 +226,8 @@ export function sortFeedItems(items: readonly FeedItem[]): FeedItem[] {
  */
 export const CAIRO_VTIMEZONE: readonly string[] = [
   'BEGIN:VTIMEZONE',
-  `TZID:${SCHOOL_TIME_ZONE}`,
-  `X-LIC-LOCATION:${SCHOOL_TIME_ZONE}`,
+  'TZID:Africa/Cairo',
+  'X-LIC-LOCATION:Africa/Cairo',
   'BEGIN:DAYLIGHT',
   'TZOFFSETFROM:+0200',
   'TZOFFSETTO:+0300',
@@ -244,6 +244,88 @@ export const CAIRO_VTIMEZONE: readonly string[] = [
   'END:STANDARD',
   'END:VTIMEZONE',
 ];
+
+/** Hand-written blocks with yearly rules, for the zones whose rules are known and stable. */
+const KNOWN_VTIMEZONES: Readonly<Record<string, readonly string[]>> = { 'Africa/Cairo': CAIRO_VTIMEZONE };
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+
+/** Minutes the zone is ahead of UTC at an instant (+120 for Cairo in winter). */
+export function zoneOffsetMinutes(timeZone: string, instant: number): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(new Date(instant));
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const wall = Date.UTC(part('year'), part('month') - 1, part('day'), part('hour'), part('minute'), part('second'));
+  return Math.round((wall - Math.floor(instant / 1000) * 1000) / MINUTE);
+}
+
+/** `+0200`, `-0330`. */
+function icsOffset(minutes: number): string {
+  const sign = minutes < 0 ? '-' : '+';
+  const abs = Math.abs(minutes);
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}${String(abs % 60).padStart(2, '0')}`;
+}
+
+/** The wall-clock time of an instant at a fixed offset, as an iCalendar local DATE-TIME. */
+function localStamp(instant: number, offset: number): string {
+  return new Date(instant + offset * MINUTE).toISOString().slice(0, 19).replace(/[-:]/g, '');
+}
+
+/**
+ * A VTIMEZONE block for any IANA zone, computed from the runtime's own zone data: one component per change of
+ * offset between January of `fromYear` and the end of `toYear` (one STANDARD component for a zone without
+ * summer time). Clients that know the zone by its TZID use their own rules; this block serves the others.
+ */
+export function vtimezone(timeZone: string, fromYear: number, toYear: number): readonly string[] {
+  const known = KNOWN_VTIMEZONES[timeZone];
+  if (known) return known;
+  const start = Date.UTC(fromYear, 0, 1);
+  const end = Date.UTC(toYear + 1, 0, 1);
+  const changes: { readonly at: number; readonly from: number; readonly to: number }[] = [];
+  let before = zoneOffsetMinutes(timeZone, start);
+  for (let t = start + 6 * HOUR; t <= end; t += 6 * HOUR) {
+    const offset = zoneOffsetMinutes(timeZone, t);
+    if (offset === before) continue;
+    // The change is inside (t - 6 h, t]: narrow it to the minute.
+    let low = t - 6 * HOUR;
+    let high = t;
+    while (high - low > MINUTE) {
+      const mid = low + Math.floor((high - low) / 2 / MINUTE) * MINUTE;
+      if (zoneOffsetMinutes(timeZone, mid) === before) low = mid;
+      else high = mid;
+    }
+    changes.push({ at: high, from: before, to: offset });
+    before = offset;
+  }
+  const initial = zoneOffsetMinutes(timeZone, start);
+  const component = (kind: 'STANDARD' | 'DAYLIGHT', at: number, from: number, to: number) => [
+    `BEGIN:${kind}`,
+    `TZOFFSETFROM:${icsOffset(from)}`,
+    `TZOFFSETTO:${icsOffset(to)}`,
+    `DTSTART:${localStamp(at, from)}`,
+    `END:${kind}`,
+  ];
+  const first = changes[0];
+  // Before the first change the zone keeps its initial offset: the kind opposite to that change.
+  const initialKind = first && first.to < first.from ? 'DAYLIGHT' : 'STANDARD';
+  return [
+    'BEGIN:VTIMEZONE',
+    `TZID:${timeZone}`,
+    `X-LIC-LOCATION:${timeZone}`,
+    ...component(initialKind, start, initial, initial),
+    ...changes.flatMap((c) => component(c.to > c.from ? 'DAYLIGHT' : 'STANDARD', c.at, c.from, c.to)),
+    'END:VTIMEZONE',
+  ];
+}
 
 const day = (d: string) => d.replace(/-/g, '');
 const time = (hhmm: string) => `${hhmm.replace(':', '')}00`;
@@ -280,35 +362,41 @@ export interface FeedOptions {
   readonly name: string;
   /** Instant the file is built (DTSTAMP). */
   readonly now: string;
+  /** The school's IANA zone (profile `timeZone`): the times of the entries are wall-clock times there. */
+  readonly timeZone: string;
+  /** The school's calendar ids (profile `calendar`). */
+  readonly calendar: SchoolCalendarIds;
 }
 
 /** The whole feed as an iCalendar file (CRLF line ends, folded lines). */
 export function toFeedIcs(items: readonly FeedItem[], options: FeedOptions): string {
   const stamp = utc(options.now);
+  const zone = options.timeZone;
+  const year = new Date(options.now).getUTCFullYear();
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//College de la Salle Daher//Agenda//FR',
+    `PRODID:-//${options.calendar.productName}//Agenda//FR`,
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${icsText(options.name)}`,
-    `X-WR-TIMEZONE:${SCHOOL_TIME_ZONE}`,
+    `X-WR-TIMEZONE:${zone}`,
     'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
     'X-PUBLISHED-TTL:PT1H',
-    ...CAIRO_VTIMEZONE,
+    ...vtimezone(zone, year - 1, year + 1),
   ];
   for (const item of sortFeedItems(items)) {
     lines.push(
       'BEGIN:VEVENT',
-      `UID:${item.uid}@${DOMAIN}`,
+      `UID:${item.uid}@${options.calendar.uidDomain}`,
       `DTSTAMP:${stamp}`,
       `LAST-MODIFIED:${utc(item.updatedAt)}`,
       `SEQUENCE:${feedSequence(item.updatedAt)}`,
     );
     if (item.start) {
       lines.push(
-        `DTSTART;TZID=${SCHOOL_TIME_ZONE}:${day(item.day)}T${time(item.start)}`,
-        `DTEND;TZID=${SCHOOL_TIME_ZONE}:${day(item.day)}T${time(item.end ?? item.start)}`,
+        `DTSTART;TZID=${zone}:${day(item.day)}T${time(item.start)}`,
+        `DTEND;TZID=${zone}:${day(item.day)}T${time(item.end ?? item.start)}`,
       );
     } else {
       lines.push(

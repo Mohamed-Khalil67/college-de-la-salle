@@ -1,0 +1,64 @@
+{
+  "id": "cdls-daher",
+  "placeholder": false,
+  "names": {
+    "fr": { "full": "Collège de la Salle", "short": "CDLS", "place": "Daher", "city": "Le Caire", "of": "du Collège de la Salle" },
+    "en": { "full": "Collège de la Salle", "short": "CDLS", "place": "Daher", "city": "Cairo", "of": "of Collège de la Salle" },
+    "ar": { "full": "كلية دي لا سال", "short": "CDLS", "place": "الظاهر", "city": "القاهرة", "of": "كلية دي لا سال" }
+  },
+  "nameLang": "fr",
+  "foundingYear": 1898,
+  "affiliation": {
+    "fr": "Frères des Écoles chrétiennes",
+    "en": "Brothers of the Christian Schools",
+    "ar": "إخوة المدارس المسيحية"
+  },
+  "contacts": {
+    "address": {
+      "fr": "6 El Beshnini St., El-Zaher, Le Caire",
+      "en": "6 El Beshnini St., El-Zaher, Cairo",
+      "ar": "6 شارع البشنيني، الظاهر، القاهرة"
+    },
+    "mapQuery": "Collège De La Salle, El-Zaher, Cairo",
+    "email": "delasalle@lasalle-eg.net",
+    "switchboard": "+20 2 2590 47 40",
+    "departments": [
+      { "id": "standard", "phones": ["+20 2 2590 47 40", "+20 2 2590 97 65", "+20 2 2588 56 53"] },
+      { "id": "superieur", "phones": ["+20 2 2590 43 48"] },
+      { "id": "directeur", "phones": ["+20 2 2592 80 70"] },
+      { "id": "secondaire", "phones": ["+20 2 2592 24 03"] },
+      { "id": "bac", "phones": ["+20 2 2592 95 98"] },
+      { "id": "preparatoire", "phones": ["+20 2 2588 56 51"] },
+      { "id": "grand-primaire", "phones": ["+20 2 2588 56 50"] },
+      { "id": "petit-primaire", "phones": ["+20 2 2588 56 49"] },
+      { "id": "jardin", "phones": ["+20 2 2588 56 52"] }
+    ]
+  },
+  "websites": [
+    { "id": "official", "url": "http://www.lasalle-eg.net/" },
+    { "id": "bac", "url": "https://bacdelasalle.com/" },
+    { "id": "network", "url": "https://lasalle-po.org/" }
+  ],
+  "loginEmailDomain": "lasalle-daher.eg",
+  "timeZone": "Africa/Cairo",
+  "defaultLanguage": "fr",
+  "languages": ["fr", "en", "ar"],
+  "sections": [
+    { "code": "nationale", "labels": { "fr": "Bac nationale", "en": "Egyptian Bac", "ar": "الثانوية العامة" } },
+    { "code": "bac", "labels": { "fr": "Bac français", "en": "French Bac", "ar": "البكالوريا الفرنسية" } }
+  ],
+  "calendar": { "uidDomain": "college-de-la-salle-daher", "productName": "College de la Salle Daher" },
+  "brand": {
+    "crest": "/crest.svg#crest",
+    "crestOnDark": "/crest.svg#crest-on-dark",
+    "marker": "/crest.svg#star-marker",
+    "themeColor": "#0A192F",
+    "icons": [
+      { "rel": "icon", "type": "image/x-icon", "href": "favicon.ico?v=2", "sizes": "16x16 32x32 48x48" },
+      { "rel": "icon", "type": "image/png", "sizes": "32x32", "href": "icon-32.png?v=2" },
+      { "rel": "icon", "type": "image/png", "sizes": "192x192", "href": "icon-192.png?v=2" },
+      { "rel": "apple-touch-icon", "href": "apple-touch-icon.png?v=2" }
+    ],
+    "colors": {}
+  }
+}

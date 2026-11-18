@@ -16,6 +16,7 @@ import { validateEnv, type Env } from './config/env.validation.js';
 import { MailModule } from './mail/mail.module.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { SchoolModule } from './school/school.module.js';
 import { AttendanceModule } from './attendance/attendance.module.js';
 import { ClassesModule } from './classes/classes.module.js';
 import { ContactModule } from './contact/contact.module.js';
@@ -91,6 +92,7 @@ const IP_CEILING_ROUTES = ['/auth/login', '/auth/password', '/auth/forgot-passwo
       },
     }),
     PrismaModule,
+    SchoolModule,
     MailModule,
     AccessModule,
     AuthModule,

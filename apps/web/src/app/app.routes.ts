@@ -1,5 +1,6 @@
 import type { Routes } from '@angular/router';
 import { anonymousGuard, firstAccessGuard, roleGuard, structureGuard } from './core/auth/auth.guards';
+import { ENABLED_LANGS } from './i18n/lang';
 import type { SiteLocale } from './i18n/locale';
 import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from './layout/space-navs';
 
@@ -14,12 +15,19 @@ const publicSite = (locale: () => Promise<SiteLocale>) => () =>
 const login = (locale: () => Promise<SiteLocale>) => () =>
   Promise.all([import('./features/auth/login.routes'), locale()]).then(([m, l]) => m.loginRoutes(l));
 
+/** The routes of one extra language, when the school's profile publishes it (`languages`). */
+const extraLanguage = (lang: 'en' | 'ar', locale: () => Promise<SiteLocale>): Routes =>
+  ENABLED_LANGS.includes(lang)
+    ? [
+        { path: `${lang}/login`, canMatch: [anonymousGuard], loadChildren: login(locale) },
+        { path: lang, loadChildren: publicSite(locale) },
+      ]
+    : [];
+
 export const routes: Routes = [
   // Public site in English and Arabic (/en/…, /ar/…); French is the last route before the fallback.
-  { path: 'en/login', canMatch: [anonymousGuard], loadChildren: login(en) },
-  { path: 'ar/login', canMatch: [anonymousGuard], loadChildren: login(ar) },
-  { path: 'en', loadChildren: publicSite(en) },
-  { path: 'ar', loadChildren: publicSite(ar) },
+  ...extraLanguage('en', en),
+  ...extraLanguage('ar', ar),
   {
     path: 'connexion/oubli',
     title: 'Mot de passe oublié',

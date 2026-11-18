@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LANG_META, LANGS, type Lang } from '../i18n/lang';
+import { ENABLED_LANGS, LANG_META, type Lang } from '../i18n/lang';
 import { pageUrl, type PublicPageId } from '../i18n/pages';
 
 /**
@@ -68,7 +68,7 @@ export class LanguageSwitcher {
   readonly tone = input<'dark' | 'light'>('dark');
 
   protected readonly links = computed(() =>
-    LANGS.map((lang) => ({
+    ENABLED_LANGS.map((lang) => ({
       lang,
       name: LANG_META[lang].endonym,
       url: pageUrl(lang, this.page()),

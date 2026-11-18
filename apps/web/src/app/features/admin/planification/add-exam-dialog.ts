@@ -1,6 +1,7 @@
 import { Component, computed, inject, linkedSignal, model, output, resource, signal, untracked } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
-import { type ActivityTypeDto, type ClassDto, type EventDto, isExamActivityCode, SECTION_LABELS, type TimetableBlockedError } from '@cdls/shared';
+import { type ActivityTypeDto, type ClassDto, type EventDto, isExamActivityCode, type TimetableBlockedError } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { SchoolClock } from '../../../core/clock/school-clock';
 import { Alert, Button, Field, FieldControl, Modal } from '../../../shared/ui';

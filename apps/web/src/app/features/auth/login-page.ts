@@ -9,6 +9,7 @@ import { LanguageSwitcher } from '../../layout/language-switcher';
 import { LOCALE } from '../../i18n/locale';
 import { pageUrl } from '../../i18n/pages';
 import { apiMessage } from '../../core/api/api-client';
+import { SITE } from '../../school';
 import { Alert, Button, Field, FieldControl, SkipLink, Wordmark } from '../../shared/ui';
 import { shownError } from '../../shared/utils/forms';
 
@@ -25,12 +26,14 @@ import { shownError } from '../../shared/utils/forms';
     <a cdlsSkipLink>{{ t.skip }}</a>
     <div class="auth">
       <aside class="auth__visual on-inverse" [attr.aria-label]="t.college">
-        <img ngSrc="/images/school/batiment-brique.jpg" width="625" height="425" alt="" priority />
+        <img [ngSrc]="image.src" [width]="image.width" [height]="image.height" alt="" priority />
         <cdls-wordmark tone="dark" [link]="home" [subtitle]="place" />
-        <blockquote class="stack stack--sm">
-          <p class="t-quote" lang="la">« Signum Fidei »</p>
-          <p class="t-body-s">{{ t.mottoMeaning }}</p>
-        </blockquote>
+        @if (motto; as m) {
+          <blockquote class="stack stack--sm">
+            <p class="t-quote" [attr.lang]="m.lang">{{ m.text }}</p>
+            <p class="t-body-s">{{ t.mottoMeaning }}</p>
+          </blockquote>
+        }
       </aside>
 
       <main id="contenu" class="auth__form" tabindex="-1">
@@ -85,6 +88,8 @@ import { shownError } from '../../shared/utils/forms';
   `,
 })
 export class LoginPage {
+  protected readonly image = SITE.authImage;
+  protected readonly motto = SITE.motto;
   /** Where to go after signing in (?suite=/eleve/notes), when it belongs to the user's area. */
   readonly suite = input<string>();
 

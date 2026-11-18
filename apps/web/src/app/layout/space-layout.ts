@@ -3,6 +3,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
+import { PROFILE } from '../core/school/school-profile';
 import { NotificationBell } from '../features/notifications/notification-bell';
 import { Alert, Avatar, Icon, SkipLink, Wordmark } from '../shared/ui';
 import { ChangePasswordModal } from './change-password-modal';
@@ -23,7 +24,7 @@ export type { SpaceNavItem } from './space-nav';
 
       <header class="app-bar on-inverse">
         <div class="app-bar__inner">
-          <cdls-wordmark tone="dark" [subtitle]="area()" [link]="base()" [label]="'Collège de la Salle, ' + area() + ' : accueil'" />
+          <cdls-wordmark tone="dark" [subtitle]="area()" [link]="base()" [label]="schoolName + ', ' + area() + ' : accueil'" />
           <p class="app-bar__title" aria-hidden="true">{{ pageTitle() }}</p>
           <nav class="app-bar__nav" [attr.aria-label]="area()">
             <ul role="list">
@@ -154,6 +155,7 @@ export type { SpaceNavItem } from './space-nav';
   host: { '(document:keydown.escape)': 'closeAccount()', '(document:click)': 'onDocumentClick($event)' },
 })
 export class SpaceLayout {
+  protected readonly schoolName = PROFILE.names.fr.full;
   /** From route data. */
   readonly areaLabel = input('Espace');
   /** Shown instead of `areaLabel` to a teacher who is a planificateur (in the administration). */

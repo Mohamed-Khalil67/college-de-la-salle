@@ -1,8 +1,9 @@
 import { Component, ElementRef, Injector, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
 import { Router } from '@angular/router';
-import { SECTION_LABELS } from '@cdls/shared';
+import { SECTION_LABELS } from '../../core/school/school-profile';
 import { AuthStore, HOME_BY_ROLE } from '../../core/auth/auth-store';
+import { SITE } from '../../school';
 import { Button, SkipLink, Wordmark } from '../../shared/ui';
 import { PasswordForm } from '../../shared/components/password-form';
 
@@ -18,12 +19,14 @@ import { PasswordForm } from '../../shared/components/password-form';
     <a cdlsSkipLink>Aller au contenu</a>
     <div class="auth">
       <aside class="auth__visual on-inverse" aria-label="Le collège">
-        <img ngSrc="/images/school/batiment-brique.jpg" width="625" height="425" alt="" priority />
+        <img [ngSrc]="image.src" [width]="image.width" [height]="image.height" alt="" priority />
         <cdls-wordmark tone="dark" />
-        <blockquote class="stack stack--sm">
-          <p class="t-quote">« Signum Fidei »</p>
-          <p class="t-body-s">Signe de la foi : la devise des Frères des Écoles chrétiennes, fondateurs du collège.</p>
-        </blockquote>
+        @if (motto; as m) {
+          <blockquote class="stack stack--sm">
+            <p class="t-quote">{{ m.text }}</p>
+            <p class="t-body-s">{{ m.meaningFr }}</p>
+          </blockquote>
+        }
       </aside>
 
       <main id="contenu" class="auth__form" tabindex="-1">
@@ -88,6 +91,8 @@ import { PasswordForm } from '../../shared/components/password-form';
   `,
 })
 export class FirstAccessPage {
+  protected readonly image = SITE.authImage;
+  protected readonly motto = SITE.motto;
   readonly #auth = inject(AuthStore);
   readonly #router = inject(Router);
   readonly #injector = inject(Injector);

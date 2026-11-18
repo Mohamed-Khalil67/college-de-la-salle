@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import type { Period, Prisma, ReportCard } from '../generated/prisma/client.js';
 import { AccessService } from '../access/access.service.js';
 import { audit } from '../common/audit.js';
@@ -6,8 +6,9 @@ import type { AuthUser } from '../common/auth-user.js';
 import { toDay, toIso } from '../common/dates.js';
 import { forbidden, notFound } from '../common/errors.js';
 import { hasNullableNumber, hasNumber, hasString, isRecord, readJsonList } from '../common/json.js';
-import { wasTargeted } from '@cdls/shared';
+import { type SchoolProfile, schoolTitle, wasTargeted } from '@cdls/shared';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { SCHOOL_PROFILE } from '../school/school.module.js';
 import { toEntries } from '../targets/target.mapper.js';
 import {
   type ClassStint,
@@ -25,7 +26,6 @@ import type {
 } from './dto/report-card.dto.js';
 import { reportCardPdf } from './report-card.pdf.js';
 
-const SCHOOL_NAME = 'Collège de la Salle — Daher';
 
 const include = { student: { include: { user: true } } } satisfies Prisma.ReportCardInclude;
 type CardRow = Prisma.ReportCardGetPayload<{ include: typeof include }>;
@@ -36,6 +36,7 @@ export class ReportCardsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    @Inject(SCHOOL_PROFILE) private readonly school: SchoolProfile,
   ) {}
 
   /** (Re)computes the unpublished report cards of a closed period; published ones are left as they are. */
@@ -279,7 +280,8 @@ export class ReportCardsService {
     ]);
     const dto = toReportCardDto(card);
     const content = await reportCardPdf(dto, {
-      schoolName: SCHOOL_NAME,
+      schoolName: schoolTitle(this.school),
+      timeZone: this.school.timeZone,
       termLabel: period.label,
       yearLabel: period.schoolYear.label,
       classLabel: schoolClass.label,

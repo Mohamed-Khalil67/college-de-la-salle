@@ -1,4 +1,5 @@
-import { addDays, schoolToday, weekday } from '@cdls/shared';
+import { addDays, weekday } from '@cdls/shared';
+import { schoolToday } from './school';
 import {
   type APIRequestContext,
   expect,

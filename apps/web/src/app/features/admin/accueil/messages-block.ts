@@ -1,5 +1,6 @@
 import { Component, computed, inject, resource } from '@angular/core';
-import { type ContactMessageDto, schoolToday } from '@cdls/shared';
+import { type ContactMessageDto } from '@cdls/shared';
+import { schoolToday } from '../../../core/school/school-profile';
 import { ApiClient } from '../../../core/api/api-client';
 import { HomeBlock } from '../../../shared/components/home-block';
 import { blockState, snapshotOf } from '../../../shared/utils/block-state';

@@ -10,6 +10,7 @@ import type {
   UserDto,
 } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { blockState, bothOf, LOADING, type Snapshot } from '../../../shared/utils/block-state';
 import {
   approvalsView,
@@ -57,7 +58,7 @@ describe('À valider', () => {
     expect(state(ready(page([])), ready(0)).status).toBe('empty');
     const s = state(ready(page([request('r1')], 4)), ready(2));
     expect(s).toMatchObject({ status: 'ready', data: { pending: 4, neverActivated: 2 } });
-    if (s.status === 'ready') expect(s.data.lines[0]).toEqual({ id: 'r1', student: 'Nour Haddad', change: 'Bac français vers Bac nationale' });
+    if (s.status === 'ready') expect(s.data.lines[0]).toEqual({ id: 'r1', student: 'Nour Haddad', change: `${SECTION_LABELS.bac} vers ${SECTION_LABELS.nationale}` });
   });
 
   it('keeps three lines at most, and shows the block for accounts alone', () => {

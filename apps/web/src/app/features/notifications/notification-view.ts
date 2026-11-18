@@ -1,4 +1,5 @@
 import { NOTIFICATION_KIND_LABELS, type NotificationKind } from '@cdls/shared';
+import { SCHOOL_TIME_ZONE } from '../../core/school/school-profile';
 import type { BadgeTone } from '../../shared/ui';
 
 /** Pure display rules of the notifications (tested in notification-view.spec.ts). */
@@ -32,12 +33,12 @@ export const kindLabel = (kind: NotificationKind) => NOTIFICATION_KIND_LABELS[ki
 const TIME = new Intl.DateTimeFormat('fr-FR', {
   hour: '2-digit',
   minute: '2-digit',
-  timeZone: 'Africa/Cairo',
+  timeZone: SCHOOL_TIME_ZONE,
 });
 const DATE = new Intl.DateTimeFormat('fr-FR', {
   day: 'numeric',
   month: 'long',
-  timeZone: 'Africa/Cairo',
+  timeZone: SCHOOL_TIME_ZONE,
 });
 
 /** « à l’instant », « il y a 12 min », « il y a 3 h », then « le 21 octobre à 08:30 » (Cairo time). */

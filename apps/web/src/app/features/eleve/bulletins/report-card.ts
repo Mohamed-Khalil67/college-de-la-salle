@@ -1,5 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import type { ReportCardDto } from '@cdls/shared';
+import { PROFILE } from '../../../core/school/school-profile';
 import { average, longDate, mark } from '../../../shared/utils/format';
 
 /** The term report card, laid out like the PDF (prototype eleve-bulletin.html). */
@@ -9,10 +10,10 @@ import { average, longDate, mark } from '../../../shared/utils/format';
     <article class="bulletin" aria-labelledby="bulletin-title">
       <header class="bulletin__head">
         <div class="wordmark">
-          <svg class="wordmark__crest" aria-hidden="true" focusable="false"><use href="/icons.svg#crest" /></svg>
+          <svg class="wordmark__crest" aria-hidden="true" focusable="false"><use [attr.href]="school.brand.crest" /></svg>
           <span class="wordmark__text">
-            <span class="wordmark__name">Collège de la Salle</span>
-            <span class="wordmark__place">Daher, Le Caire</span>
+            <span class="wordmark__name">{{ school.names.fr.full }}</span>
+            <span class="wordmark__place">{{ school.names.fr.place }}, {{ school.names.fr.city }}</span>
           </span>
         </div>
         <div class="stack stack--sm">
@@ -84,6 +85,7 @@ import { average, longDate, mark } from '../../../shared/utils/format';
   `,
 })
 export class ReportCard {
+  protected readonly school = PROFILE;
   readonly card = input.required<ReportCardDto>();
   readonly termLabel = input('trimestre');
   readonly yearLabel = input('');

@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { form, FormField, maxLength, required, submit, validate } from '@angular/forms/signals';
-import { SECTION_IDS, SECTION_LABELS, SUBJECT_LIMITS, type SectionId, type SubjectDto } from '@cdls/shared';
+import { SECTION_IDS, SUBJECT_LIMITS, type SectionId, type SubjectDto } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../../shared/ui';
 import { shownError } from '../../../shared/utils/forms';

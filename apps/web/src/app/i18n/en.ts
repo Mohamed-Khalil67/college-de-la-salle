@@ -1,6 +1,13 @@
-import { CONTENT_EN } from '../school/content.en';
+import { PROFILE } from '../core/school/school-profile';
+import { sectionLabels } from '@cdls/shared';
+import { PACK } from '../school/active/en';
+import { composeMessages } from './compose-messages';
 import type { SiteLocale } from './locale';
-import { MESSAGES_EN } from './messages.en';
+import { BASE_EN } from './messages-base.en';
 
-/** English, loaded with the /en routes only (app.routes.ts). */
-export const EN: SiteLocale = { lang: 'en', messages: MESSAGES_EN, content: CONTENT_EN };
+/** English, loaded with the English routes only (app.routes.ts): the platform's words and the school pack's (schools/<SCHOOL>/site/). */
+export const EN: SiteLocale = {
+  lang: 'en',
+  content: PACK.content,
+  messages: composeMessages(BASE_EN, PACK.messages, sectionLabels(PROFILE, 'en')),
+};

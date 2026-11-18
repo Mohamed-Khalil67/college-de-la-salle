@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, linkedSignal, type Resource, resource, signal } from '@angular/core';
-import { type ClassDto, type GroupWithMembersDto, SECTION_LABELS } from '@cdls/shared';
+import { type ClassDto, type GroupWithMembersDto } from '@cdls/shared';
+import { SECTION_LABELS } from '../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
 import { opensStructure } from '../../core/auth/planner';

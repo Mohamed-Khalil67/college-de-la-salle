@@ -14,4 +14,4 @@ sed \
   -e "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(rand 64)|" \
   "$dir/.env.example" >"$target"
 chmod 600 "$target" 2>/dev/null || true
-echo "Wrote $target. Now edit PUBLIC_WEB_URL, SCHOOL_EMAIL_DOMAIN, SMTP_* and TUNNEL_TOKEN (or DOMAIN)."
+echo "Wrote $target. Now edit SCHOOL, PUBLIC_WEB_URL, SCHOOL_EMAIL_DOMAIN, SMTP_* and TUNNEL_TOKEN (or DOMAIN)."

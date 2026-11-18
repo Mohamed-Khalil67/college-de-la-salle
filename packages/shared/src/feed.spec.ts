@@ -16,6 +16,8 @@ import {
 } from './feed.js';
 import { expandTimetable, type SlotExceptionRule, type SlotRule } from './timetable.js';
 
+const CAIRO = { timeZone: 'Africa/Cairo', calendar: { uidDomain: 'college-de-la-salle-daher', productName: 'College de la Salle Daher' } };
+
 const slot: SlotRule = {
   id: 's1',
   target: 'bac-premiere',
@@ -208,7 +210,7 @@ describe('events and closed days in the feed', () => {
       endsOn: '2026-10-29',
       updatedAt: '2026-09-01T00:00:00.000Z',
     });
-    const ics = toFeedIcs([item], { name: 'Agenda', now: '2026-10-23T10:00:00.000Z' });
+    const ics = toFeedIcs([item], { name: 'Agenda', now: '2026-10-23T10:00:00.000Z', ...CAIRO });
     expect(ics).toContain('DTSTART;VALUE=DATE:20261025\r\n');
     expect(ics).toContain('DTEND;VALUE=DATE:20261030\r\n');
     expect(ics).toContain('UID:day-d1@college-de-la-salle-daher\r\n');
@@ -219,7 +221,7 @@ describe('the iCalendar file', () => {
   const now = '2026-10-23T10:00:00.000Z';
 
   it('uses the Cairo zone, a stable UID, SEQUENCE and CRLF lines', () => {
-    const ics = toFeedIcs(items([]).slice(0, 1), { name: 'Collège de la Salle — Nadia', now });
+    const ics = toFeedIcs(items([]).slice(0, 1), { name: 'Collège de la Salle — Nadia', now, ...CAIRO });
     expect(ics.startsWith('BEGIN:VCALENDAR\r\nVERSION:2.0\r\n')).toBe(true);
     expect(ics).toContain('BEGIN:VTIMEZONE\r\nTZID:Africa/Cairo\r\n');
     expect(ics).toContain('DTSTART;TZID=Africa/Cairo:20261004T083000\r\n');
@@ -234,14 +236,14 @@ describe('the iCalendar file', () => {
 
   it('gives the same file for the same data (order does not depend on input order)', () => {
     const list = items([]);
-    expect(toFeedIcs(list, { name: 'A', now })).toBe(
-      toFeedIcs([...list].reverse(), { name: 'A', now }),
+    expect(toFeedIcs(list, { name: 'A', now, ...CAIRO })).toBe(
+      toFeedIcs([...list].reverse(), { name: 'A', now, ...CAIRO }),
     );
   });
 
   it('escapes text and folds long lines at 75 octets without splitting a character', () => {
     const long = `Révision ; chapitre, ${'é'.repeat(80)}\nfin`;
-    const ics = toFeedIcs([{ ...items([])[0]!, description: long }], { name: 'A', now });
+    const ics = toFeedIcs([{ ...items([])[0]!, description: long }], { name: 'A', now, ...CAIRO });
     const lines = ics.split('\r\n');
     for (const line of lines) expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75);
     const unfolded = ics.replace(/\r\n /g, '');

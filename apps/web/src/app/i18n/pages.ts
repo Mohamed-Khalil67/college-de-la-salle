@@ -1,4 +1,4 @@
-import { DEFAULT_LANG, type Lang, LANGS } from './lang';
+import { DEFAULT_LANG, ENABLED_LANGS, type Lang } from './lang';
 
 /**
  * The public pages and their address in each language. French keeps the site's historic addresses; English
@@ -60,5 +60,5 @@ export function pageUrl(lang: Lang, page: PublicPageId): string {
 
 /** Every page in every language, for the hreflang links and the prerender list. */
 export function alternates(page: PublicPageId): readonly { readonly lang: Lang; readonly url: string }[] {
-  return LANGS.map((lang) => ({ lang, url: pageUrl(lang, page) }));
+  return ENABLED_LANGS.map((lang) => ({ lang, url: pageUrl(lang, page) }));
 }

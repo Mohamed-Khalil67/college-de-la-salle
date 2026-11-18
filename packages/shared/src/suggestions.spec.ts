@@ -9,7 +9,7 @@ import {
   sessionCandidates,
   timeSuggestion,
 } from './suggestions.js';
-import { schoolTimeNow } from './timetable.js';
+import { timeInZone } from './timetable.js';
 
 // The seed's periods: two breaks (10:00 – 10:15, 12:15 – 12:45).
 const PERIODS = [
@@ -168,6 +168,7 @@ describe('labels', () => {
 
   it('reads the clock in Cairo', () => {
     // 06:30 UTC is 09:30 in Cairo in summer time (UTC+3).
-    expect(schoolTimeNow(new Date('2026-07-01T06:30:00Z'))).toBe('09:30');
+    expect(timeInZone('Africa/Cairo', new Date('2026-07-01T06:30:00Z'))).toBe('09:30');
+    expect(timeInZone('America/New_York', new Date('2026-07-01T06:30:00Z'))).toBe('02:30');
   });
 });

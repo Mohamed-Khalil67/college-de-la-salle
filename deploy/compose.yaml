@@ -1,4 +1,5 @@
-# CDLS production stack. Run from the repository root:
+# School platform production stack (one install per school: SCHOOL in deploy/.env picks the school pack).
+# Run from the repository root:
 #   docker compose -f deploy/compose.yaml --env-file deploy/.env --profile tunnel up -d --build
 # Profiles pick how visitors reach the site (see docs/deployment.md):
 #   tunnel  Cloudflare Tunnel: no open router port, works behind CGNAT (recommended for a home laptop)
@@ -74,7 +75,11 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-}
       SCHOOL_EMAIL_DOMAIN: ${SCHOOL_EMAIL_DOMAIN:?set SCHOOL_EMAIL_DOMAIN in deploy/.env}
       MAIL_TRANSPORT: ${MAIL_TRANSPORT:-smtp}
-      MAIL_FROM: ${MAIL_FROM:-Collège de la Salle <no-reply@${SCHOOL_EMAIL_DOMAIN}>}
+      # The school pack of this install (schools/<SCHOOL>/profile.json): names in mails and report cards, time zone.
+      # Must be the same value as the web image's build arg below.
+      SCHOOL: ${SCHOOL:-cdls-daher}
+      # Empty: "<school name> <no-reply@SCHOOL_EMAIL_DOMAIN>".
+      MAIL_FROM: ${MAIL_FROM:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -92,6 +97,8 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
+        # The school pack the public pages are prerendered for (schools/<SCHOOL>/): chosen at BUILD time.
+        SCHOOL: ${SCHOOL:-cdls-daher}
     image: cdls-web:local
     restart: unless-stopped
     depends_on:

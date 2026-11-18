@@ -540,18 +540,19 @@ export function exceptionProblems(e: {
   return out;
 }
 
-/** The school's time zone: « today » for the timetable, whatever the browser's or the server's own zone. */
-export const SCHOOL_TIME_ZONE = 'Africa/Cairo';
-
-/** Today's date in Cairo as `YYYY-MM-DD` (sessions already held are never rewritten). */
-export function schoolToday(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: SCHOOL_TIME_ZONE }).format(now);
+/**
+ * The date in a time zone as `YYYY-MM-DD`. The school's « today » is `dayInZone(profile.timeZone)`, whatever the
+ * browser's or the server's own zone (sessions already held are never rewritten). The zone comes from the
+ * school profile (`school-profile.ts`); each app wraps this as its `schoolToday()`.
+ */
+export function dayInZone(timeZone: string, now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone }).format(now);
 }
 
-/** The time now in Cairo as `HH:MM` (24 h). */
-export function schoolTimeNow(now: Date = new Date()): string {
+/** The wall-clock time in a time zone as `HH:MM` (24 h). */
+export function timeInZone(timeZone: string, now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-GB', {
-    timeZone: SCHOOL_TIME_ZONE,
+    timeZone,
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',

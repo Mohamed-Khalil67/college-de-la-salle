@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { digestText, type NotificationText } from '@cdls/shared';
+import { digestText, type NotificationText, type SchoolProfile } from '@cdls/shared';
 import type { Env } from '../config/env.validation.js';
+import { SCHOOL_PROFILE } from '../school/school.module.js';
 import { MAIL_TRANSPORT, type MailTransport } from './mail-transport.js';
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
@@ -16,6 +17,7 @@ export class MailService {
   constructor(
     @Inject(MAIL_TRANSPORT) private readonly transport: MailTransport,
     config: ConfigService<Env, true>,
+    @Inject(SCHOOL_PROFILE) private readonly school: SchoolProfile,
   ) {
     this.from = config.get('MAIL_FROM', { infer: true });
     this.webUrl = config.get('PUBLIC_WEB_URL', { infer: true });
@@ -40,21 +42,21 @@ export class MailService {
     const text = [
       `Bonjour ${firstName},`,
       '',
-      'Vous avez demandé à réinitialiser le mot de passe de votre compte du Collège de la Salle.',
+      `Vous avez demandé à réinitialiser le mot de passe de votre compte ${this.school.names.fr.of}.`,
       `Ouvrez ce lien pour en choisir un nouveau (valable ${validity}, utilisable une seule fois) :`,
       '',
       link,
       '',
       'Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe actuel reste valable.',
       '',
-      'Collège de la Salle',
+      this.school.names.fr.full,
     ].join('\n');
     const html = [
       `<p>Bonjour ${escapeHtml(firstName)},</p>`,
-      '<p>Vous avez demandé à réinitialiser le mot de passe de votre compte du Collège de la Salle.</p>',
+      `<p>Vous avez demandé à réinitialiser le mot de passe de votre compte ${escapeHtml(this.school.names.fr.of)}.</p>`,
       `<p><a href="${escapeHtml(link)}">Choisir un nouveau mot de passe</a> (lien valable ${validity}, utilisable une seule fois).</p>`,
       '<p>Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe actuel reste valable.</p>',
-      '<p>Collège de la Salle</p>',
+      `<p>${escapeHtml(this.school.names.fr.full)}</p>`,
     ].join('\n');
     await this.transport.send(
       { to, subject: 'Réinitialisation de votre mot de passe', text, html },
@@ -73,7 +75,7 @@ export class MailService {
     page: string,
   ): Promise<void> {
     const link = `${this.webUrl}${page}`;
-    const { subject, text } = digestText(firstName, items, link);
+    const { subject, text } = digestText(firstName, items, link, this.school.names.fr.full);
     const html = text
       .split('\n')
       .filter((line) => line !== '')

@@ -16,4 +16,4 @@ $text = $text -replace '(?m)^POSTGRES_PASSWORD=.*$', "POSTGRES_PASSWORD=$(New-Se
 $text = $text -replace '(?m)^JWT_ACCESS_SECRET=.*$', "JWT_ACCESS_SECRET=$(New-Secret 64)"
 $text = $text -replace '(?m)^JWT_REFRESH_SECRET=.*$', "JWT_REFRESH_SECRET=$(New-Secret 64)"
 [System.IO.File]::WriteAllText($target, $text, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "Wrote $target. Now edit PUBLIC_WEB_URL, SCHOOL_EMAIL_DOMAIN, SMTP_* and TUNNEL_TOKEN (or DOMAIN)."
+Write-Host "Wrote $target. Now edit SCHOOL, PUBLIC_WEB_URL, SCHOOL_EMAIL_DOMAIN, SMTP_* and TUNNEL_TOKEN (or DOMAIN)."

@@ -3,11 +3,10 @@ import {
   GRADE_REMINDER_COOLDOWN_HOURS,
   type GradeReminderItem,
   gradesReminderNotice,
-  schoolToday,
   type SectionId,
 } from '@cdls/shared';
 import type { Period } from '../generated/prisma/client.js';
-import { fromDay } from '../common/dates.js';
+import { fromDay, schoolToday } from '../common/dates.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { notFound } from '../common/errors.js';

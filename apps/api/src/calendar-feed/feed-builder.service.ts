@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   CALENDAR_DAY_TYPE_LABELS,
   CLOSED_DAY_TYPES,
@@ -9,6 +9,7 @@ import {
   type FeedItem,
   feedWindow,
   isAssessment,
+  type SchoolProfile,
   latestInstant,
   sessionFeedItem,
   type TimetableOccurrence,
@@ -21,6 +22,7 @@ import { eventInclude, type EventRow, toCalendarEvent } from '../events/event.ma
 import type { Prisma } from '../generated/prisma/client.js';
 import { expandSlots, type SlotData, slotInclude, toSlotData } from '../occupancy/slot-data.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { SCHOOL_PROFILE } from '../school/school.module.js';
 
 /** Whose feed it is (read from the feed's account, never from the request). */
 export interface FeedOwner {
@@ -60,6 +62,7 @@ export class FeedBuilderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
+    @Inject(SCHOOL_PROFILE) private readonly school: SchoolProfile,
   ) {}
 
   async build(owner: FeedOwner, now = new Date()): Promise<string> {
@@ -73,8 +76,10 @@ export class FeedBuilderService {
       ...(await this.days(scope, from, to)),
     ];
     return toFeedIcs(items, {
-      name: `Collège de la Salle — ${owner.firstName} ${owner.lastName}`,
+      name: `${this.school.names.fr.full} — ${owner.firstName} ${owner.lastName}`,
       now: now.toISOString(),
+      timeZone: this.school.timeZone,
+      calendar: this.school.calendar,
     });
   }
 

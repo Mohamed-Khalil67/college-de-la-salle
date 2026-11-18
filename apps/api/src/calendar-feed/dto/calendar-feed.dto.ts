@@ -14,7 +14,7 @@ export class CalendarFeedDto implements CalendarFeedContract {
 }
 
 export class CalendarFeedCreatedDto extends CalendarFeedDto implements CalendarFeedCreatedContract {
-  /** @example https://www.lasalle-daher.eg/api/calendar/feed/0193…AbC.ics */
+  /** @example https://www.example.school/api/calendar/feed/0193…AbC.ics */
   url: string;
 }
 

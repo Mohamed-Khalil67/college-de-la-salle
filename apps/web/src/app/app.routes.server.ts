@@ -1,5 +1,5 @@
 import { RenderMode, type ServerRoute } from '@angular/ssr';
-import { LANGS } from './i18n/lang';
+import { ENABLED_LANGS } from './i18n/lang';
 import { PRERENDERED_PAGES, routePath } from './i18n/pages';
 
 /**
@@ -7,7 +7,7 @@ import { PRERENDERED_PAGES, routePath } from './i18n/pages';
  * and an instant first paint, then hydrated). Login and the spaces depend on the signed-in user: client-rendered.
  */
 export const serverRoutes: ServerRoute[] = [
-  ...LANGS.flatMap((lang) =>
+  ...ENABLED_LANGS.flatMap((lang) =>
     PRERENDERED_PAGES.map((page): ServerRoute => ({ path: routePath(lang, page), renderMode: RenderMode.Prerender })),
   ),
   { path: '**', renderMode: RenderMode.Client },

@@ -1,10 +1,9 @@
 import {
   type GradeSheetDto,
   type PendingGradingDto,
-  schoolToday,
   type StudentGradesDto,
 } from '@cdls/shared';
-import { fromDay } from '../src/common/dates.js';
+import { fromDay, schoolToday } from '../src/common/dates.js';
 import {
   activityTypeId,
   ADMIN,

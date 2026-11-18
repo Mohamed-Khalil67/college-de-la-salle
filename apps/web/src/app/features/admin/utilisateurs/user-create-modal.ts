@@ -1,6 +1,7 @@
 import { Component, ElementRef, Injector, afterNextRender, computed, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { email, form, FormField, hidden, maxLength, pattern, required, submit } from '@angular/forms/signals';
-import type { ClassDto, CreatedUserResponse, Role, UserDto } from '@cdls/shared';
+import { type ClassDto, type CreatedUserResponse, loginExample, type Role, type UserDto } from '@cdls/shared';
+import { PROFILE } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { Alert, Button, Field, FieldControl, Modal } from '../../../shared/ui';
 import { CopyButton } from '../shared/copy-button';
@@ -131,7 +132,7 @@ export class UserCreateModal {
     maxLength(p.firstName, 80, { message: 'Le prénom compte 80 caractères au plus.' });
     required(p.lastName, { message: 'Saisissez le nom de famille.' });
     maxLength(p.lastName, 80, { message: 'Le nom compte 80 caractères au plus.' });
-    email(p.email, { message: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg, ou laissez le champ vide.' });
+    email(p.email, { message: 'Saisissez une adresse e-mail complète, par exemple ' + loginExample(PROFILE) + ', ou laissez le champ vide.' });
     hidden(p.classId, (ctx) => !student(ctx));
     hidden(p.studentNumber, (ctx) => !student(ctx));
     required(p.classId, { message: 'Choisissez la classe de l’élève.', when: student });

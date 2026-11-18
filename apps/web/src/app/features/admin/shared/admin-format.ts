@@ -2,17 +2,8 @@
  * Framework-free helpers for the administration: labels, dates, averages, CSV and passwords.
  * No Angular here, so they are unit-tested with Vitest (admin-format.spec.ts).
  */
-import {
-  type ClassDto,
-  type ImportUsersError,
-  type ImportRole,
-  type ImportUsersResponse,
-  type Role,
-  ROSTER_HEADERS,
-  SECTION_LABELS,
-  type SectionId,
-  type UserDto,
-} from '@cdls/shared';
+import { type ClassDto, type ImportUsersError, type ImportRole, type ImportUsersResponse, type Role, ROSTER_HEADERS, type SectionId, type UserDto } from '@cdls/shared';
+import { SCHOOL_TIME_ZONE, SECTION_LABELS } from '../../../core/school/school-profile';
 import type { BadgeTone } from '../../../shared/ui';
 
 export const ROLE_LABELS: Readonly<Record<Role, { readonly one: string; readonly tab: string; readonly noun: string }>> = {
@@ -45,15 +36,15 @@ export function userStatus(user: Pick<UserDto, 'status' | 'mustChangePassword' |
   return { label: 'Actif', tone: 'success' };
 }
 
-const TIME = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Cairo' });
-const DAY_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Cairo' });
+const TIME = new Intl.DateTimeFormat('fr-FR', { hour: 'numeric', minute: '2-digit', timeZone: SCHOOL_TIME_ZONE });
+const DAY_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: SCHOOL_TIME_ZONE });
 const DAY_MONTH_YEAR = new Intl.DateTimeFormat('fr-FR', {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
-  timeZone: 'Africa/Cairo',
+  timeZone: SCHOOL_TIME_ZONE,
 });
-const CAIRO_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' });
+const SCHOOL_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: SCHOOL_TIME_ZONE });
 const UTC_DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 /** « 9 h 14 » rather than « 09:14 ». */
@@ -70,7 +61,7 @@ function daysBetween(a: string, b: string): number {
 export function formatLastLogin(iso: string | null, now: Date): string {
   if (!iso) return 'Jamais';
   const date = new Date(iso);
-  const gap = daysBetween(CAIRO_DAY.format(date), CAIRO_DAY.format(now));
+  const gap = daysBetween(SCHOOL_DAY.format(date), SCHOOL_DAY.format(now));
   if (gap <= 0) return `Aujourd’hui, ${frenchTime(date)}`;
   if (gap === 1) return 'Hier';
   return gap < 300 ? DAY_MONTH.format(date) : DAY_MONTH_YEAR.format(date);

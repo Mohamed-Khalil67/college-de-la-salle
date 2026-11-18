@@ -12,5 +12,6 @@ source of truth for tables is `apps/api/prisma/schema.prisma`.
 | API modules, guards, services | `apps/api/src/` (one folder per feature), conventions in `apps/api/CLAUDE.md` |
 | Schema and migrations | `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/` |
 | Web app and design system | `apps/web/src/app/`, conventions in `apps/web/CLAUDE.md`, tokens in `apps/web/src/styles/` |
+| The school (names, contacts, time zone, sections, public text and pictures, crest) | `schools/<id>/`, selected by `SCHOOL`: `profile.json` (validated by `packages/shared/src/school-profile.ts`), `site/`, `public/`. `docs/new-school.md` |
 | Deployment | `deploy/`, `docs/deployment.md` |
 | Design decisions and leftovers | `docs/school-year-design.md` |

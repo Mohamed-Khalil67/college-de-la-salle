@@ -1,38 +1,14 @@
 /**
  * Content model of the site. Pure types: no Angular.
  *
- * French is the source language (photos.ts, school-info.ts, tracks.ts); content.en.ts and content.ar.ts
- * translate the same shapes (school-content.ts). These pages are institutional and static (prerendered at
- * build time); everything that changes during the school year lives in the API and is written by teachers.
+ * The school's own words (schools/<id>/site: content.fr.ts, content.en.ts, content.ar.ts) take these shapes; French
+ * is the source language and the other two translate the same shapes (school-content.ts). These pages are
+ * institutional and static (prerendered at build time); everything that changes during the school year lives in
+ * the API and is written by teachers.
  */
 
-export type PhotoId =
-  | 'campus-aerien'
-  | 'batiment-brique'
-  | 'construction-1954'
-  | 'inauguration-1955'
-  | 'inauguration-1955-discours'
-  | 'freres-1926'
-  | 'campus-1907'
-  | 'campus-1954'
-  | 'chantier-batiments-1'
-  | 'chantier-batiments-2'
-  | 'chantier-batiments-3'
-  | 'chantier-batiments-4'
-  | 'chapelle-chantier-1'
-  | 'chapelle-chantier-2'
-  | 'chapelle-chantier-3'
-  | 'chapelle-coupole'
-  | 'chapelle-facade'
-  | 'automobile'
-  | 'salle-de-classe'
-  | 'bureau'
-  | 'nef-archive'
-  | 'entree-1'
-  | 'entree-2'
-  | 'entree-3'
-  | 'batiment-ancien'
-  | 'terrain';
+/** A photo of the school pack (`photos` of its archive module); its texts are in each language's content. */
+export type PhotoId = string;
 
 export interface Photo {
   readonly id: PhotoId;
@@ -48,7 +24,8 @@ export interface Photo {
   readonly sourceUrl: string;
 }
 
-export type PhotoArchive = 'po' | 'eg';
+/** Whose archive a photo comes from (a key of the content's `photoCredits`). */
+export type PhotoArchive = string;
 
 /** The words of a photo, per language (src, size and credit owner do not change). */
 export interface PhotoText {
@@ -82,16 +59,8 @@ export interface Director {
   readonly role?: DirectorRole;
 }
 
-export type ContactId =
-  | 'standard'
-  | 'superieur'
-  | 'directeur'
-  | 'secondaire'
-  | 'bac'
-  | 'preparatoire'
-  | 'grand-primaire'
-  | 'petit-primaire'
-  | 'jardin';
+/** A department of the school (`profile.contacts.departments[].id`): its phones come from the profile, its name from the content. */
+export type ContactId = string;
 
 /** A list that always has a first item, so `list[0]` is typed without `undefined`. */
 export type NonEmptyList<T> = readonly [T, ...T[]];

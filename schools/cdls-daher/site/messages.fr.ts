@@ -1,114 +1,43 @@
-import { CONTACT_SUBJECTS, CONTACT_TRACKS } from '../school/contact-mail';
-import type { SiteMessages } from './messages';
+import type { SchoolMessages } from '../../../apps/web/src/app/i18n/messages';
+import { SITE } from './index';
 
-/** The interface in French: the source of messages.en.ts and messages.ar.ts. */
-export const MESSAGES_FR: SiteMessages = {
-  pages: {
-    home: {
-      title: '',
-      description:
-        'Collège de la Salle, Daher (Le Caire, fondé en 1898) : Bac nationale et Bac français. Histoire, patrimoine, matières, espace élève et espace enseignant.',
-    },
-    history: {
-      title: 'Histoire & Patrimoine',
-      description:
-        'Histoire du Collège de la Salle à Daher depuis 1898 : le bâtiment en briques rouges, les nouveaux bâtiments de 1955, la chapelle de 1958, en photographies d’archives.',
-    },
-    nationale: {
-      title: 'Bac nationale',
-      description:
-        'Bac nationale (Thanaweya Amma) au Collège de la Salle, Daher : programme du ministère égyptien, matières, espace élève et inscription.',
-    },
-    bac: {
-      title: 'Bac français',
-      description:
-        'Bac français au Collège de la Salle, Daher : baccalauréat français, homologation AEFE, pédagogie, orientation, effectifs et inscription.',
-    },
-    contact: {
-      title: 'Contact',
-      description: 'Adresse, e-mail et numéros de téléphone du Collège de la Salle, Daher, par service et par cycle.',
-    },
-    accessibility: {
-      title: 'Déclaration d’accessibilité',
-      description:
-        'Déclaration d’accessibilité du site du Collège de la Salle, Daher : ce que nous testons, les limites connues, comment nous signaler un problème.',
-    },
-    login: {
-      title: 'Connexion',
-      description: 'Connexion à l’espace élève, à l’espace enseignant et à l’administration du Collège de la Salle, Daher.',
-    },
+/** What the French pages say about Collège de la Salle; the shared words are the platform's (i18n/messages-base.fr.ts). */
+export const MESSAGES_FR: SchoolMessages = {
+  pageDescriptions: {
+    home: 'Collège de la Salle, Daher (Le Caire, fondé en 1898) : Bac nationale et Bac français. Histoire, patrimoine, matières, espace élève et espace enseignant.',
+    history:
+      'Histoire du Collège de la Salle à Daher depuis 1898 : le bâtiment en briques rouges, les nouveaux bâtiments de 1955, la chapelle de 1958, en photographies d’archives.',
+    nationale:
+      'Bac nationale (Thanaweya Amma) au Collège de la Salle, Daher : programme du ministère égyptien, matières, espace élève et inscription.',
+    bac: 'Bac français au Collège de la Salle, Daher : baccalauréat français, homologation AEFE, pédagogie, orientation, effectifs et inscription.',
+    contact: 'Adresse, e-mail et numéros de téléphone du Collège de la Salle, Daher, par service et par cycle.',
+    accessibility:
+      'Déclaration d’accessibilité du site du Collège de la Salle, Daher : ce que nous testons, les limites connues, comment nous signaler un problème.',
+    login: 'Connexion à l’espace élève, à l’espace enseignant et à l’administration du Collège de la Salle, Daher.',
   },
 
   layout: {
-    skipToContent: 'Aller au contenu',
-    switchboard: 'Standard',
-    menu: 'Menu',
-    mainNav: 'Navigation principale',
-    nav: { home: 'Accueil', history: 'Histoire', nationale: 'Bac nationale', bac: 'Bac français', contact: 'Contact' },
-    signIn: 'Connexion',
-    mySpace: 'Mon espace',
-    languages: 'Langue du site',
     footerAbout: 'Bac nationale et Bac français, du jardin d’enfants à la Terminale.',
-    footerCollege: 'Le collège',
-    footerSpaces: 'Espaces',
-    studentSpace: 'Espace élève',
-    teacherSpace: 'Espace enseignant',
-    administration: 'Administration',
-    findUs: 'Nous trouver',
     copyright: (year) => `© ${year} Collège de la Salle, Daher. Frères des Écoles chrétiennes.`,
     photoCredits: {
       before: 'Photographies : archives lasalliennes (',
       middle: ') et collège (',
       after: '), avec l’accord du collège.',
     },
-    accessibility: 'Accessibilité : non conforme',
   },
 
-  common: {
-    breadcrumb: 'Fil d’Ariane',
-    home: 'Accueil',
-    source: 'Source :',
-    motto: '« Signum Fidei », signe de la foi : la devise des Frères des Écoles chrétiennes.',
-    prepareRegistration: 'Préparer une inscription',
-    colon: ' : ',
-    showServerMessages: true,
-  },
+  motto: '« Signum Fidei », signe de la foi : la devise des Frères des Écoles chrétiennes.',
 
   home: {
     heroTitle: 'Un collège lasallien au cœur du Caire, depuis 1898',
     heroLead:
       'Du jardin d’enfants à la Terminale, 2 400 élèves préparent la Thanaweya Amma ou le baccalauréat français, dans un même projet éducatif.',
-    heroHistory: 'Découvrir notre histoire',
     heroCredit: 'Le campus de Daher vu du ciel.',
-    audienceTitle: 'Vous êtes…',
-    audiences: [
-      {
-        id: 'family',
-        title: 'Futur élève ou famille',
-        text: 'Les deux filières, les inscriptions et le secrétariat à contacter.',
-        page: 'contact',
-      },
-      {
-        id: 'student',
-        title: 'Élève du collège',
-        text: 'Vos notes, devoirs, emploi du temps et bulletins, dans l’espace élève.',
-        page: 'login',
-      },
-      {
-        id: 'teacher',
-        title: 'Enseignant',
-        text: 'L’appel, la saisie des notes, les devoirs et votre emploi du temps.',
-        page: 'login',
-      },
-    ],
     historyTitle: 'Plus d’un siècle à Daher',
     historyLead:
       'Fondé par les Frères des Écoles chrétiennes, l’institut créé par saint Jean-Baptiste de La Salle, le collège appartient au réseau lasallien d’Égypte et à ses 900 établissements dans le monde.',
-    historyLink: 'Lire l’histoire du collège',
     tracksTitle: 'Deux baccalauréats, un même projet éducatif',
     tracksLead: 'Les deux filières partagent les mêmes valeurs lasalliennes, la même cour et la même exigence.',
-    discoverTrack: (track) => `Découvrir le ${track}`,
-    featuresTitle: 'À découvrir',
     features: [
       {
         meta: 'Histoire, 1958',
@@ -126,15 +55,11 @@ export const MESSAGES_FR: SiteMessages = {
         text: 'Près de 190 Frères venus de toutes les écoles du pays se retrouvent au collège pour leur retraite annuelle.',
       },
     ],
-    contactTitle: 'Inscriptions et contact',
     contactLead:
       'Les ouvertures d’inscription et la liste des pièces à fournir sont publiées par le collège. Écrivez au secrétariat ou appelez directement le cycle concerné.',
-    allNumbers: 'Tous les numéros par service',
   },
 
   history: {
-    title: 'Histoire et patrimoine',
-    onThisPage: 'Sur cette page',
     anchors: {
       etapes: 'Les grandes étapes',
       fondateur: 'Le fondateur',
@@ -142,17 +67,11 @@ export const MESSAGES_FR: SiteMessages = {
       directeurs: 'Les directeurs',
       archives: 'Les archives',
     },
-    atAGlance: 'Le collège en bref',
-    stepsTitle: 'Les grandes étapes',
     stepsLead:
       'Chaque date indique sa source : l’administration du collège, son site officiel ou les archives lasalliennes. Quand elles diffèrent, la page donne les deux.',
-    keyDates: 'Dates clés',
-    directorsTitle: 'Ceux qui ont dirigé le collège',
     directorsLead: 'Liste publiée sur le site officiel du collège, depuis l’inauguration de 1905.',
     brothersTable: 'Frères directeurs et coordinateurs',
     layTable: 'Directeurs laïcs',
-    name: 'Nom',
-    period: 'Période',
     archivesTitle: 'Archives photographiques',
     archivesLead: {
       before: 'Photographies des archives des Frères des Écoles chrétiennes, Proche-Orient (',
@@ -161,107 +80,18 @@ export const MESSAGES_FR: SiteMessages = {
     },
   },
 
-  section: {
-    atAGlance: (track) => `${track} en bref`,
-    headcount: 'Effectifs',
-    cycle: 'Cycle',
-    level: 'Niveau',
-    students: 'Élèves',
-    total: 'Total',
-    practical: 'Informations pratiques',
-    office: 'Secrétariat',
-    writeToOffice: 'Écrire au secrétariat',
-    landmarks: 'Repères',
-    collegeHistory: 'L’histoire du collège',
-    usefulLinks: 'Liens utiles',
-    subjectsTitle: 'Les matières',
-    subjectsLead: {
-      before:
-        'Les matières que les enseignants publient dans l’espace de leur classe : devoirs, ressources et notes. Les élèves retrouvent celles de leur classe en se connectant à l’',
-      link: 'espace élève',
-      after: '.',
-    },
-  },
-
   contact: {
-    title: 'Contact et inscriptions',
-    lead: 'Une question sur la scolarité ou une demande d’inscription ? Écrivez au secrétariat ou appelez directement le cycle concerné.',
-    details: 'Coordonnées',
-    office: 'Secrétariat',
-    seeOnMap: 'Voir sur la carte',
-    phonesTitle: 'Téléphones par service',
-    registrationTitle: 'Inscriptions',
     registrationNationale:
       'Bac nationale : les ouvertures d’inscription, la liste des pièces à fournir et le formulaire de demande sont publiés en arabe sur le site officiel du collège.',
     registrationNationaleLink: 'Voir les annonces sur lasalle-eg.net',
     registrationBac: 'Bac français : les demandes se font en ligne, sur le site de la section.',
-    sitesTitle: 'Sites du collège',
   },
 
-  contactForm: {
-    title: 'Écrire au secrétariat',
-    sent: { before: 'Merci, votre message a bien été envoyé au secrétariat. La réponse vous parviendra à', after: '.' },
-    notSent: 'Votre message n’a pas pu être envoyé pour le moment.',
-    sendFromMail: 'Envoyer depuis ma messagerie',
-    orWriteTo: 'ou écrivez à',
-    name: 'Nom du parent ou de l’élève',
-    phone: 'Téléphone (facultatif)',
-    email: 'Adresse e-mail',
-    emailHelp: 'Pour que le secrétariat puisse vous répondre.',
-    subject: 'Objet',
-    subjects: CONTACT_SUBJECTS,
-    track: 'Filière et classe',
-    trackNone: 'Non précisée',
-    tracks: CONTACT_TRACKS,
-    trap: 'Site web',
-    message: 'Message',
-    messageHelp: '1 000 caractères au plus.',
-    note: 'Le secrétariat du collège lit chaque message et vous répond par e-mail.',
-    send: 'Envoyer le message',
-    sending: 'Envoi en cours…',
-    errors: {
-      nameRequired: 'Saisissez votre nom.',
-      emailRequired: 'Saisissez votre adresse e-mail.',
-      emailInvalid: 'Saisissez une adresse complète, par exemple nom@domaine.com.',
-      messageRequired: 'Écrivez votre message.',
-      messageTooLong: 'Raccourcissez le message à 1 000 caractères au plus.',
-      nameTooLong: 'Raccourcissez le nom à 120 caractères au plus.',
-      phoneTooLong: 'Saisissez un seul numéro de téléphone.',
-    },
-  },
+  contactTracks: Object.fromEntries(SITE.contactTracks.map((t) => [t.id, t.value])),
 
   login: {
-    skip: 'Aller au formulaire de connexion',
-    college: 'Le collège',
     mottoMeaning: 'Signe de la foi : la devise des Frères des Écoles chrétiennes, fondateurs du collège.',
-    title: 'Connexion à votre espace',
-    lead: 'Élèves, enseignants et administration du collège.',
-    spacesLanguage: null,
-    identifier: 'Identifiant',
-    identifierHelp: 'L’adresse e-mail fournie par le collège.',
-    password: 'Mot de passe',
-    show: 'Afficher',
-    hide: 'Masquer',
-    thePassword: ' le mot de passe',
-    forgot: 'Mot de passe oublié ?',
-    submit: 'Se connecter',
-    submitting: 'Connexion…',
-    noEmail: 'Pas d’e-mail reçu ? Le secrétariat de votre cycle peut réinitialiser votre mot de passe.',
-    noSignUp: 'Les comptes sont créés par le collège : il n’y a pas d’inscription en ligne.',
-    backToSite: 'Retour au site du collège',
-    sessionUnavailable:
-      'Le serveur est très sollicité et n’a pas pu rouvrir votre session. Elle est peut-être toujours valable : réessayez dans un instant.',
-    retry: 'Réessayer',
-    retrying: 'Nouvel essai…',
-    errors: {
-      emailRequired: 'Saisissez votre adresse e-mail.',
-      emailInvalid: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg.',
-      passwordRequired: 'Saisissez votre mot de passe.',
-      wrongCredentials:
-        'Identifiant ou mot de passe incorrect. Vérifiez la saisie ou contactez le secrétariat de votre cycle.',
-      tooManyAttempts: 'Trop de tentatives. Patientez une minute avant de réessayer.',
-      other: 'La connexion n’a pas abouti. Réessayez dans un instant.',
-    },
+    emailInvalid: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg.',
   },
 
   accessibility: {

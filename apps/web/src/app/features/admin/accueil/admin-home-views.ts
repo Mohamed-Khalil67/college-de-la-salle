@@ -1,16 +1,5 @@
-import {
-  type ClassDto,
-  type ContactMessageDto,
-  daysBetween,
-  type Paginated,
-  type PeriodDto,
-  type PostDto,
-  type ReportPreparationDto,
-  type SchoolYearDto,
-  SECTION_LABELS,
-  type SectionChangeRequestDto,
-  type UserDto,
-} from '@cdls/shared';
+import { type ClassDto, type ContactMessageDto, daysBetween, type Paginated, type PeriodDto, type PostDto, type ReportPreparationDto, type SchoolYearDto, type SectionChangeRequestDto, type UserDto } from '@cdls/shared';
+import { SECTION_LABELS } from '../../../core/school/school-profile';
 import { currentTerm, currentYear } from '../../../shared/utils/format';
 
 /**

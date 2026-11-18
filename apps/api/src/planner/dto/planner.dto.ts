@@ -60,7 +60,7 @@ export class AbsencePreviewQueryDto implements AbsencePreviewQuery {
 }
 
 export class PlannerDayQueryDto {
-  /** Defaults to today (Cairo). */
+  /** Defaults to today (school time zone). */
   @IsOptional()
   @IsDay()
   date?: string;

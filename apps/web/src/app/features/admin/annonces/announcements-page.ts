@@ -1,5 +1,6 @@
 import { Component, ElementRef, computed, inject, resource, signal, viewChild } from '@angular/core';
-import { type PostDto, schoolToday } from '@cdls/shared';
+import { type PostDto } from '@cdls/shared';
+import { schoolToday } from '../../../core/school/school-profile';
 import { ApiClient, apiMessage } from '../../../core/api/api-client';
 import { LoadState } from '../../../shared/components/load-state';
 import { SchoolYears } from '../../../shared/data/school-years';

@@ -4,6 +4,8 @@ import { RouterLink } from '@angular/router';
 import type { HttpErrorResponse } from '@angular/common/http';
 import { apiMessage } from '../../core/api/api-client';
 import { AuthStore } from '../../core/auth/auth-store';
+import { loginExample } from '@cdls/shared';
+import { PROFILE } from '../../core/school/school-profile';
 import { Alert, Button, Field, FieldControl } from '../../shared/ui';
 import { AuthShell } from './auth-shell';
 import { shownError } from '../../shared/utils/forms';
@@ -62,7 +64,7 @@ export class ForgotPasswordPage {
   protected readonly model = signal({ identifier: '' });
   protected readonly requestForm = form(this.model, (path) => {
     required(path.identifier, { message: 'Saisissez votre adresse e-mail.' });
-    email(path.identifier, { message: 'Saisissez une adresse e-mail complète, par exemple prenom.nom@lasalle-daher.eg.' });
+    email(path.identifier, { message: 'Saisissez une adresse e-mail complète, par exemple ' + loginExample(PROFILE) + '.' });
   });
   protected readonly identifierError = computed(() => shownError(this.requestForm.identifier()));
 

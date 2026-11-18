@@ -1,9 +1,10 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { LANG_META, LANGS, type Lang } from '../src/app/i18n/lang';
-import { MESSAGES_AR } from '../src/app/i18n/messages.ar';
-import { MESSAGES_EN } from '../src/app/i18n/messages.en';
-import { MESSAGES_FR } from '../src/app/i18n/messages.fr';
+import { LANG_META, LANGS, type Lang, siteTitle } from '../src/app/i18n/lang';
+import { SITE } from '../src/app/school/active/index';
+import { AR } from '../src/app/i18n/ar';
+import { EN } from '../src/app/i18n/en';
+import { FR } from '../src/app/i18n/fr';
 import { pageUrl, PRERENDERED_PAGES, PUBLIC_PAGES, type PublicPageId } from '../src/app/i18n/pages';
 
 /**
@@ -16,6 +17,9 @@ test.beforeEach(({}, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'checked at both widths inside each test');
 });
 
+const MESSAGES_FR = FR.messages;
+const MESSAGES_EN = EN.messages;
+const MESSAGES_AR = AR.messages;
 const MESSAGES = { fr: MESSAGES_FR, en: MESSAGES_EN, ar: MESSAGES_AR } as const;
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -61,7 +65,7 @@ for (const lang of LANGS) {
       await expectLanguage(page, lang);
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
       const title = t.pages[id].title;
-      await expect(page).toHaveTitle(title ? `${title} — ${LANG_META[lang].siteTitle}` : LANG_META[lang].homeTitle);
+      await expect(page).toHaveTitle(title ? `${title} — ${siteTitle(lang)}` : SITE.homeTitle[lang]);
       await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', t.pages[id].description);
       await axeAtBothWidths(page, url);
       if (id === 'login') {

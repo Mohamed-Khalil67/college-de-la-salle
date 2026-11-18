@@ -2,14 +2,13 @@ import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LOCALE } from '../../../i18n/locale';
 import { pageUrl } from '../../../i18n/pages';
-import { CONTACTS, localizedPhoto, MATIERE_GROUPS, matieresFor, SCHOOL, type SectionSlug } from '../../../school';
+import { CONTACTS, localizedPhoto, MATIERE_GROUPS, matieresFor, SCHOOL, SITE, type SectionSlug } from '../../../school';
 import { isMatiereId } from '../../../school/school-content';
 import { Button, Icon } from '../../../shared/ui';
 import { Breadcrumb } from '../shared/breadcrumb';
 import { telHref } from '../../../school/contact-mail';
 import { Facts } from '../shared/facts';
 import { PhotoFigure } from '../shared/photo-figure';
-import { TRACK_SUMMARY } from '../shared/track-summary';
 import { type MatiereCardData, MatiereCard } from './matiere-card';
 
 /**
@@ -189,7 +188,7 @@ export class SectionPage {
     login: pageUrl(this.#locale.lang, 'login'),
   };
   protected readonly page = computed(() => this.content.sections[this.section()]);
-  protected readonly summary = computed(() => TRACK_SUMMARY[this.section()]);
+  protected readonly summary = computed(() => SITE.trackSummary[this.section()]);
   protected readonly words = computed(() => this.content.tracks[this.section()]);
   protected readonly introPhoto = computed(() =>
     localizedPhoto(this.page().photo, this.content.photos, this.content.photoCredits),

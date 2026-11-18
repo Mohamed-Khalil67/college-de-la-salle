@@ -14,6 +14,8 @@ import { TargetsService } from '../targets/targets.service.js';
 import { ChangeNoticesService } from '../notifications/change-notices.service.js';
 import { PeriodsService } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { activeSchool } from '../school/school-profile.js';
+import { SCHOOL_PROFILE } from '../school/school.module.js';
 import { EventsService } from './events.service.js';
 
 // The archived-year guard reads the database (raw SQL); its own behaviour is covered by the e2e tests.
@@ -156,6 +158,7 @@ describe('EventsService', () => {
         { provide: CalendarDaysService, useValue: calendarDays },
         { provide: OccupancyService, useValue: occupancy },
         { provide: TargetsService, useValue: targets },
+        { provide: SCHOOL_PROFILE, useValue: activeSchool() },
         { provide: ChangeNoticesService, useValue: { homeworkAssigned: vi.fn(), eventChanged: vi.fn(), eventCancelled: vi.fn() } },
       ],
     }).compile();

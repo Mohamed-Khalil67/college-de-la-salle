@@ -1,4 +1,4 @@
-import type { Photo, PhotoArchive, PhotoId, PhotoText } from './content.model';
+import type { Photo, PhotoArchive, PhotoId, PhotoText } from '../../../apps/web/src/app/school/content.model';
 
 const CREDIT = 'Photo : Frères des Écoles Chrétiennes – Proche-Orient';
 const CREDIT_EG = 'Photo : Collège De La Salle – Égypte (archives, lasalle-eg.net)';
@@ -106,21 +106,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
   },
 };
 
-export function photo(id: PhotoId): Photo {
-  return PHOTOS[id];
-}
-
 /** The words of every photo in French, the shape the other languages translate. */
 export const PHOTO_TEXTS_FR = Object.fromEntries(
   Object.values(PHOTOS).map((p) => [p.id, { alt: p.alt, caption: p.caption }]),
 ) as Readonly<Record<PhotoId, PhotoText>>;
-
-/** A photo with its alt text, caption and credit in another language. */
-export function localizedPhoto(
-  id: PhotoId,
-  texts: Readonly<Record<PhotoId, PhotoText>>,
-  credits: Readonly<Record<PhotoArchive, string>>,
-): Photo {
-  const p = PHOTOS[id];
-  return { ...p, ...texts[id], credit: credits[p.archive] };
-}
