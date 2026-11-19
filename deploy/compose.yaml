@@ -13,6 +13,12 @@ x-logging: &logging
     max-size: "10m"
     max-file: "3"
 
+# Every service gets no-new-privileges. cap_drop ALL only where the image runs as a non-root user (api, web):
+# the postgres, caddy and cloudflared images start as root and need their default capabilities.
+x-no-new-privileges: &no-new-privileges
+  security_opt:
+    - no-new-privileges:true
+
 x-hardening: &hardening
   security_opt:
     - no-new-privileges:true
@@ -21,7 +27,7 @@ x-hardening: &hardening
 
 services:
   db:
-    image: postgres:18
+    image: postgres:18.7@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
     restart: unless-stopped
     environment:
       POSTGRES_USER: cdls
@@ -40,6 +46,7 @@ services:
       start_period: 10s
     mem_limit: 768m
     logging: *logging
+    <<: *no-new-privileges
     networks: [internal]
 
   api:
@@ -113,7 +120,10 @@ services:
     networks: [internal]
 
   backup:
-    image: postgres:18
+    # Built from deploy/backup/Dockerfile: the postgres client tools of the db service plus age (encrypted dumps).
+    build:
+      context: ./backup
+    image: cdls-backup:local
     restart: unless-stopped
     depends_on:
       db:
@@ -125,19 +135,20 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_HOUR: ${BACKUP_HOUR:-02}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
-    entrypoint: ["/bin/sh", "/backup.sh"]
+      # age public key (age1...): when set every dump is encrypted to *.dump.age. The private key stays off this machine.
+      BACKUP_AGE_RECIPIENT: ${BACKUP_AGE_RECIPIENT:-}
     volumes:
-      - ./backup/backup.sh:/backup.sh:ro
       # Dumps land in this host folder (default deploy/backups). Copy it off the machine regularly.
       - ${BACKUP_DIR:-./backups}:/backups
     mem_limit: 128m
     logging: *logging
+    <<: *no-new-privileges
     networks: [internal]
 
   # --- profile: tunnel ---------------------------------------------------------------------------
   cloudflared:
     profiles: [tunnel]
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.11.1@sha256:e613aadbc2d9511785d2e67a86b0c8ac18dd63a3f9af0d06faf04cbfdcb35f2d
     restart: unless-stopped
     # The public hostname of the tunnel (Cloudflare dashboard) must point at http://web:8080.
     command: tunnel --no-autoupdate run
@@ -148,12 +159,13 @@ services:
         condition: service_healthy
     mem_limit: 128m
     logging: *logging
+    <<: *no-new-privileges
     networks: [internal]
 
   # --- profile: caddy ----------------------------------------------------------------------------
   caddy:
     profiles: [caddy]
-    image: caddy:2
+    image: caddy:2.11.9@sha256:4851e54a46b206517c574821bb5cc67f170d2156041e9fbc4c9193b45e84a75b
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN:-}
@@ -170,6 +182,7 @@ services:
         condition: service_healthy
     mem_limit: 128m
     logging: *logging
+    <<: *no-new-privileges
     networks: [internal]
 
 volumes:
