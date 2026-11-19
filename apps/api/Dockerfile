@@ -1,9 +1,12 @@
 # syntax=docker/dockerfile:1
 # CDLS API. Build context = the repository root (see deploy/compose.yaml).
-ARG NODE_VERSION=22
+# Pinned to an exact version AND its digest (docs/deployment.md, "Pinned images", says how to bump both together;
+# Dependabot proposes the bump). To use another Node build set both args.
+ARG NODE_VERSION=22.23.5
+ARG NODE_DIGEST=sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
 
 # --- build: shared contract + API (prisma generate, nest build) -------------------------------------
-FROM node:${NODE_VERSION}-bookworm-slim AS build
+FROM node:${NODE_VERSION}-bookworm-slim@${NODE_DIGEST} AS build
 WORKDIR /app
 RUN npm install -g npm@12.0.2
 # Manifests first so the dependency layer is cached until a package.json changes.
@@ -21,7 +24,7 @@ RUN find schools -type f ! -name profile.json -delete
 RUN npm run build -w @cdls/shared && npm run build -w @cdls/api
 
 # --- deps: production dependencies only (prisma CLI and tsx are regular dependencies of the API) -----
-FROM node:${NODE_VERSION}-bookworm-slim AS deps
+FROM node:${NODE_VERSION}-bookworm-slim@${NODE_DIGEST} AS deps
 WORKDIR /app
 RUN npm install -g npm@12.0.2
 COPY package.json package-lock.json ./
@@ -31,7 +34,7 @@ COPY apps/web/package.json apps/web/
 RUN npm ci --omit=dev --workspace=@cdls/shared --workspace=@cdls/api
 
 # --- runtime ------------------------------------------------------------------------------------------
-FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+FROM node:${NODE_VERSION}-bookworm-slim@${NODE_DIGEST} AS runtime
 ENV NODE_ENV=production PORT=3000
 # openssl: the Prisma schema engine (migrate deploy). tini: forwards SIGTERM so shutdown hooks run.
 RUN apt-get update \
@@ -47,6 +50,7 @@ COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/schools schools
 COPY --from=build /app/apps/api/prisma apps/api/prisma
 COPY --from=build /app/apps/api/prisma.config.ts apps/api/prisma.config.ts
+# Kept on purpose: docs/deployment.md documents `seed:demo` for a throw-away stack in this image.
 # prisma/seed.ts (optional demo data, run with tsx) imports the TypeScript sources and the generated client.
 COPY --from=build /app/apps/api/src apps/api/src
 COPY --from=build /app/apps/api/tsconfig.json apps/api/tsconfig.json

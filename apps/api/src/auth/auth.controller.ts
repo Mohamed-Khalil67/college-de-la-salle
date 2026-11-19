@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { API_PREFIX } from '../app.prefix.js';
 import type { AuthUser } from '../common/auth-user.js';
+import { envAccessTokenSubject } from '../common/access-token-subject.js';
 import { AllowDuringPasswordChange, CurrentUser, Public } from '../common/decorators.js';
 import {
   cookieTracker,
@@ -133,7 +134,7 @@ export class AuthController {
    */
   @AllowDuringPasswordChange()
   @Throttle({
-    default: { limit: loginLimit, ttl: 60_000, getTracker: passwordTracker },
+    default: { limit: loginLimit, ttl: 60_000, getTracker: passwordTracker(envAccessTokenSubject) },
     ip: { limit: ipCeiling, ttl: 60_000 },
   })
   @Post('password')

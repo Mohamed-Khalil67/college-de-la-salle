@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AccessModule } from './access/access.module.js';
 import { ActivityTypesModule } from './activity-types/activity-types.module.js';
@@ -10,6 +9,7 @@ import { CalendarDaysModule } from './calendar-days/calendar-days.module.js';
 import { CalendarFeedModule } from './calendar-feed/calendar-feed.module.js';
 import { ClassSubjectsModule } from './class-subjects/class-subjects.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { accessTokenSubjectOf } from './common/access-token-subject.js';
 import { clientKey, trafficTracker } from './common/client-key.js';
 import { RolesGuard } from './common/roles.guard.js';
 import { validateEnv, type Env } from './config/env.validation.js';
@@ -49,18 +49,7 @@ const IP_CEILING_ROUTES = ['/auth/login', '/auth/password', '/auth/forgot-passwo
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => {
         // Only reads the account id for the rate-limit key; the authentication guard checks the token for real.
-        const jwt = new JwtService({
-          secret: config.get('JWT_ACCESS_SECRET', { infer: true }),
-          verifyOptions: { algorithms: ['HS256'], issuer: 'cdls-api', ignoreExpiration: true },
-        });
-        const subjectOf = (token: string): string | null => {
-          try {
-            const { sub } = jwt.verify<{ sub?: unknown }>(token);
-            return typeof sub === 'string' ? sub : null;
-          } catch {
-            return null;
-          }
-        };
+        const subjectOf = accessTokenSubjectOf(config.get('JWT_ACCESS_SECRET', { infer: true }));
         // One counter per IPv4 address or IPv6 /64 (a client could rotate through its /64).
         const byAddress = (req: Record<string, unknown>) => clientKey(req['ip'] as string | undefined);
         return {
