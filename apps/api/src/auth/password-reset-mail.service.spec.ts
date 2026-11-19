@@ -107,6 +107,37 @@ describe('PasswordResetMailService', () => {
     expect(errors[0]).not.toMatch(/prof@demo|seed-0123|rejected/);
   });
 
+  it('treats a send that never answers as a failure (backoff), so the outbox does not stall', async () => {
+    vi.useFakeTimers();
+    try {
+      prisma.passwordResetToken.findMany.mockResolvedValue([row()]);
+      mail.sendPasswordReset.mockReturnValue(new Promise(() => undefined));
+      const log = vi.spyOn((service as unknown as { logger: { error(m: string): void } }).logger, 'error').mockImplementation(() => undefined);
+      const pending = service.run(NOW);
+      await vi.advanceTimersByTimeAsync(61_000);
+      await expect(pending).resolves.toMatchObject({ sent: 0, failed: 1 });
+      expect(log.mock.calls[0]![0]).toContain('TimeoutError');
+      expect(updates().at(-1)!.data['mailAttempts']).toEqual({ increment: 1 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('goes on with the next mail when the update after a send fails, and logs only the user id', async () => {
+    prisma.passwordResetToken.findMany.mockResolvedValue([row(), row({ id: 'r2', userId: 'u2' })]);
+    prisma.passwordResetToken.updateMany
+      .mockResolvedValueOnce({ count: 0 }) // expiry sweep
+      .mockResolvedValueOnce({ count: 1 }) // claim r1
+      .mockRejectedValueOnce(new Error('connection lost')) // record r1: fails
+      .mockResolvedValue({ count: 1 });
+    const log = vi.spyOn((service as unknown as { logger: { error(m: string): void } }).logger, 'error').mockImplementation(() => undefined);
+    const result = await service.run(NOW);
+    expect(mail.sendPasswordReset).toHaveBeenCalledTimes(2);
+    expect(result.sent).toBe(1);
+    expect(log.mock.calls[0]![0]).toContain('user u1');
+    expect(log.mock.calls[0]![0]).not.toContain('connection lost');
+  });
+
   it.each(['disabled', 'archived'])('sends nothing to a %s account and erases the seed', async (status) => {
     prisma.passwordResetToken.findMany.mockResolvedValue([row({ user: { email: 'a@b.test', firstName: 'A', status } })]);
     const result = await service.run(NOW);

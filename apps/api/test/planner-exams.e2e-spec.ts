@@ -107,7 +107,7 @@ describe('Planner exams (e2e)', () => {
     const from = addDays(schoolToday(), 7);
     let candidate = from;
     while (new Date(`${candidate}T00:00:00Z`).getUTCDay() !== 5) candidate = addDays(candidate, 1);
-    for (let i = 0; i < 12; i++, candidate = addDays(candidate, 7)) {
+    for (let i = 0; i < 40; i++, candidate = addDays(candidate, 7)) {
       if (periods.some((p) => p.startsOn <= day(candidate) && day(candidate) <= p.endsOn)) {
         friday = candidate;
         return;

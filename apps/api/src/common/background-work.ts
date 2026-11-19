@@ -44,7 +44,7 @@ export class BackgroundWork {
     });
     try {
       while (this.#running.size > 0) {
-        const outcome = await Promise.race([Promise.allSettled([...this.#running]), timeout]);
+        const outcome = await Promise.race([Promise.allSettled(this.#running), timeout]);
         if (outcome === 'timeout') return false;
       }
       return true;

@@ -19,7 +19,7 @@ describe('BackgroundWork', () => {
   it('drain waits for work in progress and closes the door', async () => {
     const work = new BackgroundWork();
     let finished = false;
-    work.track(later(30, null).then(() => void (finished = true)));
+    void work.track(later(30, null).then(() => void (finished = true)));
     expect(work.closing).toBe(false);
     await expect(work.drain(1000)).resolves.toBe(true);
     expect(finished).toBe(true);
@@ -29,9 +29,9 @@ describe('BackgroundWork', () => {
   it('drain also waits for work that was started by work being drained', async () => {
     const work = new BackgroundWork();
     let second = false;
-    work.track(
+    void work.track(
       later(10, null).then(() => {
-        work.track(later(20, null).then(() => void (second = true)));
+        void work.track(later(20, null).then(() => void (second = true)));
       }),
     );
     await expect(work.drain(1000)).resolves.toBe(true);
@@ -40,7 +40,7 @@ describe('BackgroundWork', () => {
 
   it('drain gives up after the timeout and says so', async () => {
     const work = new BackgroundWork();
-    work.track(later(500, null));
+    void work.track(later(500, null));
     const started = Date.now();
     await expect(work.drain(40)).resolves.toBe(false);
     expect(Date.now() - started).toBeLessThan(400);

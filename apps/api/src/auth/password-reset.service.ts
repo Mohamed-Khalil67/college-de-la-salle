@@ -46,6 +46,8 @@ export class PasswordResetService {
    */
   request(identifier: string): void {
     const email = identifier.trim().toLowerCase();
+    // Shutting down: the database is going away; the user simply asks again (the answer is the same 204).
+    if (this.background.closing) return;
     void this.background.track(
       this.issue(email).catch((error: unknown) => {
         this.logger.error(

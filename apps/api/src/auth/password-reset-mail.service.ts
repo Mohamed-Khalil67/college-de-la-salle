@@ -17,6 +17,18 @@ const SCAN_INTERVAL_MS = 30_000;
 const LEASE_MS = 2 * 60_000;
 /** Mails one run handles at most. */
 const BATCH = 25;
+/** A send taking longer than this counts as failed (shorter than the lease, so a stall never causes a duplicate). */
+const SEND_TIMEOUT_MS = 60_000;
+
+/** A row of the outbox as `run` reads it. */
+interface DueRow {
+  readonly id: string;
+  readonly userId: string;
+  readonly mailSeed: string | null;
+  readonly mailAttempts: number;
+  readonly expiresAt: Date;
+  readonly user: { readonly email: string; readonly firstName: string; readonly status: string };
+}
 
 export interface ResetMailRun {
   readonly sent: number;
@@ -122,50 +134,79 @@ export class PasswordResetMailService implements OnApplicationBootstrap, OnAppli
     let sent = 0;
     let failed = 0;
     for (const row of due) {
-      const seed = row.mailSeed;
-      if (!seed) continue;
-      // Only an inactive account is never mailed: drop the seed, the link is dead anyway.
-      if (row.user.status !== 'active') {
-        await this.prisma.passwordResetToken.updateMany({
-          where: { id: row.id, mailSeed: seed },
-          data: { mailSeed: null, mailNextAt: null },
-        });
-        continue;
-      }
-      const claimed = await this.prisma.passwordResetToken.updateMany({
-        where: { id: row.id, mailSeed: seed, mailNextAt: { lte: now } },
-        data: { mailNextAt: new Date(now.getTime() + LEASE_MS) },
-      });
-      if (claimed.count !== 1) continue; // another run has it
+      // A shutdown began: leave the rest for the next start (their rows are untouched and due).
+      if (this.background.closing) break;
       try {
-        await this.mail.sendPasswordReset(
+        const outcome = await this.handle(row, now);
+        if (outcome === 'sent') sent += 1;
+        else if (outcome === 'failed') failed += 1;
+      } catch (error: unknown) {
+        // The database failed around this row: it keeps its seed and its lease, and is retried after it.
+        this.logger.error(
+          `Password reset outbox update failed for user ${row.userId}: ${error instanceof Error ? error.name : 'unknown error'}`,
+        );
+      }
+    }
+    return { sent, failed, expired: expired.count };
+  }
+
+  /** One due row: drop it, skip it (claimed elsewhere) or claim, send and record the outcome. */
+  private async handle(row: DueRow, now: Date): Promise<'sent' | 'failed' | 'skipped'> {
+    const seed = row.mailSeed;
+    if (!seed) return 'skipped';
+    // Only an inactive account is never mailed: drop the seed, the link is dead anyway.
+    if (row.user.status !== 'active') {
+      await this.prisma.passwordResetToken.updateMany({
+        where: { id: row.id, mailSeed: seed },
+        data: { mailSeed: null, mailNextAt: null },
+      });
+      return 'skipped';
+    }
+    const claimed = await this.prisma.passwordResetToken.updateMany({
+      where: { id: row.id, mailSeed: seed, mailNextAt: { lte: now } },
+      data: { mailNextAt: new Date(now.getTime() + LEASE_MS) },
+    });
+    if (claimed.count !== 1) return 'skipped'; // another run has it
+    try {
+      // Bounded: a stalled SMTP server is a failure (backoff), not a stuck outbox.
+      await withTimeout(
+        this.mail.sendPasswordReset(
           row.user.email,
           row.user.firstName,
           linkToken(this.key, seed),
           validityMinutes(row.expiresAt, now),
-        );
-      } catch (error: unknown) {
-        failed += 1;
-        await this.prisma.passwordResetToken.updateMany({
-          where: { id: row.id, mailSeed: seed },
-          data: {
-            mailNextAt: new Date(Date.now() + retryDelayMs(row.mailAttempts)),
-            mailAttempts: { increment: 1 },
-          },
-        });
-        // Never the token, the link or the address in the log (an SMTP message can quote the address): only the kind of error.
-        const code = (error as { code?: unknown } | null)?.code;
-        this.logger.error(
-          `Password reset mail for user ${row.userId} could not be sent (attempt ${row.mailAttempts + 1}): ${error instanceof Error ? error.name : 'unknown error'}${typeof code === 'string' ? ` ${code}` : ''}`,
-        );
-        continue;
-      }
-      sent += 1;
+        ),
+        SEND_TIMEOUT_MS,
+      );
+    } catch (error: unknown) {
+      // Never the token, the link or the address in the log (an SMTP message can quote the address): only the kind of error.
+      const code = (error as { code?: unknown } | null)?.code;
+      this.logger.error(
+        `Password reset mail for user ${row.userId} could not be sent (attempt ${row.mailAttempts + 1}): ${error instanceof Error ? error.name : 'unknown error'}${typeof code === 'string' ? ` ${code}` : ''}`,
+      );
       await this.prisma.passwordResetToken.updateMany({
         where: { id: row.id, mailSeed: seed },
-        data: { mailSeed: null, mailNextAt: null, mailedAt: new Date(), mailAttempts: { increment: 1 } },
+        data: {
+          mailNextAt: new Date(Date.now() + retryDelayMs(row.mailAttempts)),
+          mailAttempts: { increment: 1 },
+        },
       });
+      return 'failed';
     }
-    return { sent, failed, expired: expired.count };
+    // If this update fails the mail already left: the row is sent again after the lease (at-least-once).
+    await this.prisma.passwordResetToken.updateMany({
+      where: { id: row.id, mailSeed: seed },
+      data: { mailSeed: null, mailNextAt: null, mailedAt: new Date(), mailAttempts: { increment: 1 } },
+    });
+    return 'sent';
   }
+}
+
+/** Rejects with a `TimeoutError` when `work` takes longer than `ms`. */
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error('send timed out'), { name: 'TimeoutError' })), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
