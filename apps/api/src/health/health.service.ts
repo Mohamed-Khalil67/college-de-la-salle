@@ -1,12 +1,44 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { HealthDto } from './health.dto.js';
+import { migrationFromDisk, readVersion } from './build-info.js';
+import type { HealthDto, LiveHealthDto } from './health.dto.js';
 
 @Injectable()
-export class HealthService {
+export class HealthService implements OnApplicationBootstrap {
   private readonly logger = new Logger(HealthService.name);
+  /** From apps/api/package.json; the same relative path works from src/ and from dist/. */
+  private readonly version = readVersion(new URL('../../package.json', import.meta.url));
+  private migration: string | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Reads the last applied migration ONCE, at start (the liveness route never touches the database).
+   * If the database cannot be asked, the newest migration folder of the install stands in: the image applies
+   * its migrations before it starts.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    try {
+      const rows = await this.prisma.$queryRaw<{ migration_name: string }[]>`
+        SELECT migration_name FROM _prisma_migrations
+         WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+         ORDER BY migration_name DESC LIMIT 1`;
+      this.migration = rows[0]?.migration_name ?? null;
+    } catch {
+      this.migration = null;
+    }
+    this.migration ??= migrationFromDisk(new URL('../../prisma/migrations/', import.meta.url));
+  }
+
+  /** Cached answer of the liveness route: no I/O. */
+  live(): LiveHealthDto {
+    return { status: 'ok', version: this.version, migration: this.migration };
+  }
 
   async checkDatabase(): Promise<HealthDto> {
     try {

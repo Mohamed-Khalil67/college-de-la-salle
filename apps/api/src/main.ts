@@ -5,7 +5,7 @@ import { AppModule } from './app.module.js';
 import { configureApp, DOCS_PATH } from './app.setup.js';
 import type { Env } from './config/env.validation.js';
 
-const app = await NestFactory.create(AppModule);
+const app = await NestFactory.create(AppModule, { bufferLogs: true });
 configureApp(app);
 
 const port = app.get<ConfigService<Env, true>>(ConfigService).get('PORT', { infer: true });

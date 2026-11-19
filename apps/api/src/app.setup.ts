@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { API_PREFIX } from './app.prefix.js';
+import { AppLogger, requestLogging } from './common/app-logger.js';
 import type { Env } from './config/env.validation.js';
 import { activeSchool } from './school/school-profile.js';
 
@@ -22,6 +23,15 @@ export function configureApp(app: INestApplication): void {
       proxies,
     );
   }
+  // Structured log: level from LOG_LEVEL, JSON in production, the school id and a request id in every line.
+  const logger = new AppLogger({
+    level: config.get('LOG_LEVEL', { infer: true }),
+    json: config.get('NODE_ENV', { infer: true }) === 'production',
+    school: activeSchool().id,
+  });
+  app.useLogger(logger);
+  // First, so every later middleware, guard and handler runs inside the request's scope.
+  app.use(requestLogging(logger));
   app.setGlobalPrefix(API_PREFIX);
   app.use(helmet());
   app.use(cookieParser());

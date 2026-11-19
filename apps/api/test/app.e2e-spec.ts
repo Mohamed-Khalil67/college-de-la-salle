@@ -1,3 +1,4 @@
+import { readVersion } from '../src/health/build-info.js';
 import { createTestApp, type TestApp } from './helpers.js';
 
 describe('App (e2e)', () => {
@@ -9,8 +10,15 @@ describe('App (e2e)', () => {
 
   afterAll(() => t.close());
 
-  it('GET /api/health answers ok without a token', () =>
-    t.http().get('/api/health').expect(200, { status: 'ok' }));
+  it('GET /api/health answers ok without a token, with the version and the last applied migration', async () => {
+    const res = await t.http().get('/api/health').expect(200);
+    const body = res.body as { status: string; version: string; migration: string | null };
+    expect(body.status).toBe('ok');
+    expect(body.version).toBe(readVersion(new URL('../package.json', import.meta.url)));
+    const [last] = await t.prisma.$queryRaw<{ migration_name: string }[]>`
+      SELECT migration_name FROM _prisma_migrations ORDER BY migration_name DESC LIMIT 1`;
+    expect(body.migration).toBe(last!.migration_name);
+  });
 
   it('GET /api/health/db reaches the database', () =>
     t.http().get('/api/health/db').expect(200, { status: 'ok' }));

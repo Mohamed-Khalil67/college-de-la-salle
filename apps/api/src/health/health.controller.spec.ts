@@ -9,19 +9,34 @@ describe('HealthController', () => {
   /** A request made from inside the stack: no proxy header. */
   const direct = { headers: {} };
   let controller: HealthController;
+  let moduleRef: Awaited<ReturnType<ReturnType<typeof Test.createTestingModule>['compile']>>;
 
   beforeEach(async () => {
     prisma.$queryRaw.mockReset();
-    const moduleRef = await Test.createTestingModule({
+    moduleRef = await Test.createTestingModule({
       controllers: [HealthController],
       providers: [HealthService, { provide: PrismaService, useValue: prisma }],
     }).compile();
     controller = moduleRef.get(HealthController);
   });
 
-  it('reports liveness without touching the database', () => {
-    expect(controller.live()).toEqual({ status: 'ok' });
+  it('reports liveness with the version, without touching the database', () => {
+    expect(controller.live()).toEqual({ status: 'ok', version: expect.stringMatching(/^\d+\.\d+\.\d+/), migration: null });
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('reads the last applied migration once at start and serves it from memory', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ migration_name: '20261113000000_x' }]);
+    await moduleRef.get(HealthService).onApplicationBootstrap();
+    expect(controller.live().migration).toBe('20261113000000_x');
+    expect(controller.live().migration).toBe('20261113000000_x');
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the newest migration folder when the database cannot be asked', async () => {
+    prisma.$queryRaw.mockRejectedValue(new Error('ECONNREFUSED'));
+    await moduleRef.get(HealthService).onApplicationBootstrap();
+    expect(controller.live().migration).toMatch(/^\d{14}_/);
   });
 
   it('reports the database as ok when it answers', async () => {
