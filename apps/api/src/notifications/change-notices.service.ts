@@ -53,6 +53,11 @@ export function eventSchedule(row: EventRow): EventSchedule {
 const label = (row: EventRow) => `${row.activityType.label} — ${row.title}`;
 const same = (text: NotificationText) => () => text;
 
+/** The distinct, present values, in order of first appearance. */
+const unique = (values: readonly (string | null | undefined)[]): string[] => [
+  ...new Set(values.filter((v): v is string => typeof v === 'string' && v !== '')),
+];
+
 /**
  * Who a change concerns, and what they are told. Called INSIDE the transaction of the change (timetable
  * exception, event write, grade publication), so rosters and targets are read as that transaction sees
@@ -76,33 +81,64 @@ export class ChangeNoticesService {
     notices: readonly SessionNotice[],
     actorId: string | null,
   ): Promise<number> {
+    if (!notices.length) return this.notifications.write(tx, [], actorId);
+    // Everything the notices need is loaded with `in` queries, a fixed handful for any number of notices:
+    // queries inside a transaction run one after the other, so a 60-choice absence used to cost about 240
+    // round trips while holding the timetable's locks.
+    const slots = new Map(
+      (
+        await tx.timetableSlot.findMany({
+          where: { id: { in: unique(notices.map((n) => n.slotId)) } },
+          include: slotInclude,
+        })
+      ).map((s) => [s.id, s]),
+    );
+    const roomIds = unique(notices.map((n) => n.newRoomId));
+    const rooms = new Map(
+      roomIds.length
+        ? (
+            await tx.room.findMany({ where: { id: { in: roomIds } }, select: { id: true, name: true } })
+          ).map((r) => [r.id, r.name])
+        : [],
+    );
+    const teacherIds = unique(notices.flatMap((n) => [n.coverTeacherId, n.substituteTeacherId]));
+    const teachers = new Map(
+      teacherIds.length
+        ? (
+            await tx.teacher.findMany({
+              where: { id: { in: teacherIds } },
+              select: { id: true, userId: true, user: { select: { firstName: true, lastName: true } } },
+            })
+          ).map((t) => [t.id, t])
+        : [],
+    );
+    const present = notices.map((n) => slots.get(n.slotId)).filter((s) => s !== undefined);
+    const groupIds = unique(present.map((s) => s.groupId));
+    const classIds = unique(present.filter((s) => !s.groupId).map((s) => s.classSubject.classId));
+    const groupStudents = new Map<string, string[]>();
+    if (groupIds.length)
+      for (const m of await tx.groupMember.findMany({
+        where: { groupId: { in: groupIds }, leftOn: null },
+        select: { groupId: true, student: { select: { userId: true } } },
+      }))
+        groupStudents.set(m.groupId, [...(groupStudents.get(m.groupId) ?? []), m.student.userId]);
+    const classStudents = new Map<string, string[]>();
+    if (classIds.length)
+      for (const e of await tx.enrollment.findMany({
+        where: { classId: { in: classIds }, leftOn: null },
+        select: { classId: true, student: { select: { userId: true } } },
+      }))
+        classStudents.set(e.classId, [...(classStudents.get(e.classId) ?? []), e.student.userId]);
+
     const drafts: NotificationDraft[] = [];
     for (const notice of notices) {
-      // Queries inside a transaction run one after the other.
-      const slot = await tx.timetableSlot.findUnique({
-        where: { id: notice.slotId },
-        include: slotInclude,
-      });
+      const slot = slots.get(notice.slotId);
       if (!slot) continue;
-      const newRoom = notice.newRoomId
-        ? ((await tx.room.findUnique({ where: { id: notice.newRoomId }, select: { name: true } }))
-            ?.name ?? null)
-        : null;
-      const students = slot.groupId
-        ? await tx.groupMember.findMany({
-            where: { groupId: slot.groupId, leftOn: null },
-            select: { student: { select: { userId: true } } },
-          })
-        : await tx.enrollment.findMany({
-            where: { classId: slot.classSubject.classId, leftOn: null },
-            select: { student: { select: { userId: true } } },
-          });
-      const cover = notice.coverTeacherId
-        ? await tx.teacher.findUnique({
-            where: { id: notice.coverTeacherId },
-            select: { userId: true, user: { select: { firstName: true, lastName: true } } },
-          })
-        : null;
+      const newRoom = notice.newRoomId ? (rooms.get(notice.newRoomId) ?? null) : null;
+      const studentUserIds = slot.groupId
+        ? (groupStudents.get(slot.groupId) ?? [])
+        : (classStudents.get(slot.classSubject.classId) ?? []);
+      const cover = notice.coverTeacherId ? (teachers.get(notice.coverTeacherId) ?? null) : null;
       const facts: Omit<SessionChangeFacts, 'className'> = {
         kind: notice.kind,
         subject: slot.classSubject.subject.name,
@@ -117,10 +153,7 @@ export class ChangeNoticesService {
         coverName: cover ? `${cover.user.firstName} ${cover.user.lastName}` : null,
       };
       const substitute = notice.substituteTeacherId
-        ? await tx.teacher.findUnique({
-            where: { id: notice.substituteTeacherId },
-            select: { userId: true },
-          })
+        ? (teachers.get(notice.substituteTeacherId) ?? null)
         : null;
       const className = slot.group
         ? `${slot.classSubject.schoolClass.label}, ${slot.group.label}`
@@ -128,7 +161,7 @@ export class ChangeNoticesService {
       drafts.push({
         kind: notice.kind,
         recipients: [
-          ...students.map((s) => ({ userId: s.student.userId, role: 'student' as const })),
+          ...studentUserIds.map((userId) => ({ userId, role: 'student' as const })),
           { userId: slot.teacher.userId, role: 'teacher' },
           ...(substitute ? [{ userId: substitute.userId, role: 'teacher' as const }] : []),
           ...(cover ? [{ userId: cover.userId, role: 'teacher' as const }] : []),
