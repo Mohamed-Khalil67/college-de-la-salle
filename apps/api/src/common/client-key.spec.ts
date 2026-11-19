@@ -1,4 +1,4 @@
-import { clientKey, cookieTracker, hasCookie, trafficTracker } from './client-key.js';
+import { clientKey, cookieTracker, hasCookie, passwordTracker, trafficTracker } from './client-key.js';
 
 describe('clientKey', () => {
   it('keeps IPv4 addresses, including IPv4-mapped IPv6 ones', () => {
@@ -35,6 +35,23 @@ describe('trafficTracker', () => {
     expect(tracker(request())).toBe('203.0.113.7');
     expect(tracker(request('Bearer forged-u1'))).toBe('203.0.113.7');
     expect(tracker(request('Basic signed-u1'))).toBe('203.0.113.7');
+  });
+});
+
+describe('passwordTracker', () => {
+  const tracker = passwordTracker((token) => (token.startsWith('signed-') ? token.slice(7) : null));
+  const request = (authorization?: string) => ({
+    ip: '203.0.113.7',
+    headers: authorization === undefined ? {} : { authorization },
+  });
+
+  it('adds the account of a verified token to the address', () => {
+    expect(tracker(request('Bearer signed-u1'))).toBe('203.0.113.7|u1');
+  });
+
+  it('ignores a token that does not verify, so a forged sub cannot pick the counter', () => {
+    expect(tracker(request('Bearer forged-u1'))).toBe('203.0.113.7|');
+    expect(tracker(request())).toBe('203.0.113.7|');
   });
 });
 

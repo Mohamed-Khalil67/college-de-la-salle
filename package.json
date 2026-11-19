@@ -22,6 +22,9 @@
     "db:dev": "npm run db:dev -w @cdls/api",
     "test:e2e": "npm run build -w @cdls/shared && npm run test:e2e -w @cdls/api"
   },
+  "overrides": {
+    "vite": "$vite"
+  },
   "devDependencies": {
     "@types/node": "^22.12.0",
     "concurrently": "^10.0.6",

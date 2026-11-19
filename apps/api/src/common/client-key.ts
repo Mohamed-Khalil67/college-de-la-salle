@@ -46,27 +46,23 @@ export function forgotPasswordTracker(req: RequestLike): string {
   return `${clientKey(req['ip'] as string | undefined)}|${identifier}`;
 }
 
-/**
- * Password-change limit key: client address plus the account named by the access token. The token is only
- * read for this key (the authentication guard checks it right after), so a forged one gains nothing.
- */
-export function passwordTracker(req: RequestLike): string {
-  const header = (req['headers'] as Record<string, unknown> | undefined)?.['authorization'];
-  let sub = '';
-  if (typeof header === 'string' && header.startsWith('Bearer ')) {
-    try {
-      const payload = header.split('.')[1] ?? '';
-      const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { sub?: unknown };
-      if (typeof parsed.sub === 'string') sub = parsed.sub.slice(0, 64);
-    } catch {
-      // Not a token: counted by address alone.
-    }
-  }
-  return `${clientKey(req['ip'] as string | undefined)}|${sub}`;
-}
-
 /** The account id of an access token whose signature checks out (expired or not), or null. */
 export type AccessTokenSubject = (token: string) => string | null;
+
+/**
+ * Password-change limit key: client address plus the account named by a VERIFIED access token (the same
+ * `subjectOf` as the general limit). A forged or unsigned token counts by address alone.
+ */
+export function passwordTracker(subjectOf: AccessTokenSubject): (req: RequestLike) => string {
+  return (req) => {
+    const header = (req['headers'] as Record<string, unknown> | undefined)?.['authorization'];
+    let sub = '';
+    if (typeof header === 'string' && header.startsWith('Bearer ')) {
+      sub = (subjectOf(header.slice('Bearer '.length).trim()) ?? '').slice(0, 64);
+    }
+    return `${clientKey(req['ip'] as string | undefined)}|${sub}`;
+  };
+}
 
 /**
  * Key of the general rate limit. A request with a signed access token counts against its account: the

@@ -138,7 +138,22 @@ Free disk space from old images now and then: `docker image prune -f`.
 
 A `backup` container dumps the database at start-up and every night at 02:00 UTC into `deploy/backups/`, keeping 14 days.
 Copy that folder off the machine (external drive, cloud storage) at least weekly; practise the restore once.
-Details and the restore procedure: [`deploy/restore.md`](../deploy/restore.md).
+Set `BACKUP_AGE_RECIPIENT` (an age public key) to encrypt each dump (`*.dump.age`); the private key never lives on the
+machine. The backup container is built from `deploy/backup/Dockerfile` (postgres client tools + `age`), so after pulling
+this change run `up -d --build`. Dump files are owner-only. Details, decrypt-then-restore and the monthly restore test:
+[`deploy/restore.md`](../deploy/restore.md).
+
+### Pinned images
+
+Every third-party image is pinned to an exact version and its digest (`image:tag@sha256:...`): `postgres` (compose and
+`deploy/backup/Dockerfile`, keep these two equal), `caddy`, `cloudflared`, `nginxinc/nginx-unprivileged` and `node`
+(`NODE_VERSION` + `NODE_DIGEST` build args in both Dockerfiles). `.github/dependabot.yml` proposes bumps. By hand:
+`docker buildx imagetools inspect <image>:<new tag>` prints the `Digest:` line; replace tag and digest together, then
+`docker compose -f deploy/compose.yaml build` and test. A tag alone is not enough: the digest is what freezes the content.
+If you change `NODE_VERSION` without `NODE_DIGEST` the build fails on the digest, on purpose.
+The `db`, `backup`, `caddy` and `cloudflared` services run with `no-new-privileges`; the API container is not
+`read_only` (not tried: the stack could not be started when this was written; try it in a test stack first).
+The API image keeps `apps/api/src` and `tsx` because `seed:demo` (above) runs in it.
 
 ## Settings reference
 
