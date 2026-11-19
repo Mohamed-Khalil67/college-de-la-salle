@@ -109,6 +109,12 @@ describe('Planner (e2e)', () => {
     });
   });
 
+  it('reads « today » from the pinned clock, not from the day the suite runs', async () => {
+    const res = await t.http().get('/api/planner/today').set(bearer(planner)).expect(200);
+    expect((res.body as PlannerTodayDto).date).toBe('2026-10-04');
+    expect(TODAY).toBe('2026-10-04');
+  });
+
   describe('the lessons of an absent teacher', () => {
     it('lists the active teachers by name for a planner, who may not list users', async () => {
       const res = await t.http().get('/api/planner/teachers').set(bearer(planner)).expect(200);
