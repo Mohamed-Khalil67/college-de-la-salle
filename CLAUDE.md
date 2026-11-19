@@ -56,16 +56,17 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
   Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
 - A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
 
-## Status (2026-11-18)
+## Status (2026-11-19)
 
-- **School packs (branch `feat/school-profile`, not merged):** the school is a pack in `schools/<id>/` selected by `SCHOOL`;
+- **Audit fixes and school packs are merged on `main`** (audit 2026-11-18: per-account rate limits, forgot-password timing, health check, `posts.subject_id` index, no `!` in web code; backend and security reviews: no blocker, first-week items are encrypted backups, pinned images, a Clock for date-dependent e2e, one exception filter, JSON logs, password-reset mail through the outbox).
+- **School packs:** the school is a pack in `schools/<id>/` selected by `SCHOOL`;
   `cdls-daher` holds everything the site had (the prerendered text and images are unchanged, the crest sprite is now
   `/crest.svg`), `example` is a fictional school. Time zone, names in mails, PDF and calendar files, and section names come
   from the profile; section codes are still the two fixed ones. See `docs/new-school.md`.
 
 ## Status (2026-11-13)
 
-Everything below is merged on `main` and pushed: `college/main` is at 9e41612 (checked 2026-11-18). The 7 open Dependabot PRs on GitHub (#1–#7) predate the rebuild and are obsolete: workflow and Firebase bumps target files that no longer exist, TypeScript 7 is outside Angular 22's `>=6.0 <6.1` peer range, and `@types/node` stays on ^22 to match the Node 22 runtime.
+Everything below is merged on `main`. The 7 open Dependabot PRs on GitHub (#1–#7) predate the rebuild and are obsolete: workflow and Firebase bumps target files that no longer exist, TypeScript 7 is outside Angular 22's `>=6.0 <6.1` peer range, and `@types/node` stays on ^22 to match the Node 22 runtime.
 
 - **Done:** public site in fr/en/ar with accessibility statement; login, first sign-in password change, forgotten
   password by e-mail; student, teacher and admin spaces; timetable with hard/soft conflicts and suggestions; groups and
