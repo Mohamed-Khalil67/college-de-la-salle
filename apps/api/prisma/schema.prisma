@@ -216,10 +216,21 @@ model PasswordResetToken {
   usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
+  /// The mail outbox: while the link has not been mailed, `mailSeed` holds the random seed the link token is
+  /// derived from (HMAC with the server secret, never the token itself); it is cleared when the mail is sent
+  /// and when the link expires, so it lives at most `PASSWORD_RESET_TTL_MINUTES`. `mailNextAt` is when the
+  /// mail may be tried (again). CHECK `password_reset_tokens_outbox_check` in the migration SQL: a seed and
+  /// a next try go together, and a mailed link has neither.
+  mailSeed     String?   @map("mail_seed") @db.VarChar(64)
+  mailNextAt   DateTime? @map("mail_next_at") @db.Timestamptz(3)
+  mailedAt     DateTime? @map("mailed_at") @db.Timestamptz(3)
+  mailAttempts Int       @default(0) @map("mail_attempts")
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([mailNextAt], where: raw("mail_seed IS NOT NULL"), map: "password_reset_tokens_mail_due_idx")
   @@map("password_reset_tokens")
 }
 

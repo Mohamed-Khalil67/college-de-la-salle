@@ -58,6 +58,8 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
 
 ## Status (2026-11-19)
 
+- **Backend reliability (branch `fix/backend-reliability`, not merged):** the e2e suite pins the school's clock (`common/clock.ts`, 2026-10-04) so it no longer fails on the real date; one global exception filter gives every error `{ statusCode, message, code? }`; structured JSON log with request id and school id (`LOG_LEVEL`); `/api/health` reports version and last migration; the password-reset mail goes through a durable outbox (new migration `20261119080945`) with retries and no stored token; shutdown waits for background work; session-change notices are batched. Details in `apps/api/CLAUDE.md`.
+
 - **Audit fixes and school packs are merged on `main`** (audit 2026-11-18: per-account rate limits, forgot-password timing, health check, `posts.subject_id` index, no `!` in web code; backend and security reviews: no blocker, first-week items are encrypted backups, pinned images, a Clock for date-dependent e2e, one exception filter, JSON logs, password-reset mail through the outbox).
 - **School packs:** the school is a pack in `schools/<id>/` selected by `SCHOOL`;
   `cdls-daher` holds everything the site had (the prerendered text and images are unchanged, the crest sprite is now

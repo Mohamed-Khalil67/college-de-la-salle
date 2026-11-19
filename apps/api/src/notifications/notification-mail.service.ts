@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { notificationsPage } from '@cdls/shared';
+import { BackgroundWork } from '../common/background-work.js';
 import { fromDay, schoolToday } from '../common/dates.js';
 import type { Env } from '../config/env.validation.js';
 import { RETENTION_INTERVAL_MS, retentionCutoff } from '../contact/retention.js';
@@ -40,19 +41,23 @@ export class NotificationMailService implements OnApplicationBootstrap, OnApplic
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly notifications: NotificationsService,
+    private readonly background: BackgroundWork,
     private readonly config: ConfigService<Env, true>,
   ) {}
 
   onApplicationBootstrap(): void {
     const every = this.config.get('NOTIFICATION_MAIL_INTERVAL_MINUTES', { infer: true }) * 60_000;
     // Not awaited: start-up never waits on (or fails because of) a digest.
-    this.#digest = setInterval(() => void this.safely('digest', () => this.sendDigests()), every);
+    // Tracked, so a shutdown waits for a digest being sent (and starts none once it began).
+    this.#digest = setInterval(() => this.start('digest', () => this.sendDigests()), every);
     this.#digest.unref();
-    this.#daily = setInterval(
-      () => void this.safely('retention', () => this.purge()),
-      RETENTION_INTERVAL_MS,
-    );
+    this.#daily = setInterval(() => this.start('retention', () => this.purge()), RETENTION_INTERVAL_MS);
     this.#daily.unref();
+  }
+
+  private start(what: string, run: () => Promise<unknown>): void {
+    if (this.background.closing) return;
+    void this.background.track(this.safely(what, run));
   }
 
   onApplicationShutdown(): void {
