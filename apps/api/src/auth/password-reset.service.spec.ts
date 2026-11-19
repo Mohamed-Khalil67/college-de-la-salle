@@ -1,9 +1,11 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
-import { MailService } from '../mail/mail.service.js';
+import { BackgroundWork } from '../common/background-work.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthService } from './auth.service.js';
+import { PasswordResetMailService } from './password-reset-mail.service.js';
+import { linkToken } from './reset-link.js';
 import { PasswordResetService } from './password-reset.service.js';
 
 const ENV: Record<string, unknown> = {
@@ -23,12 +25,11 @@ describe('PasswordResetService', () => {
     $transaction: vi.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const auth = { revokeAll: vi.fn() };
-  const mail = { sendPasswordReset: vi.fn() };
+  const mailer = { kick: vi.fn() };
   let service: PasswordResetService;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    mail.sendPasswordReset.mockResolvedValue(undefined);
     tx.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
     tx.user.updateMany.mockResolvedValue({ count: 1 });
     const moduleRef = await Test.createTestingModule({
@@ -36,7 +37,8 @@ describe('PasswordResetService', () => {
         PasswordResetService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuthService, useValue: auth },
-        { provide: MailService, useValue: mail },
+        { provide: PasswordResetMailService, useValue: mailer },
+        BackgroundWork,
         { provide: ConfigService, useValue: { get: (key: string) => ENV[key] } },
       ],
     }).compile();
@@ -55,45 +57,46 @@ describe('PasswordResetService', () => {
       expect(tx.passwordResetToken.create).not.toHaveBeenCalled();
     });
 
-    it('then stores only a hash, replaces earlier links and mails the token', async () => {
+    it('then stores a seed and the hash of the derived token (never the token), replaces earlier links and queues the mail', async () => {
       prisma.user.findUnique.mockResolvedValue(activeUser);
       service.request(' PROF@demo.cdls.test ');
-      await vi.waitFor(() => expect(mail.sendPasswordReset).toHaveBeenCalled());
+      await vi.waitFor(() => expect(mailer.kick).toHaveBeenCalledTimes(1));
       expect(prisma.user.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { email: 'prof@demo.cdls.test' } }),
       );
       expect(tx.passwordResetToken.deleteMany).toHaveBeenCalled();
-      const [, , token, minutes] = mail.sendPasswordReset.mock.calls[0] as [string, string, string, number];
-      expect(token).toMatch(/^[\w-]{43}$/);
-      expect(minutes).toBe(30);
       const data = (
-        tx.passwordResetToken.create.mock.calls[0]![0] as { data: { tokenHash: string; expiresAt: Date } }
+        tx.passwordResetToken.create.mock.calls[0]![0] as {
+          data: { tokenHash: string; expiresAt: Date; mailSeed: string; mailNextAt: Date };
+        }
       ).data;
+      const token = linkToken(ENV['JWT_REFRESH_SECRET'] as string, data.mailSeed);
+      expect(token).toMatch(/^[\w-]{43}$/);
+      expect(data.mailSeed).toMatch(/^[\w-]{43}$/);
       expect(data.tokenHash).toMatch(/^[0-9a-f]{64}$/);
       expect(data.tokenHash).not.toContain(token);
+      expect(JSON.stringify(data)).not.toContain(token);
+      expect(data.mailNextAt).toBeInstanceOf(Date);
       expect(data.expiresAt.getTime()).toBeGreaterThan(Date.now() + 29 * 60_000);
     });
 
     it.each([null, { ...activeUser, status: 'disabled' }, { ...activeUser, status: 'archived' }])(
-      'sends nothing for %j',
+      'queues nothing for %j',
       async (user) => {
         prisma.user.findUnique.mockResolvedValue(user);
         expect(service.request('x@demo.cdls.test')).toBeUndefined();
         await settle();
         expect(prisma.user.findUnique).toHaveBeenCalled();
-        expect(mail.sendPasswordReset).not.toHaveBeenCalled();
+        expect(mailer.kick).not.toHaveBeenCalled();
         expect(tx.passwordResetToken.create).not.toHaveBeenCalled();
       },
     );
 
-    it('only logs when the mail cannot be sent or the database fails', async () => {
-      prisma.user.findUnique.mockResolvedValueOnce(activeUser);
-      mail.sendPasswordReset.mockRejectedValue(new Error('smtp down'));
-      expect(() => service.request('prof@demo.cdls.test')).not.toThrow();
+    it('only logs when the database fails', async () => {
       prisma.user.findUnique.mockRejectedValueOnce(new Error('db down'));
       expect(() => service.request('prof@demo.cdls.test')).not.toThrow();
-      await vi.waitFor(() => expect(mail.sendPasswordReset).toHaveBeenCalledTimes(1));
       await settle();
+      expect(mailer.kick).not.toHaveBeenCalled();
     });
   });
 

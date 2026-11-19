@@ -45,11 +45,42 @@ export interface Paginated<T> {
   readonly pageSize: number;
 }
 
-/** Body of every error response (Nest's default shape). */
+/** `GET /api/health/db`: the database answers. */
+export interface HealthStatus {
+  readonly status: 'ok';
+}
+
+/**
+ * `GET /api/health` (public, no database call): the process is up, with what an operator of several installs
+ * needs to see: the API version (package.json) and the last migration applied when it started.
+ */
+export interface LiveHealth extends HealthStatus {
+  readonly version: string;
+  /** Name of the last applied migration, read once at start; null when it could not be read. */
+  readonly migration: string | null;
+}
+
+/** Machine-readable codes the API's global exception filter adds for the database failures it translates. */
+export const DB_ERROR_CODES = [
+  'UNIQUE_VIOLATION',
+  'REFERENCE_VIOLATION',
+  'RECORD_NOT_FOUND',
+  'SERIALIZATION_FAILURE',
+] as const;
+export type DbErrorCode = (typeof DB_ERROR_CODES)[number];
+
+/**
+ * Body of every error response: `{ statusCode, message, code? }`. Handlers keep their own bodies (validation
+ * lists, `TIMETABLE_CONFLICT`, `PASSWORD_CHANGE_REQUIRED`…); anything unexpected is a 500 « Erreur interne. »
+ * without detail. `retryable` is set on a transient conflict (a serialization failure): the same request
+ * may succeed.
+ */
 export interface ApiError {
   readonly statusCode: number;
   readonly message: string | readonly string[];
   readonly error?: string;
+  readonly code?: string;
+  readonly retryable?: boolean;
 }
 
 /* ------------------------------------------------------------------------------------------------

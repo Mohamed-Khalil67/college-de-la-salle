@@ -77,6 +77,8 @@ services:
       TEMP_PASSWORD_TTL_DAYS: ${TEMP_PASSWORD_TTL_DAYS:-14}
       CONTACT_RETENTION_DAYS: ${CONTACT_RETENTION_DAYS:-365}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       # One proxy (the web container) sits in front of the API; it forwards the real visitor address.
       TRUST_PROXY: ${TRUST_PROXY:-1}
       COOKIE_SECURE: ${COOKIE_SECURE:-}

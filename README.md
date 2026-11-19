@@ -45,7 +45,7 @@ the app's role and database once, as `postgres`, with [apps/api/prisma/setup-dat
 a password of your choice, and put that password in `DATABASE_URL`; `db:dev` then leaves `.env` alone.
 
 Open http://localhost:4200; the dev server proxies `/api` to the API. API docs: http://localhost:3000/api/docs,
-health: `/api/health` (process) and `/api/health/db` (database; rate-limited, and a 404 when the request came through a reverse proxy, so only callers inside the stack can make the database work).
+health: `/api/health` (process, with the API `version` and the last applied `migration`, read once at start, so an operator of several installs can tell them apart; no database call) and `/api/health/db` (database; rate-limited, and a 404 when the request came through a reverse proxy, so only callers inside the stack can make the database work).
 
 Migrations: `npm run db:migrate` (`prisma migrate dev`) on a development database; `npx prisma migrate deploy`
 (from `apps/api`) applies the committed ones to any other database, from empty or as an upgrade (it never resets
@@ -77,6 +77,13 @@ characters, not the e-mail) every other route answers 403 `PASSWORD_CHANGE_REQUI
 « Premier accès » page. Accounts are `active`, `disabled` or `archived` (graduated or left: no sign-in, read-only).
 Sign-in returns a 15-minute access token (send it as
 `Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
+
+**Log and errors.** `LOG_LEVEL` (`error`, `warn`, `info` by default, `debug`) sets how much the API writes: one JSON object per
+line in production, readable text otherwise, always with the school id (`school`) and a request id (`requestId`). Every response carries
+`X-Request-Id` (the caller's own when it is 8 to 64 safe characters, else generated): quote it to find the lines of a request. Authorization,
+cookies, passwords and tokens are never written, the access line has no query string, and the calendar feed address is replaced by
+`:token`. Every error answers `{ statusCode, message, code? }`; an unexpected one is an opaque 500 (the detail is in the log only), and a
+transient database conflict is a 409 with `retryable: true`.
 
 **Rate limits.** The whole school shares one public address, so signed-in requests count per account (`THROTTLE_LIMIT`, 120
 a minute per route) and anonymous ones per address. Sign-in, `POST /auth/password` and « mot de passe oublié » allow

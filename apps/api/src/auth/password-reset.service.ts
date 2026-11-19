@@ -1,13 +1,14 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, randomBytes } from 'node:crypto';
 import { passwordProblems } from '@cdls/shared';
 import { hash } from 'argon2';
 import { audit } from '../common/audit.js';
+import { BackgroundWork } from '../common/background-work.js';
 import type { Env } from '../config/env.validation.js';
-import { MailService } from '../mail/mail.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthService } from './auth.service.js';
+import { PasswordResetMailService } from './password-reset-mail.service.js';
+import { linkToken, newSeed, tokenDigest } from './reset-link.js';
 
 const INVALID_LINK = 'Ce lien est invalide ou a expiré. Demandez-en un nouveau.';
 /** Used and expired rows are kept this long (for support), then deleted by the next request. */
@@ -26,7 +27,8 @@ export class PasswordResetService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
-    private readonly mail: MailService,
+    private readonly mailer: PasswordResetMailService,
+    private readonly background: BackgroundWork,
     config: ConfigService<Env, true>,
   ) {
     this.ttlMs = config.get('PASSWORD_RESET_TTL_MINUTES', { infer: true }) * 60_000;
@@ -35,28 +37,37 @@ export class PasswordResetService {
   }
 
   /**
-   * Mails a reset link to an active account. Returns at once, before reading anything: the lookup, the
-   * token row and the mail happen after the answer, so the caller sees the same 204 at the same speed
-   * whether the account exists, is active or not. A failure is only logged (never the token or the address).
+   * Issues a reset link to an active account. Returns at once, before reading anything: the lookup and the
+   * outbox row happen after the answer, so the caller sees the same 204 at the same speed whether the
+   * account exists, is active or not. The mail itself is sent by `PasswordResetMailService` from the row,
+   * with retries. A failure here is only logged (never the token or the address); the work is tracked so
+   * a shutdown waits for it. A restart between the answer and the row loses the request (the user asks
+   * again): it cannot be queued without storing identifiers of accounts that may not exist.
    */
   request(identifier: string): void {
     const email = identifier.trim().toLowerCase();
-    void this.issue(email).catch((error: unknown) => {
-      this.logger.error(
-        `Password reset request could not be processed: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-    });
+    // Shutting down: the database is going away; the user simply asks again (the answer is the same 204).
+    if (this.background.closing) return;
+    void this.background.track(
+      this.issue(email).catch((error: unknown) => {
+        this.logger.error(
+          `Password reset request could not be processed: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+      }),
+    );
   }
 
   /** The work behind `request`: a new link for an active account, nothing for any other identifier. */
   private async issue(email: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, firstName: true, status: true },
+      select: { id: true, status: true },
     });
     if (!user || user.status !== 'active') return;
 
-    const token = randomBytes(32).toString('base64url');
+    // The link token is derived from this seed (`reset-link.ts`); the row keeps the seed, never the token,
+    // until the outbox has mailed it (`PasswordResetMailService`), which retries after a failure or a restart.
+    const seed = newSeed();
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       // A new request invalidates the earlier links of this account.
@@ -66,20 +77,14 @@ export class PasswordResetService {
       await tx.passwordResetToken.create({
         data: {
           userId: user.id,
-          tokenHash: this.digest(token),
+          tokenHash: this.digest(linkToken(this.key, seed)),
           expiresAt: new Date(now.getTime() + this.ttlMs),
+          mailSeed: seed,
+          mailNextAt: now,
         },
       });
     });
-
-    try {
-      await this.mail.sendPasswordReset(user.email, user.firstName, token, this.ttlMs / 60_000);
-    } catch (error: unknown) {
-      // Never the token or the address in the log.
-      this.logger.error(
-        `Password reset mail for user ${user.id} could not be sent: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-    }
+    this.mailer.kick();
   }
 
   /** Chooses the new password with the token of a link. The token works once, and only while valid. */
@@ -129,6 +134,6 @@ export class PasswordResetService {
   }
 
   private digest(token: string): string {
-    return createHmac('sha256', this.key).update(`password-reset:${token}`).digest('hex');
+    return tokenDigest(this.key, token);
   }
 }

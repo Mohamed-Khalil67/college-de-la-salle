@@ -9,7 +9,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { Public } from '../common/decorators.js';
 import { HealthService } from './health.service.js';
-import { HealthDto } from './health.dto.js';
+import { HealthDto, LiveHealthDto } from './health.dto.js';
 import { cameThroughProxy } from './proxied.js';
 
 @ApiTags('health')
@@ -19,11 +19,14 @@ import { cameThroughProxy } from './proxied.js';
 export class HealthController {
   constructor(private readonly health: HealthService) {}
 
-  /** Liveness: the process is up. Does not touch the database. Public, not rate-limited (container healthcheck). */
+  /**
+   * Liveness: the process is up, with the API version and the last applied migration (cached at start).
+   * Does not touch the database. Public, not rate-limited (container healthcheck).
+   */
   @Get()
-  @ApiOkResponse({ type: HealthDto })
-  live(): HealthDto {
-    return { status: 'ok' };
+  @ApiOkResponse({ type: LiveHealthDto })
+  live(): LiveHealthDto {
+    return this.health.live();
   }
 
   /**

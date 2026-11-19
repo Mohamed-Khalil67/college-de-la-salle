@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
+import { BackgroundWorkModule } from './common/background-work.js';
 import { AccessModule } from './access/access.module.js';
 import { ActivityTypesModule } from './activity-types/activity-types.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -82,6 +84,7 @@ const IP_CEILING_ROUTES = ['/auth/login', '/auth/password', '/auth/forgot-passwo
     }),
     PrismaModule,
     SchoolModule,
+    BackgroundWorkModule,
     MailModule,
     AccessModule,
     AuthModule,
@@ -117,6 +120,7 @@ const IP_CEILING_ROUTES = ['/auth/login', '/auth/password', '/auth/forgot-passwo
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useExisting: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
 export class AppModule {}

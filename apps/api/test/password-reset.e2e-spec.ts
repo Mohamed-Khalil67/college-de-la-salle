@@ -1,4 +1,6 @@
 import type { CreatedUserResponse, SessionResponse } from '@cdls/shared';
+import { PasswordResetMailService } from '../src/auth/password-reset-mail.service.js';
+import { MailService } from '../src/mail/mail.service.js';
 import { ADMIN, bearer, createTestApp, type TestApp } from './helpers.js';
 
 const cookieOf = (res: { headers: Record<string, unknown> }) => {
@@ -165,6 +167,69 @@ describe('Password reset (e2e)', () => {
     await reset(token).expect(400);
     await t.prisma.user.update({ where: { id: account.id }, data: { status: 'active' } });
     await reset(token).expect(204);
+  });
+
+  it('does not lose the mail when the first send fails: the link is kept in the outbox and sent by a later run, then the seed is erased', async () => {
+    const account = await newAccount('Outbox');
+    const mailService = t.app.get(MailService);
+    const send = vi.spyOn(mailService, 'sendPasswordReset').mockRejectedValueOnce(new Error('smtp down'));
+    try {
+      await t.http().post('/api/auth/forgot-password').send({ identifier: account.email }).expect(204);
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+      expect(t.mails.filter((m) => m.to === account.email)).toHaveLength(0);
+
+      // The row is still there with its seed and a retry time; the token itself is nowhere in it.
+      const pending = await vi.waitFor(async () => {
+        const rows = await t.prisma.passwordResetToken.findMany({ where: { userId: account.id } });
+        expect(rows[0]?.mailAttempts).toBe(1);
+        return rows[0]!;
+      });
+      expect(pending.mailSeed).toMatch(/^[\w-]{43}$/);
+      expect(pending.mailNextAt!.getTime()).toBeGreaterThan(Date.now());
+      expect(pending.mailedAt).toBeNull();
+
+      // « A restart »: a fresh scan finds the row (due again) and sends the same link.
+      await t.prisma.passwordResetToken.update({ where: { id: pending.id }, data: { mailNextAt: new Date() } });
+      const run = await t.app.get(PasswordResetMailService).run();
+      expect(run.sent).toBeGreaterThanOrEqual(1);
+      const mail = t.mails.filter((m) => m.to === account.email).at(-1)!;
+      const token = /token=([\w-]+)/.exec(mail.text)?.[1];
+      expect(token).toBeTruthy();
+
+      const sent = await t.prisma.passwordResetToken.findUniqueOrThrow({ where: { id: pending.id } });
+      expect(sent.mailSeed).toBeNull();
+      expect(sent.mailNextAt).toBeNull();
+      expect(sent.mailedAt).not.toBeNull();
+      expect(JSON.stringify(sent)).not.toContain(token!);
+      await reset(token!).expect(204);
+
+      // Nothing is sent twice.
+      const again = await t.app.get(PasswordResetMailService).run();
+      expect(again.sent).toBe(0);
+    } finally {
+      send.mockRestore();
+    }
+  });
+
+  it('erases the seed of a link that expired before its mail went out, and sends nothing', async () => {
+    const account = await newAccount('Late');
+    const send = vi.spyOn(t.app.get(MailService), 'sendPasswordReset').mockRejectedValue(new Error('smtp down'));
+    try {
+      await t.http().post('/api/auth/forgot-password').send({ identifier: account.email }).expect(204);
+      await vi.waitFor(() => expect(send).toHaveBeenCalled());
+      await t.prisma.passwordResetToken.updateMany({
+        where: { userId: account.id },
+        data: { expiresAt: new Date(Date.now() - 1000), mailNextAt: new Date() },
+      });
+      const calls = send.mock.calls.length;
+      const run = await t.app.get(PasswordResetMailService).run();
+      expect(run.expired).toBeGreaterThanOrEqual(1);
+      expect(send.mock.calls.length).toBe(calls);
+      const [row] = await t.prisma.passwordResetToken.findMany({ where: { userId: account.id } });
+      expect(row!.mailSeed).toBeNull();
+    } finally {
+      send.mockRestore();
+    }
   });
 
   it('limits requests per address and e-mail', async () => {

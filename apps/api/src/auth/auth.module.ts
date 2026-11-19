@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import type { Env } from '../config/env.validation.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { PasswordResetMailService } from './password-reset-mail.service.js';
 import { PasswordResetService } from './password-reset.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 
@@ -19,7 +20,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordResetService, JwtAuthGuard],
+  providers: [AuthService, PasswordResetService, PasswordResetMailService, JwtAuthGuard],
   exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}

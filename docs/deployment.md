@@ -117,9 +117,9 @@ docker compose -f deploy/compose.yaml exec api cat demo-credentials.local.md    
 | Task | Command (repository root) |
 |---|---|
 | Status | `docker compose -f deploy/compose.yaml ps` |
-| Logs (rotated: 3 × 10 MB per container) | `docker compose -f deploy/compose.yaml logs -f --tail 100 api` |
+| Logs (rotated: 3 × 10 MB per container; JSON lines with `school` and `requestId`, level `LOG_LEVEL`; a response's `X-Request-Id` names its lines: `… logs api | grep <id>`) | `docker compose -f deploy/compose.yaml logs -f --tail 100 api` |
 | Stop / start | `docker compose -f deploy/compose.yaml --profile tunnel stop` / `… up -d` |
-| Health | `curl http://127.0.0.1:8080/api/health` (process, public); database: `docker compose -f deploy/compose.yaml exec api node -e "fetch('http://127.0.0.1:3000/api/health/db').then(r=>r.text()).then(console.log)"` (only from inside the stack: through nginx `/api/health/db` is a 404) |
+| Health | `curl http://127.0.0.1:8080/api/health` (process, public; answers the API `version` and the last applied `migration`); database: `docker compose -f deploy/compose.yaml exec api node -e "fetch('http://127.0.0.1:3000/api/health/db').then(r=>r.text()).then(console.log)"` (only from inside the stack: through nginx `/api/health/db` is a 404) |
 | Back up now | `docker compose -f deploy/compose.yaml run --rm -e BACKUP_ONCE=true backup` |
 | Restore | [`deploy/restore.md`](../deploy/restore.md) |
 
@@ -174,7 +174,7 @@ The API image keeps `apps/api/src` and `tsx` because `seed:demo` (above) runs in
 ## Security checklist
 
 - [ ] `deploy/.env` created by `generate-env` (random secrets), kept out of git and stored in a password manager. Never paste
-      it into chats or tickets. Rotating `JWT_*` signs everybody out; do not change `POSTGRES_PASSWORD` on an existing database
+      it into chats or tickets. Rotating `JWT_*` signs everybody out and voids the « mot de passe oublié » links not yet used; do not change `POSTGRES_PASSWORD` on an existing database
       without also running `ALTER USER cdls PASSWORD '…'`.
 - [ ] Only the tunnel, or ports 80/443, are reachable from the internet. No router port-forward for 5432, 3000 or 8080
       (compose does not publish them anyway; 8080 is bound to 127.0.0.1).

@@ -15,6 +15,7 @@ import {
   validateSync,
 } from 'class-validator';
 import { DURATION } from '../common/duration.js';
+import { LOG_LEVELS, type LogLevel } from '../common/log-format.js';
 import { DEFAULT_SCHOOL, loadSchoolProfile, schoolsDir } from '../school/school-profile.js';
 
 const PLACEHOLDER = /^replace-with-/;
@@ -256,6 +257,14 @@ export class Env {
   @Min(1)
   @Max(1000)
   IMPORT_THROTTLE_LIMIT = 10;
+
+  /**
+   * Lowest level written to the log: `error`, `warn`, `info` (default) or `debug`. Lines are JSON in production
+   * (one object per line, with the school id and the request id), readable text otherwise.
+   */
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @IsIn(LOG_LEVELS, { message: 'LOG_LEVEL must be error, warn, info or debug' })
+  LOG_LEVEL: LogLevel = 'info';
 }
 
 export function validateEnv(raw: Record<string, unknown>): Env {
