@@ -51,14 +51,16 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
 
 - One feature per agent, in its own worktree and branch from `main`. Commit on the branch; never push, never touch
   secrets, never use `prisma migrate reset`. The owner decides merges.
-- Each agent uses its own database and ports. `cdls_main`, ports 3000 (API) and 4300 (web) belong to the main checkout.
+- Each agent uses its own database and ports. The main checkout owns the embedded dev database `cdls_dev` on port 5433 (`npm run db:dev`) and ports 3000 (API) and 4300 (web).
 - Done means: `npm run build`, `npm run lint` (0 warnings), `npm test`, `npm run test:e2e`, and for UI the Playwright +
   Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
 - A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
 
-## Status (2026-11-19)
+## Status (2026-11-20)
 
-- **Backend reliability (branch `fix/backend-reliability`, not merged):** the e2e suite pins the school's clock (`common/clock.ts`, 2026-10-04) so it no longer fails on the real date; one global exception filter gives every error `{ statusCode, message, code? }`; structured JSON log with request id and school id (`LOG_LEVEL`); `/api/health` reports version and last migration; the password-reset mail goes through a durable outbox (new migration `20261119080945`) with retries and no stored token; shutdown waits for background work; session-change notices are batched. Details in `apps/api/CLAUDE.md`.
+- **Clean-up (2026-11-20):** only `main` is left (worktrees and merged branches removed, the dead `origin` remote dropped; `college` over SSH as Mohamed-Khalil67 is the only remote). The full audit and test plan is `docs/qa/full-audit-plan.md`.
+- **Security hardening (merged):** owner-only, optionally `age`-encrypted backups (`BACKUP_AGE_RECIPIENT`), images pinned to `tag@sha256`, `no-new-privileges` on every service, a vite override, `.github/dependabot.yml`.
+- **Backend reliability (merged):** the e2e suite pins the school's clock (`common/clock.ts`, 2026-10-04) so it no longer fails on the real date; one global exception filter gives every error `{ statusCode, message, code? }`; structured JSON log with request id and school id (`LOG_LEVEL`); `/api/health` reports version and last migration; the password-reset mail goes through a durable outbox (new migration `20261119080945`) with retries and no stored token; shutdown waits for background work; session-change notices are batched. Details in `apps/api/CLAUDE.md`.
 
 - **Audit fixes and school packs are merged on `main`** (audit 2026-11-18: per-account rate limits, forgot-password timing, health check, `posts.subject_id` index, no `!` in web code; backend and security reviews: no blocker, first-week items are encrypted backups, pinned images, a Clock for date-dependent e2e, one exception filter, JSON logs, password-reset mail through the outbox).
 - **School packs:** the school is a pack in `schools/<id>/` selected by `SCHOOL`;
