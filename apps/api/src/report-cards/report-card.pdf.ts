@@ -1,16 +1,43 @@
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import pdfmake from 'pdfmake';
 import type { ReportCardDto } from './dto/report-card.dto.js';
+import { hasArabic, visualRuns, wrapParagraph, type Direction, type TextRun } from './pdf-text.js';
 
 const require = createRequire(import.meta.url);
-const fonts = require('pdfmake/fonts/Roboto.js') as Parameters<typeof pdfmake.setFonts>[0];
+type FontDescriptors = Parameters<typeof pdfmake.setFonts>[0];
+const roboto = require('pdfmake/fonts/Roboto.js') as FontDescriptors;
 const fontDir = dirname(require.resolve('pdfmake/fonts/Roboto.js'));
+/** Cairo (SIL OFL 1.1, Arabic block only, from @fontsource/cairo; licence next to it): committed, never fetched. */
+const assetDir = fileURLToPath(new URL('../../assets/fonts/', import.meta.url));
+const cairo = {
+  normal: `${assetDir}Cairo-Arabic-Regular.woff`,
+  bold: `${assetDir}Cairo-Arabic-Bold.woff`,
+  italics: `${assetDir}Cairo-Arabic-Regular.woff`,
+  bolditalics: `${assetDir}Cairo-Arabic-Bold.woff`,
+};
 
-pdfmake.setFonts(fonts);
-// No network, and only the bundled fonts from disk.
+pdfmake.setFonts({ ...roboto, Cairo: cairo });
+// No network, and only the bundled and committed fonts from disk.
 pdfmake.setUrlAccessPolicy(() => false);
-pdfmake.setLocalAccessPolicy((path) => path.startsWith(fontDir));
+pdfmake.setLocalAccessPolicy((path) => path.startsWith(fontDir) || path.startsWith(assetDir));
+
+/** The few fontkit calls used to measure a line (fontkit ships no types; it is the engine pdfkit embeds with). */
+interface MeasuredFont {
+  readonly unitsPerEm: number;
+  layout(text: string): { readonly advanceWidth: number };
+}
+const fontkit = require('fontkit') as { openSync(path: string): MeasuredFont };
+const robotoRegular = roboto['Roboto']?.normal;
+let measureFonts: { latin: MeasuredFont; arabic: MeasuredFont } | undefined;
+function fonts(): { latin: MeasuredFont; arabic: MeasuredFont } {
+  if (!measureFonts) {
+    if (typeof robotoRegular !== 'string') throw new Error('Roboto introuvable');
+    measureFonts = { latin: fontkit.openSync(robotoRegular), arabic: fontkit.openSync(cairo.normal) };
+  }
+  return measureFonts;
+}
 
 export interface ReportCardPdfContext {
   readonly schoolName: string;
@@ -22,23 +49,66 @@ export interface ReportCardPdfContext {
   readonly classSize: number;
 }
 
+const PAGE_WIDTH = 595.28; // A4
+const MARGIN_X = 48;
+const BODY_SIZE = 10;
+
 const fmt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const mark = (n: number | null) => (n === null ? '—' : fmt.format(n));
 
+interface Inline {
+  readonly text: string;
+  readonly font?: string;
+  readonly noWrap: true;
+}
+
+function inlines(runs: readonly TextRun[]): Inline[] {
+  return runs.map((r) => (r.arabic ? { text: r.text, font: 'Cairo', noWrap: true } : { text: r.text, noWrap: true }));
+}
+
+/**
+ * A short text (a name, a label) as pdfmake text: unchanged when it has no Arabic, else visual runs, each set in
+ * the font that has its glyphs. Isolated: its order never mixes with the French around it.
+ */
+export function rich(text: string): Array<string | Inline> {
+  return hasArabic(text) ? inlines(visualRuns(text)) : [text];
+}
+
+function width(runs: readonly TextRun[], fontSize: number): number {
+  const { latin, arabic } = fonts();
+  return runs.reduce((sum, r) => {
+    const font = r.arabic ? arabic : latin;
+    return sum + (font.layout(r.text).advanceWidth / font.unitsPerEm) * fontSize;
+  }, 0);
+}
+
+/** A paragraph: pdfmake's own wrapping when it has no Arabic; lines broken here and aligned to its side otherwise. */
+function paragraph(text: string, maxWidth: number, fontSize: number) {
+  if (!hasArabic(text)) return { text };
+  const { dir, lines } = wrapParagraph(text, maxWidth, (runs) => width(runs, fontSize));
+  return { stack: lines.map((line) => ({ text: inlines(line), alignment: side(dir) })) };
+}
+
+const side = (dir: Direction) => (dir === 'rtl' ? 'right' : 'left');
+
 /** The report card as a one-page A4 PDF. */
 export function reportCardPdf(card: ReportCardDto, ctx: ReportCardPdfContext): Promise<Buffer> {
+  const bodyWidth = PAGE_WIDTH - 2 * MARGIN_X - 2;
   const doc = {
     pageSize: 'A4',
-    pageMargins: [48, 56, 48, 56],
+    pageMargins: [MARGIN_X, 56, MARGIN_X, 56],
     info: { title: `Bulletin — ${card.studentName} — ${ctx.termLabel}`, author: ctx.schoolName },
-    defaultStyle: { font: 'Roboto', fontSize: 10, color: '#1f2937' },
+    defaultStyle: { font: 'Roboto', fontSize: BODY_SIZE, color: '#1f2937' },
     content: [
-      { text: ctx.schoolName, style: 'school' },
-      { text: `Bulletin scolaire — ${ctx.termLabel} ${ctx.yearLabel}`, style: 'title' },
+      { text: rich(ctx.schoolName), style: 'school' },
+      {
+        text: ['Bulletin scolaire — ', ...rich(ctx.termLabel), ' ', ...rich(ctx.yearLabel)],
+        style: 'title',
+      },
       {
         columns: [
-          { text: [{ text: 'Élève : ', bold: true }, card.studentName] },
-          { text: [{ text: 'Classe : ', bold: true }, ctx.classLabel], alignment: 'right' },
+          { text: [{ text: 'Élève : ', bold: true }, ...rich(card.studentName)] },
+          { text: [{ text: 'Classe : ', bold: true }, ...rich(ctx.classLabel)], alignment: 'right' },
         ],
         margin: [0, 8, 0, 16],
       },
@@ -54,7 +124,7 @@ export function reportCardPdf(card: ReportCardDto, ctx: ReportCardPdfContext): P
               { text: 'Notes', style: 'th', alignment: 'center' },
             ],
             ...card.subjects.map((s) => [
-              s.subjectName,
+              hasArabic(s.subjectName) ? { text: rich(s.subjectName) } : s.subjectName,
               { text: fmt.format(s.coefficient), alignment: 'center' },
               { text: mark(s.average), alignment: 'center' },
               { text: String(s.gradeCount), alignment: 'center' },
@@ -77,7 +147,9 @@ export function reportCardPdf(card: ReportCardDto, ctx: ReportCardPdfContext): P
         ],
       },
       { text: 'Appréciation', style: 'h2' },
-      { text: card.appreciation || '—', italics: !card.appreciation },
+      card.appreciation
+        ? paragraph(card.appreciation, bodyWidth, BODY_SIZE)
+        : { text: '—', italics: true },
       {
         text: `Édité le ${new Date(card.generatedAt).toLocaleDateString('fr-FR', { timeZone: ctx.timeZone })}`,
         style: 'small',

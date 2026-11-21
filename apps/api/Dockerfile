@@ -46,6 +46,8 @@ COPY --from=build /app/packages/shared/package.json packages/shared/package.json
 COPY --from=build /app/packages/shared/dist packages/shared/dist
 COPY --from=build /app/apps/api/package.json apps/api/package.json
 COPY --from=build /app/apps/api/dist apps/api/dist
+# The report-card PDF's Arabic font (Cairo, OFL; read from apps/api/assets/fonts next to dist/, never fetched).
+COPY --from=build /app/apps/api/assets apps/api/assets
 # SCHOOL (compose) names one folder of it; /app/schools is found by walking up from dist/ (SCHOOLS_DIR overrides).
 COPY --from=build /app/schools schools
 COPY --from=build /app/apps/api/prisma apps/api/prisma
