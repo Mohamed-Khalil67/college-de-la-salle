@@ -56,7 +56,15 @@ describe('one current school year (school_years_one_current_key)', () => {
           .post(`/api/school-years/${b}/current`)
           .set(bearer(admin))
           .then((res) => res);
-        await sleep(600);
+        // Commit only once admin 2's clean-up waits on the row this transaction updated (not after a fixed delay).
+        const blocked = async () =>
+          (
+            await t.prisma.$queryRaw<{ n: number }[]>`
+              SELECT count(*)::int AS n FROM pg_stat_activity
+               WHERE datname = current_database() AND wait_event_type = 'Lock'`
+          )[0]?.n ?? 0;
+        for (let i = 0; i < 100 && !(await blocked()); i++) await sleep(50);
+        expect(await blocked()).toBeGreaterThan(0);
         void second.then((res) => (lost = { status: res.status, body: res.body }));
       },
       { timeout: 10_000 },

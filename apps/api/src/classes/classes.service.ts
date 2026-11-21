@@ -140,12 +140,11 @@ export class ClassesService {
       if (!locked.length) throw notFound('Classe');
       await tx.$queryRaw`SELECT id FROM events WHERE class_id = ${id}::uuid FOR UPDATE`;
       const schoolClass = await tx.schoolClass.findUniqueOrThrow({ where: { id } });
-      const [enrollments, reportCards, grades, attendance] = await Promise.all([
-        tx.enrollment.count({ where: { classId: id } }),
-        tx.reportCard.count({ where: { classId: id } }),
-        tx.grade.count({ where: { event: { classId: id } } }),
-        tx.attendance.count({ where: { event: { classId: id } } }),
-      ]);
+      // One after the other: a transaction has one connection (never Promise.all on `tx`).
+      const enrollments = await tx.enrollment.count({ where: { classId: id } });
+      const reportCards = await tx.reportCard.count({ where: { classId: id } });
+      const grades = await tx.grade.count({ where: { event: { classId: id } } });
+      const attendance = await tx.attendance.count({ where: { event: { classId: id } } });
       if (enrollments) throw new ConflictException(CLASS_HAS_STUDENTS);
       if (await tx.timetableSlot.count({ where: { classSubject: { classId: id } } }))
         throw new ConflictException(CLASS_HAS_SLOTS);

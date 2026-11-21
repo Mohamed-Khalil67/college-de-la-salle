@@ -41,13 +41,13 @@ export class Env {
 
   /**
    * Database connections this API process keeps at most. 10 suits a school of 600 (each request holds one only
-   * while it queries); keep it well under the server's `max_connections` (60 in deploy/compose.yaml) minus the
-   * backup and migration connections.
+   * while it queries). At most 40: the server allows 60 (`max_connections` in deploy/compose.yaml), and the backup,
+   * `prisma migrate deploy` and an operator's psql need some of them.
    */
   @Transform(({ value }) => Number(value))
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(40)
   DB_POOL_MAX = 10;
 
   /**

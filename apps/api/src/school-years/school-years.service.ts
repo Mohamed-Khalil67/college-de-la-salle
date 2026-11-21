@@ -68,21 +68,14 @@ export class SchoolYearsService {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${id}::uuid FOR UPDATE`;
       assertYearWritable(await tx.schoolYear.findUniqueOrThrow({ where: { id } }));
-      const outside = await Promise.all([
-        tx.period.count({
-          where: {
-            schoolYearId: id,
-            OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
-          },
-        }),
-        tx.calendarDay.count({
-          where: {
-            schoolYearId: id,
-            OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
-          },
-        }),
-      ]);
-      if (outside[0] || outside[1])
+      // One after the other: a transaction has one connection (never Promise.all on `tx`).
+      const outside = {
+        schoolYearId: id,
+        OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
+      };
+      const periodsOutside = await tx.period.count({ where: outside });
+      const daysOutside = await tx.calendarDay.count({ where: outside });
+      if (periodsOutside || daysOutside)
         throw new ConflictException(
           'Des périodes ou des jours du calendrier sortiraient de l’année : modifiez-les d’abord.',
         );

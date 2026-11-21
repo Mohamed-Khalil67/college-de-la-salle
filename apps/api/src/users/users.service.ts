@@ -187,7 +187,8 @@ export class UsersService {
                             create: {
                               classId: schoolClass.id,
                               schoolYearId: schoolClass.schoolYearId,
-                              // The school's day: Prisma's default is the UTC date, yesterday before 02:00.
+                              // The school's day: Prisma's default is the UTC date, which is yesterday between the
+                              // school's midnight and UTC midnight.
                               enrolledOn: fromDay(schoolToday()),
                             },
                           },

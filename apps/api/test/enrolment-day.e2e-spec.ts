@@ -7,10 +7,13 @@ import { ADMIN, bearer, createTestApp, deleteUsers, type TestApp } from './helpe
 /** The instant `test/setup-env.ts` pins for every spec; put back after each test here. */
 const SUITE_CLOCK = '2026-10-04T09:00:00Z';
 /**
- * 22:30 UTC on 4 October is 01:30 on 5 October in Cairo (UTC+3 until the end of October): the school's day and the
- * UTC date differ, which is when Prisma's `@default(now())` gave the enrolment the day before (finding 9).
+ * 22:30 UTC on 4 October is already 5 October for a school east of UTC (01:30 in Cairo): the school's day and the
+ * UTC date differ, which is when Prisma's `@default(now())` gave the enrolment the day before (finding 9). The
+ * expected day is the school's own (`schoolToday()` under the pinned clock); a pack west of UTC skips.
  */
 const AFTER_MIDNIGHT = '2026-10-04T22:30:00Z';
+const SCHOOL_DAY = schoolToday(new Date(AFTER_MIDNIGHT));
+const EAST_OF_UTC = SCHOOL_DAY !== AFTER_MIDNIGHT.slice(0, 10);
 
 describe('enrolment date of created and imported students (school day, not UTC date)', () => {
   let t: TestApp;
@@ -43,10 +46,10 @@ describe('enrolment date of created and imported students (school day, not UTC d
     return toDay(student.enrollments[0]!.enrolledOn);
   };
 
-  it('is the school day for an account created between midnight and 02:00', async () => {
+  it.skipIf(!EAST_OF_UTC)('is the school day for an account created after the school’s midnight', async () => {
     pinClock(AFTER_MIDNIGHT);
     try {
-      expect(schoolToday()).toBe('2026-10-05');
+      expect(schoolToday()).toBe(SCHOOL_DAY);
       const res = await t
         .http()
         .post('/api/users')
@@ -55,13 +58,13 @@ describe('enrolment date of created and imported students (school day, not UTC d
         .expect(201);
       const created = res.body as CreatedUserResponse;
       userIds.push(created.user.id);
-      expect(await enrolledOn(created.user.id)).toBe('2026-10-05');
+      expect(await enrolledOn(created.user.id)).toBe(SCHOOL_DAY);
     } finally {
       pinClock(SUITE_CLOCK);
     }
   });
 
-  it('is the school day for a roster imported between midnight and 02:00', async () => {
+  it.skipIf(!EAST_OF_UTC)('is the school day for a roster imported after the school’s midnight', async () => {
     pinClock(AFTER_MIDNIGHT);
     try {
       const last = `Importe${Date.now().toString(36)}`;
@@ -77,7 +80,7 @@ describe('enrolment date of created and imported students (school day, not UTC d
       const [account] = (res.body as ImportUsersResponse).created;
       const user = await t.prisma.user.findUniqueOrThrow({ where: { email: account!.email } });
       userIds.push(user.id);
-      expect(await enrolledOn(user.id)).toBe('2026-10-05');
+      expect(await enrolledOn(user.id)).toBe(SCHOOL_DAY);
     } finally {
       pinClock(SUITE_CLOCK);
     }

@@ -24,21 +24,26 @@ export class HealthService implements OnApplicationBootstrap {
    * its migrations before it starts.
    */
   async onApplicationBootstrap(): Promise<void> {
+    // Its own query: a missing `_prisma_migrations` must not skip it. Outside a try only for the check itself: a
+    // database that answers in another zone would store shifted instants, so the API stops.
     let zone: string | null = null;
     try {
-      const rows = await this.prisma.$queryRaw<{ migration_name: string | null; zone: string }[]>`
-        SELECT (SELECT migration_name FROM _prisma_migrations
-                 WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
-                 ORDER BY migration_name DESC LIMIT 1) AS migration_name,
-               current_setting('TimeZone') AS zone`;
+      const [row] = await this.prisma.$queryRaw<{ zone: string }[]>`SELECT current_setting('TimeZone') AS zone`;
+      zone = row?.zone ?? null;
+    } catch {
+      zone = null; // unreachable: the API still boots, /api/health/db says so
+    }
+    assertSessionTimeZone(zone);
+    try {
+      const rows = await this.prisma.$queryRaw<{ migration_name: string }[]>`
+        SELECT migration_name FROM _prisma_migrations
+         WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+         ORDER BY migration_name DESC LIMIT 1`;
       this.migration = rows[0]?.migration_name ?? null;
-      zone = rows[0]?.zone ?? null;
     } catch {
       this.migration = null;
     }
     this.migration ??= migrationFromDisk(new URL('../../prisma/migrations/', import.meta.url));
-    // Outside the try: a database that answers in another zone would store shifted instants, so the API stops.
-    assertSessionTimeZone(zone);
   }
 
   /** Cached answer of the liveness route: no I/O. */

@@ -65,6 +65,32 @@ describe('no two queries at once on one pg client', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('PATCH /school-years/:id and DELETE /classes/:id (counts inside their transaction)', async () => {
+    const day = (d: string) => new Date(`${d}T00:00:00Z`);
+    const year = await t.prisma.schoolYear.create({
+      data: { label: '2061-2062', startsOn: day('2061-09-01'), endsOn: day('2062-06-30') },
+    });
+    try {
+      const section = await t.prisma.section.findFirstOrThrow({ orderBy: { code: 'asc' } });
+      const schoolClass = await t.prisma.schoolClass.create({
+        data: { schoolYearId: year.id, sectionId: section.id, code: 'pg-seule', label: 'Requête seule' },
+      });
+      await t
+        .http()
+        .patch(`/api/school-years/${year.id}`)
+        .set(bearer(admin))
+        .send({ startsOn: '2061-09-02', endsOn: '2062-06-29' })
+        .expect(200);
+      await t.http().delete(`/api/classes/${schoolClass.id}`).set(bearer(admin)).expect(204);
+    } finally {
+      await t.prisma.auditLog.deleteMany({ where: { entityId: year.id } });
+      await t.prisma.schoolClass.deleteMany({ where: { schoolYearId: year.id } });
+      await t.prisma.schoolYear.delete({ where: { id: year.id } });
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(warnings).toEqual([]);
+  });
+
   it('the other paginated lists that read a page and its count', async () => {
     for (const path of ['/api/users?page=1', '/api/contact-messages?page=1', '/api/posts?page=1'])
       await t.http().get(path).set(bearer(admin)).expect(200);
