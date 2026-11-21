@@ -3,10 +3,10 @@ import type { Period, Prisma, SchoolYear } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay, toIso } from '../common/dates.js';
-import { conflictOnReference, notFound } from '../common/errors.js';
+import { conflictOnReference, conflictOnUnique, notFound } from '../common/errors.js';
 import { toPeriodDto } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { assertYearWritable } from './year-guard.js';
+import { ANOTHER_YEAR_BECAME_CURRENT, assertYearWritable } from './year-guard.js';
 import type {
   CreateSchoolYearDto,
   SchoolYearDto,
@@ -121,11 +121,11 @@ export class SchoolYearsService {
         where: { isCurrent: true, NOT: { id } },
         data: { isCurrent: false },
       });
-      const year = await tx.schoolYear.update({
-        where: { id },
-        data: { isCurrent: true },
-        include: withPeriods,
-      });
+      // Two admins making two years current at once: the second commit hits `school_years_one_current_key`.
+      const year = await conflictOnUnique(
+        tx.schoolYear.update({ where: { id }, data: { isCurrent: true }, include: withPeriods }),
+        ANOTHER_YEAR_BECAME_CURRENT,
+      );
       await audit(tx, [
         {
           actorId: user.id,
