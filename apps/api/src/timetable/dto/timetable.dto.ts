@@ -69,7 +69,7 @@ import { emptyToNull, trim } from '../../common/transforms.js';
 import { ActivityTypeSummaryDto } from '../../activity-types/dto/activity-type.dto.js';
 
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
-const CLOCK_MESSAGE = '$property must be a time written HH:MM';
+const CLOCK_MESSAGE = '« $property » doit être une heure écrite HH:MM.';
 
 /* Requests ------------------------------------------------------------------------------------- */
 

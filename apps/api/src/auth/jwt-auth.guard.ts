@@ -37,6 +37,8 @@ export class JwtAuthGuard implements CanActivate {
       throw new ForbiddenException({
         statusCode: 403,
         message: 'Choisissez votre mot de passe avant de continuer.',
+        code: PASSWORD_CHANGE_REQUIRED,
+        // Kept one release for web builds that still read `error`.
         error: PASSWORD_CHANGE_REQUIRED,
       });
     }

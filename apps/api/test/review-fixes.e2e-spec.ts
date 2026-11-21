@@ -7,6 +7,7 @@ import type {
   SessionResponse,
   SectionChangeRequestDto,
 } from '@cdls/shared';
+import { JwtService } from '@nestjs/jwt';
 import type { AuthUser } from '../src/common/auth-user.js';
 import { UsersService } from '../src/users/users.service.js';
 import { ActivityTypesService } from '../src/activity-types/activity-types.service.js';
@@ -324,7 +325,11 @@ describe('Review fixes (e2e)', () => {
         const a = await create('Limite');
         const b = await create('Limite');
         for (let i = 0; i < 3; i++) await login(a.user.email, 'faux').expect(401);
-        await login(a.user.email, 'faux').expect(429);
+        const limited = await login(a.user.email, 'faux').expect(429);
+        // French, with a code (finding 13), never « ThrottlerException: Too Many Requests ».
+        expect(limited.body).toMatchObject({ statusCode: 429, code: 'RATE_LIMITED', retryable: true });
+        expect(message(limited.body)).toMatch(/Patientez/);
+        expect(limited.headers['retry-after']).toBeDefined();
         // A classmate behind the same address is not locked out.
         await login(b.user.email, b.temporaryPassword).expect(200);
       } finally {
@@ -358,6 +363,37 @@ describe('Review fixes (e2e)', () => {
       await login(created.user.email, 'Nouveau-Provisoire-1').expect(200);
     });
 
+    it('refuses to change an expired temporary password through a session opened before it expired', async () => {
+      const created = await create('Ouverte');
+      const session = (await login(created.user.email, created.temporaryPassword).expect(200))
+        .body as SessionResponse;
+      await t.prisma.user.update({
+        where: { id: created.user.id },
+        data: { temporaryPasswordExpiresAt: new Date(Date.now() - 1000) },
+      });
+      const refused = await t
+        .http()
+        .post('/api/auth/password')
+        .set(bearer(session.accessToken))
+        .send({ currentPassword: created.temporaryPassword, newPassword: 'Mon-Mot-De-Passe-2026' })
+        .expect(401);
+      expect(message(refused.body)).toMatch(/expiré.*secrétariat/);
+      const row = await t.prisma.user.findUniqueOrThrow({ where: { id: created.user.id } });
+      expect(row.mustChangePassword).toBe(true);
+      // The sessions of that password are over.
+      expect(await t.prisma.refreshToken.count({ where: { userId: created.user.id, revokedAt: null } })).toBe(0);
+    });
+
+    it('refuses an access token without exp, even with a good signature', async () => {
+      const created = await create('SansExp');
+      const session = (await login(created.user.email, created.temporaryPassword).expect(200))
+        .body as SessionResponse;
+      await t.http().get('/api/auth/me').set(bearer(session.accessToken)).expect(200);
+      const forever = await t.app.get(JwtService).signAsync({ sub: created.user.id, role: 'teacher', pv: 0 });
+      expect(JSON.parse(Buffer.from(forever.split('.')[1]!, 'base64url').toString())).not.toHaveProperty('exp');
+      await t.http().get('/api/auth/me').set(bearer(forever)).expect(401);
+    });
+
     it('clears the expiry once the person has chosen a password', async () => {
       const created = await create('Choisi');
       const session = (await login(created.user.email, created.temporaryPassword).expect(200))
@@ -370,6 +406,27 @@ describe('Review fixes (e2e)', () => {
         .expect(200);
       const row = await t.prisma.user.findUniqueOrThrow({ where: { id: created.user.id } });
       expect(row).toMatchObject({ mustChangePassword: false, temporaryPasswordExpiresAt: null });
+    });
+  });
+
+  describe('error bodies in French with a code (finding 13)', () => {
+    it('answers an unknown address with ROUTE_NOT_FOUND, without echoing the path', async () => {
+      const res = await t.http().get('/api/nulle-part?jeton=secret').expect(404);
+      expect(res.body).toEqual({ statusCode: 404, code: 'ROUTE_NOT_FOUND', message: 'Cette adresse n’existe pas.' });
+    });
+
+    it('lists validation problems in French with VALIDATION_FAILED', async () => {
+      const res = await t.http().post('/api/auth/login').send({ email: 3, password: 'x', extra: 1 }).expect(400);
+      expect(res.body).toMatchObject({ statusCode: 400, code: 'VALIDATION_FAILED' });
+      const messages = (res.body as ApiError).message;
+      expect(Array.isArray(messages) && messages.length > 0).toBe(true);
+      for (const m of messages) expect(m).not.toMatch(/\b(must|should)\b/);
+      expect(messages).toContain('Le champ « extra » n’est pas accepté.');
+    });
+
+    it('refuses a malformed id in the address in French', async () => {
+      const res = await t.http().get('/api/users/pas-un-uuid').set(bearer(admin)).expect(400);
+      expect(res.body).toMatchObject({ code: 'VALIDATION_FAILED', message: 'Un paramètre de l’adresse n’est pas valide.' });
     });
   });
 

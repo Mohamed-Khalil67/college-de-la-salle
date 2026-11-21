@@ -14,6 +14,9 @@ const ENV: Record<string, string> = {
 
 const ROW_ID = '0190d5b4-1c2a-7000-8000-000000000001';
 
+/** An exp an hour after the test runs: the tokens AuthService issues always carry one. */
+const EXP = Math.floor(Date.now() / 1000) + 3600;
+
 describe('AuthService', () => {
   const prisma = {
     user: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn() },
@@ -158,6 +161,20 @@ describe('AuthService', () => {
       expect(prisma.user.updateMany).not.toHaveBeenCalled();
     });
 
+    it('refuses an expired temporary password, even through a session opened before, and ends the sessions', async () => {
+      prisma.user.findUnique.mockResolvedValue(
+        await user({ mustChangePassword: true, temporaryPasswordExpiresAt: new Date(Date.now() - 1000) }),
+      );
+      await expect(
+        auth.changePassword('u1', 'correct horse', 'Cedre-du-Liban-2026'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.user.updateMany).not.toHaveBeenCalled();
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'u1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
     it('applies the rules: 10 characters, not the e-mail, not the current password', async () => {
       prisma.user.findUnique.mockResolvedValue(await user({ mustChangePassword: true }));
       for (const weak of ['short', 'prof@demo.cdls.test', 'PROF', 'correct horse']) {
@@ -204,22 +221,29 @@ describe('AuthService', () => {
     it('refuses tokens issued before the last password change', async () => {
       const changedAt = new Date('2026-10-20T10:00:00.250Z');
       prisma.user.findUnique.mockResolvedValue(await user({ passwordChangedAt: changedAt }));
-      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher' });
+      jwt.verifyAsync.mockResolvedValue({ exp: EXP, sub: 'u1', role: 'teacher' });
       expect(await auth.userFromAccessToken('before any version')).toBeNull();
-      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher', pv: changedAt.getTime() - 1 });
+      jwt.verifyAsync.mockResolvedValue({ exp: EXP, sub: 'u1', role: 'teacher', pv: changedAt.getTime() - 1 });
       expect(await auth.userFromAccessToken('old')).toBeNull();
-      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher', pv: changedAt.getTime() });
+      jwt.verifyAsync.mockResolvedValue({ exp: EXP, sub: 'u1', role: 'teacher', pv: changedAt.getTime() });
       expect(await auth.userFromAccessToken('new')).toMatchObject({ id: 'u1' });
     });
 
     it('accepts tokens without a version for accounts that never changed their password', async () => {
       prisma.user.findUnique.mockResolvedValue(await user());
-      jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher' });
+      jwt.verifyAsync.mockResolvedValue({ exp: EXP, sub: 'u1', role: 'teacher' });
       expect(await auth.userFromAccessToken('t')).toMatchObject({ id: 'u1' });
     });
 
-    it('refuses archived and disabled accounts', async () => {
+    it('refuses a token without exp, even with a good signature', async () => {
+      prisma.user.findUnique.mockResolvedValue(await user());
       jwt.verifyAsync.mockResolvedValue({ sub: 'u1', role: 'teacher' });
+      expect(await auth.userFromAccessToken('no-exp')).toBeNull();
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('refuses archived and disabled accounts', async () => {
+      jwt.verifyAsync.mockResolvedValue({ exp: EXP, sub: 'u1', role: 'teacher' });
       prisma.user.findUnique.mockResolvedValue(await user({ status: 'archived' }));
       expect(await auth.userFromAccessToken('t')).toBeNull();
       prisma.user.findUnique.mockResolvedValue(await user({ status: 'disabled' }));

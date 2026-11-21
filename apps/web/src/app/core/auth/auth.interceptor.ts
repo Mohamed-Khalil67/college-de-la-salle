@@ -2,7 +2,7 @@ import { HttpErrorResponse, type HttpInterceptorFn } from '@angular/common/http'
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, from, switchMap, throwError } from 'rxjs';
-import { PASSWORD_CHANGE_REQUIRED } from '@cdls/shared';
+import { passwordChangeRequired } from './auth-errors';
 import { AuthStore, FIRST_ACCESS } from './auth-store';
 
 const AUTH_PATHS = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
@@ -28,7 +28,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   return next(withToken()).pipe(
     catchError((error: unknown) => {
       if (!(error instanceof HttpErrorResponse)) return throwError(() => error);
-      if (error.status === 403 && (error.error as { error?: unknown } | null)?.error === PASSWORD_CHANGE_REQUIRED) {
+      if (error.status === 403 && passwordChangeRequired(error.error)) {
         void router.navigateByUrl(FIRST_ACCESS);
         return throwError(() => error);
       }

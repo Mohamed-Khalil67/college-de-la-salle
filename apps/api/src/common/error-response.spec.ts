@@ -1,6 +1,19 @@
-import { BadRequestException, ConflictException, ForbiddenException, HttpException } from '@nestjs/common';
-import { DB_ERROR_CODES } from '@cdls/shared';
-import { INTERNAL_MESSAGE, mapException } from './error-response.js';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  NotFoundException,
+} from '@nestjs/common';
+import { ThrottlerException } from '@nestjs/throttler';
+import { DB_ERROR_CODES, HTTP_ERROR_CODES } from '@cdls/shared';
+import {
+  INTERNAL_MESSAGE,
+  INVALID_PARAMETER_MESSAGE,
+  RATE_LIMITED_MESSAGE,
+  ROUTE_NOT_FOUND_MESSAGE,
+  mapException,
+} from './error-response.js';
 
 /** What Prisma throws, without importing the generated client. */
 const prismaError = (code: string, message = 'Invalid `prisma.user.create()` invocation: SELECT * FROM users WHERE email = \'a@b.c\'') =>
@@ -25,7 +38,37 @@ describe('mapException', () => {
   });
 
   it('wraps a plain string response', () => {
-    expect(mapException(new HttpException('Trop vite.', 429)).body).toEqual({ statusCode: 429, message: 'Trop vite.' });
+    expect(mapException(new HttpException('Salle introuvable.', 404)).body).toEqual({
+      statusCode: 404,
+      message: 'Salle introuvable.',
+    });
+  });
+
+  it('says a 429 in French with RATE_LIMITED, keeping a French message of our own', () => {
+    expect(mapException(new ThrottlerException()).body).toEqual({
+      statusCode: 429,
+      message: RATE_LIMITED_MESSAGE,
+      code: 'RATE_LIMITED',
+      retryable: true,
+    });
+    expect(mapException(new HttpException('Trop vite.', 429)).body).toEqual({
+      statusCode: 429,
+      message: 'Trop vite.',
+      code: 'RATE_LIMITED',
+      retryable: true,
+    });
+  });
+
+  it('turns the router 404 « Cannot GET /… » into ROUTE_NOT_FOUND without echoing the path', () => {
+    const m = mapException(new NotFoundException('Cannot GET /api/nope?x=secret'));
+    expect(m.body).toEqual({ statusCode: 404, message: ROUTE_NOT_FOUND_MESSAGE, code: 'ROUTE_NOT_FOUND' });
+    expect(JSON.stringify(m.body)).not.toContain('nope');
+  });
+
+  it('turns a parse pipe refusal into VALIDATION_FAILED in French', () => {
+    const m = mapException(new BadRequestException('Validation failed (uuid is expected)'));
+    expect(m.body).toEqual({ statusCode: 400, message: INVALID_PARAMETER_MESSAGE, code: 'VALIDATION_FAILED' });
+    expect(HTTP_ERROR_CODES).toContain(m.body.code);
   });
 
   it.each([

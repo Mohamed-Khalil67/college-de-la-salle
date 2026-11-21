@@ -23,6 +23,8 @@ export interface AccessTokenPayload {
    * version differs from the account's is refused, so a password change or reset ends every session.
    */
   readonly pv?: number;
+  /** Set by the signer from JWT_ACCESS_TTL; a token without it is refused. */
+  readonly exp?: number;
 }
 
 /** The password version an access token must carry for this account. */
@@ -176,6 +178,11 @@ export class AuthService {
     if (!user || user.status !== 'active') throw new UnauthorizedException(INVALID_SESSION);
     if (!(await passwordMatches(user.passwordHash, currentPassword)))
       throw new BadRequestException(WRONG_CURRENT_PASSWORD);
+    // A session opened before the temporary password ran out cannot turn it into a chosen one.
+    if (temporaryPasswordExpired(user)) {
+      await this.revokeAll(userId);
+      throw new UnauthorizedException(EXPIRED_TEMPORARY_PASSWORD);
+    }
     const problems = passwordProblems(newPassword, user.email);
     if (problems.length) throw new BadRequestException(problems);
     if (await passwordMatches(user.passwordHash, newPassword))
@@ -220,6 +227,8 @@ export class AuthService {
     } catch {
       return null;
     }
+    // Every token we issue expires: one without exp was not made by issue() and is refused.
+    if (typeof payload.exp !== 'number') return null;
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: userInclude,

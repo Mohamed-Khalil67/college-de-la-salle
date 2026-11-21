@@ -82,7 +82,7 @@ describe('JwtAuthGuard', () => {
     const refused = guard.canActivate(context('Bearer good').ctx);
     await expect(refused).rejects.toBeInstanceOf(ForbiddenException);
     await expect(guard.canActivate(context('Bearer good').ctx)).rejects.toMatchObject({
-      response: { error: 'PASSWORD_CHANGE_REQUIRED' },
+      response: { code: 'PASSWORD_CHANGE_REQUIRED', error: 'PASSWORD_CHANGE_REQUIRED' },
     });
     // Marked: /auth/me and POST /auth/password.
     spy.mockImplementation((key: unknown) => key === 'allowDuringPasswordChange');
