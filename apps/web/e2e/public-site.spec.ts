@@ -6,6 +6,7 @@ import { AR } from '../src/app/i18n/ar';
 import { EN } from '../src/app/i18n/en';
 import { FR } from '../src/app/i18n/fr';
 import { pageUrl, PRERENDERED_PAGES, PUBLIC_PAGES, type PublicPageId } from '../src/app/i18n/pages';
+import { PROFILE } from '../src/app/core/school/school-profile';
 
 /**
  * The public site in French, English and Arabic: every page opens with the right language and direction, has
@@ -40,11 +41,17 @@ async function axeAtBothWidths(page: Page, where: string): Promise<void> {
   }
 }
 
-/** Console errors, except the expected 401 of the session check (a visitor is not signed in). */
+/**
+ * Console errors and Angular warnings (NG02952 aspect ratio, NG02960 oversized image…). No 401 is expected any
+ * more: without the session marker cookie the page does not ask POST /api/auth/refresh (finding 18).
+ */
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
   page.on('console', (m) => {
-    if (m.type() === 'error' && !/status of 401/.test(m.text())) errors.push(m.text());
+    if (m.type() === 'error' || (m.type() === 'warning' && /NG0\d+/.test(m.text()))) errors.push(m.text());
+  });
+  page.on('request', (r) => {
+    if (r.url().includes('/api/auth/refresh')) errors.push(`unexpected session check ${r.method()} ${r.url()}`);
   });
   page.on('pageerror', (e) => errors.push(String(e)));
   return errors;
@@ -94,6 +101,44 @@ test('each public page is prerendered in each language, with its hreflang links'
       expect(html, url).toContain('hreflang="x-default"');
     }
   }
+});
+
+test('canonical and hreflang links are absolute, on the site address of the build', async ({ request }) => {
+  const origin = PROFILE.siteUrl;
+  for (const lang of LANGS) {
+    for (const id of PRERENDERED_PAGES) {
+      const html = await (await request.get(pageUrl(lang, id))).text();
+      expect(html).toContain(`<link rel="canonical" href="${origin}${pageUrl(lang, id)}"`);
+      expect(html).toContain(`hreflang="x-default" href="${origin}${pageUrl('fr', id)}"`);
+    }
+  }
+});
+
+test('robots.txt keeps crawlers out of the spaces and names the sitemap of every prerendered page', async ({ request }) => {
+  const robots = await request.get('/robots.txt');
+  expect(robots.headers()['content-type']).toContain('text/plain');
+  const text = await robots.text();
+  expect(text).toMatch(/^User-agent: \*$/m);
+  for (const path of ['/api/', '/connexion', '/eleve', '/enseignant', '/admin']) expect(text).toContain(`Disallow: ${path}`);
+  expect(text).toContain(`Sitemap: ${PROFILE.siteUrl}/sitemap.xml`);
+  const sitemap = await (await request.get('/sitemap.xml')).text();
+  expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+  for (const lang of LANGS) {
+    for (const id of PRERENDERED_PAGES) expect(sitemap).toContain(`<loc>${PROFILE.siteUrl}${pageUrl(lang, id)}</loc>`);
+  }
+  expect(sitemap).not.toContain('connexion');
+});
+
+test('an anonymous visit sends no session check, and phones get the small photo', async ({ page }) => {
+  const asked: string[] = [];
+  page.on('request', (r) => asked.push(r.url()));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  expect(asked.filter((u) => u.includes('/api/'))).toEqual([]);
+  // The hero photo comes from the srcset of WebP copies, not the full-size original.
+  const hero = await page.locator('.hero__media').evaluate((img: HTMLImageElement) => img.currentSrc);
+  expect(hero, 'hero photo').not.toMatch(/\.(?:jpe?g|png)$/);
 });
 
 test('the language switcher keeps the page and turns the layout right to left', async ({ page }) => {

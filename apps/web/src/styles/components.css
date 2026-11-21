@@ -805,10 +805,25 @@ textarea.field__control {
   overflow: hidden;
   min-width: 0;
 }
+/* The frame crops; the photo inside is an NgOptimizedImage in fill mode (absolute, 100 % x 100 %), so the crop is
+   said explicitly and Angular's aspect-ratio check (NG02952) has nothing to report. */
 .card__media {
+  position: relative;
+  overflow: hidden;
+  flex: none;
   aspect-ratio: 16 / 9;
   width: 100%;
+  background: var(--color-info-tint);
+}
+.card__media > img,
+.photo-frame > img {
   object-fit: cover;
+}
+.photo-frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: var(--radius-sm);
   background: var(--color-info-tint);
 }
 .card__body {
@@ -1549,11 +1564,15 @@ textarea.field__control {
   color: var(--color-heritage);
 }
 .timeline__item img {
-  margin-top: var(--space-2);
   width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
   border-radius: var(--radius-sm);
+}
+.timeline__item figure > img,
+.timeline__item .photo-frame {
+  margin-top: var(--space-2);
+}
+.timeline__item .photo-frame {
+  aspect-ratio: 16 / 10;
 }
 .timeline__item figcaption {
   margin-top: var(--space-1);
@@ -1833,12 +1852,7 @@ textarea.field__control {
 .page-intro--compact {
   padding-block: var(--space-12);
 }
-.page-intro__figure img {
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-}
+
 .page-intro__figure figcaption {
   margin-top: var(--space-2);
 }

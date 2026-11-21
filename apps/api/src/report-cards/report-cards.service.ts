@@ -291,7 +291,9 @@ export class ReportCardsService {
       .normalize('NFD')
       .replace(/[^\w]+/g, '-')
       .toLowerCase();
-    return { filename: `bulletin-${period.number}-${slug}.pdf`, content };
+    // A name with no Latin letter (Arabic) leaves only dashes: name the file after the student id then.
+    const name = /[a-z0-9]/.test(slug) ? slug : `eleve-${dto.studentId.slice(0, 8)}`;
+    return { filename: `bulletin-${period.number}-${name}.pdf`, content };
   }
 
   /** Students: their own published card; teachers: cards of classes they teach; admins: all. */

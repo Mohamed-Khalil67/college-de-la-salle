@@ -115,6 +115,7 @@ export class EventDetails {
   protected downloadIcs(): void {
     const e = this.occurrence()?.event;
     if (!e) return;
-    saveFile(this.#document, new Blob([eventIcs(e)], { type: 'text/calendar;charset=utf-8' }), fileName(e.title, 'ics'));
+    // A click handler: only ever runs in the browser, so « now » (the DTSTAMP) is the real time.
+    saveFile(this.#document, new Blob([eventIcs(e, new Date().toISOString())], { type: 'text/calendar;charset=utf-8' }), fileName(e.title, 'ics'));
   }
 }

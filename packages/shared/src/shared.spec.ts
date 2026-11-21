@@ -8,8 +8,8 @@ import {
   occurrences,
   skippedDays,
   SYSTEM_ACTIVITY_TYPES,
-  toIcs,
 } from './calendar.js';
+import { toIcs } from './feed.js';
 import {
   audienceMatches,
   averageOnTwenty,
@@ -21,6 +21,7 @@ import {
 import { MATIERES, matieresFor } from './subjects.js';
 
 const IDS = { uidDomain: 'college-de-la-salle-daher', productName: 'College de la Salle Daher' };
+const ICS = { timeZone: 'Africa/Cairo', now: '2026-10-01T08:00:00.000Z' };
 
 const grade = (
   subject: string,
@@ -115,9 +116,13 @@ describe('calendar', () => {
   });
 
   it('exports a weekly .ics event with its rule', () => {
-    const ics = toIcs(event({ repeatUntil: '2026-12-20' }), IDS);
-    expect(ics).toContain('DTSTART:20261004T083000');
-    expect(ics).toContain('RRULE:FREQ=WEEKLY;UNTIL=20261220T235959');
+    const ics = toIcs(event({ repeatUntil: '2026-12-20' }), IDS, ICS);
+    // RFC 5545: a DTSTAMP, zoned times with their VTIMEZONE, and UNTIL in UTC next to a zoned DTSTART.
+    expect(ics).toContain('DTSTAMP:20261001T080000Z\r\n');
+    expect(ics).toContain('BEGIN:VTIMEZONE\r\nTZID:Africa/Cairo\r\n');
+    expect(ics).toContain('DTSTART;TZID=Africa/Cairo:20261004T083000');
+    expect(ics).toContain('RRULE:FREQ=WEEKLY;UNTIL=20261220T215959Z');
+    expect(ics.split('\r\n').every((line) => new TextEncoder().encode(line).length <= 75)).toBe(true);
     expect(ics).toContain('SUMMARY:Cours — Mathématiques');
     expect(ics).not.toContain('EXDATE');
     expect(ics.endsWith('END:VCALENDAR\r\n')).toBe(true);
@@ -161,9 +166,12 @@ describe('calendar', () => {
     const weekly = event({ repeatUntil: '2026-12-20' });
     const closures = [{ ...autumn, targets: ['all'] }];
     expect(skippedDays(weekly, closures)).toEqual(['2026-10-18']);
-    expect(toIcs(weekly, IDS, closures)).toContain('EXDATE:20261018T083000\r\n');
+    expect(toIcs(weekly, IDS, { ...ICS, closures })).toContain('EXDATE;TZID=Africa/Cairo:20261018T083000\r\n');
     const allDay = event({ start: '', end: '', repeatUntil: '2026-12-20' });
-    expect(toIcs(allDay, IDS, closures)).toContain('EXDATE;VALUE=DATE:20261018\r\n');
+    const allDayIcs = toIcs(allDay, IDS, { ...ICS, closures });
+    expect(allDayIcs).toContain('EXDATE;VALUE=DATE:20261018\r\n');
+    expect(allDayIcs).toContain('RRULE:FREQ=WEEKLY;UNTIL=20261220\r\n');
+    expect(allDayIcs).not.toContain('VTIMEZONE');
   });
 
   it('finds the next assessment by its flags', () => {

@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { DOCUMENT, Injectable, PLATFORM_ID, computed, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import type {
@@ -12,6 +12,7 @@ import type {
   SessionUser,
 } from '@cdls/shared';
 import { type RefreshOutcome, refreshWithRetry } from './refresh-retry';
+import { hasSessionMarker } from './session-marker';
 
 export type { RefreshOutcome } from './refresh-retry';
 
@@ -40,6 +41,7 @@ export function landingFor(user: Pick<SessionUser, 'role' | 'mustChangePassword'
 export class AuthStore {
   readonly #http = inject(HttpClient);
   readonly #browser = isPlatformBrowser(inject(PLATFORM_ID));
+  readonly #document = inject(DOCUMENT);
 
   readonly #user = signal<SessionUser | null>(null);
   readonly #status = signal<AuthStatus>('unknown');
@@ -76,10 +78,16 @@ export class AuthStore {
     return this.#accessToken;
   }
 
-  /** Restores the session once per page load (browser only); later calls wait for the same result. */
+  /**
+   * Restores the session once per page load (browser only); later calls wait for the same result. Without the
+   * API's session marker cookie there is no session to restore: the visitor is anonymous at once, and no
+   * POST /auth/refresh is sent (anonymous visits of the public site cost the shared limit nothing).
+   */
   restore(): Promise<void> {
     if (!this.#browser) return Promise.resolve();
-    this.#restored ??= this.refresh().then(() => undefined);
+    this.#restored ??= hasSessionMarker(this.#document.cookie)
+      ? this.refresh().then(() => undefined)
+      : Promise.resolve(this.#clear());
     return this.#restored;
   }
 

@@ -33,7 +33,7 @@ import { type MatiereCardData, MatiereCard } from './matiere-card';
             <a class="t-label" [href]="s.links[0].url">{{ s.links[0].label }}</a>
           </div>
         </div>
-        <figure sitePhoto class="page-intro__figure" [photo]="introPhoto()" [priority]="true"></figure>
+        <figure sitePhoto class="page-intro__figure" [photo]="introPhoto()" [priority]="true" aspect="3 / 2"></figure>
       </div>
     </section>
 

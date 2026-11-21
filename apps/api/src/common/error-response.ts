@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import type { ApiError, DbErrorCode } from '@cdls/shared';
+import type { ApiError, DbErrorCode, HttpErrorCode } from '@cdls/shared';
 
 /** What the global exception filter sends, and whether it is a server fault to log. */
 export interface MappedError {
@@ -57,6 +57,34 @@ function asHttpError(error: unknown): { status: number; message: string } | null
   return { status, message: typeof e.message === 'string' ? e.message.slice(0, 200) : 'Requête invalide.' };
 }
 
+export const RATE_LIMITED_MESSAGE = 'Trop de demandes en peu de temps. Patientez une minute, puis réessayez.';
+export const ROUTE_NOT_FOUND_MESSAGE = 'Cette adresse n’existe pas.';
+export const INVALID_PARAMETER_MESSAGE = 'Un paramètre de l’adresse n’est pas valide.';
+
+/**
+ * The framework's own English refusals, said in French with a code: the throttler's 429 (« ThrottlerException:
+ * Too Many Requests »), the router's 404 (« Cannot GET /… », whose path is not echoed), the parse pipes' 400
+ * (« Validation failed (uuid is expected) »). A body that already has a code is ours and is kept as it is.
+ */
+function frameworkRefusal(status: number, body: ApiError): ApiError | null {
+  if (body.code) return null;
+  const message = typeof body.message === 'string' ? body.message : '';
+  if (status === 429) {
+    const french = message && !/ThrottlerException|Too Many Requests/i.test(message) ? message : RATE_LIMITED_MESSAGE;
+    const code: HttpErrorCode = 'RATE_LIMITED';
+    return { statusCode: 429, message: french, code, retryable: true };
+  }
+  if (status === 404 && /^Cannot [A-Z]+ /.test(message)) {
+    const code: HttpErrorCode = 'ROUTE_NOT_FOUND';
+    return { statusCode: 404, message: ROUTE_NOT_FOUND_MESSAGE, code };
+  }
+  if (status === 400 && /^Validation failed\b/.test(message)) {
+    const code: HttpErrorCode = 'VALIDATION_FAILED';
+    return { statusCode: 400, message: INVALID_PARAMETER_MESSAGE, code };
+  }
+  return null;
+}
+
 const errorName = (error: unknown): string =>
   error instanceof Error ? error.name : typeof error === 'object' ? 'Object' : typeof error;
 
@@ -69,10 +97,11 @@ export function mapException(exception: unknown): MappedError {
   if (exception instanceof HttpException) {
     const status = exception.getStatus();
     const response = exception.getResponse();
-    const body: ApiError =
+    const own: ApiError =
       typeof response === 'string'
         ? { statusCode: status, message: response }
         : { statusCode: status, ...(response as object) } as ApiError;
+    const body = frameworkRefusal(status, own) ?? own;
     return {
       status,
       body,

@@ -29,7 +29,8 @@ schools/<id>/
 The profile (`profile.json`) holds: `id`, `placeholder`, the school's names per language (`full`, `short`, `place`,
 `city`, and `of`, the form used in a sentence: « votre compte du Collège de la Salle »), `nameLang`, `foundingYear`,
 the affiliation line, the contacts (address per language, map query, switchboard, e-mail, departments with their
-phones), the linked websites, `loginEmailDomain`, the IANA `timeZone`, `defaultLanguage`, the enabled `languages`, the
+phones), the linked websites, `siteUrl` (the https origin of this platform's site: canonical and hreflang links,
+robots.txt, sitemap.xml), `loginEmailDomain`, the IANA `timeZone`, `defaultLanguage`, the enabled `languages`, the
 two `sections` (code and name per language), the calendar ids (`uidDomain`, `productName`) and the `brand` (crest,
 icons, theme colour, optional colour overrides). Open `schools/example/profile.json` and change every value; the
 validator names each field that is wrong, with the file, so a typo stops the build instead of reaching a page.
@@ -40,7 +41,10 @@ validator names each field that is wrong, with the file, so a typo stops the bui
    `"id"` and `"placeholder": false` in `profile.json`.
 2. **Fill the profile.** Names, address, phones, e-mails, time zone (for example `Europe/Paris`), languages (`fr` is
    the default and the only possible one for now; `en` and `ar` are optional, a school that drops one simply has no
-   pages for it), `loginEmailDomain` (the example shown in help texts, normally the same as `SCHOOL_EMAIL_DOMAIN`).
+   pages for it), `loginEmailDomain` (the example shown in help texts, normally the same as `SCHOOL_EMAIL_DOMAIN`),
+   `siteUrl` (`https://www.<domain>`, no path and no trailing slash). While the domain is not chosen, use a reserved
+   placeholder such as `https://<your-id>.invalid`: builds warn, and the Docker image (`CDLS_RELEASE=1`) refuses it
+   unless `PUBLIC_WEB_URL` gives the real address. A demonstration pack (`"placeholder": true`) may keep one.
 3. **Write the content.** `site/content.fr.ts` is the source; English and Arabic translate the same shapes (a missing
    field does not compile). Replace the `site/messages.*.ts` texts, `archive.ts` (photos with their credits) and
    `index.ts`. Run `SCHOOL=<your-id> npm test -w @cdls/web`: `pack.spec.ts` checks that every photo, department and

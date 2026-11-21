@@ -108,6 +108,13 @@ export interface SchoolProfile {
   readonly contacts: SchoolContacts;
   readonly websites: readonly SchoolWebsite[];
   /**
+   * The public address of THIS platform's site, an https origin without a path (`https://www.ecole.eg`): absolute
+   * canonical and hreflang links, robots.txt and sitemap.xml. A reserved placeholder host (`.invalid`, `.example`,
+   * `.test`) is allowed while the domain is not chosen, but a release build refuses it (`siteUrlReleaseProblems`).
+   * The web build's `PUBLIC_WEB_URL`, when set, overrides it.
+   */
+  readonly siteUrl: string;
+  /**
    * The domain shown in help texts as an example of a login (`prenom.nom@<domain>`). The real domain of
    * generated logins is the API's `SCHOOL_EMAIL_DOMAIN`; the API warns in production when they differ.
    */
@@ -255,6 +262,8 @@ export function schoolProfileProblems(value: unknown): string[] {
     c.url(w['url'], `websites[${i}].url`);
   });
 
+  const siteUrl = c.text(p['siteUrl'], 'siteUrl');
+  if (siteUrl && !isSiteOrigin(siteUrl)) c.fail('siteUrl', 'origine https sans chemin ni barre finale attendue (https://www.ecole.eg)');
   c.text(p['loginEmailDomain'], 'loginEmailDomain', DOMAIN, 'nom de domaine attendu (lasalle-daher.eg)');
   const zone = c.text(p['timeZone'], 'timeZone');
   if (zone && !isTimeZone(zone)) c.fail('timeZone', `fuseau IANA inconnu « ${zone} » (Africa/Cairo)`);
@@ -310,6 +319,32 @@ function isSchoolProfile(value: unknown): value is SchoolProfile {
 export function parseSchoolProfile(value: unknown, source = 'profile.json'): SchoolProfile {
   if (isSchoolProfile(value)) return value;
   throw new Error(`Profil d’établissement invalide (${source}) :\n- ${schoolProfileProblems(value).join('\n- ')}`);
+}
+
+/** An https origin, no path, query or trailing slash: `https://www.ecole.eg` or `https://ecole.eg:8443`. */
+export function isSiteOrigin(url: string): boolean {
+  return /^https:\/\/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?$/i.test(url);
+}
+
+/** Reserved names (RFC 2606, RFC 6761) a pack uses while its domain is not chosen. */
+const PLACEHOLDER_HOST = /(?:\.(?:invalid|example|test|localhost)|(?:^|\.)example\.(?:com|net|org))(?::\d+)?$/i;
+
+/** True for a placeholder address (`https://cdls-daher.invalid`). */
+export function isPlaceholderSiteUrl(url: string): boolean {
+  return PLACEHOLDER_HOST.test(url.replace(/^https?:\/\//, ''));
+}
+
+/**
+ * What stops a release build (the Docker image) of a real school: its site address must be a real https origin.
+ * `origin` is the address the build will use (`PUBLIC_WEB_URL` or the profile's `siteUrl`). A demonstration
+ * pack (`placeholder: true`) may keep a placeholder.
+ */
+export function siteUrlReleaseProblems(profile: SchoolProfile, origin = profile.siteUrl): string[] {
+  if (!isSiteOrigin(origin)) return [`siteUrl: « ${origin} » n’est pas une origine https (https://www.ecole.eg)`];
+  if (isPlaceholderSiteUrl(origin) && !profile.placeholder) {
+    return [`siteUrl: « ${origin} » est une adresse provisoire ; indiquez le domaine du site (profile.json ou PUBLIC_WEB_URL) avant une mise en production`];
+  }
+  return [];
 }
 
 /* ------------------------------------------------------------------------------------------------

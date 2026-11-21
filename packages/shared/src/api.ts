@@ -70,6 +70,13 @@ export const DB_ERROR_CODES = [
 export type DbErrorCode = (typeof DB_ERROR_CODES)[number];
 
 /**
+ * Codes the filter adds to the framework's own refusals: too many requests (429, `retryable`), a body or query
+ * that fails validation (400, the French list stays in `message`), an address no route answers (404).
+ */
+export const HTTP_ERROR_CODES = ['RATE_LIMITED', 'VALIDATION_FAILED', 'ROUTE_NOT_FOUND'] as const;
+export type HttpErrorCode = (typeof HTTP_ERROR_CODES)[number];
+
+/**
  * Body of every error response: `{ statusCode, message, code? }`. Handlers keep their own bodies (validation
  * lists, `TIMETABLE_CONFLICT`, `PASSWORD_CHANGE_REQUIRED`…); anything unexpected is a 500 « Erreur interne. »
  * without detail. `retryable` is set on a transient conflict (a serialization failure): the same request
@@ -112,12 +119,18 @@ export interface SessionUser {
   readonly sectionCode: SectionId | null;
   /**
    * First sign-in or password reset by the administration: until the user chooses a password
-   * (POST /auth/password), every other route answers 403 with `error: PASSWORD_CHANGE_REQUIRED`.
+   * (POST /auth/password), every other route answers 403 with `code: PASSWORD_CHANGE_REQUIRED`.
    */
   readonly mustChangePassword: boolean;
 }
 
-/** `error` of the 403 sent while the user must still choose a password. */
+/**
+ * A non-secret cookie (`cdls_session=1`, path `/`, readable by the page) the API sets with the refresh cookie and
+ * clears on logout and on a refused refresh: without it the web does not try POST /auth/refresh on load.
+ */
+export const SESSION_MARKER_COOKIE = 'cdls_session';
+
+/** `code` of the 403 sent while the user must still choose a password (also in `error` until the next release). */
 export const PASSWORD_CHANGE_REQUIRED = 'PASSWORD_CHANGE_REQUIRED';
 
 /** Returned by POST /auth/login and POST /auth/refresh. Send `Authorization: Bearer <accessToken>`. */

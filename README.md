@@ -73,10 +73,11 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 by one, or from a roster CSV); there is no open sign-up. Every login e-mail is `prenom.nom@<SCHOOL_EMAIL_DOMAIN>`
 (accents removed, spaces and apostrophes turned into hyphens, `2`, `3`… on a collision). A new or reset account has a
 temporary password and `mustChangePassword`: until the person chooses a password (`POST /auth/password`, at least 10
-characters, not the e-mail) every other route answers 403 `PASSWORD_CHANGE_REQUIRED`, and the web app shows the
+characters, not the e-mail) every other route answers 403 with `code: PASSWORD_CHANGE_REQUIRED`, and the web app shows the
 « Premier accès » page. Accounts are `active`, `disabled` or `archived` (graduated or left: no sign-in, read-only).
 Sign-in returns a 15-minute access token (send it as
-`Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`).
+`Authorization: Bearer …`) and sets a rotating refresh token in an httpOnly cookie (`POST /api/auth/refresh`), plus a
+non-secret `cdls_session=1` marker the page can read: without it a page load does not try the refresh.
 
 **Log and errors.** `LOG_LEVEL` (`error`, `warn`, `info` by default, `debug`) sets how much the API writes: one JSON object per
 line in production, readable text otherwise, always with the school id (`school`) and a request id (`requestId`). Every response carries

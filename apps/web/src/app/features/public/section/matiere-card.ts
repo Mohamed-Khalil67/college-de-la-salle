@@ -17,18 +17,13 @@ export interface MatiereCardData extends MatiereText {
   host: { class: 'card' },
   template: `
     @let m = matiere();
-    <img class="card__media" [ngSrc]="m.image" width="600" height="400" [alt]="m.alt" sizes="(max-width: 64rem) 100vw, 33vw" />
+    <div class="card__media"><img [ngSrc]="m.image" fill [alt]="m.alt" sizes="(max-width: 64rem) 100vw, 33vw" /></div>
     <div class="card__body">
       <p class="t-h3">{{ m.name }}</p>
       <p class="t-body-s t-muted">{{ m.blurb }}</p>
     </div>
   `,
-  styles: `
-    /* The width/height attributes reserve space; height: auto lets aspect-ratio and the width decide. */
-    .card__media {
-      height: auto;
-    }
-  `,
+
 })
 export class MatiereCard {
   readonly matiere = input.required<MatiereCardData>();

@@ -133,7 +133,7 @@ describe('Accounts (e2e)', () => {
         .get(`/api/students/${created.user.studentId}/grades`)
         .set(bearer(token))
         .expect(403);
-      expect(blocked.body).toMatchObject({ error: 'PASSWORD_CHANGE_REQUIRED' });
+      expect(blocked.body).toMatchObject({ code: 'PASSWORD_CHANGE_REQUIRED', error: 'PASSWORD_CHANGE_REQUIRED' });
       await t.http().get('/api/events/occurrences?from=2026-09-01&to=2026-09-30').set(bearer(token)).expect(403);
       await t.http().get('/api/section-changes/mine').set(bearer(token)).expect(403);
       await t.http().get('/api/auth/me').set(bearer(token)).expect(200);
@@ -644,7 +644,7 @@ describe('Accounts (e2e)', () => {
         .set(bearer(temporary))
         .send({ name: 'Salle temporaire', kind: 'classroom' })
         .expect(403);
-      expect((blocked.body as { error: string }).error).toBe('PASSWORD_CHANGE_REQUIRED');
+      expect((blocked.body as { code: string }).code).toBe('PASSWORD_CHANGE_REQUIRED');
 
       const session = await firstSignIn(created, 'Un-bon-mot-de-passe-2026');
       const room = await t

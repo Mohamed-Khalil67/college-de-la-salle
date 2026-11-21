@@ -20,10 +20,14 @@ COPY schools schools
 # The school this image is for (deploy/.env SCHOOL), a folder of schools/. The API container must use the same value.
 ARG SCHOOL=cdls-daher
 ENV SCHOOL=${SCHOOL}
-# The site's public address (deploy/.env PUBLIC_WEB_URL): absolute hreflang and canonical links in the
-# prerendered pages. Empty: root-relative links.
+# The site's public address (deploy/.env PUBLIC_WEB_URL): absolute canonical and hreflang links, robots.txt and
+# sitemap.xml. Empty: the pack's profile.json siteUrl. Both are read by scripts/site-origin.mjs (build args are
+# environment variables of RUN).
 ARG PUBLIC_WEB_URL=
-RUN npm run build -w @cdls/shared && npm run build -w @cdls/web -- --define "SITE_ORIGIN='${PUBLIC_WEB_URL}'"
+# A release image refuses a placeholder or non-https site address for a real school (select-school.mjs);
+# --build-arg CDLS_RELEASE=0 only for a throw-away trial image.
+ARG CDLS_RELEASE=1
+RUN npm run build -w @cdls/shared && npm run build -w @cdls/web
 # Content-Security-Policy: the prerendered pages carry a few inline scripts (Angular's event-dispatch
 # contract, the stylesheet swap); allow exactly those by hash instead of 'unsafe-inline' for scripts.
 RUN node apps/web/nginx/csp-hashes.mjs apps/web/dist/college-website/browser /tmp/csp.conf

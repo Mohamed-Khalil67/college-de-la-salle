@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ActivityTypeSummary, EventDto, OccurrenceDto } from '@cdls/shared';
+import { PROFILE } from '../../core/school/school-profile';
 import { eventIcs, fileName, shiftWeek, weekColumns, weekLabel, weekRange } from './week';
 
 const COURS: ActivityTypeSummary = {
@@ -62,8 +63,9 @@ describe('week', () => {
     expect(weekLabel('2026-12-01')).toBe('Semaine du 29 novembre au 3 décembre 2026');
   });
   it('writes an .ics file and a safe file name', () => {
-    const ics = eventIcs(event({ repeatUntil: '2026-12-17' }));
-    expect(ics).toContain('DTSTART:20261020T083000');
+    const ics = eventIcs(event({ repeatUntil: '2026-12-17' }), '2026-10-01T08:00:00.000Z');
+    expect(ics).toContain(`DTSTART;TZID=${PROFILE.timeZone}:20261020T083000`);
+    expect(ics).toContain('DTSTAMP:20261001T080000Z');
     expect(ics).toContain('RRULE:FREQ=WEEKLY');
     expect(fileName('Contrôle n° 3 : fonctions', 'ics')).toBe('controle-n-3-fonctions.ics');
     expect(fileName('***', 'pdf')).toBe('fichier.pdf');

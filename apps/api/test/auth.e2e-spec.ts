@@ -45,6 +45,31 @@ describe('Auth (e2e)', () => {
     await t.http().post('/api/auth/logout').set('Cookie', second).expect(204);
   });
 
+  it('sets a readable session marker with the refresh cookie and clears it on logout and on a failed refresh', async () => {
+    const marker = (res: { headers: Record<string, unknown> }) =>
+      ((res.headers['set-cookie'] as string[] | undefined) ?? []).find((c) => c.startsWith('cdls_session='));
+    const login = await t
+      .http()
+      .post('/api/auth/login')
+      .send({ email: ADMIN, password: inject('password') })
+      .expect(200);
+    const set = marker(login)!;
+    // Not a secret (it only says « a session may exist »), so the page's script may read it: no HttpOnly.
+    expect(set).toMatch(/^cdls_session=1;/);
+    expect(set).not.toMatch(/HttpOnly/);
+    expect(set).toMatch(/SameSite=Strict/);
+    expect(set).toMatch(/Path=\/;/);
+    expect(set).toMatch(/Max-Age=604800/);
+
+    const refreshed = await t.http().post('/api/auth/refresh').set('Cookie', cookieOf(login)).expect(200);
+    expect(marker(refreshed)).toMatch(/^cdls_session=1;/);
+    // A refused refresh (the old cookie was rotated away) clears the marker, so the next page load skips it.
+    const refused = await t.http().post('/api/auth/refresh').set('Cookie', cookieOf(login)).expect(401);
+    expect(marker(refused)).toMatch(/^cdls_session=;.*Expires=Thu, 01 Jan 1970/);
+    const out = await t.http().post('/api/auth/logout').set('Cookie', cookieOf(refreshed)).expect(204);
+    expect(marker(out)).toMatch(/^cdls_session=;.*Expires=Thu, 01 Jan 1970/);
+  });
+
   it('refuses a refresh without a cookie and a forged access token', async () => {
     await t.http().post('/api/auth/refresh').expect(401);
     await t.http().get('/api/auth/me').set(bearer('not.a.jwt')).expect(401);

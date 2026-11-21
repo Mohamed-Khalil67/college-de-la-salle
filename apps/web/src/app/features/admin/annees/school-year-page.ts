@@ -250,7 +250,7 @@ type Pending = { readonly kind: 'delete-entry'; readonly entry: TimelineEntry } 
         }
         @case ('close') {
           <p>
-            La clôture de <strong>{{ pendingEntry()?.label }}</strong> verrouille ses notes : ce sont elles qui servent à calculer les bulletins.
+            La clôture de la période <strong>{{ pendingEntry()?.label }}</strong> verrouille ses notes : ce sont elles qui servent à calculer les bulletins.
             Elle ne pourra plus être modifiée.
           </p>
           <p>Clôturez seulement quand tous les enseignants ont saisi et publié leurs notes.</p>

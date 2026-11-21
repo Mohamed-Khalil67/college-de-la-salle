@@ -75,7 +75,10 @@ a colour; gold (`--color-accent`) is never text on light surfaces (use `--color-
   `api.calendar`, `api.grades`, `api.attendance`, `api.reportCards`, `api.contact`). Types come from `@cdls/shared` (`api.ts`).
   Read with `resource({ params, loader })`; write in async handlers. Show errors with `apiMessage(error)`.
 - `AuthStore` (`core/auth/auth-store.ts`): `user()` (with `studentId`/`teacherId`, and `classId` for students), `role()`, `displayName()`.
-  The access token is memory-only; the interceptor adds it and refreshes once on a 401.
+  The access token is memory-only; the interceptor adds it and refreshes once on a 401. `restore()` (once per page
+  load) sends `POST /api/auth/refresh` only when the API's `cdls_session` marker cookie is present
+  (`core/auth/session-marker.ts`); without it the visitor is anonymous at once, so a public page makes no API call and
+  logs no 401. The 403 `PASSWORD_CHANGE_REQUIRED` is read from `code` or `error` (`core/auth/auth-errors.ts`).
   **A failed refresh signs out only on 401/403** (the API refused the token). On a 429, a 5xx or a network error
   `AuthStore.refresh()` retries up to three times (`core/auth/refresh-retry.ts`, pure, with a spec: 1 s, 2 s, 4 s plus
   jitter, `Retry-After` honoured, 8 s cap), keeps the session, resolves `'unavailable'` and sets `sessionUnavailable()`,
@@ -150,6 +153,19 @@ through `school/index.ts`; never import `schools/` or a generated file directly.
 zone or section name in a component. A string that used to be a CDLS id (`PhotoId`, `ContactId`) is a plain `string` checked by
 `school/pack.spec.ts`. `src/index.template.html` is the page shell: edit it, not `src/generated/index.html`.
 To check a school: `SCHOOL=<id> npm run build`, then `SCHOOL=<id> npm run e2e:smoke`. Docs: `docs/new-school.md`.
+
+## Photos and SEO of the public site
+
+- `scripts/select-school.mjs` makes WebP copies of the pack's photos at 480/768/1080/1600 px narrower than the original
+  (`scripts/responsive-images.mjs`, sharp, cached in `apps/web/.cache/`) and lists them in the generated
+  `core/school/images.generated.ts`; the app's `IMAGE_LOADER` (`core/school/images.ts`, `photoUrl`) and `IMAGE_CONFIG`
+  breakpoints turn `sizes` into a srcset of those copies. Give every photo a `sizes`; `priority` on the LCP one.
+- A photo shown at another ratio than its own is cropped by a frame, never by CSS on the `<img>` (Angular's NG02952):
+  `<div class="card__media">` / `<div class="photo-frame">` has the `aspect-ratio`, the `<img ngSrc fill>` inside covers
+  it. `PhotoFigure`'s `aspect` input does it for figures. An uncropped photo keeps `width`/`height` and `height: auto`.
+- Canonical and hreflang links are absolute on `PROFILE.siteUrl` (the pack's `siteUrl`, or `PUBLIC_WEB_URL` at build
+  time, `scripts/site-origin.mjs`); `npm run build` then writes `robots.txt` and `sitemap.xml` (`scripts/seo-files.mjs`,
+  postbuild). `CDLS_RELEASE=1` (the Docker image) refuses a placeholder site address for a real school.
 
 ## Public site languages
 

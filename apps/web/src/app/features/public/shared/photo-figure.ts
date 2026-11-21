@@ -11,7 +11,14 @@ import type { Photo } from '../../../school';
   imports: [NgOptimizedImage],
   template: `
     @let p = photo();
-    <img [ngSrc]="p.src" [width]="p.width" [height]="p.height" [alt]="p.alt" [priority]="priority()" [sizes]="sizes()" [style.aspect-ratio]="aspect()" />
+    @if (aspect(); as ratio) {
+      <!-- Cropped on purpose: the frame has the ratio, the photo fills it (fill mode, object-fit: cover). -->
+      <div class="photo-frame" [style.aspect-ratio]="ratio">
+        <img [ngSrc]="p.src" fill [alt]="p.alt" [priority]="priority()" [sizes]="sizes()" />
+      </div>
+    } @else {
+      <img [ngSrc]="p.src" [width]="p.width" [height]="p.height" [alt]="p.alt" [priority]="priority()" [sizes]="sizes()" />
+    }
     <figcaption class="t-caption t-muted">
       @if (caption()) {
         {{ p.caption }}
@@ -20,11 +27,10 @@ import type { Photo } from '../../../school';
     </figcaption>
   `,
   styles: `
-    /* The width/height attributes reserve space; height: auto lets aspect-ratio and the width decide. */
-    img {
+    /* Uncropped: the width/height attributes reserve the space and height: auto keeps the photo's own proportions. */
+    :host > img {
       width: 100%;
       height: auto;
-      object-fit: cover;
       border-radius: var(--radius-sm);
       background: var(--color-info-tint);
     }
@@ -39,6 +45,6 @@ export class PhotoFigure {
   /** Show the photo's caption before the credit. */
   readonly caption = input(true);
   readonly sizes = input('(max-width: 64rem) 100vw, 50vw');
-  /** Crop to this CSS aspect ratio (e.g. '4 / 3'); the photo's own proportions when null. */
+  /** Crop to this CSS aspect ratio (e.g. '4 / 3') in a frame; the photo's own proportions, uncropped, when null. */
   readonly aspect = input<string | null>(null);
 }

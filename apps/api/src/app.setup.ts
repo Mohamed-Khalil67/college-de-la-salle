@@ -1,10 +1,11 @@
-import { type INestApplication, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, type INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { API_PREFIX } from './app.prefix.js';
 import { AppLogger, requestLogging } from './common/app-logger.js';
+import { validationMessages } from './common/validation-messages.js';
 import type { Env } from './config/env.validation.js';
 import { activeSchool } from './school/school-profile.js';
 
@@ -47,6 +48,14 @@ export function configureApp(app: INestApplication): void {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      // French messages (the DTO's own, or a French one for class-validator's English defaults) and a code.
+      exceptionFactory: (errors) =>
+        new BadRequestException({
+          statusCode: 400,
+          message: validationMessages(errors),
+          error: 'Bad Request',
+          code: 'VALIDATION_FAILED',
+        }),
     }),
   );
   app.enableShutdownHooks();

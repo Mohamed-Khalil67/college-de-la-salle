@@ -39,6 +39,7 @@
     { "id": "bac", "url": "https://bacdelasalle.com/" },
     { "id": "network", "url": "https://lasalle-po.org/" }
   ],
+  "siteUrl": "https://cdls-daher.invalid",
   "loginEmailDomain": "lasalle-daher.eg",
   "timeZone": "Africa/Cairo",
   "defaultLanguage": "fr",

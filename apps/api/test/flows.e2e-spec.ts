@@ -197,7 +197,7 @@ describe('School flows (e2e)', () => {
     expect(days).toEqual(['2026-11-03', '2026-11-10', '2026-11-17', '2026-11-24']);
 
     const ics = await t.http().get(`/api/events/${event.id}/ics`).set(bearer(pupil)).expect(200);
-    expect(ics.text).toContain('RRULE:FREQ=WEEKLY;UNTIL=20261124T235959');
+    expect(ics.text).toContain('RRULE:FREQ=WEEKLY;UNTIL=20261124T215959Z');
 
     await t
       .http()

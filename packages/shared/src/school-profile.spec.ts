@@ -3,8 +3,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { toFeedIcs, vtimezone, zoneOffsetMinutes } from './feed.js';
 import {
+  isPlaceholderSiteUrl,
+  isSiteOrigin,
   isTimeZone,
   loginExample,
+  siteUrlReleaseProblems,
   parseSchoolProfile,
   schoolProfileProblems,
   schoolTitle,
@@ -84,6 +87,28 @@ describe('schoolProfileProblems', () => {
     expect(() => parseSchoolProfile({ id: 'x' }, 'schools/x/profile.json')).toThrow(
       /Profil d’établissement invalide \(schools\/x\/profile\.json\) :\n- placeholder/,
     );
+  });
+
+  it('wants siteUrl as an https origin without a path', () => {
+    for (const bad of ['http://www.ecole.eg', 'https://www.ecole.eg/', 'https://www.ecole.eg/fr', 'www.ecole.eg', '']) {
+      expect(schoolProfileProblems(withField(['siteUrl'], bad))[0]).toMatch(/^siteUrl:/);
+    }
+    expect(isSiteOrigin('https://www.ecole.eg')).toBe(true);
+    expect(isSiteOrigin('https://ecole.eg:8443')).toBe(true);
+  });
+
+  it('lets a placeholder siteUrl through validation but not through a release build of a real school', () => {
+    expect(isPlaceholderSiteUrl(cdls.siteUrl)).toBe(true);
+    expect(siteUrlReleaseProblems(cdls)[0]).toMatch(/^siteUrl: .*provisoire/);
+    // The deploy's PUBLIC_WEB_URL (a real https origin) satisfies it, an http one does not.
+    expect(siteUrlReleaseProblems(cdls, 'https://www.ecole.eg')).toEqual([]);
+    expect(siteUrlReleaseProblems(cdls, 'http://www.ecole.eg')[0]).toMatch(/origine https/);
+    // The demonstration pack may keep its placeholder.
+    expect(siteUrlReleaseProblems(parseSchoolProfile(readPack('example')))).toEqual([]);
+    for (const url of ['https://x.invalid', 'https://ecole.example', 'https://a.test', 'https://example.com']) {
+      expect(isPlaceholderSiteUrl(url)).toBe(true);
+    }
+    expect(isPlaceholderSiteUrl('https://www.lasalle-daher.eg')).toBe(false);
   });
 
   it('knows IANA zones and refuses bare abbreviations', () => {

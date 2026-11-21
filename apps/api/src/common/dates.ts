@@ -22,7 +22,7 @@ export function IsDay(options?: ValidationOptions): PropertyDecorator {
       name: 'isDay',
       target: target.constructor,
       propertyName: String(propertyName),
-      options: { message: `${String(propertyName)} must be a date written YYYY-MM-DD`, ...options },
+      options: { message: `« ${String(propertyName)} » doit être une date écrite AAAA-MM-JJ.`, ...options },
       validator: {
         validate: (value: unknown) => typeof value === 'string' && isCalendarDay(value),
       },

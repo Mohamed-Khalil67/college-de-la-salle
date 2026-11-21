@@ -11,6 +11,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import { SESSION_MARKER_COOKIE } from '@cdls/shared';
 import { API_PREFIX } from '../app.prefix.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { envAccessTokenSubject } from '../common/access-token-subject.js';
@@ -206,6 +207,15 @@ export class AuthController {
       path: `/${API_PREFIX}/auth`,
       maxAge: issued.refreshMaxAgeMs,
     });
+    // « A session may exist »: not a secret, readable by the page (path /, no httpOnly) so a public page
+    // skips POST /auth/refresh for anonymous visitors. Same lifetime and flags as the refresh cookie.
+    res.cookie(SESSION_MARKER_COOKIE, '1', {
+      httpOnly: false,
+      secure: this.secureCookie,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: issued.refreshMaxAgeMs,
+    });
     return issued.session;
   }
 
@@ -216,6 +226,7 @@ export class AuthController {
       sameSite: 'strict',
       path: `/${API_PREFIX}/auth`,
     });
+    res.clearCookie(SESSION_MARKER_COOKIE, { secure: this.secureCookie, sameSite: 'strict', path: '/' });
   }
 }
 

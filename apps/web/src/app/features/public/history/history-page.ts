@@ -32,7 +32,7 @@ const ANCHORS = ['etapes', 'fondateur', 'freres', 'directeurs', 'archives'] as c
             </ul>
           </nav>
         </div>
-        <figure sitePhoto class="page-intro__figure" [photo]="introPhoto" [priority]="true"></figure>
+        <figure sitePhoto class="page-intro__figure" [photo]="introPhoto" [priority]="true" aspect="3 / 2"></figure>
       </div>
     </section>
 
