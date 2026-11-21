@@ -177,7 +177,10 @@ session. Public pages are prerendered; the spaces are client-rendered and lazy-l
 
 The whole stack (site, API, PostgreSQL 18, nightly backups, HTTPS from anywhere through a Cloudflare Tunnel or Caddy) runs
 with Docker Compose from `deploy/` (`SCHOOL` in `deploy/.env` picks the school pack, for the API and the web image alike). Step by step for a Windows laptop or a Linux VM: [docs/deployment.md](docs/deployment.md);
-backup and restore: [deploy/restore.md](deploy/restore.md).
+backup and restore: [deploy/restore.md](deploy/restore.md). The API connects as `cdls_app`, the database's owner but not
+a superuser (`APP_DB_PASSWORD`; an install from before needs a one-time step, « Database login of the API » in the
+deployment guide), with at most `DB_POOL_MAX` (10) connections, a `DB_CONNECT_TIMEOUT_MS` (5 s) wait, and every session in
+UTC.
 
 ## History of this repository
 
