@@ -21,6 +21,8 @@ const types = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain',
+  '.xml': 'application/xml',
+  '.webp': 'image/webp',
 };
 
 function file(path) {
@@ -33,6 +35,11 @@ createServer((req, res) => {
   if (path.startsWith('/api/')) {
     res.writeHead(401, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ statusCode: 401, message: 'Non authentifié' }));
+    return;
+  }
+  // robots.txt and sitemap.xml are files or nothing, never the shell (nginx: location = /robots.txt).
+  if ((path === '/robots.txt' || path === '/sitemap.xml') && !file(path)) {
+    res.writeHead(404).end();
     return;
   }
   const found = file(path) ?? file(join(path, 'index.html')) ?? file('index.csr.html');
