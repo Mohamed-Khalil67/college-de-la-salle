@@ -10,6 +10,12 @@ import { schoolToday } from './school';
 
 type Headers = { Authorization: string };
 
+/** `value`, or a failed test that says what the stack lacks. */
+function present<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`The stack has no ${what}.`);
+  return value;
+}
+
 /** `teacherId=…`, `classId=…` or `roomId=…`: whose lessons count. */
 export type Scope = `${'teacherId' | 'classId' | 'roomId'}=${string}`;
 
@@ -59,8 +65,7 @@ export async function firstTeachingWeek(
   const ok = (weeks: Map<string, TimetableOccurrenceDto[]>) => [...weeks].some(([w, l]) => w >= from && l.length >= minLessons);
   const weeks = await weeksFrom(request, headers, scope, from, ok);
   const found = [...weeks].filter(([w, l]) => w >= from && l.length >= minLessons).map(([w]) => w).sort()[0];
-  expect(found, `a school week with ${minLessons} lessons for ${scope} after ${after}`).toBeTruthy();
-  return found!;
+  return present(found, `a school week with ${minLessons} lessons for ${scope} after ${after}`);
 }
 
 /** Two school weeks that follow each other, both with lessons for `scope` (a weekly event shows on both). */
@@ -74,9 +79,8 @@ export async function twoTeachingWeeks(
   const pair = (weeks: Map<string, TimetableOccurrenceDto[]>) =>
     [...weeks.keys()].sort().find((w) => w >= from && weeks.has(addDays(w, 7)));
   const weeks = await weeksFrom(request, headers, scope, from, (w) => !!pair(w));
-  const first = pair(weeks);
-  expect(first, `two school weeks in a row with lessons for ${scope} after ${after}`).toBeTruthy();
-  return [first!, addDays(first!, 7)];
+  const first = present(pair(weeks), `two school weeks in a row with lessons for ${scope} after ${after}`);
+  return [first, addDays(first, 7)];
 }
 
 /** A day of `week` with planned lessons for `scope` (the first one). */
@@ -85,8 +89,7 @@ export async function teachingDayOf(request: APIRequestContext, headers: Headers
     .filter((o) => o.status === 'normal' && !o.exceptionId)
     .map((o) => o.originalDate)
     .sort();
-  expect(days[0], `a day with lessons in the week of ${week}`).toBeTruthy();
-  return days[0]!;
+  return present(days[0], `a day with lessons in the week of ${week}`);
 }
 
 /** The most recent school day with lessons for `scope`, today included; the first one ahead when the year has not started. */
@@ -97,7 +100,8 @@ export async function latestTeachingDay(request: APIRequestContext, headers: Hea
       .filter((o) => o.status === 'normal' && !o.exceptionId)
       .map((o) => o.originalDate)
       .sort();
-    if (days.length) return days.at(-1)!;
+    const last = days.at(-1);
+    if (last) return last;
   }
   return teachingDayOf(request, headers, scope, await firstTeachingWeek(request, headers, scope, { after: addDays(today, -7), minLessons: 1 }));
 }
@@ -121,9 +125,8 @@ async function openPeriods(request: APIRequestContext, headers: Headers): Promis
  */
 export async function gradableDay(request: APIRequestContext, headers: Headers): Promise<string> {
   const today = schoolToday();
-  const next = (await openPeriods(request, headers)).find((p) => p.endsOn >= today);
-  expect(next, `an open period on or after ${today}`).toBeTruthy();
-  return next!.startsOn > today ? next!.startsOn : today;
+  const next = present((await openPeriods(request, headers)).find((p) => p.endsOn >= today), `an open period on or after ${today}`);
+  return next.startsOn > today ? next.startsOn : today;
 }
 
 /** « Noter » dates its note today: true when an open period covers today (false in the holidays between terms). */

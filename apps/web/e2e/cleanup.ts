@@ -62,7 +62,7 @@ export async function studentsMatching(request: APIRequestContext, search: strin
   const page = await api.get<{ items: { studentId: string | null; status: string }[] }>(
     `/api/users?role=student&search=${encodeURIComponent(search)}&pageSize=100`,
   );
-  return page.items.filter((u) => u.studentId && u.status !== 'archived').map((u) => u.studentId!);
+  return page.items.flatMap((u) => (u.studentId && u.status !== 'archived' ? [u.studentId] : []));
 }
 
 /** The user ids of the accounts of a role whose e-mail or name matches `search`. */
@@ -154,7 +154,8 @@ export async function fixtureClass(
 ): Promise<ClassDto> {
   const api = await adminApi(request);
   const sections = await api.get<{ id: string; code: string }[]>('/api/sections');
-  const sectionId = sections.find((s) => s.code === section)!.id;
+  const sectionId = sections.find((s) => s.code === section)?.id;
+  if (!sectionId) throw new Error(`No section « ${section} » in the stack.`);
   const code = `e2e-${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
   return api.post<ClassDto>('/api/classes', { schoolYearId: year.id, sectionId, code, label });
 }
