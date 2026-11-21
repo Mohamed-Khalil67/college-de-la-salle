@@ -1,5 +1,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { adminApi } from './cleanup';
+import { schoolToday } from './school';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
 
 /**
@@ -8,7 +10,24 @@ import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
  * in the browser, and checks the promoted classes and the read-only old year. The demo year is never touched.
  * Years get a far-future label drawn at random, so the suite can run again on the same database.
  * The phone project is skipped: every step and dialog is checked at 390 and 1440 px through Axe.
+ *
+ * What stays: the API keeps a year that has classes, and a class that ever had a student, so the two far-future
+ * years of a run remain (never the current year, nor shown in its screens). `afterAll` archives the students
+ * of both years that the rollover left active, so they are out of every class list and of the users' list of
+ * active accounts.
  */
+
+/** The years this file made, by label: their remaining students are archived in `afterAll`. */
+const madeYears: string[] = [];
+
+test.afterAll(async ({ request }) => {
+  const api = await adminApi(request);
+  const years = await api.get<{ id: string; label: string; status: string }[]>('/api/school-years');
+  for (const year of years.filter((y) => madeYears.includes(y.label) && y.status !== 'archived')) {
+    for (const c of await api.get<{ id: string; studentCount: number }[]>(`/api/classes?schoolYearId=${year.id}`))
+      if (c.studentCount) await api.post('/api/users/archive', { classId: c.id, outcome: 'left', on: schoolToday() });
+  }
+});
 test.beforeEach(({}, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'checked at both widths inside each test');
 });
@@ -67,6 +86,7 @@ async function createCopyYear(request: APIRequestContext): Promise<Created> {
     const roster = await json<{ id: string }[]>(await request.get(`/api/classes/${classId}/students`, { headers }));
     await json(await request.post(`/api/groups/${group.id}/members`, { headers, data: { studentIds: roster.map((r) => r.id) } }));
   }
+  madeYears.push(label, `${start + 1}-${start + 2}`);
   return { yearId: year.id, label, nextLabel: `${start + 1}-${start + 2}`, secondeId: seconde.id, premiereId: premiere.id, names };
 }
 

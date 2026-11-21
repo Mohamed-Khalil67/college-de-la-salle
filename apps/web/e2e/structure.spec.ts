@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { adminApi } from './cleanup';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf, unique } from './structure';
 
 /**
@@ -9,6 +10,32 @@ import { axeAtBothWidths, goInApp, signInAs, tokenOf, unique } from './structure
  */
 test.beforeEach(({}, testInfo) => {
   test.skip(testInfo.project.name === 'phone', 'checked at both widths inside each test');
+});
+
+/**
+ * The net under the tests' own clean-up (a test that stops half way leaves its data): what this file creates
+ * carries a unique name (`unique()`: the prefix, a space, six letters), and is removed or archived here.
+ * Subjects can only be archived.
+ */
+test.afterAll(async ({ request }) => {
+  const api = await adminApi(request);
+  const ours = (prefixes: string, text: string) => new RegExp(`^(${prefixes}) [a-z]{6}$`).test(text);
+  for (const s of await api.get<{ id: string; name: string; archived: boolean }[]>('/api/subjects'))
+    if (!s.archived && ours('Matière|Option', s.name)) await api.patch(`/api/subjects/${s.id}`, { archived: true });
+  for (const r of await api.get<{ id: string; name: string }[]>('/api/rooms'))
+    if (ours('Salle', r.name)) await api.del(`/api/rooms/${r.id}`);
+  for (const t of await api.get<{ id: string; label: string }[]>('/api/activity-types'))
+    if (ours('Atelier|Sortie', t.label)) await api.del(`/api/activity-types/${t.id}`);
+  const years = await api.get<{ id: string; isCurrent: boolean; periods: { id: string; kind: string; label: string; closedAt: string | null; sectionId: string | null }[] }[]>('/api/school-years');
+  const current = years.find((y) => y.isCurrent);
+  if (!current) return;
+  for (const d of await api.get<{ id: string; label: string }[]>(`/api/calendar-days?schoolYearId=${current.id}`))
+    if (ours('Vacances', d.label)) await api.del(`/api/calendar-days/${d.id}`);
+  for (const p of current.periods) {
+    // The semester the period test adds (the seed has trimesters only), and the term the holiday test closes.
+    if (p.kind === 'semester' && p.label === '1er semestre' && p.sectionId) await api.del(`/api/periods/${p.id}`);
+    if (p.label === '3e trimestre' && p.closedAt) await api.post(`/api/periods/${p.id}/close?closed=false`);
+  }
 });
 
 interface ClassRow {
