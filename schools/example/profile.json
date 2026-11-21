@@ -29,6 +29,7 @@
     ]
   },
   "websites": [],
+  "siteUrl": "https://ecole-exemple.example",
   "loginEmailDomain": "ecole-exemple.example",
   "timeZone": "Europe/Paris",
   "defaultLanguage": "fr",

@@ -12,7 +12,7 @@ import { Button } from '../../../shared/ui';
   imports: [NgOptimizedImage, RouterLink, Button],
   host: { class: 'hero on-inverse', 'aria-labelledby': 'hero-title' },
   template: `
-    <img class="hero__media" [ngSrc]="campus.src" [width]="campus.width" [height]="campus.height" [alt]="campus.alt" priority sizes="100vw" />
+    <img class="hero__media" [ngSrc]="campus.src" fill [alt]="campus.alt" priority sizes="100vw" />
     <div class="container">
       <div class="hero__content">
         <hr class="gold-rule" />

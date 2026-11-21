@@ -223,7 +223,7 @@ export function buildChecklist(input: ChecklistInput): ChecklistStep[] {
       title: 'Trimestres ou semestres',
       status: ratio(withPeriods.length, sections.length),
       detail: sections.length
-        ? `${withPeriods.length} filière${withPeriods.length > 1 ? 's' : ''} sur ${sections.length} ${withPeriods.length > 1 ? 'ont' : 'a'} ses périodes.`
+        ? `${withPeriods.length} filière${withPeriods.length > 1 ? 's' : ''} sur ${sections.length} ${withPeriods.length > 1 ? 'ont leurs' : 'a ses'} périodes.`
         : 'Aucune filière.',
       action: 'Ajouter les périodes',
     },
@@ -249,7 +249,7 @@ export function buildChecklist(input: ChecklistInput): ChecklistStep[] {
       title: 'Matières des classes',
       status: ratio(withSubjects.length, classes.length),
       detail: classes.length
-        ? `${withSubjects.length} classe${withSubjects.length > 1 ? 's' : ''} sur ${classes.length} ${withSubjects.length > 1 ? 'ont' : 'a'} ses matières.`
+        ? `${withSubjects.length} classe${withSubjects.length > 1 ? 's' : ''} sur ${classes.length} ${withSubjects.length > 1 ? 'ont leurs' : 'a ses'} matières.`
         : 'Créez d’abord les classes.',
       action: 'Définir les matières',
     },

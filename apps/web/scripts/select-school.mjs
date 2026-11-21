@@ -6,11 +6,17 @@
 //   src/app/school/active/{index,archive,fr,en,ar}.ts   one-line re-exports of the pack's site/ modules
 //   src/generated/index.html                     the page shell (title, theme colour, icons from the profile)
 //   src/generated/brand.css                      the profile's colour overrides (empty for none)
-//   src/generated/public/                        a copy of the pack's public/ folder (crest, icons, photos)
+//   src/generated/public/                        a copy of the pack's public/ folder (crest, icons, photos), plus
+//                                                WebP copies of the photos at 480/960/1600 px (responsive-images.mjs)
+//   src/app/core/school/images.generated.ts      which photos have those copies, for the image loader
+// The profile's siteUrl is replaced by PUBLIC_WEB_URL when the build has one (site-origin.mjs); CDLS_RELEASE=1
+// refuses a placeholder or non-https address for a real school.
 // When the shared package is built, the profile is also validated with parseSchoolProfile (time zone, sections…).
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { responsiveImages } from './responsive-images.mjs';
+import { siteOrigin } from './site-origin.mjs';
 
 const web = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const schools = resolve(web, '../../schools');
@@ -29,15 +35,22 @@ for (const file of ['index.ts', 'archive.ts', 'fr.ts', 'en.ts', 'ar.ts']) {
   if (!existsSync(join(pack, 'site', file))) fail(`schools/${id}/site/${file} is missing (see schools/example/site).`);
 }
 
-const profile = JSON.parse(readFileSync(profileFile, 'utf8'));
-if (profile.id !== id) fail(`schools/${id}/profile.json says its id is « ${profile.id} »; they must match.`);
+const packProfile = JSON.parse(readFileSync(profileFile, 'utf8'));
+if (packProfile.id !== id) fail(`schools/${id}/profile.json says its id is « ${packProfile.id} »; they must match.`);
+// CDLS_RELEASE=1 (the Docker image) refuses a placeholder or non-https site address for a real school.
+const release = process.env.CDLS_RELEASE === '1';
 try {
   const shared = await import('@cdls/shared');
-  shared.parseSchoolProfile(profile, `schools/${id}/profile.json`);
+  shared.parseSchoolProfile(packProfile, `schools/${id}/profile.json`);
+  const problems = shared.siteUrlReleaseProblems(packProfile, siteOrigin(packProfile));
+  if (problems.length && release) fail(problems.join('\n'));
+  if (problems.length && !packProfile.placeholder) console.warn(`select-school: ${problems.join('; ')} (refused when CDLS_RELEASE=1)`);
 } catch (error) {
   // Not built yet (a fresh clone running lint): the types still check the shape, the unit tests the rest.
-  if (error?.code !== 'ERR_MODULE_NOT_FOUND' && error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED') fail(error.message);
+  if (release || (error?.code !== 'ERR_MODULE_NOT_FOUND' && error?.code !== 'ERR_PACKAGE_PATH_NOT_EXPORTED')) fail(error.message);
 }
+// The build's own address wins over the pack's (PUBLIC_WEB_URL): SiteHead and seo-files.mjs read the same value.
+const profile = { ...packProfile, siteUrl: siteOrigin(packProfile) };
 
 /** Writes a file only when its content changes, so the dev server does not rebuild for nothing. */
 function write(path, content) {
@@ -94,5 +107,12 @@ const publicOut = join(web, 'src/generated/public');
 rmSync(publicOut, { recursive: true, force: true });
 mkdirSync(publicOut, { recursive: true });
 if (existsSync(join(pack, 'public'))) cpSync(join(pack, 'public'), publicOut, { recursive: true });
+
+// WebP copies of the photos at a few widths, for the srcset of NgOptimizedImage (core/school/images.ts).
+const manifest = await responsiveImages(publicOut, join(web, '.cache/images', id));
+write(
+  join(web, 'src/app/core/school/images.generated.ts'),
+  `${header}/** The photos with WebP copies (\`<name>-<width>w.webp\`), and their widths. */\nexport const GENERATED_IMAGE_WIDTHS: Readonly<Record<string, readonly number[]>> = ${JSON.stringify(manifest, null, 2)};\n`,
+);
 
 console.log(`select-school: ${profile.names.fr.full} (${id})`);

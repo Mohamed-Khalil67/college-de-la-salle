@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { hasSessionMarker } from './session-marker';
 
 describe('hasSessionMarker', () => {

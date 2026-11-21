@@ -1,4 +1,4 @@
-import { registerLocaleData } from '@angular/common';
+import { IMAGE_CONFIG, IMAGE_LOADER, registerLocaleData } from '@angular/common';
 import localeFr from '@angular/common/locales/fr';
 import { Injectable, inject } from '@angular/core';
 import {
@@ -18,6 +18,7 @@ import {
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/auth/auth.interceptor';
+import { IMAGE_BREAKPOINTS, photoUrl } from './core/school/images';
 import { DEFAULT_LANG, siteTitle } from './i18n/lang';
 import { readPublicRoute } from './i18n/locale';
 import { SITE } from './school/active/index';
@@ -54,5 +55,9 @@ export const appConfig: ApplicationConfig = {
     // Every page is prerendered; hydration reuses that DOM (no flash, no layout shift) and event
     // replay keeps clicks made before the bundle finishes loading.
     provideClientHydration(withEventReplay()),
+    // Photos: NgOptimizedImage writes a srcset of the pack's WebP copies (scripts/responsive-images.mjs), so a
+    // phone downloads a 480 or 768 px photo instead of the original.
+    { provide: IMAGE_LOADER, useValue: photoUrl },
+    { provide: IMAGE_CONFIG, useValue: { breakpoints: [...IMAGE_BREAKPOINTS] } },
   ],
 };

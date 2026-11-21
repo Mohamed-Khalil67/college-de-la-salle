@@ -13,7 +13,7 @@ import { Button } from '../../../shared/ui';
   host: { class: 'card track-card', '[attr.aria-labelledby]': 'titleId()' },
   template: `
     @let p = image();
-    <img class="card__media" [ngSrc]="p.src" [width]="p.width" [height]="p.height" [alt]="p.alt" sizes="(max-width: 64rem) 100vw, 50vw" />
+    <div class="card__media"><img [ngSrc]="p.src" fill [alt]="p.alt" sizes="(max-width: 64rem) 100vw, 50vw" /></div>
     <div class="card__body">
       <h3 [id]="titleId()" class="t-h1">{{ track().title }}</h3>
       <p class="t-accent">{{ words().kicker }}</p>
@@ -25,12 +25,7 @@ import { Button } from '../../../shared/ui';
       <p><a cdlsButton variant="secondary" [routerLink]="link()">{{ discover(track().title) }}</a></p>
     </div>
   `,
-  styles: `
-    /* The width/height attributes reserve space; height: auto lets aspect-ratio and the width decide. */
-    .card__media {
-      height: auto;
-    }
-  `,
+
 })
 export class TrackCard {
   readonly track = input.required<SectionPage>();

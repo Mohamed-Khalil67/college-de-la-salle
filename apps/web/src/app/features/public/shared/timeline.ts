@@ -8,7 +8,7 @@ import { localizedPhoto, type Milestone, type PhotoId } from '../../../school';
  * `<ol siteTimeline [milestones]="…">`: the site's signature. Brick Garamond years on a gold rule with
  * Lasallian star markers, next to archive photographs.
  *
- * - `row` (home): four columns on a horizontal rule, photos cropped to 16:10.
+ * - `row` (home): four columns on a horizontal rule, photos cropped to 16:10 by a `.photo-frame`.
  * - `full` (history page): one column on a vertical rule, the photo beside the text on wide
  *   screens and never cropped (the 1926 group photo is a panorama), with the source of each date.
  *   Each item has an id (`annee-1926`) so other pages can link to it.
@@ -30,14 +30,12 @@ import { localizedPhoto, type Milestone, type PhotoId } from '../../../school';
         @if (m.photo; as id) {
           @let p = photoOf(id);
           <figure>
-            <img
-              [ngSrc]="p.src"
-              [width]="p.width"
-              [height]="p.height"
-              [alt]="p.alt"
-              [sizes]="sizes()"
-              [style.aspect-ratio]="variant() === 'full' ? p.width + ' / ' + p.height : null"
-            />
+            @if (variant() === 'full') {
+              <img [ngSrc]="p.src" [width]="p.width" [height]="p.height" [alt]="p.alt" [sizes]="sizes()" />
+            } @else {
+              <!-- Row: cropped to 16:10 on purpose, by the frame (the photo fills it). -->
+              <div class="photo-frame"><img [ngSrc]="p.src" fill [alt]="p.alt" [sizes]="sizes()" /></div>
+            }
             <figcaption class="t-caption t-muted">{{ p.credit }}.</figcaption>
           </figure>
         }
@@ -45,8 +43,8 @@ import { localizedPhoto, type Milestone, type PhotoId } from '../../../school';
     }
   `,
   styles: `
-    /* The width/height attributes reserve space; height: auto lets aspect-ratio and the width decide. */
-    img {
+    /* Full: never cropped; the width/height attributes reserve the space, height: auto keeps the proportions. */
+    figure > img {
       height: auto;
     }
     :host(.timeline--full) {

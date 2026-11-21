@@ -156,9 +156,12 @@ describe('buildChecklist', () => {
   it('is partial while a section has no period, and done with a school-wide one', () => {
     const partial = buildChecklist({ year: year([period('a', { sectionId: 's1' })]), sections, days: [], classes, subjectCounts: new Map() });
     expect(partial[1]!.status).toBe('partial');
-    expect(partial[1]!.detail).toContain('1 filière sur 2');
-    const done = buildChecklist({ year: year([period('a')]), sections, days: [], classes, subjectCounts: new Map() });
+    expect(partial[1]!.detail).toBe('1 filière sur 2 a ses périodes.');
+    const done = buildChecklist({ year: year([period('a')]), sections, days: [], classes, subjectCounts: new Map([['k1', 2], ['k2', 1]]) });
     expect(done[1]!.status).toBe('done');
+    // « leurs », never « 2 filières … ont ses périodes ».
+    expect(done[1]!.detail).toBe('2 filières sur 2 ont leurs périodes.');
+    expect(done[4]!.detail).toBe('2 classes sur 2 ont leurs matières.');
   });
 
   it('needs both holidays and exam weeks', () => {

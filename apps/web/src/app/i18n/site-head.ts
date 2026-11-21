@@ -4,16 +4,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Meta } from '@angular/platform-browser';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
+import { PROFILE } from '../core/school/school-profile';
 import { DEFAULT_LANG, LANG_META } from './lang';
 import { readPublicRoute } from './locale';
 import { alternates, pageUrl } from './pages';
 
 /**
- * The site's address, for the absolute URLs of hreflang and canonical links. Set at build time with
- * `ng build --define SITE_ORIGIN="'https://…'"` (see docs/i18n.md); when empty, the links are root-relative.
+ * The site's address, for the absolute URLs of the hreflang and canonical links (search engines ignore relative
+ * ones): the school profile's `siteUrl`, or the build's `PUBLIC_WEB_URL` (scripts/site-origin.mjs, docs/i18n.md).
  */
-declare const SITE_ORIGIN: string | undefined;
-const ORIGIN = typeof SITE_ORIGIN === 'string' ? SITE_ORIGIN.replace(/\/$/, '') : '';
+const ORIGIN = PROFILE.siteUrl.replace(/\/+$/, '');
 
 /**
  * Keeps <html lang dir> and the language links of <head> in step with the page, on the server (so the

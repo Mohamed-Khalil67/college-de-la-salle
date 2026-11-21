@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { passwordChangeRequired } from './auth-errors';
 
 describe('passwordChangeRequired', () => {
