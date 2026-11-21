@@ -63,7 +63,7 @@ describe('one current school year (school_years_one_current_key)', () => {
     );
     for (let i = 0; i < 50 && !lost; i++) await sleep(100);
     expect(lost?.status).toBe(409);
-    expect((lost?.body as { message?: string }).message).toBe(ANOTHER_YEAR_BECAME_CURRENT);
+    expect(lost?.body).toMatchObject({ message: ANOTHER_YEAR_BECAME_CURRENT });
     const current = await t.prisma.schoolYear.findMany({ where: { isCurrent: true }, select: { id: true } });
     expect(current).toEqual([{ id: a }]);
   });
