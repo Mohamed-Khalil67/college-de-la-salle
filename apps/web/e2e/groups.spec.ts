@@ -324,6 +324,8 @@ test.describe('groups and « Assigner à »', () => {
   for (const width of [390, 1440]) {
     test(`Axe finds nothing on the new screens and dialogs at ${width} px, and the keyboard reaches them`, async ({ page, request, browser }, info) => {
       test.skip(info.project.name === 'phone' && width === 1440, 'One viewport per project is enough: the test sets its own width.');
+      // A dozen Axe passes, two people and two dialogs: well over the default 30 s on a busy machine.
+      test.setTimeout(90_000);
       const setup = await setUpGroups(request);
       const teacher = await teacherApi(request);
       const evTitle = `${TITLE_PREFIX}axe contrôle`;
