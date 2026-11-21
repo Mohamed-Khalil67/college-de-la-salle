@@ -51,16 +51,15 @@ export class SectionChangesService {
 
   async list(query: SectionChangeListQueryDto): Promise<Paginated<SectionChangeDto>> {
     const where: Prisma.SectionChangeRequestWhereInput = query.status ? { status: query.status } : {};
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.sectionChangeRequest.findMany({
-        where,
-        include,
-        // Oldest first while waiting; most recent decisions first otherwise.
-        orderBy: query.status === 'pending' ? { createdAt: 'asc' } : { createdAt: 'desc' },
-        ...pageArgs(query),
-      }),
-      this.prisma.sectionChangeRequest.count({ where }),
-    ]);
+    // One after the other, never a batch `$transaction([...])`: it sends both on one connection at once.
+    const rows = await this.prisma.sectionChangeRequest.findMany({
+      where,
+      include,
+      // Oldest first while waiting; most recent decisions first otherwise.
+      orderBy: query.status === 'pending' ? { createdAt: 'asc' } : { createdAt: 'desc' },
+      ...pageArgs(query),
+    });
+    const total = await this.prisma.sectionChangeRequest.count({ where });
     return paginated(rows.map(toSectionChangeDto), total, query);
   }
 

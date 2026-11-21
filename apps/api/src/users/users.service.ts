@@ -118,15 +118,14 @@ export class UsersService {
           }
         : {}),
     };
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where,
-        include,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-        ...pageArgs(query),
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    // One after the other, never a batch `$transaction([...])`: it sends both on one connection at once.
+    const rows = await this.prisma.user.findMany({
+      where,
+      include,
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      ...pageArgs(query),
+    });
+    const total = await this.prisma.user.count({ where });
     return paginated(rows.map(toUserDto), total, query);
   }
 

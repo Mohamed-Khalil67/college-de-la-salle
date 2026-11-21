@@ -26,10 +26,10 @@ describe('one current school year (school_years_one_current_key)', () => {
 
   afterAll(async () => {
     // Put the seeded year back as the current one, then remove the fixtures (and their audit rows).
-    await t.prisma.$transaction([
-      t.prisma.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } }),
-      t.prisma.schoolYear.update({ where: { id: seeded }, data: { isCurrent: true } }),
-    ]);
+    await t.prisma.$transaction(async (tx) => {
+      await tx.schoolYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } });
+      await tx.schoolYear.update({ where: { id: seeded }, data: { isCurrent: true } });
+    });
     await t.prisma.auditLog.deleteMany({ where: { entityId: { in: ids } } });
     await t.prisma.schoolYear.deleteMany({ where: { id: { in: ids } } });
     await t.close();

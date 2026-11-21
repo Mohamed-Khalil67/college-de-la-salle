@@ -182,7 +182,7 @@ export class AuthService {
       throw new BadRequestException('Choisissez un mot de passe différent de l’actuel.');
 
     const newHash = await hash(newPassword);
-    const updated = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       // Only if the password is still the one that was checked: a reset or another change in between wins.
       const swapped = await tx.user.updateMany({
         where: { id: userId, passwordHash: user.passwordHash, status: 'active' },
@@ -194,13 +194,15 @@ export class AuthService {
         },
       });
       if (swapped.count === 0) throw new ConflictException('Votre mot de passe vient d’être modifié : reconnectez-vous.');
-      const row = await tx.user.findUniqueOrThrow({ where: { id: userId }, include: userInclude });
       await tx.refreshToken.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      return row;
     });
+    // Read after the commit, not inside the transaction: Prisma loads the relations of `userInclude` in parallel,
+    // which on the transaction's single connection is two queries at once (pg warns, pg 9 throws). Should another
+    // change land in between, the session below carries its password version and is refused, as it should be.
+    const updated = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, include: userInclude });
     return this.issue(toAuthUser(updated), passwordVersion(updated), randomUUID(), userAgent);
   }
 

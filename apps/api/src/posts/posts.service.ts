@@ -35,15 +35,14 @@ export class PostsService {
         ],
       };
     }
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.post.findMany({
-        where,
-        include,
-        orderBy: { createdAt: 'desc' },
-        ...pageArgs(query),
-      }),
-      this.prisma.post.count({ where }),
-    ]);
+    // One after the other, never a batch `$transaction([...])`: it sends both on one connection at once.
+    const rows = await this.prisma.post.findMany({
+      where,
+      include,
+      orderBy: { createdAt: 'desc' },
+      ...pageArgs(query),
+    });
+    const total = await this.prisma.post.count({ where });
     return paginated(rows.map(toPostDto), total, query);
   }
 
