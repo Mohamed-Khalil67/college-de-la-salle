@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { migrationFromDisk, readVersion } from './build-info.js';
 import type { HealthDto, LiveHealthDto } from './health.dto.js';
+import { assertSessionTimeZone } from '../prisma/pool-config.js';
 
 @Injectable()
 export class HealthService implements OnApplicationBootstrap {
@@ -23,16 +24,21 @@ export class HealthService implements OnApplicationBootstrap {
    * its migrations before it starts.
    */
   async onApplicationBootstrap(): Promise<void> {
+    let zone: string | null = null;
     try {
-      const rows = await this.prisma.$queryRaw<{ migration_name: string }[]>`
-        SELECT migration_name FROM _prisma_migrations
-         WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
-         ORDER BY migration_name DESC LIMIT 1`;
+      const rows = await this.prisma.$queryRaw<{ migration_name: string | null; zone: string }[]>`
+        SELECT (SELECT migration_name FROM _prisma_migrations
+                 WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+                 ORDER BY migration_name DESC LIMIT 1) AS migration_name,
+               current_setting('TimeZone') AS zone`;
       this.migration = rows[0]?.migration_name ?? null;
+      zone = rows[0]?.zone ?? null;
     } catch {
       this.migration = null;
     }
     this.migration ??= migrationFromDisk(new URL('../../prisma/migrations/', import.meta.url));
+    // Outside the try: a database that answers in another zone would store shifted instants, so the API stops.
+    assertSessionTimeZone(zone);
   }
 
   /** Cached answer of the liveness route: no I/O. */

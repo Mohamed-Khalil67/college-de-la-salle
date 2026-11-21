@@ -27,6 +27,7 @@ import {
 } from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role, type Prisma } from '../src/generated/prisma/client.js';
+import { poolConfig } from '../src/prisma/pool-config.js';
 import { activeSchool } from '../src/school/school-profile.js';
 import { seedGroups } from './seed-groups.js';
 import { hoursPerWeek, seedTimetable, type TimetableClassSubject } from './seed-timetable.js';
@@ -40,7 +41,7 @@ const DOMAIN = 'demo.cdls.test';
 const STUDENTS_PER_CLASS = 10;
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env['DATABASE_URL'] }),
+  adapter: new PrismaPg(poolConfig(process.env['DATABASE_URL'] ?? '')),
 });
 
 /** Deterministic pseudo-random numbers (mulberry32), so the demo looks the same on every run. */

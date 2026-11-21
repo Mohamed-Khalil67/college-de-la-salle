@@ -39,6 +39,27 @@ export class Env {
   })
   DATABASE_URL: string;
 
+  /**
+   * Database connections this API process keeps at most. 10 suits a school of 600 (each request holds one only
+   * while it queries); keep it well under the server's `max_connections` (60 in deploy/compose.yaml) minus the
+   * backup and migration connections.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  DB_POOL_MAX = 10;
+
+  /**
+   * Milliseconds a query waits for a connection (all in use, or the database unreachable) before it fails with
+   * an error instead of hanging the request.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(500)
+  @Max(60_000)
+  DB_CONNECT_TIMEOUT_MS = 5_000;
+
   /** Comma-separated origins. */
   @IsString()
   @IsNotEmpty()

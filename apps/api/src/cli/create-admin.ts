@@ -16,6 +16,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { MATIERES, passwordProblems, SECTION_IDS, sectionLabels } from '@cdls/shared';
 import { hash } from 'argon2';
 import { PrismaClient, Role } from '../generated/prisma/client.js';
+import { poolConfig } from '../prisma/pool-config.js';
 import { activeSchool } from '../school/school-profile.js';
 
 const { values } = parseArgs({
@@ -38,7 +39,7 @@ if (problems.length) fail(problems.join(' '));
 
 const databaseUrl = process.env['DATABASE_URL'];
 if (!databaseUrl) fail('DATABASE_URL is not set.');
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+const prisma = new PrismaClient({ adapter: new PrismaPg(poolConfig(databaseUrl)) });
 
 try {
   await ensureReferenceData();

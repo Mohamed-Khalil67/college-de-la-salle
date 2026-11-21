@@ -34,7 +34,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run deploy/scripts/generate-env first}
       POSTGRES_DB: cdls
     # Sized for ~600 students: a few dozen connections, modest memory. Never published on the host.
-    command: ["postgres", "-c", "shared_buffers=192MB", "-c", "max_connections=60", "-c", "work_mem=8MB", "-c", "log_min_duration_statement=1000"]
+    # Slow statements (over 1 s) are logged WITHOUT their bind values (log_parameter_max_length=0): they carry names,
+    # e-mails and hashes, and the container log is neither encrypted nor part of the backups.
+    command: ["postgres", "-c", "shared_buffers=192MB", "-c", "max_connections=60", "-c", "work_mem=8MB", "-c", "log_min_duration_statement=1000", "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0"]
     volumes:
       # PostgreSQL 18 images keep the data in a versioned sub-folder of /var/lib/postgresql.
       - db-data:/var/lib/postgresql
@@ -77,6 +79,8 @@ services:
       TEMP_PASSWORD_TTL_DAYS: ${TEMP_PASSWORD_TTL_DAYS:-14}
       CONTACT_RETENTION_DAYS: ${CONTACT_RETENTION_DAYS:-365}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_CONNECT_TIMEOUT_MS: ${DB_CONNECT_TIMEOUT_MS:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # One proxy (the web container) sits in front of the API; it forwards the real visitor address.
       TRUST_PROXY: ${TRUST_PROXY:-1}

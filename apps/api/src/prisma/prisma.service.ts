@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { BackgroundWork } from '../common/background-work.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import type { Env } from '../config/env.validation.js';
+import { poolConfig } from './pool-config.js';
 
 /**
  * The one Prisma client of the app, injected wherever the database is needed.
@@ -17,7 +18,12 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
     private readonly background: BackgroundWork,
   ) {
     super({
-      adapter: new PrismaPg({ connectionString: config.get('DATABASE_URL', { infer: true }) }),
+      adapter: new PrismaPg(
+        poolConfig(config.get('DATABASE_URL', { infer: true }), {
+          max: config.get('DB_POOL_MAX', { infer: true }),
+          connectionTimeoutMillis: config.get('DB_CONNECT_TIMEOUT_MS', { infer: true }),
+        }),
+      ),
     });
   }
 
