@@ -33,7 +33,8 @@ that code and inspected its structure:
 
 - PDF 1.3, **no `/StructTreeRoot`, no `/MarkInfo`, no `/Lang`, no tagged content** (no `BDC`/`MCID`): the file is
   **not a tagged PDF**, so it fails PDF/UA. Headings and the table have no semantic structure for a screen reader.
-- It does have real text (embedded Roboto with `/ToUnicode`: the text is selectable and readable, not an image) and
+- It does have real text (embedded Roboto, and Cairo for Arabic runs, with `/ToUnicode`: the text is selectable and
+  readable, not an image) and
   a document `/Title` (« Bulletin — nom — trimestre »). `/DisplayDocTitle` is not set.
 - Mitigation today: the same report card is shown as an accessible web page in the student space
   (`eleve/bulletins`, Axe clean) and can be printed from it. The statement says all of this.
