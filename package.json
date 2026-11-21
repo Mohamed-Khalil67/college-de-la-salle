@@ -23,7 +23,8 @@
     "test:e2e": "npm run build -w @cdls/shared && npm run test:e2e -w @cdls/api"
   },
   "overrides": {
-    "vite": "$vite"
+    "vite": "$vite",
+    "effect": "3.22.4"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",
