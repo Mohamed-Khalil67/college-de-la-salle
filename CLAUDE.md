@@ -35,7 +35,8 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
 - Spec expectations that depend on the school (Cairo time, `Bac français`) read the profile or `it.skipIf` another zone.
 - A pack is checked by `apps/web/src/app/school/pack.spec.ts`, `SCHOOL=<id> npm run e2e:smoke -w @cdls/web` (every public
   page, Axe at 390 and 1440 px) and the API's `school-profile.spec.ts`. CI-less: run both packs before a merge:
-  `SCHOOL=example npm run build` and `npm run build`.
+  `SCHOOL=example npm run build` and `npm run build`, plus `npm audit` (0) and
+  `docker compose -f deploy/compose.yaml --env-file deploy/.env.example config -q` (README, « Before a merge »).
 
 ## Type safety (not optional)
 
