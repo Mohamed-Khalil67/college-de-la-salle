@@ -468,47 +468,5 @@ export const icsText = (s: string) =>
     .replace(/\\/g, '\\\\')
     .replace(/\r\n?|\n/g, '\\n')
     .replace(/([,;])/g, '\\$1');
-const icsDate = (day: string) => day.replace(/-/g, '');
-
-/**
- * An .ics file for the event (weekly events keep their repetition, minus the sessions cancelled by
- * `closures`, as EXDATE lines). Times are local (floating). `calendar` is the school profile's `calendar`.
- */
-export function toIcs(event: CalendarEvent, calendar: SchoolCalendarIds, closures: readonly Closure[] = []): string {
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    `PRODID:-//${calendar.productName}//Espace eleve//FR`,
-    'BEGIN:VEVENT',
-    `UID:${event.id}@${calendar.uidDomain}`,
-  ];
-  if (event.start) {
-    const t = (hhmm: string) => `${hhmm.replace(':', '')}00`;
-    lines.push(`DTSTART:${icsDate(event.date)}T${t(event.start)}`);
-    lines.push(`DTEND:${icsDate(event.date)}T${t(event.end || event.start)}`);
-  } else {
-    lines.push(
-      `DTSTART;VALUE=DATE:${icsDate(event.date)}`,
-      `DTEND;VALUE=DATE:${icsDate(addDays(event.date, 1))}`,
-    );
-  }
-  if (isWeekly(event)) {
-    // RFC 5545: UNTIL has the value type of DTSTART (a DATE for an all-day series).
-    lines.push(
-      `RRULE:FREQ=WEEKLY;UNTIL=${icsDate(event.repeatUntil)}${event.start ? 'T235959' : ''}`,
-    );
-    // One EXDATE per cancelled session (short lines), with the same value type as DTSTART.
-    for (const day of skippedDays(event, closures)) {
-      lines.push(
-        event.start
-          ? `EXDATE:${icsDate(day)}T${event.start.replace(':', '')}00`
-          : `EXDATE;VALUE=DATE:${icsDate(day)}`,
-      );
-    }
-  }
-  lines.push(`SUMMARY:${icsText(`${event.type.label} — ${event.title}`)}`);
-  if (event.place) lines.push(`LOCATION:${icsText(event.place)}`);
-  if (event.description) lines.push(`DESCRIPTION:${icsText(event.description)}`);
-  lines.push('END:VEVENT', 'END:VCALENDAR');
-  return lines.join('\r\n') + '\r\n';
-}
+// The .ics file of one event (`toIcs`) is written by feed.ts, with the same zone block, stamps and folding as
+// the subscription feed.

@@ -13,6 +13,7 @@ import {
   type SessionFeedInfo,
   toFeedIcs,
   webcalUrl,
+  feedFileName,
 } from './feed.js';
 import { expandTimetable, type SlotExceptionRule, type SlotRule } from './timetable.js';
 
@@ -271,6 +272,9 @@ describe('feed tokens', () => {
   });
 
   it('builds the webcal address', () => {
+    expect(feedFileName(CAIRO.calendar)).toBe('college-de-la-salle-daher.ics');
+    expect(feedFileName({ uidDomain: 'ecole.example', productName: 'X' })).toBe('ecole.example.ics');
+    expect(feedFileName({ uidDomain: '..', productName: 'X' })).toBe('agenda.ics');
     expect(webcalUrl('https://ecole.eg/api/calendar/feed/x.ics')).toBe(
       'webcal://ecole.eg/api/calendar/feed/x.ics',
     );

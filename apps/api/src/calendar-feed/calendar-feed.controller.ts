@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Header, HttpCode, Param, Post } from '@nestjs/common';
+import { Controller, Delete, Get, Header, HttpCode, Inject, Param, Post, Res } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -10,6 +10,8 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { feedFileName, type SchoolProfile } from '@cdls/shared';
+import type { Response } from 'express';
 import type { AuthUser } from '../common/auth-user.js';
 import { CurrentUser, Public, Roles } from '../common/decorators.js';
 import { CalendarFeedService } from './calendar-feed.service.js';
@@ -19,13 +21,22 @@ import {
   CalendarFeedFileParamDto,
 } from './dto/calendar-feed.dto.js';
 import { throttleLimit } from '../config/throttle-limits.js';
+import { SCHOOL_PROFILE } from '../school/school.module.js';
 
 const feedLimit = throttleLimit('FEED_THROTTLE_LIMIT');
 
 @ApiTags('calendar-feed')
 @Controller('calendar/feed')
 export class CalendarFeedController {
-  constructor(private readonly feeds: CalendarFeedService) {}
+  /** inline; filename="<calendar id>.ics": named after the school pack, never a name written here. */
+  private readonly disposition: string;
+
+  constructor(
+    private readonly feeds: CalendarFeedService,
+    @Inject(SCHOOL_PROFILE) school: SchoolProfile,
+  ) {
+    this.disposition = `inline; filename="${feedFileName(school.calendar)}"`;
+  }
 
   /** Whether the signed-in user has a working feed address (the address itself is never shown again). */
   @Roles('student', 'teacher')
@@ -64,7 +75,6 @@ export class CalendarFeedController {
   @Throttle({ default: { limit: feedLimit, ttl: 60_000 } })
   @Get(':file')
   @Header('Content-Type', 'text/calendar; charset=utf-8')
-  @Header('Content-Disposition', 'inline; filename="college-de-la-salle.ics"')
   @Header('Cache-Control', 'private, no-store')
   @Header('Referrer-Policy', 'no-referrer')
   @Header('X-Robots-Tag', 'noindex, nofollow')
@@ -72,7 +82,11 @@ export class CalendarFeedController {
   @ApiOkResponse({ description: 'An iCalendar file.' })
   @ApiNotFoundResponse({ description: 'Unknown, revoked or outdated address.' })
   @ApiTooManyRequestsResponse({ description: 'Too many requests from this client; retry later.' })
-  feed(@Param() params: CalendarFeedFileParamDto): Promise<string> {
+  feed(
+    @Param() params: CalendarFeedFileParamDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<string> {
+    res.setHeader('Content-Disposition', this.disposition);
     return this.feeds.render(params.file);
   }
 }

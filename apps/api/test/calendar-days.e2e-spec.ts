@@ -205,12 +205,12 @@ describe('Calendar days (e2e)', () => {
     const ics = (
       await t.http().get(`/api/events/${bacEvent.id}/ics`).set(bearer(bacToken)).expect(200)
     ).text;
-    expect(ics).toContain('RRULE:FREQ=WEEKLY;UNTIL=20270302T235959');
+    expect(ics).toContain('RRULE:FREQ=WEEKLY;UNTIL=20270302T215959Z');
     const exdates = ics.split('\r\n').filter((l) => l.startsWith('EXDATE'));
     expect(exdates).toEqual([
-      'EXDATE:20270209T140000',
-      'EXDATE:20270216T140000',
-      'EXDATE:20270223T140000',
+      'EXDATE;TZID=Africa/Cairo:20270209T140000',
+      'EXDATE;TZID=Africa/Cairo:20270216T140000',
+      'EXDATE;TZID=Africa/Cairo:20270223T140000',
     ]);
 
     const other = (
@@ -221,8 +221,8 @@ describe('Calendar days (e2e)', () => {
         .expect(200)
     ).text;
     expect(other.split('\r\n').filter((l) => l.startsWith('EXDATE'))).toEqual([
-      'EXDATE:20270209T140000',
-      'EXDATE:20270302T140000',
+      'EXDATE;TZID=Africa/Cairo:20270209T140000',
+      'EXDATE;TZID=Africa/Cairo:20270302T140000',
     ]);
   });
 

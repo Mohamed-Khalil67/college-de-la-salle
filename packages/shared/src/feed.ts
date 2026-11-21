@@ -6,6 +6,7 @@ import {
   longDay,
   occurrences,
   isWeekly,
+  skippedDays,
 } from './calendar.js';
 import type { SchoolCalendarIds } from './school-profile.js';
 import type { TimetableOccurrence } from './timetable.js';
@@ -414,6 +415,74 @@ export function toFeedIcs(items: readonly FeedItem[], options: FeedOptions): str
   return lines.map(foldLine).join('\r\n') + '\r\n';
 }
 
+/** The UTC instant of a wall-clock time in a zone (`2026-10-04`, `23:59:59`). */
+function zonedInstant(dayIso: string, hhmmss: string, timeZone: string): number {
+  const [y = 0, m = 1, d = 1] = dayIso.split('-').map(Number);
+  const [h = 0, min = 0, s = 0] = hhmmss.split(':').map(Number);
+  const wall = Date.UTC(y, m - 1, d, h, min, s);
+  // Two passes settle the offset also next to a change of summer time.
+  const first = wall - zoneOffsetMinutes(timeZone, wall) * MINUTE;
+  return wall - zoneOffsetMinutes(timeZone, first) * MINUTE;
+}
+
+export interface EventIcsOptions {
+  /** The school's IANA zone (profile `timeZone`): the event's times are wall-clock times there. */
+  readonly timeZone: string;
+  /** Instant the file is written (DTSTAMP), ISO. */
+  readonly now: string;
+  /** Closed days: the weekly sessions they cancel become EXDATE lines. */
+  readonly closures?: readonly Closure[];
+}
+
+/**
+ * « Ajouter à mon agenda »: one event as an RFC 5545 file, written like the feed (VTIMEZONE of the school's
+ * zone, times with TZID, DTSTAMP, escaped and folded lines). A weekly event keeps its repetition (UNTIL in UTC,
+ * as RFC 5545 asks next to a zoned DTSTART), minus the sessions cancelled by `closures`.
+ */
+export function toIcs(event: CalendarEvent, calendar: SchoolCalendarIds, options: EventIcsOptions): string {
+  const zone = options.timeZone;
+  const year = Number(event.date.slice(0, 4)) || new Date(options.now).getUTCFullYear();
+  const lastYear = Number((event.repeatUntil || event.date).slice(0, 4)) || year;
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    `PRODID:-//${calendar.productName}//Espace eleve//FR`,
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    ...(event.start ? vtimezone(zone, year, lastYear) : []),
+    'BEGIN:VEVENT',
+    `UID:${event.id}@${calendar.uidDomain}`,
+    `DTSTAMP:${utc(options.now)}`,
+  ];
+  if (event.start) {
+    lines.push(
+      `DTSTART;TZID=${zone}:${day(event.date)}T${time(event.start)}`,
+      `DTEND;TZID=${zone}:${day(event.date)}T${time(event.end || event.start)}`,
+    );
+  } else {
+    lines.push(`DTSTART;VALUE=DATE:${day(event.date)}`, `DTEND;VALUE=DATE:${day(addDays(event.date, 1))}`);
+  }
+  if (isWeekly(event)) {
+    // UNTIL: a DATE for an all-day series, else the last minute of the last day in UTC.
+    const until = event.start
+      ? utc(new Date(zonedInstant(event.repeatUntil, '23:59:59', zone)).toISOString())
+      : day(event.repeatUntil);
+    lines.push(`RRULE:FREQ=WEEKLY;UNTIL=${until}`);
+    for (const skipped of skippedDays(event, options.closures ?? [])) {
+      lines.push(
+        event.start
+          ? `EXDATE;TZID=${zone}:${day(skipped)}T${time(event.start)}`
+          : `EXDATE;VALUE=DATE:${day(skipped)}`,
+      );
+    }
+  }
+  lines.push(`SUMMARY:${icsText(`${event.type.label} — ${event.title}`)}`);
+  if (event.place) lines.push(`LOCATION:${icsText(event.place)}`);
+  if (event.description) lines.push(`DESCRIPTION:${icsText(event.description)}`);
+  lines.push('END:VEVENT', 'END:VCALENDAR');
+  return lines.map(foldLine).join('\r\n') + '\r\n';
+}
+
 /* ------------------------------------------------------------------------------------------------
  * The secret link
  * ---------------------------------------------------------------------------------------------- */
@@ -438,6 +507,15 @@ export function parseFeedToken(
 /** The token of a feed row and its secret. */
 export function feedToken(id: string, secret: string): string {
   return `${id.replace(/-/g, '').toLowerCase()}${secret}`;
+}
+
+/**
+ * The file name calendar apps see for the feed: the school's calendar id (profile `calendar.uidDomain`, lower
+ * case letters, digits, dots and dashes), never a name written in code.
+ */
+export function feedFileName(calendar: SchoolCalendarIds): string {
+  const base = calendar.uidDomain.replace(/[^a-z0-9.-]+/g, '-').replace(/^[.-]+|[.-]+$/g, '');
+  return `${base || 'agenda'}.ics`;
 }
 
 /** `webcal://` form of an https feed address (Apple Calendrier, Outlook on the desktop). */

@@ -9,6 +9,7 @@ import {
   weekday,
 } from '@cdls/shared';
 import { schoolToday } from '../src/common/dates.js';
+import { activeSchool } from '../src/school/school-profile.js';
 import {
   ADMIN,
   bearer,
@@ -53,6 +54,10 @@ describe('Calendar feed (e2e)', () => {
   const ics = async (url: string) => {
     const res = await get(pathOf(url)).expect(200);
     expect(res.headers['content-type']).toContain('text/calendar');
+    // Named after the school pack (finding 12), never a name written in code.
+    expect(res.headers['content-disposition']).toBe(
+      `inline; filename="${activeSchool().calendar.uidDomain}.ics"`,
+    );
     return res.text;
   };
 

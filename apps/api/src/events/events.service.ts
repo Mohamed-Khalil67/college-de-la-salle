@@ -84,7 +84,11 @@ export class EventsService {
     const row = await this.visible(id, user);
     const until = row.repeatUntil ? toDay(row.repeatUntil) : toDay(row.date);
     const closures = await this.calendarDays.closures(toDay(row.date), until);
-    return toIcs(toCalendarEvent(row), this.school.calendar, closures);
+    return toIcs(toCalendarEvent(row), this.school.calendar, {
+      timeZone: this.school.timeZone,
+      now: new Date().toISOString(),
+      closures,
+    });
   }
 
   /**

@@ -441,8 +441,13 @@ describe('EventsService', () => {
         { startsOn: '2027-02-16', endsOn: '2027-02-16', targets: ['all'] },
       ]);
       const ics = await events.ics('e1', TEACHER);
-      expect(ics).toContain('EXDATE:20270216T140000');
-      expect(ics).not.toContain('EXDATE:20270209');
+      const zone = activeSchool().timeZone;
+      expect(ics).toContain(`EXDATE;TZID=${zone}:20270216T140000`);
+      expect(ics).not.toMatch(/EXDATE[^\r]*20270209/);
+      // RFC 5545: a DTSTAMP and zoned times with their VTIMEZONE (finding 11).
+      expect(ics).toMatch(/\r\nDTSTAMP:\d{8}T\d{6}Z\r\n/);
+      expect(ics).toContain(`DTSTART;TZID=${zone}:20270202T140000`);
+      expect(ics).toContain(`BEGIN:VTIMEZONE\r\nTZID:${zone}\r\n`);
       expect(calendarDays.closures).toHaveBeenCalledWith('2027-02-02', '2027-02-23');
     });
   });

@@ -74,8 +74,8 @@ export function toCalendarEvent(e: EventDto): CalendarEvent {
 }
 
 /** « Ajouter à mon agenda »: the event as an iCalendar file. */
-export function eventIcs(e: EventDto): string {
-  return toIcs(toCalendarEvent(e), PROFILE.calendar);
+export function eventIcs(e: EventDto, now: string): string {
+  return toIcs(toCalendarEvent(e), PROFILE.calendar, { timeZone: PROFILE.timeZone, now });
 }
 
 /** A safe file name from a title: « controle-n-3-fonctions.ics ». */
