@@ -13,7 +13,7 @@ import {
 import type { Prisma } from '../generated/prisma/client.js';
 import { loadClosures } from '../calendar-days/closures.js';
 import { toDay } from '../common/dates.js';
-import { isExclusionViolation } from '../common/errors.js';
+import { isExclusionViolation, isTransientConflict } from '../common/errors.js';
 import { conflictBlocked } from './blocked.js';
 import { conflictMessage } from './conflict-messages.js';
 import type { GroupHold } from './event-hold.js';
@@ -518,12 +518,15 @@ export class OccupancyService {
 
   /**
    * Awaits a write; when two requests raced and the database's exclusion constraint refused the second,
-   * answers 409 instead of a 500.
+   * answers 409 instead of a 500. A deadlock or serialization failure between them (Postgres 40P01/40001, often
+   * inside a raw-query P2010) is passed on as it is: the global filter answers it 409 `SERIALIZATION_FAILURE`
+   * with `retryable` and `Retry-After`, which tells the client to try again rather than that the slot is taken.
    */
   async guard<T>(work: Promise<T>): Promise<T> {
     try {
       return await work;
     } catch (error) {
+      if (isTransientConflict(error)) throw error;
       if (CONSTRAINTS.some((c) => isExclusionViolation(error, c))) throw conflictBlocked([]);
       throw error;
     }

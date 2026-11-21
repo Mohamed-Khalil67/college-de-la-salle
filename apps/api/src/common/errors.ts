@@ -16,6 +16,35 @@ function mentions(error: unknown, constraint: string, depth = 0): boolean {
   return mentions(e.cause, constraint, depth + 1);
 }
 
+/** Postgres SQLSTATEs of a transaction that lost a race and may simply be run again. */
+export const TRANSIENT_SQLSTATES = ['40001', '40P01'] as const; // serialization_failure, deadlock_detected
+
+const TRANSIENT = new Set<string>(TRANSIENT_SQLSTATES);
+
+/**
+ * A serialization failure or a deadlock, however it arrives: Prisma's P2034 (a query of the client), a P2010
+ * raw-query error (`meta.driverAdapterError.cause.originalCode`, also in the message as « Code: `40P01` »),
+ * or the `pg` error itself (`code`). Looks in the error, its `meta` and its `cause`, a few levels deep.
+ */
+export function isTransientConflict(error: unknown, depth = 0): boolean {
+  if (typeof error !== 'object' || error === null || depth > 5) return false;
+  const e = error as {
+    code?: unknown;
+    originalCode?: unknown;
+    kind?: unknown;
+    message?: unknown;
+    meta?: unknown;
+    cause?: unknown;
+    driverAdapterError?: unknown;
+  };
+  if (e.code === 'P2034' || e.kind === 'TransactionWriteConflict') return true;
+  for (const code of [e.code, e.originalCode])
+    if (typeof code === 'string' && TRANSIENT.has(code)) return true;
+  const message = e.code === 'P2010' && typeof e.message === 'string' ? e.message : '';
+  if (TRANSIENT_SQLSTATES.some((s) => message.includes(`Code: \`${s}\``))) return true;
+  return [e.meta, e.driverAdapterError, e.cause].some((next) => isTransientConflict(next, depth + 1));
+}
+
 /** A violation of the named Postgres EXCLUDE constraint (the error message carries its name). */
 export function isExclusionViolation(error: unknown, constraint: string): boolean {
   return mentions(error, constraint);

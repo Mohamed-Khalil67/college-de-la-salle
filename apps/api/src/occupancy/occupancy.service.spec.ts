@@ -1,5 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { mapException } from '../common/error-response.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OccupancyService } from './occupancy.service.js';
 
@@ -74,6 +75,30 @@ describe('OccupancyService', () => {
         ),
       );
       await expect(service.guard(raced)).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('passes a deadlock inside a raw query (P2010, 40P01) on, so the filter answers a retryable 409', async () => {
+      // The shape Prisma 7 with the pg adapter throws when the occupancy INSERT deadlocks.
+      const deadlock = Object.assign(
+        new Error('Raw query failed. Code: `40P01`. Message: `deadlock detected`'),
+        {
+          name: 'PrismaClientKnownRequestError',
+          code: 'P2010',
+          meta: {
+            driverAdapterError: Object.assign(new Error('deadlock detected'), {
+              cause: { originalCode: '40P01', kind: 'TransactionWriteConflict' },
+            }),
+          },
+        },
+      );
+      const thrown: unknown = await service.guard(Promise.reject(deadlock)).catch((e: unknown) => e);
+      expect(thrown).toBe(deadlock);
+      expect(thrown).not.toBeInstanceOf(ConflictException);
+      expect(mapException(thrown)).toMatchObject({
+        status: 409,
+        body: { code: 'SERIALIZATION_FAILURE', retryable: true },
+        headers: { 'Retry-After': '1' },
+      });
     });
 
     it('lets other errors and values through', async () => {
