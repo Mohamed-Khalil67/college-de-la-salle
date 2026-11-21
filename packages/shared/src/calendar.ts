@@ -1,4 +1,3 @@
-import type { SchoolCalendarIds } from './school-profile.js';
 import { audienceMatches, isHttpsUrl, type SectionId, type Target } from './space.js';
 
 /**
