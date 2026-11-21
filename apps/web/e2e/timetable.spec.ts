@@ -39,6 +39,8 @@ async function signInTo(page: Page, account: Account, path: string): Promise<voi
 }
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
+  // Dialog buttons fade in: measure the colours once they have settled (a run caught one mid-fade at 390 px).
+  await page.waitForTimeout(400);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa', 'best-practice'])
     .analyze();
