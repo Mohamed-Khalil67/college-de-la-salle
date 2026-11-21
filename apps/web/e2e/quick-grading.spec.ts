@@ -1,13 +1,24 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import type { SessionResponse } from '@cdls/shared';
+import { addDays } from '@cdls/shared';
 import { ACCOUNTS, type Account } from './accounts';
+import { removeEvents } from './cleanup';
+import { schoolToday } from './school';
+import { todayIsGradable } from './school-weeks';
+import { tokenOf } from './structure';
 
 /**
  * « Noter » (quick grading): the teacher creates a note from « Saisie des notes », types the marks with the
  * keyboard, finishes later, reopens the draft, publishes, and the student sees the grade. At 390 px (phone
- * project) and 1440 px (desktop project), with 0 Axe violations on each step.
+ * project) and 1440 px (desktop project), with 0 Axe violations on each step. The notes are dated today in the
+ * demo class: `afterAll` removes their marks and deletes them, so the demo averages and report cards stay as seeded.
  */
+
+test.afterAll(async ({ request }) => {
+  const today = schoolToday();
+  await removeEvents(request, ACCOUNTS.teacher, (t) => /^(Interro éclair|Essai échec) /.test(t), addDays(today, -1), addDays(today, 1));
+});
 
 async function signIn(page: Page, account: Account): Promise<void> {
   await page.goto('/connexion');
@@ -34,6 +45,7 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 
 test('a teacher grades a class straight away and the student sees the grade once published', async ({ page, request }, info) => {
   test.setTimeout(90_000);
+  test.skip(!(await todayIsGradable(request, await tokenOf(request, ACCOUNTS.teacher))), 'No open term covers today (a holiday between terms): « Noter » dates its note today, so there is nothing to grade.');
   const phone = info.project.name === 'phone';
   await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1440, height: 900 });
 
@@ -129,6 +141,7 @@ test('a teacher grades a class straight away and the student sees the grade once
 
 test('a failed autosave is reported once and not retried on a timer', async ({ page, request }, info) => {
   test.setTimeout(60_000);
+  test.skip(!(await todayIsGradable(request, await tokenOf(request, ACCOUNTS.teacher))), 'No open term covers today (a holiday between terms): « Noter » dates its note today, so there is nothing to grade.');
   const login = await request.post('/api/auth/login', { data: ACCOUNTS.student });
   const pupil = ((await login.json()) as SessionResponse).user;
   await signIn(page, ACCOUNTS.teacher);

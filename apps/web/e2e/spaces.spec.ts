@@ -1,6 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
+import { removeContactMessages } from './cleanup';
+
+/** The contact messages this file sends (visitor addresses at example.com) are deleted at the end. */
+test.afterAll(async ({ request }) => {
+  await removeContactMessages(request, (m) => /^(parent|promo)\.[\w.]*@example\.com$/.test(m.email));
+});
 
 async function signIn(page: Page, account: Account): Promise<void> {
   await page.goto('/connexion');
@@ -71,7 +77,8 @@ test('a teacher takes the roll and saves it', async ({ page }) => {
   const day = page.getByLabel('Jour');
   const save = page.getByRole('button', { name: /Enregistrer l’appel/ });
   // Walk back from today until a day with a session of this class.
-  for (let back = 0; back < 14 && !(await save.isVisible()); back++) {
+  // Three weeks back, so a two-week holiday never leaves the loop without a school day.
+  for (let back = 0; back < 21 && !(await save.isVisible()); back++) {
     const date = new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10);
     await day.fill(date);
     await page.waitForTimeout(400);

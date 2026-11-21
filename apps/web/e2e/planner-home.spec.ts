@@ -9,6 +9,7 @@ import {
   test,
 } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { firstTeachingWeek } from './school-weeks';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
 
 /**
@@ -280,6 +281,14 @@ async function teacherName(request: APIRequestContext): Promise<string> {
   return `${me.firstName} ${me.lastName}`;
 }
 
+/** The first school week with lessons of the demo teacher (never a holiday, whatever the day of the run). */
+async function lessonWeek(request: APIRequestContext): Promise<{ from: string; to: string }> {
+  const teacher = await tokenOf(request, ACCOUNTS.teacher);
+  const me = (await (await request.get('/api/auth/me', { headers: teacher })).json()) as { teacherId: string };
+  const from = await firstTeachingWeek(request, teacher, `teacherId=${me.teacherId}`);
+  return { from, to: addDays(from, 6) };
+}
+
 async function lookUp(page: Page, name: string, from: string, to: string): Promise<void> {
   await page.getByLabel('Enseignant absent').selectOption({ label: name });
   await page.getByLabel('Premier jour').fill(from);
@@ -293,8 +302,7 @@ test('Professeur absent: a teacher and days, one choice per lesson, saved togeth
 }) => {
   test.setTimeout(180_000);
   const name = await teacherName(request);
-  const from = addDays(schoolToday(), 28);
-  const to = addDays(from, 6);
+  const { from, to } = await lessonWeek(request);
   try {
     await openPlanner(page);
     await page.getByRole('link', { name: 'Professeur absent', exact: true }).click();
@@ -407,8 +415,8 @@ test('Professeur absent: a failing lookup, a day without lessons, a refused save
         )(route)
       : route.continue(),
   );
-  const from = addDays(schoolToday(), 28);
-  await lookUp(page, name, from, addDays(from, 6));
+  const { from, to } = await lessonWeek(request);
+  await lookUp(page, name, from, to);
   await expect(page.getByRole('alert')).toContainText('Les séances sont indisponibles');
   await axeAtBothWidths(page);
   failing = false;

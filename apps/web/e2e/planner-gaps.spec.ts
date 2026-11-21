@@ -2,6 +2,7 @@ import { addDays, daysBetween, weekday, weekDays } from '@cdls/shared';
 import { schoolToday } from './school';
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { firstTeachingWeek } from './school-weeks';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
 
 /**
@@ -143,8 +144,9 @@ test('a late 409 refreshes the lists, says who is no longer free and proposes so
   request,
 }) => {
   test.setTimeout(240_000);
-  const { name, id } = await teacherOf(request);
-  const from = addDays(schoolToday(), 28);
+  const { name, id, auth } = await teacherOf(request);
+  // The first school week with lessons (never a holiday, whatever the day of the run).
+  const from = await firstTeachingWeek(request, auth, `teacherId=${id}`);
   const to = addDays(from, 6);
   const admin = await tokenOf(request, ACCOUNTS.admin);
   const touched: string[] = [id];
@@ -245,9 +247,9 @@ test('a moved lesson is one real session on its new day and a struck trace on it
   request,
 }) => {
   test.setTimeout(180_000);
-  const { id } = await teacherOf(request);
+  const { id, auth } = await teacherOf(request);
   const admin = await tokenOf(request, ACCOUNTS.admin);
-  const from = addDays(schoolToday(), 28);
+  const from = await firstTeachingWeek(request, auth, `teacherId=${id}`);
   const to = addDays(from, 6);
   try {
     const sessions = (await (
