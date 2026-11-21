@@ -48,10 +48,14 @@ docker compose -f deploy/compose.yaml run --rm -e BACKUP_ONCE=true backup
    ```
 3. Recreate an empty database and load the dump:
    ```bash
-   docker compose -f deploy/compose.yaml exec db psql -U cdls -d postgres -c "DROP DATABASE cdls WITH (FORCE)" -c "CREATE DATABASE cdls OWNER cdls"
+   docker compose -f deploy/compose.yaml exec db psql -U cdls -d postgres -c "DROP DATABASE cdls WITH (FORCE)" -c "CREATE DATABASE cdls OWNER cdls_app"
    docker compose -f deploy/compose.yaml run --rm --no-deps -v "$PWD/deploy/backups:/backups:ro" --entrypoint pg_restore backup \
-     --no-owner --role=cdls --dbname=cdls /backups/cdls-20261023-020000.dump
+     --no-owner --role=cdls_app --dbname=cdls /backups/cdls-20261023-020000.dump
    ```
+   The restored objects then belong to `cdls_app`, the API's own login, so its next migrations can alter them. On an
+   install that has no `cdls_app` yet (from before it existed, or a new machine whose volume was created by an older
+   version), run step 3 of « Database login of the API » in `docs/deployment.md` first. Restored with `--role=cdls`
+   by mistake: run that same step 3 afterwards, it hands every object over.
    On Windows PowerShell replace `$PWD/deploy/backups` by `${PWD}/deploy/backups` (or use `./deploy/backups`).
 4. Start everything again (the API applies any migration newer than the dump):
    ```bash

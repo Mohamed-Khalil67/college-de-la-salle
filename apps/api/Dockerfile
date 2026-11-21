@@ -59,6 +59,11 @@ COPY --from=build /app/apps/api/tsconfig.json apps/api/tsconfig.json
 # The API writes no file in production (the dev-only `log` mail transport is refused there); Prisma and npm write
 # their caches under /home/node and /tmp, which `node` owns.
 COPY --chmod=0755 apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# The schema engine of `prisma migrate deploy`: npm does not run @prisma/engines' install script, so the CLI used
+# to download the engine into node_modules on EVERY start (only possible while node_modules belonged to `node`).
+# Fetched once here, as root, for this image's platform (openssl 3 is installed above); the start needs no network.
+RUN node node_modules/@prisma/engines/dist/scripts/postinstall.js \
+ && ls node_modules/@prisma/engines/ | grep -q schema-engine
 USER node
 WORKDIR /app/apps/api
 EXPOSE 3000
