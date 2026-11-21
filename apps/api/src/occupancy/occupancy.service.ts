@@ -13,7 +13,7 @@ import {
 import type { Prisma } from '../generated/prisma/client.js';
 import { loadClosures } from '../calendar-days/closures.js';
 import { toDay } from '../common/dates.js';
-import { isExclusionViolation } from '../common/errors.js';
+import { isExclusionViolation, isTransientConflict } from '../common/errors.js';
 import { conflictBlocked } from './blocked.js';
 import { conflictMessage } from './conflict-messages.js';
 import type { GroupHold } from './event-hold.js';
@@ -50,7 +50,7 @@ const CONSTRAINTS = [
   'occupancy_group_no_overlap',
 ] as const;
 
-interface Clash {
+export interface Clash {
   readonly i: number;
   readonly kind: TimetableConflictKind;
   readonly slotId: string | null;
@@ -157,7 +157,15 @@ export class OccupancyService {
     return this.describeBy(db, rows, clashes, (c) => rows[c.i]!.slotId ?? '');
   }
 
-  private async clashes(db: Db, rows: readonly IndexRow[]): Promise<Clash[]> {
+  /**
+   * Every index row each candidate overlaps, by the four rules of the exclusion constraints. Each candidate
+   * probes the GiST indexes of those constraints through a LATERAL subquery (their `IS NOT NULL` predicates
+   * spelled out so the partial indexes qualify). A plain join made the planner, which guesses 100 rows for
+   * `jsonb_to_recordset`, hash-join on the room or teacher alone and test every pair: 4.7 s for the 17,927
+   * candidates of a rollover at 600 students, against 0.22 s now, with the same results.
+   */
+  async indexClashes(db: Db, rows: readonly IndexRow[]): Promise<Clash[]> {
+    if (!rows.length) return [];
     const json = JSON.stringify(
       rows.map((r, i) => ({
         i,
@@ -183,26 +191,34 @@ export class OccupancyService {
         SELECT * FROM jsonb_to_recordset(${json}::jsonb) AS c(
           i int, room_id uuid, teacher_id uuid, class_id uuid, division_key text, group_id uuid, starts_at timestamp, ends_at timestamp)
       )
-      SELECT c.i, 'room'::text AS kind, o.slot_id, o.exception_id, o.event_id
-        FROM c JOIN occupancy o ON o.room_id = c.room_id AND o.during && tsrange(c.starts_at, c.ends_at)
-      UNION ALL
-      SELECT c.i, 'teacher'::text, o.slot_id, o.exception_id, o.event_id
-        FROM c JOIN occupancy o ON o.teacher_id = c.teacher_id AND o.during && tsrange(c.starts_at, c.ends_at)
-      UNION ALL
-      SELECT c.i, 'class'::text, o.slot_id, o.exception_id, o.event_id
-        FROM c JOIN occupancy o ON o.class_id = c.class_id AND o.during && tsrange(c.starts_at, c.ends_at)
-         AND (c.division_key IS NULL OR o.division_key IS DISTINCT FROM c.division_key)
-      UNION ALL
-      SELECT c.i, 'class'::text, o.slot_id, o.exception_id, o.event_id
-        FROM c JOIN occupancy o ON o.group_id = c.group_id AND o.during && tsrange(c.starts_at, c.ends_at)
-       WHERE c.group_id IS NOT NULL`;
-    const clashes: Clash[] = found.map((f) => ({
+      SELECT c.i, h.kind, h.slot_id, h.exception_id, h.event_id
+        FROM c CROSS JOIN LATERAL (
+          SELECT 'room'::text AS kind, o.slot_id, o.exception_id, o.event_id FROM occupancy o
+           WHERE o.room_id = c.room_id AND o.room_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at)
+          UNION ALL
+          SELECT 'teacher'::text, o.slot_id, o.exception_id, o.event_id FROM occupancy o
+           WHERE o.teacher_id = c.teacher_id AND o.teacher_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at)
+          UNION ALL
+          SELECT 'class'::text, o.slot_id, o.exception_id, o.event_id FROM occupancy o
+           WHERE o.class_id = c.class_id AND o.class_id IS NOT NULL AND o.during && tsrange(c.starts_at, c.ends_at)
+             AND (c.division_key IS NULL OR o.division_key IS DISTINCT FROM c.division_key)
+          UNION ALL
+          SELECT 'class'::text, o.slot_id, o.exception_id, o.event_id FROM occupancy o
+           WHERE c.group_id IS NOT NULL AND o.group_id = c.group_id AND o.group_id IS NOT NULL
+             AND o.during && tsrange(c.starts_at, c.ends_at)
+        ) h`;
+    return found.map((f) => ({
       i: f.i,
       kind: f.kind,
       slotId: f.slot_id,
       exceptionId: f.exception_id,
       eventId: f.event_id,
     }));
+  }
+
+  /** `indexClashes` plus the rows of the batch that clash with each other. */
+  private async clashes(db: Db, rows: readonly IndexRow[]): Promise<Clash[]> {
+    const clashes = await this.indexClashes(db, rows);
     // Rows of the same change that clash with each other (a session moved onto another one of its series).
     // Sweep by start time: a row can only clash with the rows that start before it ends.
     const order = rows
@@ -502,12 +518,15 @@ export class OccupancyService {
 
   /**
    * Awaits a write; when two requests raced and the database's exclusion constraint refused the second,
-   * answers 409 instead of a 500.
+   * answers 409 instead of a 500. A deadlock or serialization failure between them (Postgres 40P01/40001, often
+   * inside a raw-query P2010) is passed on as it is: the global filter answers it 409 `SERIALIZATION_FAILURE`
+   * with `retryable` and `Retry-After`, which tells the client to try again rather than that the slot is taken.
    */
   async guard<T>(work: Promise<T>): Promise<T> {
     try {
       return await work;
     } catch (error) {
+      if (isTransientConflict(error)) throw error;
       if (CONSTRAINTS.some((c) => isExclusionViolation(error, c))) throw conflictBlocked([]);
       throw error;
     }

@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { migrationFromDisk, readVersion } from './build-info.js';
 import type { HealthDto, LiveHealthDto } from './health.dto.js';
+import { assertSessionTimeZone } from '../prisma/pool-config.js';
 
 @Injectable()
 export class HealthService implements OnApplicationBootstrap {
@@ -23,6 +24,16 @@ export class HealthService implements OnApplicationBootstrap {
    * its migrations before it starts.
    */
   async onApplicationBootstrap(): Promise<void> {
+    // Its own query: a missing `_prisma_migrations` must not skip it. Outside a try only for the check itself: a
+    // database that answers in another zone would store shifted instants, so the API stops.
+    let zone: string | null = null;
+    try {
+      const [row] = await this.prisma.$queryRaw<{ zone: string }[]>`SELECT current_setting('TimeZone') AS zone`;
+      zone = row?.zone ?? null;
+    } catch {
+      zone = null; // unreachable: the API still boots, /api/health/db says so
+    }
+    assertSessionTimeZone(zone);
     try {
       const rows = await this.prisma.$queryRaw<{ migration_name: string }[]>`
         SELECT migration_name FROM _prisma_migrations

@@ -19,7 +19,7 @@ import { AccessService } from '../access/access.service.js';
 import { AuthService } from '../auth/auth.service.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
-import { fromDay, toDay, toIso } from '../common/dates.js';
+import { fromDay, schoolToday, toDay, toIso } from '../common/dates.js';
 import { notFound } from '../common/errors.js';
 import { pageArgs, paginated } from '../common/pagination.js';
 import type { Env } from '../config/env.validation.js';
@@ -118,15 +118,14 @@ export class UsersService {
           }
         : {}),
     };
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where,
-        include,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-        ...pageArgs(query),
-      }),
-      this.prisma.user.count({ where }),
-    ]);
+    // One after the other, never a batch `$transaction([...])`: it sends both on one connection at once.
+    const rows = await this.prisma.user.findMany({
+      where,
+      include,
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      ...pageArgs(query),
+    });
+    const total = await this.prisma.user.count({ where });
     return paginated(rows.map(toUserDto), total, query);
   }
 
@@ -188,6 +187,9 @@ export class UsersService {
                             create: {
                               classId: schoolClass.id,
                               schoolYearId: schoolClass.schoolYearId,
+                              // The school's day: Prisma's default is the UTC date, which is yesterday between the
+                              // school's midnight and UTC midnight.
+                              enrolledOn: fromDay(schoolToday()),
                             },
                           },
                         }
@@ -384,7 +386,11 @@ export class UsersService {
                           birthDate: row.birthDate ? fromDay(row.birthDate) : null,
                           sectionId: sectionIds.get(row.sectionCode!)!,
                           enrollments: {
-                            create: { classId: row.classId!, schoolYearId: schoolYearId! },
+                            create: {
+                              classId: row.classId!,
+                              schoolYearId: schoolYearId!,
+                              enrolledOn: fromDay(schoolToday()),
+                            },
                           },
                         },
                       },

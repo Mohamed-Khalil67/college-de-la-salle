@@ -45,15 +45,14 @@ export class ContactService {
   async list(query: ContactMessageListQueryDto): Promise<Paginated<ContactMessageDto>> {
     const where: Prisma.ContactMessageWhereInput =
       query.handled === undefined ? {} : { handledAt: query.handled ? { not: null } : null };
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.contactMessage.findMany({
-        where,
-        include,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        ...pageArgs(query),
-      }),
-      this.prisma.contactMessage.count({ where }),
-    ]);
+    // One after the other, never a batch `$transaction([...])`: it sends both on one connection at once.
+    const rows = await this.prisma.contactMessage.findMany({
+      where,
+      include,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      ...pageArgs(query),
+    });
+    const total = await this.prisma.contactMessage.count({ where });
     return paginated(rows.map(toContactMessageDto), total, query);
   }
 

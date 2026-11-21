@@ -35,7 +35,8 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
 - Spec expectations that depend on the school (Cairo time, `Bac français`) read the profile or `it.skipIf` another zone.
 - A pack is checked by `apps/web/src/app/school/pack.spec.ts`, `SCHOOL=<id> npm run e2e:smoke -w @cdls/web` (every public
   page, Axe at 390 and 1440 px) and the API's `school-profile.spec.ts`. CI-less: run both packs before a merge:
-  `SCHOOL=example npm run build` and `npm run build`.
+  `SCHOOL=example npm run build` and `npm run build`, plus `npm audit` (0) and
+  `docker compose -f deploy/compose.yaml --env-file deploy/.env.example config -q` (README, « Before a merge »).
 
 ## Type safety (not optional)
 
@@ -55,6 +56,10 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
 - Done means: `npm run build`, `npm run lint` (0 warnings), `npm test`, `npm run test:e2e`, and for UI the Playwright +
   Axe specs, all green, plus README/docs updated. Report what was verified and what is left.
 - A correction from the owner or a review goes into the right `CLAUDE.md` so the next agent follows it.
+
+## Status (2026-11-21)
+
+- **QA fixes, API, database and deploy (branch `fix/qa-api-db-deploy`, not merged):** findings 1, 2, 3, 4, 7, 8, 9, 10, 15 and 25 of `docs/qa/findings.md`: compose parses again (and is in the pre-merge list), deadlocks answer a retryable 409, `effect` override (`npm audit` 0), the clash probe uses the GiST indexes (rollover preview 6.0 → 4.9 s at 600 students), UTC on every connection with a boot check, pool size and timeout, slow-query log without values, the API as `cdls_app` (not superuser; one-time step for existing installs in `docs/deployment.md`), enrolment on the school's day, one current year (new migration `20261121090000`), no parallel queries on one connection, API image 1.59 → 1.03 GB with read-only app files. Details in `apps/api/CLAUDE.md`.
 
 ## Status (2026-11-20)
 

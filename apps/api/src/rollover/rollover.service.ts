@@ -13,6 +13,8 @@ import {
 import { audit, type AuditEntry } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay } from '../common/dates.js';
+import { conflictOnUnique } from '../common/errors.js';
+import { ANOTHER_YEAR_BECAME_CURRENT } from '../school-years/year-guard.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { OccupancyService } from '../occupancy/occupancy.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -483,7 +485,10 @@ export class RolloverService {
         where: { isCurrent: true, NOT: { id: yearId } },
         data: { isCurrent: false },
       });
-      await tx.schoolYear.update({ where: { id: yearId }, data: { isCurrent: true } });
+      await conflictOnUnique(
+        tx.schoolYear.update({ where: { id: yearId }, data: { isCurrent: true } }),
+        ANOTHER_YEAR_BECAME_CURRENT,
+      );
       trail.push({
         actorId: user.id,
         action: 'school_year.make_current',

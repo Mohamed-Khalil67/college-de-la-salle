@@ -134,6 +134,47 @@ container instead of running on a wrong schema). Take a backup first (command ab
 Rollback: `git checkout <previous tag or commit>` and rebuild; restore the pre-update dump if a migration changed the data.
 Free disk space from old images now and then: `docker image prune -f`.
 
+### Database login of the API (`cdls_app`)
+
+The API connects as **`cdls_app`**, not as the superuser `cdls` that the postgres image creates (`POSTGRES_USER`):
+`cdls_app` is `NOSUPERUSER NOCREATEDB NOCREATEROLE`, so a flaw in the API could never run programs in the database
+container (`COPY … TO PROGRAM`), read server files or touch other roles. It **owns** the `cdls` database and everything in
+its `public` schema, which is what `prisma migrate deploy` (run by the API container at every start) needs to create and
+alter its own tables, enums, indexes and the `btree_gist` extension (trusted: a database owner may create it). A split
+into a migration owner and a separate read/write login would add a second password and `GRANT`s on every new table for
+little gain here (the API would still write every row), so it is not done. The superuser `cdls` stays for the image
+itself, the `backup` container and the commands of `deploy/restore.md`.
+
+- **New install:** nothing to do. `generate-env` writes `APP_DB_PASSWORD`, and the db container runs
+  `deploy/db-init/10-app-role.sql` once, when its data volume is created.
+- **Install from before this change** (its volume already exists, so the init script never runs; `up` stops with
+  « required variable APP_DB_PASSWORD is missing »). Once:
+  1. Take a backup (`docker compose -f deploy/compose.yaml run --rm -e BACKUP_ONCE=true backup`).
+  2. Add a line `APP_DB_PASSWORD=<40 random letters and digits>` to `deploy/.env` (PowerShell:
+     `-join ((48..57)+(97..122) | Get-Random -Count 36 | % {[char]$_})`; Linux: `head -c 30 /dev/urandom | od -An -vtx1 | tr -d ' \n'`).
+  3. Start only the database with the new setting and hand the objects over (idempotent: safe to run again):
+     ```bash
+     docker compose -f deploy/compose.yaml --env-file deploy/.env up -d db
+     docker compose -f deploy/compose.yaml --env-file deploy/.env exec db psql -v ON_ERROR_STOP=1 -U cdls -d cdls -f /docker-entrypoint-initdb.d/10-app-role.sql
+     ```
+     (In Git Bash on Windows, prefix with `MSYS_NO_PATHCONV=1`.) It creates or updates `cdls_app`, gives it the database,
+     the schema, and every table, sequence, enum and function the superuser owned (extension members stay as they are).
+  4. `docker compose -f deploy/compose.yaml --env-file deploy/.env --profile tunnel up -d --build`. The API log shows
+     `No pending migrations to apply.` (or applies new ones as `cdls_app`).
+- **Changing `APP_DB_PASSWORD`:** edit `deploy/.env`, run step 3 again (it sets the role's password from the file), then
+  `up -d`.
+
+Tested on Docker (Compose 5.5, postgres 18.7): a fresh volume (24 migrations applied as `cdls_app`, health ok), the
+hand-over of a database whose 191 objects all belonged to `cdls` (then rolled-back DDL as `cdls_app`: `ADD COLUMN`,
+`CREATE INDEX`, `ALTER TYPE … ADD VALUE`, `CREATE OR REPLACE FUNCTION`, a gist `EXCLUDE`; refused: `COPY … TO PROGRAM`,
+`CREATE ROLE`, `pg_read_file`), a dump restored with `--role=cdls_app`, and an API restart on the handed-over database.
+
+**Connections and time zone.** The API keeps at most `DB_POOL_MAX` (10) connections and a query waits at most
+`DB_CONNECT_TIMEOUT_MS` (5 s) for one before failing; the server allows 60. Every connection runs in UTC (the API sets
+it and refuses to start if the database answers in another zone), so `TZ`, `PGTZ` or `ALTER DATABASE … SET timezone`
+cannot shift stored times. The database logs statements slower than 1 s without their values
+(`log_parameter_max_length=0`), so no name, e-mail or hash reaches the container log.
+
 ### Backups
 
 A `backup` container dumps the database at start-up and every night at 02:00 UTC into `deploy/backups/`, keeping 14 days.
@@ -153,7 +194,10 @@ Every third-party image is pinned to an exact version and its digest (`image:tag
 If you change `NODE_VERSION` without `NODE_DIGEST` the build fails on the digest, on purpose.
 The `db`, `backup`, `caddy` and `cloudflared` services run with `no-new-privileges`; the API container is not
 `read_only` (not tried: the stack could not be started when this was written; try it in a test stack first).
-The API image keeps `apps/api/src` and `tsx` because `seed:demo` (above) runs in it.
+The API image keeps `apps/api/src` and `tsx` because `seed:demo` (above) runs in it. Its files belong to root and are
+read-only for the `node` user that runs it (no recursive `chown`, which used to copy `node_modules` into a second
+~500 MB layer: 1.59 GB before, 1.03 GB now), and Prisma's schema engine is downloaded at build time instead of into
+`node_modules` at every start.
 
 ## Settings reference
 
@@ -175,7 +219,8 @@ The API image keeps `apps/api/src` and `tsx` because `seed:demo` (above) runs in
 
 - [ ] `deploy/.env` created by `generate-env` (random secrets), kept out of git and stored in a password manager. Never paste
       it into chats or tickets. Rotating `JWT_*` signs everybody out and voids the « mot de passe oublié » links not yet used; do not change `POSTGRES_PASSWORD` on an existing database
-      without also running `ALTER USER cdls PASSWORD '…'`.
+      without also running `ALTER USER cdls PASSWORD '…'` (for `APP_DB_PASSWORD`, see « Database login of the API »).
+- [ ] The API connects as `cdls_app` (not a superuser): `docker compose -f deploy/compose.yaml exec db psql -U cdls -d cdls -tAc "select rolsuper from pg_roles where rolname='cdls_app'"` prints `f`.
 - [ ] Only the tunnel, or ports 80/443, are reachable from the internet. No router port-forward for 5432, 3000 or 8080
       (compose does not publish them anyway; 8080 is bound to 127.0.0.1).
 - [ ] Windows laptop: Windows Firewall on, Windows and Docker Desktop updated, disk encrypted (BitLocker), a strong account

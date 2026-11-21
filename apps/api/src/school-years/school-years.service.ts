@@ -3,10 +3,10 @@ import type { Period, Prisma, SchoolYear } from '../generated/prisma/client.js';
 import { audit } from '../common/audit.js';
 import type { AuthUser } from '../common/auth-user.js';
 import { fromDay, toDay, toIso } from '../common/dates.js';
-import { conflictOnReference, notFound } from '../common/errors.js';
+import { conflictOnReference, conflictOnUnique, notFound } from '../common/errors.js';
 import { toPeriodDto } from '../periods/periods.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { assertYearWritable } from './year-guard.js';
+import { ANOTHER_YEAR_BECAME_CURRENT, assertYearWritable } from './year-guard.js';
 import type {
   CreateSchoolYearDto,
   SchoolYearDto,
@@ -68,21 +68,14 @@ export class SchoolYearsService {
     return this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM school_years WHERE id = ${id}::uuid FOR UPDATE`;
       assertYearWritable(await tx.schoolYear.findUniqueOrThrow({ where: { id } }));
-      const outside = await Promise.all([
-        tx.period.count({
-          where: {
-            schoolYearId: id,
-            OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
-          },
-        }),
-        tx.calendarDay.count({
-          where: {
-            schoolYearId: id,
-            OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
-          },
-        }),
-      ]);
-      if (outside[0] || outside[1])
+      // One after the other: a transaction has one connection (never Promise.all on `tx`).
+      const outside = {
+        schoolYearId: id,
+        OR: [{ startsOn: { lt: fromDay(startsOn) } }, { endsOn: { gt: fromDay(endsOn) } }],
+      };
+      const periodsOutside = await tx.period.count({ where: outside });
+      const daysOutside = await tx.calendarDay.count({ where: outside });
+      if (periodsOutside || daysOutside)
         throw new ConflictException(
           'Des périodes ou des jours du calendrier sortiraient de l’année : modifiez-les d’abord.',
         );
@@ -121,11 +114,11 @@ export class SchoolYearsService {
         where: { isCurrent: true, NOT: { id } },
         data: { isCurrent: false },
       });
-      const year = await tx.schoolYear.update({
-        where: { id },
-        data: { isCurrent: true },
-        include: withPeriods,
-      });
+      // Two admins making two years current at once: the second commit hits `school_years_one_current_key`.
+      const year = await conflictOnUnique(
+        tx.schoolYear.update({ where: { id }, data: { isCurrent: true }, include: withPeriods }),
+        ANOTHER_YEAR_BECAME_CURRENT,
+      );
       await audit(tx, [
         {
           actorId: user.id,

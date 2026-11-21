@@ -15,6 +15,13 @@ export function yearArchived(label: string): ConflictException {
   });
 }
 
+/**
+ * The 409 when another year became current at the same moment (`school_years_one_current_key`, at most one
+ * current year): `makeCurrent` and the rollover answer it through `conflictOnUnique`.
+ */
+export const ANOTHER_YEAR_BECAME_CURRENT =
+  'Une autre année vient de devenir l’année en cours. Rechargez la page, puis réessayez si besoin.';
+
 /** 409 when the school year is archived. */
 export function assertYearWritable(year: { label: string; archivedAt: Date | null }): void {
   if (year.archivedAt) throw yearArchived(year.label);

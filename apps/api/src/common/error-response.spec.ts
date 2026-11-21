@@ -19,6 +19,23 @@ import {
 const prismaError = (code: string, message = 'Invalid `prisma.user.create()` invocation: SELECT * FROM users WHERE email = \'a@b.c\'') =>
   Object.assign(new Error(message), { name: 'PrismaClientKnownRequestError', code, meta: { target: ['email'] } });
 
+/** What Prisma 7 with the pg adapter throws when a `$queryRaw`/`$executeRaw` fails in Postgres. */
+const rawQueryError = (sqlstate: string, text: string) =>
+  Object.assign(new Error(`Raw query failed. Code: \`${sqlstate}\`. Message: \`${text}\``), {
+    name: 'PrismaClientKnownRequestError',
+    code: 'P2010',
+    meta: {
+      driverAdapterError: Object.assign(new Error(text), {
+        name: 'DriverAdapterError',
+        cause: {
+          originalCode: sqlstate,
+          originalMessage: text,
+          kind: sqlstate.startsWith('40') ? 'TransactionWriteConflict' : 'postgres',
+        },
+      }),
+    },
+  });
+
 describe('mapException', () => {
   it('keeps the body and message of an HTTP exception, and adds the status code', () => {
     const m = mapException(new ConflictException('Salle déjà prise.'));
@@ -91,6 +108,37 @@ describe('mapException', () => {
     expect(m.body.retryable).toBe(true);
     expect(m.headers['Retry-After']).toBe('1');
     expect(mapException(prismaError('P2002')).body.retryable).toBeUndefined();
+  });
+
+  it.each([
+    ['40P01', 'deadlock detected'],
+    ['40001', 'could not serialize access due to concurrent update'],
+  ])('maps a %s raised inside a raw query (P2010) like P2034: 409, retryable, Retry-After', (sqlstate, text) => {
+    const m = mapException(rawQueryError(sqlstate, text));
+    expect(m.status).toBe(409);
+    expect(m.body).toMatchObject({ statusCode: 409, code: 'SERIALIZATION_FAILURE', retryable: true });
+    expect(m.headers['Retry-After']).toBe('1');
+    expect(m.serverFault).toBe(false);
+    expect(JSON.stringify(m.body)).not.toMatch(/deadlock|serialize|occupancy/);
+    expect(m.logLine).toBe('Prisma P2010 (transient)');
+  });
+
+  it('finds the SQLSTATE in the cause chain or on the driver error itself', () => {
+    const pg = Object.assign(new Error('deadlock detected'), { name: 'DatabaseError', code: '40P01' });
+    expect(mapException(pg)).toMatchObject({ status: 409, body: { code: 'SERIALIZATION_FAILURE' } });
+    const wrapped = Object.assign(new Error('transaction failed'), { cause: pg });
+    expect(mapException(wrapped).status).toBe(409);
+    // Only the message says it (a meta without the adapter error).
+    const bare = prismaError('P2010', 'Raw query failed. Code: `40001`. Message: `could not serialize`');
+    expect(mapException(bare).body.code).toBe('SERIALIZATION_FAILURE');
+  });
+
+  it('keeps any other raw-query failure an opaque 500', () => {
+    const m = mapException(rawQueryError('23P01', 'conflicting key value violates exclusion constraint'));
+    expect(m.status).toBe(500);
+    expect(m.serverFault).toBe(true);
+    // A text mentioning the code outside « Code: `…` » is not enough.
+    expect(mapException(prismaError('P2010', 'value 40P01 in a column')).status).toBe(500);
   });
 
   it('turns an unknown Prisma code into an opaque 500, logged without the message', () => {

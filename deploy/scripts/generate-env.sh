@@ -10,6 +10,7 @@ rand() { head -c 48 /dev/urandom | od -An -vtx1 | tr -d ' \n' | cut -c1-"$1"; }
 
 sed \
   -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(rand 40)|" \
+  -e "s|^APP_DB_PASSWORD=.*|APP_DB_PASSWORD=$(rand 40)|" \
   -e "s|^JWT_ACCESS_SECRET=.*|JWT_ACCESS_SECRET=$(rand 64)|" \
   -e "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(rand 64)|" \
   "$dir/.env.example" >"$target"

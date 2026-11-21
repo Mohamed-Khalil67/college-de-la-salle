@@ -33,11 +33,17 @@ services:
       POSTGRES_USER: cdls
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run deploy/scripts/generate-env first}
       POSTGRES_DB: cdls
+      # Password of cdls_app, the API's own non-superuser login, created by db-init/10-app-role.sql on a new volume.
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?run deploy/scripts/generate-env first, or add APP_DB_PASSWORD (docs/deployment.md)}
     # Sized for ~600 students: a few dozen connections, modest memory. Never published on the host.
-    command: ["postgres", "-c", "shared_buffers=192MB", "-c", "max_connections=60", "-c", "work_mem=8MB", "-c", "log_min_duration_statement=1000"]
+    # Slow statements (over 1 s) are logged WITHOUT their bind values (log_parameter_max_length=0): they carry names,
+    # e-mails and hashes, and the container log is neither encrypted nor part of the backups.
+    command: ["postgres", "-c", "shared_buffers=192MB", "-c", "max_connections=60", "-c", "work_mem=8MB", "-c", "log_min_duration_statement=1000", "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0"]
     volumes:
       # PostgreSQL 18 images keep the data in a versioned sub-folder of /var/lib/postgresql.
       - db-data:/var/lib/postgresql
+      # Run once by the image on an empty volume: creates cdls_app (see the file for an existing install).
+      - ./db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cdls -d cdls"]
       interval: 5s
@@ -61,7 +67,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      DATABASE_URL: postgresql://cdls:${POSTGRES_PASSWORD}@db:5432/cdls?schema=public
+      # cdls_app: owner of the database (migrations run as it), not a superuser. The superuser cdls is for the
+      # image, the backups and deploy/restore.md only.
+      DATABASE_URL: postgresql://cdls_app:${APP_DB_PASSWORD}@db:5432/cdls?schema=public
       CORS_ORIGIN: ${PUBLIC_WEB_URL:?set PUBLIC_WEB_URL in deploy/.env}
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?run deploy/scripts/generate-env first}
@@ -77,7 +85,8 @@ services:
       TEMP_PASSWORD_TTL_DAYS: ${TEMP_PASSWORD_TTL_DAYS:-14}
       CONTACT_RETENTION_DAYS: ${CONTACT_RETENTION_DAYS:-365}
       PASSWORD_RESET_TTL_MINUTES: ${PASSWORD_RESET_TTL_MINUTES:-60}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_CONNECT_TIMEOUT_MS: ${DB_CONNECT_TIMEOUT_MS:-5000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # One proxy (the web container) sits in front of the API; it forwards the real visitor address.
       TRUST_PROXY: ${TRUST_PROXY:-1}

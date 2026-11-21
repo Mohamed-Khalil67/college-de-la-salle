@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import type { ApiError, DbErrorCode, HttpErrorCode } from '@cdls/shared';
+import { isTransientConflict } from './errors.js';
 
 /** What the global exception filter sends, and whether it is a server fault to log. */
 export interface MappedError {
@@ -113,8 +114,11 @@ export function mapException(exception: unknown): MappedError {
   }
 
   const prisma = asPrisma(exception);
-  const known = prisma ? DB_MAPPING[prisma.code] : undefined;
-  if (prisma && known) {
+  // A deadlock or serialization failure raised inside a raw query (P2010) or by the driver itself is the same
+  // lost race as P2034: worth retrying, never a 500.
+  const transient = isTransientConflict(exception);
+  const known = transient ? DB_MAPPING['P2034'] : prisma ? DB_MAPPING[prisma.code] : undefined;
+  if (known && (prisma || transient)) {
     return {
       status: known.status,
       body: {
@@ -125,7 +129,7 @@ export function mapException(exception: unknown): MappedError {
       },
       headers: known.retryable ? { 'Retry-After': '1' } : {},
       serverFault: false,
-      logLine: `Prisma ${prisma.code}`,
+      logLine: prisma ? `Prisma ${prisma.code}${transient ? ' (transient)' : ''}` : `${errorName(exception)} (transient)`,
     };
   }
 

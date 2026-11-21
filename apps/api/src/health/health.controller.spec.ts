@@ -26,11 +26,25 @@ describe('HealthController', () => {
   });
 
   it('reads the last applied migration once at start and serves it from memory', async () => {
-    prisma.$queryRaw.mockResolvedValue([{ migration_name: '20261113000000_x' }]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ zone: 'UTC' }])
+      .mockResolvedValueOnce([{ migration_name: '20261113000000_x' }]);
     await moduleRef.get(HealthService).onApplicationBootstrap();
     expect(controller.live().migration).toBe('20261113000000_x');
     expect(controller.live().migration).toBe('20261113000000_x');
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses to start when the database session is not on UTC (stored instants would shift)', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ zone: 'Africa/Cairo' }]);
+    await expect(moduleRef.get(HealthService).onApplicationBootstrap()).rejects.toThrow(/Africa\/Cairo/);
+  });
+
+  it('checks the zone even when the migrations table cannot be read', async () => {
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ zone: 'Africa/Cairo' }])
+      .mockRejectedValueOnce(new Error('relation "_prisma_migrations" does not exist'));
+    await expect(moduleRef.get(HealthService).onApplicationBootstrap()).rejects.toThrow(/Africa\/Cairo/);
   });
 
   it('falls back to the newest migration folder when the database cannot be asked', async () => {

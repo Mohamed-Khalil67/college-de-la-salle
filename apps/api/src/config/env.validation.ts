@@ -39,6 +39,27 @@ export class Env {
   })
   DATABASE_URL: string;
 
+  /**
+   * Database connections this API process keeps at most. 10 suits a school of 600 (each request holds one only
+   * while it queries). At most 40: the server allows 60 (`max_connections` in deploy/compose.yaml), and the backup,
+   * `prisma migrate deploy` and an operator's psql need some of them.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(40)
+  DB_POOL_MAX = 10;
+
+  /**
+   * Milliseconds a query waits for a connection (all in use, or the database unreachable) before it fails with
+   * an error instead of hanging the request.
+   */
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(500)
+  @Max(60_000)
+  DB_CONNECT_TIMEOUT_MS = 5_000;
+
   /** Comma-separated origins. */
   @IsString()
   @IsNotEmpty()

@@ -67,6 +67,16 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
 | `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
 
+**Before a merge** (there is no CI: run these by hand, all must pass):
+
+1. `npm run build` and `SCHOOL=example npm run build` (both school packs)
+2. `npm run lint` (0 warnings) and `npm test`
+3. `PUBLIC_WEB_URL=http://localhost:4200 npm run test:e2e` (with `npm run db:dev` running)
+4. `npm audit` (0 vulnerabilities; fix with an `overrides` entry, never `npm audit fix --force`)
+5. `docker compose -f deploy/compose.yaml --env-file deploy/.env.example config -q` (the deploy file still parses; a
+   broken one stops the stack, the backups and every `restore.md` command)
+6. For UI changes, the Playwright + Axe specs (`npm run e2e -w @cdls/web`)
+
 ## The API
 
 `apps/api` serves `/api` (docs at http://localhost:3000/api/docs). Accounts are created by the admin (one
@@ -168,7 +178,10 @@ session. Public pages are prerendered; the spaces are client-rendered and lazy-l
 
 The whole stack (site, API, PostgreSQL 18, nightly backups, HTTPS from anywhere through a Cloudflare Tunnel or Caddy) runs
 with Docker Compose from `deploy/` (`SCHOOL` in `deploy/.env` picks the school pack, for the API and the web image alike). Step by step for a Windows laptop or a Linux VM: [docs/deployment.md](docs/deployment.md);
-backup and restore: [deploy/restore.md](deploy/restore.md).
+backup and restore: [deploy/restore.md](deploy/restore.md). The API connects as `cdls_app`, the database's owner but not
+a superuser (`APP_DB_PASSWORD`; an install from before needs a one-time step, « Database login of the API » in the
+deployment guide), with at most `DB_POOL_MAX` (10) connections, a `DB_CONNECT_TIMEOUT_MS` (5 s) wait, and every session in
+UTC.
 
 ## History of this repository
 

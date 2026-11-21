@@ -244,7 +244,7 @@ model SchoolYear {
   label      String    @unique @db.VarChar(20)
   startsOn   DateTime  @map("starts_on") @db.Date
   endsOn     DateTime  @map("ends_on") @db.Date
-  /// Exactly one year is current (enforced by the service).
+  /// At most one year is current (partial unique index `school_years_one_current_key`); the service keeps one.
   isCurrent  Boolean   @default(false) @map("is_current")
   /// Set by the rollover (or an admin) when the year is over: the year is then read-only (no grades, events,
   /// attendance or timetable edits). An archived year is never the current one (CHECK in the migration SQL).
@@ -256,6 +256,7 @@ model SchoolYear {
   enrollments  Enrollment[]
 
   @@index([isCurrent])
+  @@unique([isCurrent], where: raw("is_current"), map: "school_years_one_current_key")
   @@map("school_years")
 }
 
