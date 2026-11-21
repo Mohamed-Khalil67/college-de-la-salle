@@ -13,6 +13,7 @@ function New-Secret([int]$length) {
 }
 $text = Get-Content (Join-Path $dir '.env.example') -Raw -Encoding UTF8
 $text = $text -replace '(?m)^POSTGRES_PASSWORD=.*$', "POSTGRES_PASSWORD=$(New-Secret 40)"
+$text = $text -replace '(?m)^APP_DB_PASSWORD=.*$', "APP_DB_PASSWORD=$(New-Secret 40)"
 $text = $text -replace '(?m)^JWT_ACCESS_SECRET=.*$', "JWT_ACCESS_SECRET=$(New-Secret 64)"
 $text = $text -replace '(?m)^JWT_REFRESH_SECRET=.*$', "JWT_REFRESH_SECRET=$(New-Secret 64)"
 [System.IO.File]::WriteAllText($target, $text, (New-Object System.Text.UTF8Encoding($false)))

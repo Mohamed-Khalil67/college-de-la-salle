@@ -54,8 +54,11 @@ COPY --from=build /app/apps/api/prisma.config.ts apps/api/prisma.config.ts
 # prisma/seed.ts (optional demo data, run with tsx) imports the TypeScript sources and the generated client.
 COPY --from=build /app/apps/api/src apps/api/src
 COPY --from=build /app/apps/api/tsconfig.json apps/api/tsconfig.json
-COPY apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh && chown -R node:node /app
+# Everything under /app stays owned by root and read-only for the `node` user that runs it: no recursive chown
+# (that rewrote all of node_modules into a second ~500 MB layer), and a compromised process cannot change the code.
+# The API writes no file in production (the dev-only `log` mail transport is refused there); Prisma and npm write
+# their caches under /home/node and /tmp, which `node` owns.
+COPY --chmod=0755 apps/api/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 USER node
 WORKDIR /app/apps/api
 EXPOSE 3000
