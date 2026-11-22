@@ -77,7 +77,6 @@
   /* ---------- Type ---------- */
   --font-display: "Cormorant Garamond", "EB Garamond", Garamond, Georgia, serif;
   --font-sans: "Inter", "Inter Fallback", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
-  --font-arabic: "Cairo", "Segoe UI", Tahoma, sans-serif;
 
   --text-display-xl: clamp(2.75rem, 1.6rem + 3.2vw, 4.5rem); /* 44 → 72 */
   --text-display-xl--line-height: 1.06;

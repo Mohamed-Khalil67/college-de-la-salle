@@ -73,10 +73,6 @@ a:hover {
 .on-inverse a {
   color: var(--color-on-inverse);
 }
-[lang="ar"],
-:lang(ar) {
-  font-family: var(--font-arabic);
-}
 [hidden] {
   display: none !important;
 }
@@ -947,13 +943,6 @@ textarea.field__control {
 }
 .site-header__utility a:hover {
   text-decoration: underline;
-}
-.site-header__lang {
-  margin-inline-start: auto;
-  color: var(--color-accent) !important;
-  font-family: var(--font-arabic);
-  font-weight: 600;
-  font-size: 0.8125rem;
 }
 .site-header__main {
   background: var(--color-page);
