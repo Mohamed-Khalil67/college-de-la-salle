@@ -34,7 +34,7 @@ Every rule is enforced by the API, not only the screens: 138 routes × 5 roles w
 | Id | Workflow | How it works |
 |---|---|---|
 | WF-P01 | Browse the site | Six prerendered pages: home, « Histoire », « Bac nationale », « Bac français », « Contact », « Accessibilité ». The text and photos come from the pack. Phones get small WebP copies of the photos; the hero photo loads first. Canonical links are absolute (pack `siteUrl` or `PUBLIC_WEB_URL`); `robots.txt` keeps crawlers out of the spaces and names a `sitemap.xml` of the six pages. |
-| WF-P02 | « Vous êtes… » | The home page sends a student, a teacher or a family to the right place. |
+| WF-P02 | « Vous êtes… » | Three cards on the home page: « Futur élève ou famille » goes to « Contact », « Élève du collège » and « Enseignant » go to the sign-in page. |
 | WF-P03 | Write to the secretariat | Contact form (name, e-mail, subject, message). The send button stays disabled until the page is ready, so a message cannot be lost by an early click. 5 messages a minute per address. The admin reads it in « Messages » (WF-AD09). |
 | WF-P04 | Accessibility statement | The RGAA statement (« non conforme » until an independent audit), what is tested, how to report a problem. |
 | WF-P05 | Keyboard and screen readers | Skip link, phone menu closed with Escape, one `h1` per page, Axe-clean at 390 and 1440 px, WCAG AA contrast. |
@@ -45,7 +45,7 @@ Every rule is enforced by the API, not only the screens: 138 routes × 5 roles w
 |---|---|---|
 | WF-A01 | Sign in | `/connexion`: school e-mail (`prenom.nom@<domain>`) and password. Each role lands on its own « Accueil ». Wrong credentials: « Identifiant ou mot de passe incorrect ». 5 tries a minute per account and address. |
 | WF-A02 | First sign-in | An account created or imported by the admin has a temporary password (valid 14 days). At first sign-in every page except « Premier accès » is closed: the person chooses a password; a student also confirms section and class. An expired temporary password is refused: « demandez-en un nouveau au secrétariat ». |
-| WF-A03 | Stay signed in | The access token lives in memory (15 min); a refresh cookie (httpOnly, 7 days) restores the session after a reload. A busy minute (429) never signs anyone out: the app retries and says « serveur occupé » with « Réessayer ». |
+| WF-A03 | Stay signed in | The access token lives in memory (15 min); a refresh cookie (httpOnly, 7 days) restores the session after a reload. A busy minute (429) never signs anyone out: the app retries (up to three times) and then says « Le serveur est très sollicité et n’a pas pu rouvrir votre session… » with « Réessayer ». |
 | WF-A04 | Sign out | Account menu → « Se déconnecter »: the session ends on the server; opening a space then goes to `/connexion?suite=…` and back after sign-in. |
 | WF-A05 | Change password | Account menu → « Changer mon mot de passe ». Every other session of the account ends at once. |
 | WF-A06 | Forgotten password | `/connexion/oubli`: always the same answer whatever the identifier (no account fishing). If the account exists, an e-mail with a link valid 60 minutes, single use, is sent through a durable outbox (retried if the mail server is down). `/connexion/reinitialiser?token=…` sets the new password and ends every session. |
@@ -121,11 +121,11 @@ Every rule is enforced by the API, not only the screens: 138 routes × 5 roles w
 
 | Id | What | How it works |
 |---|---|---|
-| WF-X01 | Permissions | Global sign-in check, role check, and ownership through one access service (a teacher only where they teach; a student only their own records and the audience of each event). |
+| WF-X01 | Permissions | Global sign-in check, role check, and ownership through one access service (a teacher only where they teach; a student only their own records and the audience of each event). Examples: a student gets 403 on the activity types; a student reads their own groups with `GET /groups/mine`, a teacher the groups of a class with `GET /groups?classId=`. |
 | WF-X02 | Rate limits | Signed-in traffic counts per account, not per address, because the whole school shares one public address; sign-in, password, forgotten password, contact and import have their own limits. |
 | WF-X03 | Errors | One shape everywhere, `{ statusCode, message, code?, retryable? }`, in French; a database race answers a retryable 409, never a 500 with details. |
 | WF-X04 | Audit log | Sensitive changes are recorded in the same transaction (accounts, imports, permissions, section changes, grade changes, exams by planners, reminders, rollover). |
-| WF-X05 | Logs and health | JSON logs with a request id and the school, never e-mails, tokens or passwords; `/api/health` gives the version and the last migration; `/api/health/db` only inside the stack. |
+| WF-X05 | Logs and health | JSON logs with a request id and the school, never e-mails, tokens or passwords; `/api/health` gives the version and the last migration; `/api/health/db` answers 404 to any request that came through the web proxy (`X-Forwarded-For`, `X-Real-IP` or `Forwarded` header), so only callers inside the stack reach it. |
 | WF-X06 | Time | « Today » is the school's day in its time zone; the database session is UTC. |
 
 ## 10. Operations

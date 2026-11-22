@@ -1,5 +1,6 @@
 import type { CreatedUserResponse, SessionResponse } from '@cdls/shared';
 import { PasswordResetMailService } from '../src/auth/password-reset-mail.service.js';
+import { ConfigService } from '@nestjs/config';
 import { MailService } from '../src/mail/mail.service.js';
 import { ADMIN, bearer, createTestApp, type TestApp } from './helpers.js';
 
@@ -72,7 +73,9 @@ describe('Password reset (e2e)', () => {
     const token = await requestLink(account.email, ` ${account.email.toUpperCase()} `);
     const mail = t.mails.filter((m) => m.to === account.email).at(-1)!;
     expect(mail.subject).toBe('Réinitialisation de votre mot de passe');
-    expect(mail.text).toContain('http://localhost:4200/connexion/reinitialiser?token=');
+    // The link is built on PUBLIC_WEB_URL: read it from the app, so the test runs on any port.
+    const site = t.app.get(ConfigService).get<string>('PUBLIC_WEB_URL');
+    expect(mail.text).toContain(`${site}/connexion/reinitialiser?token=`);
     // Only the HMAC is stored, never the token itself.
     const stored = await t.prisma.passwordResetToken.findMany({ where: { userId: account.id } });
     expect(stored).toHaveLength(1);
