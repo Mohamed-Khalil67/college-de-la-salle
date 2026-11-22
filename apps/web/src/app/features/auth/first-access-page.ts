@@ -1,5 +1,4 @@
 import { Component, ElementRef, Injector, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
-import { NgOptimizedImage } from '@angular/common';
 import { Router } from '@angular/router';
 import { SECTION_LABELS } from '../../core/school/school-profile';
 import { AuthStore, HOME_BY_ROLE } from '../../core/auth/auth-store';
@@ -14,13 +13,12 @@ import { PasswordForm } from '../../shared/components/password-form';
  */
 @Component({
   selector: 'app-first-access-page',
-  imports: [NgOptimizedImage, Button, PasswordForm, SkipLink, Wordmark],
+  imports: [Button, PasswordForm, SkipLink, Wordmark],
   template: `
     <a cdlsSkipLink>Aller au contenu</a>
     <div class="auth">
-      <aside class="auth__visual on-inverse" aria-label="Le collège">
-        <img [ngSrc]="image.src" [width]="image.width" [height]="image.height" alt="" priority />
-        <cdls-wordmark tone="dark" />
+      <aside class="auth__visual on-inverse" aria-label="Le collège" [style.background-image]="backdrop">
+                <cdls-wordmark tone="dark" />
         @if (motto; as m) {
           <blockquote class="stack stack--sm">
             <p class="t-quote">{{ m.text }}</p>
@@ -91,7 +89,8 @@ import { PasswordForm } from '../../shared/components/password-form';
   `,
 })
 export class FirstAccessPage {
-  protected readonly image = SITE.authImage;
+  /** Decorative, full-height panel: the photo is its background (an <img> cropped by CSS is flagged by Angular). */
+  protected readonly backdrop = `url("${SITE.authImage.src}")`;
   protected readonly motto = SITE.motto;
   readonly #auth = inject(AuthStore);
   readonly #router = inject(Router);

@@ -1,7 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { email, form, FormField, required, submit } from '@angular/forms/signals';
 import { Router, RouterLink } from '@angular/router';
-import { NgOptimizedImage } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { SessionUser } from '@cdls/shared';
 import { AuthStore, HOME_BY_ROLE, landingFor } from '../../core/auth/auth-store';
@@ -19,13 +18,12 @@ import { shownError } from '../../shared/utils/forms';
  */
 @Component({
   selector: 'app-login-page',
-  imports: [FormField, RouterLink, NgOptimizedImage, Alert, Button, Field, FieldControl, SkipLink, Wordmark],
+  imports: [FormField, RouterLink, Alert, Button, Field, FieldControl, SkipLink, Wordmark],
   template: `
     <a cdlsSkipLink>{{ t.skip }}</a>
     <div class="auth">
-      <aside class="auth__visual on-inverse" [attr.aria-label]="t.college">
-        <img [ngSrc]="image.src" [width]="image.width" [height]="image.height" alt="" priority />
-        <cdls-wordmark tone="dark" [link]="home" [subtitle]="place" />
+      <aside class="auth__visual on-inverse" [attr.aria-label]="t.college" [style.background-image]="backdrop">
+                <cdls-wordmark tone="dark" [link]="home" [subtitle]="place" />
         @if (motto; as m) {
           <blockquote class="stack stack--sm">
             <p class="t-quote" [attr.lang]="m.lang">{{ m.text }}</p>
@@ -82,7 +80,8 @@ import { shownError } from '../../shared/utils/forms';
   `,
 })
 export class LoginPage {
-  protected readonly image = SITE.authImage;
+  /** Decorative, full-height panel: the photo is its background (an <img> cropped by CSS is flagged by Angular). */
+  protected readonly backdrop = `url("${SITE.authImage.src}")`;
   protected readonly motto = SITE.motto;
   /** Where to go after signing in (?suite=/eleve/notes), when it belongs to the user's area. */
   readonly suite = input<string>();
