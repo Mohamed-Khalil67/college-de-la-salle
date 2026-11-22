@@ -32,7 +32,7 @@ RUN npm run build -w @cdls/shared && npm run build -w @cdls/web
 # contract, the stylesheet swap); allow exactly those by hash instead of 'unsafe-inline' for scripts.
 RUN node apps/web/nginx/csp-hashes.mjs apps/web/dist/college-website/browser /tmp/csp.conf
 
-FROM nginxinc/nginx-unprivileged:1.30.6-alpine@sha256:f5116ed4606f3eb015dd4a8e28cb9b351476dc0ad4bc6e9f93b19cec130cdf03 AS runtime
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e AS runtime
 COPY apps/web/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY apps/web/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /tmp/csp.conf /etc/nginx/snippets/csp.conf
