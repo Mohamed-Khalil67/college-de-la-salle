@@ -1,12 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
-import { DEFAULT_LANG, ENABLED_LANGS, LANG_META } from '../src/app/i18n/lang';
+import { DEFAULT_LANG, LANG_META, LANGS } from '../src/app/i18n/lang';
 import { pageUrl, PRERENDERED_PAGES } from '../src/app/i18n/pages';
 import { PROFILE } from './school';
 
 /**
  * Smoke test of any school pack (`SCHOOL=<id> npm run build`, then `npm run e2e:smoke -w @cdls/web`): every prerendered
- * public page, in every language the profile enables, opens in the right language and direction, has one h1, shows
+ * public page opens in French, has one h1, shows
  * the school's own name, and passes Axe at 390 and 1440 px. It needs no API or database (static server).
  */
 const VIEWPORTS = [
@@ -14,7 +14,7 @@ const VIEWPORTS = [
   { width: 1440, height: 900 },
 ] as const;
 
-for (const lang of ENABLED_LANGS) {
+for (const lang of LANGS) {
   for (const page of PRERENDERED_PAGES) {
     test(`${lang} ${page}: language, one h1, the school's name, Axe at 390 and 1440 px`, async ({ page: tab }) => {
       await tab.goto(pageUrl(lang, page));

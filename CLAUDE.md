@@ -21,7 +21,7 @@ Put the skill line at the top of every brief you give an agent. The logo and cre
 
 The platform is not multi-tenant: each school gets its own deployment and database. Everything that makes a school
 itself is a **school pack**, `schools/<id>/` (`docs/new-school.md`): `profile.json` (the `SchoolProfile` type and
-validator in `packages/shared/src/school-profile.ts`), `site/` (public text per language, photos, `SITE` config) and
+validator in `packages/shared/src/school-profile.ts`), `site/` (public text in French, photos, `SITE` config) and
 `public/` (crest, icons, images). `SCHOOL` picks it: the API reads it at start (`env.validation.ts`, unknown pack refuses
 to boot; `activeSchool()` in `apps/api/src/school/`), the web build wires it in with `apps/web/scripts/select-school.mjs`
 (generated, gitignored files in `src/app/school/active/`, `src/app/core/school/profile.generated.ts`, `src/generated/`),
@@ -73,11 +73,18 @@ the Docker web image takes it as a build arg. Default `cdls-daher`; `schools/exa
   `/crest.svg`), `example` is a fictional school. Time zone, names in mails, PDF and calendar files, and section names come
   from the profile; section codes are still the two fixed ones. See `docs/new-school.md`.
 
+## Status (2026-11-22)
+
+- **French only (branch `feat/french-only`, not merged):** the school decided the platform is French only. The public
+  site has no `/en` or `/ar` routes, no language switcher and no hreflang; the packs keep only `fr.ts` (`site/*.en.ts`
+  and `*.ar.ts` are gone) and `profile.languages` is `["fr"]`; the web's Cairo font is removed. `docs/i18n.md` says how
+  the site is built. The profile keeps its per-language name, address and section-label fields for the schema.
+
 ## Status (2026-11-13)
 
 Everything below is merged on `main`. The 7 open Dependabot PRs on GitHub (#1–#7) predate the rebuild and are obsolete: workflow and Firebase bumps target files that no longer exist, TypeScript 7 is outside Angular 22's `>=6.0 <6.1` peer range, and `@types/node` stays on ^22 to match the Node 22 runtime.
 
-- **Done:** public site in fr/en/ar with accessibility statement; login, first sign-in password change, forgotten
+- **Done:** public site (French only since 2026-11-22) with accessibility statement; login, first sign-in password change, forgotten
   password by e-mail; student, teacher and admin spaces; timetable with hard/soft conflicts and suggestions; groups and
   « Assigner à »; grades, attendance, report cards (PDF); announcements and contact messages with clean-up; roster
   import with numbered homonym e-mails; section-change approvals; next-year rollover; personal calendar feed and
@@ -85,7 +92,7 @@ Everything below is merged on `main`. The 7 open Dependabot PRs on GitHub (#1–
 - **Checks on main (2026-11-13, merged redesign):** 153 shared, 331 API and 341 web unit tests; 381 of 385 API e2e (3 date-dependent: `timetable` x2, `calendar-feed` x1, until 2027-01-02; plus `password-reset`, which needs `PUBLIC_WEB_URL=http://localhost:4200`); Playwright 148 passed, 105 phone variants skipped, 3 flakes that passed alone (English contact form hydration race, roster import, visitor message; fixed on `fix/contact-form-hydration`: the prerendered send button is disabled until hydration, and the roster flake was the 10 a minute import throttle, now `IMPORT_THROTTLE_LIMIT`). `npm audit --omit=dev`: 0 vulnerabilities.
 - **No CI yet:** nothing runs the checks on push; run them by hand before every merge.
 - **Open:** the real login e-mail domain (`SCHOOL_EMAIL_DOMAIN`), SMTP details, a Cloudflare tunnel token or domain for
-  going live, the school's review of the machine-drafted English and Arabic text, legacy weekly events not converted to
+  going live, legacy weekly events not converted to
   timetable slots, school-scale testing (600 students), an independent RGAA audit.
 - Diagrams (system, web layers, database groups, school year): `docs/architecture-map.html`; where things live: `docs/architecture.md`.
 - **One page per role (built):** student `/eleve`, teacher `/enseignant`, planner `/admin/planification` (with « Professeur absent » and « Ajouter un examen », also for admin-only planners), admin `/admin` (« Préparer les bulletins », « Relancer »), « Noter » quick grading, the Planificateur permission and the nav clean-up (`docs/workflow-redesign.md`). The teacher page reads `GET /teacher/summary` (one request; « Appel fait », repeated absences, Cairo announcement dates). The contact form is disabled until hydrated. `apps/web/e2e/design-conformance.spec.ts` checks the built pages against the agreed design. Open: « Générer les bulletins » from the preparation page, a visible « Abs » control in « Noter ».

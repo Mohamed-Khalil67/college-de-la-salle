@@ -58,10 +58,10 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 
 | Command | What it does |
 | --- | --- |
-| `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 6 public pages are prerendered in French, English and Arabic (18 routes) into `apps/web/dist/college-website/browser` |
+| `npm run build` | Builds shared, then the API (`apps/api/dist`), then the site; the 6 public pages are prerendered in French (6 routes) into `apps/web/dist/college-website/browser` |
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
-| `npm run e2e:public -w @cdls/web` | Public site only, no database: Playwright + Axe at 390 and 1440 px on every public page in French, English and Arabic, language switcher, hreflang, keyboard. Run `npm run build` first; it serves the build on :4610 (`E2E_PUBLIC_PORT`) |
+| `npm run e2e:public -w @cdls/web` | Public site only, no database: Playwright + Axe at 390 and 1440 px on every public page in French, keyboard. Run `npm run build` first; it serves the build on :4610 (`E2E_PUBLIC_PORT`) |
 | `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe at 390 and 1440 px on every screen of every space) against the running stack (`E2E_BASE_URL` for another port); needs the seeded demo accounts, a high `THROTTLE_LIMIT` (say 100000) and `LOGIN_THROTTLE_LIMIT=1000` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default)  ; the run sends 4 contact messages, so wait a minute between runs or raise `CONTACT_THROTTLE_LIMIT`; a repeated run of the roster-import tests also needs `IMPORT_THROTTLE_LIMIT` (10 a minute by default) raised |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
@@ -137,13 +137,12 @@ and subjects they are assigned; admins manage everything. The request and respon
 
 ## Where the content lives
 
-**The public site is in French (source), English and Arabic**: see [docs/i18n.md](docs/i18n.md) for how to edit
-a translation (the English and Arabic text is machine-drafted and awaits the school's review). The accessibility
-statement (`/accessibilite`) and what we test are in [docs/accessibility.md](docs/accessibility.md).
+**The public site is in French only** (the school's decision): see [docs/i18n.md](docs/i18n.md) for how the site is built.
+The accessibility statement (`/accessibilite`) and what we test are in [docs/accessibility.md](docs/accessibility.md).
 
 The school's own content is its pack, `schools/<id>/` (docs/new-school.md): `profile.json` (names, contacts, time zone,
 sections, languages, brand), `site/` (`school-info.ts` milestones, directors; `tracks.ts` the two track pages; `photos.ts`
-the photos with file, size, alt, credit and source; the messages and content per language) and `public/` (crest, icons,
+the photos with file, size, alt, credit and source; the messages and content) and `public/` (crest, icons,
 images). `apps/web/scripts/select-school.mjs` wires the pack named by `SCHOOL` into the build. Shared by every school:
 **the subject catalogue** (`packages/shared/src/subjects.ts`, shared with the API): one entry per
 subject plus its illustration in `apps/web/public/images/matieres/` (`node scripts/subject-images.mjs`,
@@ -161,7 +160,7 @@ apps/web/src/app/
   shared/        ui/ (UI kit cdls-*), components/, utils/ (pure helpers), data/: used by several features
   layout/        Public layout, space layout (app bar, bottom nav)
   core/          ApiClient (every endpoint), AuthStore, interceptor, role guards
-  i18n/, school/ Languages of the public site; the school pack's content is wired in at build time (school/active/, generated)
+  i18n/, school/ The public site (French only) and its words; the school pack's content is wired in at build time (school/active/, generated)
 apps/web/src/styles.css   Design tokens as a Tailwind 4 theme + component classes from the prototypes
 apps/api/src/             One NestJS module per area (auth, users, classes, events, grades, attendance…)
 apps/api/prisma/          Schema, migrations, seed

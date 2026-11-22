@@ -413,23 +413,15 @@ for (const role of ROLES) {
       expect(errors).toEqual([]);
     });
 
-    test(`${id}10 right-to-left smoke: the page mirrors (no sideways scroll, columns reversed) and stays Axe-clean at 390 and 1440 px`, async ({ page }) => {
+    test(`${id}10 layout at 390 and 1440 px: no sideways scroll, every block visible, Axe-clean`, async ({ page }) => {
       await openHome(page, role);
       await settled(page);
-      await page.evaluate(() => {
-        document.documentElement.dir = 'rtl';
-        document.documentElement.lang = 'ar';
-      });
       for (const size of [PHONE, DESKTOP]) {
         await page.setViewportSize(size);
         await page.waitForTimeout(200);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `no sideways scroll at ${size.width}`).toBe(true);
         for (const b of role.blocks) await expect(block(page, b.heading)).toBeVisible();
       }
-      // At 1440 px the first row of narrow blocks runs right to left.
-      const narrow = role.blocks.filter((b) => !b.wide);
-      const [a, b] = await Promise.all([block(page, narrow[0]!.heading).boundingBox(), block(page, narrow[1]!.heading).boundingBox()]);
-      if (Math.abs(a!.y - b!.y) < 2) expect(a!.x, `${narrow[0]!.heading} is right of ${narrow[1]!.heading}`).toBeGreaterThan(b!.x);
       // Entry buttons stay inside their block.
       for (const blk of role.blocks) {
         const [box, entry] = await Promise.all([block(page, blk.heading).boundingBox(), block(page, blk.heading).getByRole('link', { name: blk.link, exact: true }).boundingBox()]);

@@ -1,7 +1,7 @@
 # Accessibility
 
-The public statement is the page **Déclaration d'accessibilité** (`/accessibilite`, `/en/accessibility`,
-`/ar/accessibility`, linked in every footer). Its text is in the `accessibility` section of
+The public statement is the page **Déclaration d'accessibilité** (`/accessibilite`,
+linked in every footer). Its text is in the `accessibility` section of
 `schools/<id>/site/messages.<lang>.ts` (each school writes its own), in the shape of an RGAA statement: status, what is tested, known
 limitations, test environment, contact, remedies.
 
@@ -17,10 +17,10 @@ result (share of criteria met, sample, date, auditor).
 
 | Check | Where | Run with |
 |---|---|---|
-| Axe (WCAG 2.0–2.2 A/AA + best practices), 390 and 1440 px, every public page in fr/en/ar, plus the login page with its errors | `apps/web/e2e/public-site.spec.ts` | `npm run build`, then `npm run e2e:public -w @cdls/web` (no database; port 4610) |
+| Axe (WCAG 2.0–2.2 A/AA + best practices), 390 and 1440 px, every public page (French), plus the login page with its errors | `apps/web/e2e/public-site.spec.ts` | `npm run build`, then `npm run e2e:public -w @cdls/web` (no database; port 4610) |
 | Axe on every screen of the three spaces | `apps/web/e2e/all-screens.spec.ts` and the feature specs | `npm run e2e -w @cdls/web` (needs the stack) |
-| Keyboard: skip link, phone menu, Escape (Arabic) | `public-site.spec.ts` | same as the first row |
-| Language and direction of every page, hreflang in the prerendered HTML | `public-site.spec.ts` | same as the first row |
+| Keyboard: skip link, phone menu, Escape (French) | `public-site.spec.ts` | same as the first row |
+| Language and direction of every page, no hreflang alternates in the prerendered HTML | `public-site.spec.ts` | same as the first row |
 | Contrast | tokens in `styles.css` (gold is never text on light surfaces); Axe's `color-contrast` rule | with Axe |
 
 **Not tested yet (the statement says so):** screen readers (NVDA, VoiceOver, TalkBack) with people who use them
