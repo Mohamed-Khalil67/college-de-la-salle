@@ -1,14 +1,12 @@
 import { RenderMode, type ServerRoute } from '@angular/ssr';
-import { ENABLED_LANGS } from './i18n/lang';
+import { DEFAULT_LANG } from './i18n/lang';
 import { PRERENDERED_PAGES, routePath } from './i18n/pages';
 
 /**
- * The public pages are static: PRERENDERED at build time in each language (complete HTML for search engines
- * and an instant first paint, then hydrated). Login and the spaces depend on the signed-in user: client-rendered.
+ * The public pages are static: PRERENDERED at build time (complete HTML for search engines and an instant first
+ * paint, then hydrated). Login and the spaces depend on the signed-in user: client-rendered.
  */
 export const serverRoutes: ServerRoute[] = [
-  ...ENABLED_LANGS.flatMap((lang) =>
-    PRERENDERED_PAGES.map((page): ServerRoute => ({ path: routePath(lang, page), renderMode: RenderMode.Prerender })),
-  ),
+  ...PRERENDERED_PAGES.map((page): ServerRoute => ({ path: routePath(DEFAULT_LANG, page), renderMode: RenderMode.Prerender })),
   { path: '**', renderMode: RenderMode.Client },
 ];

@@ -7,18 +7,17 @@ import { filter } from 'rxjs';
 import { PROFILE } from '../core/school/school-profile';
 import { DEFAULT_LANG, LANG_META } from './lang';
 import { readPublicRoute } from './locale';
-import { alternates, pageUrl } from './pages';
+import { canonicalPageUrl } from './pages';
 
 /**
- * The site's address, for the absolute URLs of the hreflang and canonical links (search engines ignore relative
- * ones): the school profile's `siteUrl`, or the build's `PUBLIC_WEB_URL` (scripts/site-origin.mjs, docs/i18n.md).
+ * The site's address, for the absolute canonical link (search engines ignore relative ones): the school profile's
+ * `siteUrl`, or the build's `PUBLIC_WEB_URL` (scripts/site-origin.mjs, docs/i18n.md).
  */
 const ORIGIN = PROFILE.siteUrl.replace(/\/+$/, '');
 
 /**
- * Keeps <html lang dir> and the language links of <head> in step with the page, on the server (so the
- * prerendered HTML is right for each language) and after each client navigation (leaving /ar for the
- * French spaces turns the page back to ltr).
+ * Keeps <html lang dir>, the canonical link and the description of <head> in step with the page, on the server (so
+ * the prerendered HTML is complete) and after each client navigation (the spaces get no description or locale).
  */
 @Service()
 export class SiteHead {
@@ -54,11 +53,7 @@ export class SiteHead {
 
     this.#meta.updateTag({ name: 'description', content: route.description });
     this.#meta.updateTag({ property: 'og:locale', content: LANG_META[lang].ogLocale });
-    this.#link({ rel: 'canonical', href: ORIGIN + pageUrl(lang, route.page) });
-    // Only the prerendered pages have alternates worth indexing; the login page is client-rendered.
-    if (route.page === 'login') return;
-    for (const alt of alternates(route.page)) this.#link({ rel: 'alternate', hreflang: alt.lang, href: ORIGIN + alt.url });
-    this.#link({ rel: 'alternate', hreflang: 'x-default', href: ORIGIN + pageUrl(DEFAULT_LANG, route.page) });
+    this.#link({ rel: 'canonical', href: ORIGIN + canonicalPageUrl(route.page) });
   }
 
   #link(attributes: Readonly<Record<string, string>>): void {

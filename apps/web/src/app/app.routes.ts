@@ -1,33 +1,17 @@
 import type { Routes } from '@angular/router';
 import { anonymousGuard, firstAccessGuard, roleGuard, structureGuard } from './core/auth/auth.guards';
-import { ENABLED_LANGS } from './i18n/lang';
 import type { SiteLocale } from './i18n/locale';
 import { ADMIN_NAV, ELEVE_NAV, ENSEIGNANT_NAV } from './layout/space-navs';
 
 const spaceLayout = () => import('./layout/space-layout').then((m) => m.SpaceLayout);
 
-/** Each language's words come in their own chunk: a French visitor never downloads the Arabic text. */
+/** The French words come in their own chunk, loaded with the public and sign-in routes. */
 const fr = () => import('./i18n/fr').then((m): SiteLocale => m.FR);
-const en = () => import('./i18n/en').then((m): SiteLocale => m.EN);
-const ar = () => import('./i18n/ar').then((m): SiteLocale => m.AR);
-const publicSite = (locale: () => Promise<SiteLocale>) => () =>
-  Promise.all([import('./features/public/public.routes'), locale()]).then(([m, l]) => m.publicRoutes(l));
-const login = (locale: () => Promise<SiteLocale>) => () =>
-  Promise.all([import('./features/auth/login.routes'), locale()]).then(([m, l]) => m.loginRoutes(l));
-
-/** The routes of one extra language, when the school's profile publishes it (`languages`). */
-const extraLanguage = (lang: 'en' | 'ar', locale: () => Promise<SiteLocale>): Routes =>
-  ENABLED_LANGS.includes(lang)
-    ? [
-        { path: `${lang}/login`, canMatch: [anonymousGuard], loadChildren: login(locale) },
-        { path: lang, loadChildren: publicSite(locale) },
-      ]
-    : [];
+const publicSite = () =>
+  Promise.all([import('./features/public/public.routes'), fr()]).then(([m, l]) => m.publicRoutes(l));
+const login = () => Promise.all([import('./features/auth/login.routes'), fr()]).then(([m, l]) => m.loginRoutes(l));
 
 export const routes: Routes = [
-  // Public site in English and Arabic (/en/…, /ar/…); French is the last route before the fallback.
-  ...extraLanguage('en', en),
-  ...extraLanguage('ar', ar),
   {
     path: 'connexion/oubli',
     title: 'Mot de passe oublié',
@@ -67,10 +51,10 @@ export const routes: Routes = [
     loadComponent: spaceLayout,
     loadChildren: () => import('./features/admin/admin.routes').then((m) => m.ADMIN_ROUTES),
   },
-  { path: 'connexion', canMatch: [anonymousGuard], loadChildren: login(fr) },
+  { path: 'connexion', canMatch: [anonymousGuard], loadChildren: login },
   // Addresses of the previous site.
   { path: 'espace-eleve', redirectTo: 'eleve' },
   { path: 'espace-enseignant', redirectTo: 'enseignant' },
-  { path: '', loadChildren: publicSite(fr) },
+  { path: '', loadChildren: publicSite },
   { path: '**', redirectTo: '' },
 ];

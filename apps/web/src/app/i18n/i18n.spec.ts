@@ -2,25 +2,17 @@ import type { ActivatedRouteSnapshot } from '@angular/router';
 import { MATIERES } from '@cdls/shared';
 import { describe, expect, it } from 'vitest';
 import { PROFILE } from '../core/school/school-profile';
-import { AR } from './ar';
-import { EN } from './en';
 import { FR } from './fr';
 import { DIRECTORS } from '../school/active/archive';
 import { directorPeriod, MATIERE_IDS, type SchoolContent } from '../school/school-content';
-import { isLang, LANG_META, LANGS } from './lang';
+import { DEFAULT_LANG, isLang, LANG_META, LANGS } from './lang';
 import { publicRouteData, readPublicRoute } from './locale';
-import type { SiteMessages } from './messages';
-import { alternates, childPath, pageUrl, PRERENDERED_PAGES, PUBLIC_PAGES, routePath } from './pages';
+import { canonicalPageUrl, pageUrl, PRERENDERED_PAGES, PUBLIC_PAGES, routePath } from './pages';
 
 /*
- * The types already make every language give every key. These tests check what types cannot: that a translation
- * keeps the French facts (years, photos, links, headcounts) and that no text was left empty.
+ * The types already make every key of the interface present. These tests check what types cannot: the addresses of
+ * the pages, the route data, and that no text of the French site was left empty.
  */
-
-const TRANSLATIONS = [
-  { lang: 'en', content: EN.content, messages: EN.messages },
-  { lang: 'ar', content: AR.content, messages: AR.messages },
-] as const;
 
 /** Every string reachable in a value (functions are called with a sample argument). */
 function strings(value: unknown, path = ''): { path: string; text: string }[] {
@@ -31,44 +23,18 @@ function strings(value: unknown, path = ''): { path: string; text: string }[] {
   return [];
 }
 
-/** The facts of the content that are not words. */
-function facts(c: SchoolContent) {
-  return {
-    keyFigures: c.keyFigures.length,
-    milestones: c.milestones.map((m) => [m.year, m.photo]),
-    founderFacts: c.founder.facts.length,
-    freres: c.freres.map((b) => [b.id, b.paragraphs.length, b.items.length]),
-    links: c.links.map((l) => [l.url, l.registration ?? false]),
-    sections: Object.values(c.sections).map((s) => ({
-      slug: s.slug,
-      photo: s.photo,
-      facts: s.facts.length,
-      blocks: s.blocks.map((b) => [b.id, b.paragraphs.length, b.items.length]),
-      links: s.links.map((l) => [l.url, l.registration ?? false]),
-      counts: s.counts.map((c) => c.levels.map((l) => [l.level, l.students])),
-    })),
-    tracks: Object.values(c.tracks).map((t) => t.points.length),
-  };
-}
-
-function shape(m: SiteMessages) {
-  return {
-    audiences: m.home.audiences.map((a) => [a.id, a.page]),
-    features: m.home.features.length,
-    statement: m.accessibility.sections.map((s) => [s.id, s.paragraphs.length, s.items?.length ?? 0, s.paragraphs.map((p) => p.link?.page ?? p.link?.href?.split('?')[0] ?? null)]),
-    summary: m.accessibility.summary.length,
-  };
-}
-
-describe('languages and pages', () => {
-  it('knows its three languages, Arabic right to left', () => {
-    expect(LANGS).toEqual(['fr', 'en', 'ar']);
-    expect(LANGS.map((l) => LANG_META[l].dir)).toEqual(['ltr', 'ltr', 'rtl']);
-    expect(isLang('ar')).toBe(true);
-    expect(isLang('de')).toBe(false);
+describe('the French site and its pages', () => {
+  it('is French only', () => {
+    expect(LANGS).toEqual(['fr']);
+    expect(DEFAULT_LANG).toBe('fr');
+    expect(LANG_META.fr.dir).toBe('ltr');
+    expect(isLang('fr')).toBe(true);
+    expect(isLang('en')).toBe(false);
+    expect(isLang('ar')).toBe(false);
+    expect(PROFILE.languages).toEqual(['fr']);
   });
 
-  it('keeps the historic French addresses and prefixes the other languages', () => {
+  it('keeps the historic French addresses', () => {
     expect(PUBLIC_PAGES.map((p) => pageUrl('fr', p))).toEqual([
       '/',
       '/histoire',
@@ -78,27 +44,17 @@ describe('languages and pages', () => {
       '/accessibilite',
       '/connexion',
     ]);
-    for (const lang of ['en', 'ar'] as const) {
-      for (const page of PUBLIC_PAGES) {
-        expect(routePath(lang, page).startsWith(lang)).toBe(true);
-        expect(`${lang}/${childPath(lang, page)}`.replace(/\/$/, '')).toBe(routePath(lang, page));
-      }
-    }
+    for (const page of PUBLIC_PAGES) expect(canonicalPageUrl(page)).toBe(pageUrl('fr', page));
   });
 
-  it('gives each page a distinct address in each language', () => {
-    const all = LANGS.flatMap((l) => PUBLIC_PAGES.map((p) => pageUrl(l, p)));
+  it('gives each page a distinct address', () => {
+    const all = PUBLIC_PAGES.map((p) => routePath('fr', p));
     expect(new Set(all).size).toBe(all.length);
   });
 
-  it('prerenders every page but the login page, and lists every language as an alternate', () => {
+  it('prerenders every page but the login page', () => {
     expect(PRERENDERED_PAGES).not.toContain('login');
     expect(PRERENDERED_PAGES).toHaveLength(PUBLIC_PAGES.length - 1);
-    expect(alternates('history')).toEqual([
-      { lang: 'fr', url: '/histoire' },
-      { lang: 'en', url: '/en/history' },
-      { lang: 'ar', url: '/ar/history' },
-    ]);
   });
 });
 
@@ -107,59 +63,41 @@ describe('route data', () => {
     ({ data, firstChild }) as unknown as ActivatedRouteSnapshot;
 
   it('reads the deepest public route', () => {
-    const leaf = snapshot(publicRouteData({ lang: 'ar', page: 'contact', description: 'd' }));
-    expect(readPublicRoute(snapshot({}, snapshot({ lang: 'ar' }, leaf)))).toEqual({ lang: 'ar', page: 'contact', description: 'd' });
+    const leaf = snapshot(publicRouteData({ lang: 'fr', page: 'contact', description: 'd' }));
+    expect(readPublicRoute(snapshot({}, snapshot({ lang: 'fr' }, leaf)))).toEqual({ lang: 'fr', page: 'contact', description: 'd' });
   });
 
   it('ignores the spaces and malformed data', () => {
     expect(readPublicRoute(snapshot({ areaLabel: 'Espace élève' }))).toBeNull();
-    expect(readPublicRoute(snapshot({ lang: 'de', page: 'home', description: 'd' }))).toBeNull();
+    expect(readPublicRoute(snapshot({ lang: 'en', page: 'home', description: 'd' }))).toBeNull();
     expect(readPublicRoute(snapshot({ lang: 'fr', page: 'nowhere', description: 'd' }))).toBeNull();
   });
 });
 
-describe('translations', () => {
-  for (const t of TRANSLATIONS) {
-    it(`${t.lang}: keeps the French facts`, () => {
-      expect(facts(t.content)).toEqual(facts(FR.content));
-    });
-
-    it(`${t.lang}: keeps the shape of the interface (audiences, cards, statement)`, () => {
-      expect(shape(t.messages)).toEqual(shape(FR.messages));
-    });
-
-    it(`${t.lang}: leaves no text empty`, () => {
-      const empty = strings({ ...t.messages, pages: { ...t.messages.pages, home: { description: t.messages.pages.home.description } } })
-        .concat(strings(t.content))
-        .filter((s) => !s.text.trim() && !s.path.endsWith('countsNote'));
-      expect(empty).toEqual([]);
-    });
-  }
-
-  it('ar: writes the interface in Arabic script', () => {
-    const latinOnly = strings(AR.messages.layout).filter((s) => !/[؀-ۿ]/.test(s.text) && /[a-z]{4}/i.test(s.text));
-    expect(latinOnly).toEqual([]);
+describe('french texts', () => {
+  it('leaves no text empty', () => {
+    const messages = { ...FR.messages, pages: { ...FR.messages.pages, home: { description: FR.messages.pages.home.description } } };
+    const empty = strings(messages)
+      .concat(strings(FR.content))
+      .filter((s) => !s.text.trim() && !s.path.endsWith('countsNote'));
+    expect(empty).toEqual([]);
   });
 
-  it('the home page has no title of its own in any language (the site name is used)', () => {
-    expect([FR.messages, EN.messages, AR.messages].map((m) => m.pages.home.title)).toEqual(['', '', '']);
+  it('has no title of its own on the home page (the site name is used)', () => {
+    expect(FR.messages.pages.home.title).toBe('');
   });
 });
 
 describe('school content', () => {
-  it('translates every subject of the catalogue', () => {
+  it('has every subject of the catalogue', () => {
     expect([...MATIERE_IDS].sort()).toEqual(MATIERES.map((m) => m.id).sort());
-    for (const content of [FR.content, EN.content, AR.content]) {
-      expect(Object.keys(content.matieres).sort()).toEqual([...MATIERE_IDS].sort());
-    }
+    expect(Object.keys(FR.content.matieres as SchoolContent['matieres']).sort()).toEqual([...MATIERE_IDS].sort());
   });
 
-  it.skipIf(PROFILE.id !== 'cdls-daher')('writes the directors’ terms in each language', () => {
+  it.skipIf(PROFILE.id !== 'cdls-daher')('writes the directors’ terms', () => {
     const louis = DIRECTORS.find((d) => d.name === 'Louis-Antonin')!;
     const absi = DIRECTORS.find((d) => d.name === 'Georges Absi')!;
     expect(directorPeriod(louis, FR.content.directors)).toBe('1956 – 1961 et 1968 – 1969');
     expect(directorPeriod(absi, FR.content.directors)).toBe('2011 – aujourd’hui');
-    expect(directorPeriod(louis, EN.content.directors)).toBe('1956 – 1961 and 1968 – 1969');
-    expect(directorPeriod(absi, AR.content.directors)).toBe('2011 – حتى اليوم');
   });
 });

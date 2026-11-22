@@ -1,7 +1,7 @@
 import type { Routes } from '@angular/router';
 import { provideLocale, publicRouteData, type SiteLocale } from '../../i18n/locale';
 
-/** The login page in one language (/connexion, /en/login, /ar/login): client-rendered, the guard sits in app.routes.ts. */
+/** The login page in one language (/connexion): client-rendered, the guard sits in app.routes.ts. */
 export function loginRoutes(locale: SiteLocale): Routes {
   const { title, description } = locale.messages.pages.login;
   return [

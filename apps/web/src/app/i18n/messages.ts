@@ -2,8 +2,8 @@ import type { ContactSubjectId } from '../school/contact-mail';
 import type { PublicPageId } from './pages';
 
 /**
- * Every word of the public site's interface, in one language. French (messages.fr.ts) is the source;
- * messages.en.ts and messages.ar.ts are typed `SiteMessages`, so a missing or misspelt key does not compile.
+ * Every word of the public site's interface, in French (the site is French only, docs/i18n.md). Typed here, so a
+ * missing or misspelt key does not compile.
  * Sentences that embed a value are functions, so their parameters are typed too. The school's own content
  * (history, tracks, photos) lives in school/content.*.ts.
  */
@@ -42,7 +42,6 @@ export interface SiteMessages {
     readonly nav: Readonly<Record<'home' | 'history' | 'nationale' | 'bac' | 'contact', string>>;
     readonly signIn: string;
     readonly mySpace: string;
-    readonly languages: string;
     readonly footerAbout: string;
     readonly footerCollege: string;
     readonly footerSpaces: string;
@@ -180,8 +179,6 @@ export interface SiteMessages {
     readonly mottoMeaning: string;
     readonly title: string;
     readonly lead: string;
-    /** Shown on the English and Arabic pages: the spaces themselves are in French. */
-    readonly spacesLanguage: string | null;
     readonly identifier: string;
     readonly identifierHelp: string;
     readonly password: string;

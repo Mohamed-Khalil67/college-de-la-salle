@@ -3,7 +3,7 @@
 // Points the web build at one school pack (schools/<SCHOOL>/, docs/new-school.md). Run before every build, serve,
 // test and lint (the npm pre-scripts of apps/web do it). It writes, all gitignored:
 //   src/app/core/school/profile.generated.ts   the pack's profile.json, typed SchoolProfile (checked by tsc)
-//   src/app/school/active/{index,archive,fr,en,ar}.ts   one-line re-exports of the pack's site/ modules
+//   src/app/school/active/{index,archive,fr}.ts   one-line re-exports of the pack's site/ modules (the site is French only)
 //   src/generated/index.html                     the page shell (title, theme colour, icons from the profile)
 //   src/generated/brand.css                      the profile's colour overrides (empty for none)
 //   src/generated/public/                        a copy of the pack's public/ folder (crest, icons, photos), plus
@@ -31,7 +31,7 @@ if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) fail(`SCHOOL « ${id} » is not a pa
 const pack = join(schools, id);
 const profileFile = join(pack, 'profile.json');
 if (!existsSync(profileFile)) fail(`no ${relative(web, profileFile)}. Copy schools/example to start a new school.`);
-for (const file of ['index.ts', 'archive.ts', 'fr.ts', 'en.ts', 'ar.ts']) {
+for (const file of ['index.ts', 'archive.ts', 'fr.ts']) {
   if (!existsSync(join(pack, 'site', file))) fail(`schools/${id}/site/${file} is missing (see schools/example/site).`);
 }
 
@@ -70,9 +70,7 @@ const activeDir = join(web, 'src/app/school/active');
 const toPack = relative(activeDir, join(pack, 'site')).split('\\').join('/');
 write(join(activeDir, 'index.ts'), `${header}export { SITE } from '${toPack}/index';\n`);
 write(join(activeDir, 'archive.ts'), `${header}export { DIRECTORS, PHOTOS } from '${toPack}/archive';\n`);
-for (const lang of ['fr', 'en', 'ar']) {
-  write(join(activeDir, `${lang}.ts`), `${header}export { PACK } from '${toPack}/${lang}';\n`);
-}
+write(join(activeDir, 'fr.ts'), `${header}export { PACK } from '${toPack}/fr';\n`);
 
 const escape = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 const names = profile.names.fr;

@@ -6,8 +6,8 @@ import type { SchoolContent } from './school-content';
 
 /**
  * What a school pack (`schools/<id>/site/`, docs/new-school.md) gives the public site besides its words:
- * `index.ts` exports a `SITE`, `archive.ts` its photos and directors, and `fr.ts`, `en.ts`, `ar.ts` one
- * `SchoolPack` each. `scripts/select-school.mjs` points `school/active/` at the pack named by `SCHOOL`.
+ * `index.ts` exports a `SITE`, `archive.ts` its photos and directors, and `fr.ts` a
+ * `SchoolPack`. `scripts/select-school.mjs` points `school/active/` at the pack named by `SCHOOL`.
  * Pure types: no Angular.
  */
 
@@ -42,7 +42,7 @@ export interface CreditLink {
 }
 
 export interface SiteConfig {
-  /** The home page's whole browser title, per language (other pages are « Page — site title »). */
+  /** The home page's whole browser title (other pages are « Page — site title »). */
   readonly homeTitle: Readonly<Record<Lang, string>>;
   /** Departments whose first number is shown on the home page (`profile.contacts.departments` ids). */
   readonly homePhones: readonly ContactId[];

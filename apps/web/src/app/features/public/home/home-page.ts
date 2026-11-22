@@ -12,7 +12,7 @@ import { type Feature, FeatureCard } from './feature-card';
 import { Hero } from './hero';
 import { TrackCard } from './track-card';
 
-/** `/`, `/en`, `/ar`: the home page. */
+/** `/`: the home page. */
 @Component({
   selector: 'site-home-page',
   imports: [RouterLink, Icon, Hero, AudienceLinks, Timeline, TrackCard, FeatureCard, ContactForm],

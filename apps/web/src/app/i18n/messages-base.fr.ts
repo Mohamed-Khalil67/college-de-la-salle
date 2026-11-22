@@ -4,7 +4,7 @@ import type { BaseMessages } from './messages';
 /**
  * The interface in French that every school shares: the platform's own words (sign-in, contact form, page chrome).
  * What names the school (descriptions, hero, history, accessibility statement…) is the pack's `messages.fr.ts`;
- * `composeMessages` joins the two. French is the source of messages-base.en.ts and messages-base.ar.ts.
+ * `composeMessages` joins the two. The site is French only (docs/i18n.md).
  */
 export const BASE_FR: BaseMessages = {
   pageTitles: {
@@ -25,7 +25,6 @@ export const BASE_FR: BaseMessages = {
     nav: { home: 'Accueil', history: 'Histoire', contact: 'Contact' },
     signIn: 'Connexion',
     mySpace: 'Mon espace',
-    languages: 'Langue du site',
     footerCollege: 'Le collège',
     footerSpaces: 'Espaces',
     studentSpace: 'Espace élève',
@@ -154,7 +153,6 @@ export const BASE_FR: BaseMessages = {
     college: 'Le collège',
     title: 'Connexion à votre espace',
     lead: 'Élèves, enseignants et administration du collège.',
-    spacesLanguage: null,
     identifier: 'Identifiant',
     identifierHelp: 'L’adresse e-mail fournie par le collège.',
     password: 'Mot de passe',
