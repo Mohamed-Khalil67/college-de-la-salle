@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PROFILE } from '../core/school/school-profile';
-import { ENABLED_LANGS } from '../i18n/lang';
-import { PACK as AR } from './active/ar';
+import { DEFAULT_LANG } from '../i18n/lang';
 import { DIRECTORS, PHOTOS } from './active/archive';
-import { PACK as EN } from './active/en';
 import { PACK as FR } from './active/fr';
 import { SITE } from './active/index';
 import { CONTACTS, localizedPhoto } from './school-info';
@@ -13,14 +11,14 @@ import { CONTACTS, localizedPhoto } from './school-info';
  * in every language. A new school's pack fails here before it fails in the prerender.
  */
 
-const PACKS = { fr: FR, en: EN, ar: AR } as const;
+const PACKS = { [DEFAULT_LANG]: FR } as const;
 const photoIds = Object.keys(PHOTOS);
 const departmentIds = PROFILE.contacts.departments.map((d) => d.id);
 
 describe('the school pack of this build', () => {
   it('matches the profile it ships with', () => {
     expect(CONTACTS.map((c) => c.id)).toEqual(departmentIds);
-    expect(ENABLED_LANGS).toEqual(PROFILE.languages);
+    expect(PROFILE.languages).toEqual([DEFAULT_LANG]);
   });
 
   it('points the site configuration at photos, departments and years that exist', () => {
@@ -35,7 +33,7 @@ describe('the school pack of this build', () => {
   });
 
   it('keeps every photo of the pack in the milestones and sections, with credits', () => {
-    for (const content of [FR.content, EN.content, AR.content]) {
+    for (const content of [FR.content]) {
       const used = [...content.milestones.flatMap((m) => (m.photo ? [m.photo] : [])), ...Object.values(content.sections).map((s) => s.photo)];
       expect(used.filter((id) => !photoIds.includes(id))).toEqual([]);
     }

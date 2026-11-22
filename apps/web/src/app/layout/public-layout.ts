@@ -1,13 +1,12 @@
 import { Component, ElementRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthStore } from '../core/auth/auth-store';
-import { LOCALE, readPublicRoute } from '../i18n/locale';
-import { pageUrl, type PublicPageId } from '../i18n/pages';
+import { LOCALE } from '../i18n/locale';
+import { pageUrl } from '../i18n/pages';
 import { SCHOOL, SITE } from '../school';
 import { Button, Icon, SkipLink, Wordmark } from '../shared/ui';
-import { LanguageSwitcher } from './language-switcher';
 
 type NavPage = 'home' | 'history' | 'nationale' | 'bac' | 'contact';
 
@@ -20,13 +19,13 @@ interface NavItem {
 const NAV_PAGES: readonly NavPage[] = ['home', 'history', 'nationale', 'bac', 'contact'];
 
 /**
- * The public site's frame, in the route's language (LOCALE): navy utility strip with the language switcher,
+ * The public site's frame, in French (LOCALE): navy utility strip with the switchboard and the e-mail,
  * the main header with the college's wordmark and the navigation, and the footer. Prerendered; the sign-in
  * state is read in the browser after hydration.
  */
 @Component({
   selector: 'app-public-layout',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Button, SkipLink, LanguageSwitcher],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Wordmark, Icon, Button, SkipLink],
   template: `
     <a cdlsSkipLink>{{ t.layout.skipToContent }}</a>
 
@@ -37,7 +36,6 @@ const NAV_PAGES: readonly NavPage[] = ['home', 'history', 'nationale', 'bac', 'c
             >{{ t.layout.switchboard }} <span class="phone-number">{{ phone }}</span></a
           >
           <a class="site-header__hide-sm" [href]="'mailto:' + school.email">{{ school.email }}</a>
-          <nav siteLanguages class="site-header__languages" [current]="lang" [page]="page()" [label]="t.layout.languages"></nav>
         </div>
       </div>
       <div class="site-header__main">
@@ -128,16 +126,10 @@ const NAV_PAGES: readonly NavPage[] = ['home', 'history', 'nationale', 'bac', 'c
       </div>
     </footer>
   `,
-  styles: `
-    .site-header__languages {
-      margin-inline-start: auto;
-    }
-  `,
   host: { '(document:keydown.escape)': 'closeMenu()' },
 })
 export class PublicLayout {
   readonly #auth = inject(AuthStore);
-  readonly #route = inject(ActivatedRoute);
   readonly #router = inject(Router);
   readonly #locale = inject(LOCALE);
   private readonly toggle = viewChild.required<ElementRef<HTMLButtonElement>>('toggle');
@@ -158,8 +150,6 @@ export class PublicLayout {
     link: pageUrl(this.lang, page),
     exact: page === 'home',
   }));
-  /** The page shown, so the language switcher links to the same page in the other languages. */
-  protected readonly page = signal<PublicPageId>(this.#currentPage());
   protected readonly menuOpen = signal(false);
   protected readonly accountLabel = computed(() => (this.#auth.user() ? this.t.layout.mySpace : this.t.layout.signIn));
   protected readonly accountLink = computed(() => (this.#auth.user() ? this.#auth.home() : this.loginLink));
@@ -173,7 +163,6 @@ export class PublicLayout {
       )
       .subscribe(() => {
         this.menuOpen.set(false);
-        this.page.set(this.#currentPage());
       });
   }
 
@@ -181,9 +170,5 @@ export class PublicLayout {
     if (!this.menuOpen()) return;
     this.menuOpen.set(false);
     this.toggle().nativeElement.focus();
-  }
-
-  #currentPage(): PublicPageId {
-    return readPublicRoute(this.#route.snapshot)?.page ?? 'home';
   }
 }

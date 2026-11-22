@@ -5,7 +5,6 @@ import { NgOptimizedImage } from '@angular/common';
 import type { HttpErrorResponse } from '@angular/common/http';
 import type { SessionUser } from '@cdls/shared';
 import { AuthStore, HOME_BY_ROLE, landingFor } from '../../core/auth/auth-store';
-import { LanguageSwitcher } from '../../layout/language-switcher';
 import { LOCALE } from '../../i18n/locale';
 import { pageUrl } from '../../i18n/pages';
 import { apiMessage } from '../../core/api/api-client';
@@ -16,12 +15,11 @@ import { shownError } from '../../shared/utils/forms';
 /** First error message of a field once the user has left it (or tried to submit). */
 
 /**
- * Sign-in for students, teachers and staff, in the route's language (/connexion, /en/login, /ar/login; the
- * spaces behind it are in French). Accounts are created by the college: there is no sign-up.
+ * Sign-in for students, teachers and staff (/connexion). Accounts are created by the college: there is no sign-up.
  */
 @Component({
   selector: 'app-login-page',
-  imports: [FormField, RouterLink, NgOptimizedImage, Alert, Button, Field, FieldControl, LanguageSwitcher, SkipLink, Wordmark],
+  imports: [FormField, RouterLink, NgOptimizedImage, Alert, Button, Field, FieldControl, SkipLink, Wordmark],
   template: `
     <a cdlsSkipLink>{{ t.skip }}</a>
     <div class="auth">
@@ -38,13 +36,9 @@ import { shownError } from '../../shared/utils/forms';
 
       <main id="contenu" class="auth__form" tabindex="-1">
         <div class="auth__panel">
-          <nav siteLanguages tone="light" [current]="lang" page="login" [label]="languagesLabel"></nav>
           <div class="stack stack--sm">
             <h1 class="t-h1">{{ t.title }}</h1>
             <p class="t-muted">{{ t.lead }}</p>
-            @if (t.spacesLanguage) {
-              <p class="t-body-s">{{ t.spacesLanguage }}</p>
-            }
           </div>
 
           @if (sessionUnavailable()) {
@@ -71,7 +65,7 @@ import { shownError } from '../../shared/utils/forms';
                 </button>
               </div>
             </cdls-field>
-            <p class="t-body-s"><a routerLink="/connexion/oubli" hreflang="fr">{{ t.forgot }}</a></p>
+            <p class="t-body-s"><a routerLink="/connexion/oubli">{{ t.forgot }}</a></p>
             <button cdlsButton [block]="true" type="submit" [disabled]="busy()">
               {{ busy() ? t.submitting : t.submit }}
             </button>
@@ -97,8 +91,6 @@ export class LoginPage {
   readonly #router = inject(Router);
   readonly #locale = inject(LOCALE);
 
-  protected readonly lang = this.#locale.lang;
-  protected readonly languagesLabel = this.#locale.messages.layout.languages;
   protected readonly t = this.#locale.messages.login;
   protected readonly home = pageUrl(this.#locale.lang, 'home');
   protected readonly place = this.#locale.content.school.place;

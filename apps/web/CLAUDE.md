@@ -11,7 +11,7 @@ and how to use what already exists.
 
 | Folder | What | Rendering |
 |---|---|---|
-| `features/public/` | Public site pages (home, histoire, bac pages, contact, accessibility statement), in fr/en/ar | Prerendered |
+| `features/public/` | Public site pages (home, histoire, bac pages, contact, accessibility statement), in French | Prerendered |
 | `features/auth/` | `/connexion` login page, `/connexion/oubli` and `/connexion/reinitialiser?token=` (forgotten password, framed by `auth-shell.ts`), first access | Client |
 | `features/eleve/` | Student space `/eleve`: routes in `eleve.routes.ts`, the one page in `accueil/` (`home-page.ts` + one block component per block + `home-views.ts` and `now-next.ts` pure rules) | Client |
 | `features/enseignant/` | Teacher space `/enseignant`: the one page in `accueil/` (`home-page.ts`, one block component per block, `home-views.ts` pure rules, `teacher-home-data.ts` the page's ONE `GET /teacher/summary` resource and `section()`, which turns a failed section into the block's error); « Mes classes » is `classes/` | Client |
@@ -26,7 +26,7 @@ and how to use what already exists.
 | `shared/data/` | Shared resources: `teacher-data.ts` (the teacher's assignments and classes), `school-years.ts` (`SchoolYears` root service: the years and the term of today, loaded once) | n/a |
 | `layout/` | `PublicLayout`, `SpaceLayout` (app bar, account menu, bottom nav), `space-navs.ts`, `PagePlaceholder` | n/a |
 | `core/` | `ApiClient`, `AuthStore`, `SchoolClock` (`clock/`: the school's `today` and `now` signals, one browser-only timer), `school/` (`PROFILE`, `SECTION_LABELS`, `schoolToday()`: the school's profile of this build), interceptor, role guards | n/a |
-| `i18n/` | Languages of the public site: typed `SiteMessages` per language (`messages-base.<lang>.ts` shared words + the pack's `SchoolMessages`, joined by `composeMessages`), page addresses, `LOCALE`, `SiteHead` (lang/dir/hreflang). See `docs/i18n.md` | n/a |
+| `i18n/` | The public site, French only: typed `SiteMessages` (`messages-base.fr.ts` shared words + the pack's `SchoolMessages`, joined by `composeMessages`), page addresses, `LOCALE`, `SiteHead` (lang/dir/canonical). See `docs/i18n.md` | n/a |
 | `school/` | The types of the school pack (`content.model.ts`, `school-content.ts`, `site-config.ts`), `school-info.ts` (`SCHOOL`, `CONTACTS`, `localizedPhoto()` from the profile), `matieres-text.ts`, `contact-mail.ts`; `active/` is GENERATED and points at the pack. The school's own text and photos are NOT here: they are `schools/<id>/site/` | n/a |
 | `src/styles.css`, `src/styles/` | Tokens as a Tailwind 4 theme, prototype component classes, fonts | n/a |
 
@@ -170,20 +170,20 @@ To check a school: `SCHOOL=<id> npm run build`, then `SCHOOL=<id> npm run e2e:sm
 - A photo shown at another ratio than its own is cropped by a frame, never by CSS on the `<img>` (Angular's NG02952):
   `<div class="card__media">` / `<div class="photo-frame">` has the `aspect-ratio`, the `<img ngSrc fill>` inside covers
   it. `PhotoFigure`'s `aspect` input does it for figures. An uncropped photo keeps `width`/`height` and `height: auto`.
-- Canonical and hreflang links are absolute on `PROFILE.siteUrl` (the pack's `siteUrl`, or `PUBLIC_WEB_URL` at build
+- Canonical links are absolute on `PROFILE.siteUrl` (the pack's `siteUrl`, or `PUBLIC_WEB_URL` at build
   time, `scripts/site-origin.mjs`); `npm run build` then writes `robots.txt` and `sitemap.xml` (`scripts/seo-files.mjs`,
   postbuild). `CDLS_RELEASE=1` (the Docker image) refuses a placeholder site address for a real school.
 
-## Public site languages
+## Public site
 
 Public pages and the login entry read their words from `inject(LOCALE)` (`messages` for the interface, `content` for
 the school's text): never write French text in a public component. Links go through `pageUrl(lang, page)`. CSS uses
-logical properties only (`inline-start/end`, `text-align: start`): the Arabic pages are `dir="rtl"`. Skip links are
-`<a cdlsSkipLink>`. The English and Arabic text is machine-drafted: say so when you touch it.
+logical properties only (`inline-start/end`, `text-align: start`). Skip links are
+`<a cdlsSkipLink>`. The site is French only (docs/i18n.md).
 
 ## Design conformance spec
 
-`e2e/design-conformance.spec.ts` proves the built pages match what the owner agreed (`docs/workflow-redesign.md`, `docs/rollout.md` « What … sees » and « The menus »). A table per role (`ROLES`: blocks in order, entry label and route, header buttons, the three menus, the agreed empty text, the endpoint that fails each block) drives the same checks for student, teacher, planner and admin: order and layout, entry routes, failure isolation, empty and loading states, menus at 1440 and 390 px, Axe, French typography, and a right-to-left smoke (the spaces are French only; it mirrors the document). It also covers Planificateur routing, « Noter » and « Préparer les bulletins ». When you change a block, heading, entry label, header button or menu entry, change the table here too. A known gap is a `test.fail()` with its reason: it turns red the day the gap is closed, so remove `fail` then. Run it: `E2E_BASE_URL=… npx playwright test e2e/design-conformance.spec.ts --project=desktop`.
+`e2e/design-conformance.spec.ts` proves the built pages match what the owner agreed (`docs/workflow-redesign.md`, `docs/rollout.md` « What … sees » and « The menus »). A table per role (`ROLES`: blocks in order, entry label and route, header buttons, the three menus, the agreed empty text, the endpoint that fails each block) drives the same checks for student, teacher, planner and admin: order and layout, entry routes, failure isolation, empty and loading states, menus at 1440 and 390 px, Axe, French typography. It also covers Planificateur routing, « Noter » and « Préparer les bulletins ». When you change a block, heading, entry label, header button or menu entry, change the table here too. A known gap is a `test.fail()` with its reason: it turns red the day the gap is closed, so remove `fail` then. Run it: `E2E_BASE_URL=… npx playwright test e2e/design-conformance.spec.ts --project=desktop`.
 
 ## Page checklist (before you commit)
 
@@ -192,7 +192,7 @@ logical properties only (`inline-start/end`, `text-align: start`): the Arabic pa
 2. Loading (`.loading-line`), error (`<cdls-alert tone="danger">`) and empty (`<cdls-empty-state>`) states.
 3. Tables: `<caption>`, `scope` on header cells; `.table--stack` + `data-label` on phones.
 4. Forms: Signal Forms, `<cdls-field>` + `cdlsControl`, errors that say how to fix the problem.
-5. Public pages: also `npm run e2e:public -w @cdls/web` (fr/en/ar). Axe: 0 violations at 390 px and 1440 px (inject axe-core 4.10 from cdnjs, run tags wcag2a, wcag2aa, wcag21aa,
+5. Public pages: also `npm run e2e:public -w @cdls/web`. Axe: 0 violations at 390 px and 1440 px (inject axe-core 4.10 from cdnjs, run tags wcag2a, wcag2aa, wcag21aa,
    wcag22aa, best-practice). Keyboard: everything reachable, visible focus, Escape closes menus and dialogs.
 6. `npm run build`, `npm run lint` and `npm test` green. Pure logic goes in decorator-free `.ts` files with a
    `*.spec.ts` next to it (Vitest, `vitest.config.ts`).

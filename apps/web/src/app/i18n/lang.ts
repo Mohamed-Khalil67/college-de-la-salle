@@ -1,31 +1,24 @@
 import { PROFILE } from '../core/school/school-profile';
 
 /**
- * The public site's languages. French is the source and the default (no prefix in the URL); English and
- * Arabic live under /en and /ar. The spaces (élève, enseignant, administration) stay in French.
+ * The public site's language: French only, the school's decision (docs/i18n.md). No language prefix in the URL,
+ * no switcher. The spaces (élève, enseignant, administration) are French too.
  * Pure data, no Angular: read by the routes, the head service and the unit tests.
  */
 
-export const LANGS = ['fr', 'en', 'ar'] as const;
+export const LANGS = ['fr'] as const;
 export type Lang = (typeof LANGS)[number];
 
 export const DEFAULT_LANG: Lang = 'fr';
 
-/** The languages this school's site is published in (`profile.languages`): routes, prerendering, switcher, hreflang. */
-export const ENABLED_LANGS: readonly Lang[] = LANGS.filter((lang) => PROFILE.languages.includes(lang));
-
 export interface LangMeta {
-  /** The language's own name, shown in the switcher (with `lang` set to the language). */
-  readonly endonym: string;
-  readonly dir: 'ltr' | 'rtl';
+  readonly dir: 'ltr';
   /** For og:locale. */
   readonly ogLocale: string;
 }
 
 export const LANG_META: Readonly<Record<Lang, LangMeta>> = {
-  fr: { endonym: 'Français', dir: 'ltr', ogLocale: 'fr_FR' },
-  en: { endonym: 'English', dir: 'ltr', ogLocale: 'en_GB' },
-  ar: { endonym: 'العربية', dir: 'rtl', ogLocale: 'ar_EG' },
+  fr: { dir: 'ltr', ogLocale: 'fr_FR' },
 };
 
 /** Appended to every page title: « Collège de la Salle — Daher ». */

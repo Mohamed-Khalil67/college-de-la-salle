@@ -4,8 +4,6 @@ import type { SiteConfig } from '../../../apps/web/src/app/school/site-config';
 export const SITE: SiteConfig = {
   homeTitle: {
     fr: 'Collège de la Salle — Daher · Bac nationale et Bac français',
-    en: 'Collège de la Salle — Daher · Egyptian and French baccalaureates',
-    ar: 'كلية دي لا سال — الظاهر · الثانوية العامة والبكالوريا الفرنسية',
   },
   homePhones: ['standard', 'bac', 'secondaire'],
   teaserYears: ['1898', '1905', '1955', '2013'],

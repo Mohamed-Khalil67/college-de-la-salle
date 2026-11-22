@@ -1,13 +1,13 @@
 import type { Route, Routes } from '@angular/router';
 import { provideLocale, publicRouteData, type SiteLocale } from '../../i18n/locale';
-import { childPath, type PublicPageId } from '../../i18n/pages';
+import { routePath, type PublicPageId } from '../../i18n/pages';
 import { PublicLayout } from '../../layout/public-layout';
 import type { SectionSlug } from '../../school';
 
 /**
- * The public site in one language (app.routes.ts mounts it at '', 'en' and 'ar'). Every page is static and
+ * The public site (app.routes.ts mounts it at ''). Every page is static and
  * prerendered (app.routes.server.ts); its title and description come from the language's messages, and its
- * data says which page it is, so the language switcher and hreflang links can find it in the other languages.
+ * data says which page it is.
  */
 export function publicRoutes(locale: SiteLocale): Routes {
   const { lang, messages } = locale;
@@ -15,7 +15,7 @@ export function publicRoutes(locale: SiteLocale): Routes {
     const { title, description } = messages.pages[id];
     const data = publicRouteData({ lang, page: id, description });
     return {
-      path: childPath(lang, id),
+      path: routePath(lang, id),
       pathMatch: 'full',
       // The home page has no title of its own: the strategy shows the site's full name.
       ...(title ? { title } : {}),

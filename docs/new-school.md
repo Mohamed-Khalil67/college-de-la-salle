@@ -10,7 +10,7 @@ Two packs ship with the repository:
 | Pack | What it is |
 |---|---|
 | `schools/cdls-daher/` | Collège de la Salle, Daher, Cairo: everything the site said before packs existed, moved as is. The default. |
-| `schools/example/` | École Exemple, a **fictional** school with placeholder text in French, English and Arabic and a text-only monogram. It proves that a second school builds, prerenders and runs, and it is the starting point for yours. |
+| `schools/example/` | École Exemple, a **fictional** school with placeholder text in French and a text-only monogram. It proves that a second school builds, prerenders and runs, and it is the starting point for yours. |
 
 ## What a pack holds
 
@@ -22,15 +22,15 @@ schools/<id>/
     archive.ts        PHOTOS (file, size, alt, credit) and DIRECTORS
     content.<lang>.ts the long-form text per language: key figures, milestones, founder, tracks, contact labels, photos
     messages.<lang>.ts the words that name the school: page descriptions, hero, history, accessibility statement
-    fr.ts en.ts ar.ts one line each: the pack's two files of a language
+    fr.ts one line: the pack's two files of the French
   public/             files served from the site root: crest.svg, favicon and icons, images/
 ```
 
 The profile (`profile.json`) holds: `id`, `placeholder`, the school's names per language (`full`, `short`, `place`,
 `city`, and `of`, the form used in a sentence: « votre compte du Collège de la Salle »), `nameLang`, `foundingYear`,
 the affiliation line, the contacts (address per language, map query, switchboard, e-mail, departments with their
-phones), the linked websites, `siteUrl` (the https origin of this platform's site: canonical and hreflang links,
-robots.txt, sitemap.xml), `loginEmailDomain`, the IANA `timeZone`, `defaultLanguage`, the enabled `languages`, the
+phones), the linked websites, `siteUrl` (the https origin of this platform's site: canonical links,
+robots.txt, sitemap.xml), `loginEmailDomain`, the IANA `timeZone`, `defaultLanguage` (`fr`), the `languages` (`["fr"]`: the site is French only), the
 two `sections` (code and name per language), the calendar ids (`uidDomain`, `productName`) and the `brand` (crest,
 icons, theme colour, optional colour overrides). Open `schools/example/profile.json` and change every value; the
 validator names each field that is wrong, with the file, so a typo stops the build instead of reaching a page.
@@ -39,18 +39,15 @@ validator names each field that is wrong, with the file, so a typo stops the bui
 
 1. **Copy the example.** `cp -r schools/example schools/<your-id>` (`<your-id>`: lower case, digits and hyphens). Change
    `"id"` and `"placeholder": false` in `profile.json`.
-2. **Fill the profile.** Names, address, phones, e-mails, time zone (for example `Europe/Paris`), languages (`fr` is
-   the default and the only possible one for now; `en` and `ar` are optional, a school that drops one simply has no
-   pages for it), `loginEmailDomain` (the example shown in help texts, normally the same as `SCHOOL_EMAIL_DOMAIN`),
+2. **Fill the profile.** Names, address, phones, e-mails, time zone (for example `Europe/Paris`), languages (`["fr"]`, the French-only site: write French only, see docs/i18n.md)
+   `loginEmailDomain` (the example shown in help texts, normally the same as `SCHOOL_EMAIL_DOMAIN`),
    `siteUrl` (`https://www.<domain>`, no path and no trailing slash). While the domain is not chosen, use a reserved
    placeholder such as `https://<your-id>.invalid`: builds warn, and the Docker image (`CDLS_RELEASE=1`) refuses it
    unless `PUBLIC_WEB_URL` gives the real address. A demonstration pack (`"placeholder": true`) may keep one.
-3. **Write the content.** `site/content.fr.ts` is the source; English and Arabic translate the same shapes (a missing
-   field does not compile). Replace the `site/messages.*.ts` texts, `archive.ts` (photos with their credits) and
-   `index.ts`. Run `SCHOOL=<your-id> npm test -w @cdls/web`: `pack.spec.ts` checks that every photo, department and
-   year the pages point at exists, in every language, and `i18n.spec.ts` that a translation keeps the facts of the
-   French. The English and Arabic words the platform shares (sign-in, contact form) are in
-   `apps/web/src/app/i18n/messages-base.<lang>.ts` and are machine-drafted: have a native speaker review them.
+3. **Write the content.** `site/content.fr.ts` is the whole content (a missing
+   field does not compile). Replace the `site/messages.fr.ts` texts, `archive.ts` (photos with their credits) and
+   `index.ts`. Run `SCHOOL=<your-id> npm test -w @cdls/web`: `pack.spec.ts` checks that every photo, department and year the pages point at exists.
+   The words the platform shares (sign-in, contact form) are in `apps/web/src/app/i18n/messages-base.fr.ts`.
 4. **Add the crest and the pictures.** Put the school's own crest in `public/crest.svg` as three symbols with the ids
    `crest`, `crest-on-dark` and `star-marker`, the favicon and icons next to it (and list them in
    `brand.icons`), and the photographs in `public/images/`. Use only files the school has the right to publish; the
@@ -81,8 +78,8 @@ validator names each field that is wrong, with the file, so a typo stops the bui
 - **Password-reset mail only reaches addresses the school's mail system already has.** « Mot de passe oublié » sends a link
   to the login address. If the school has no mailbox for it, the account can only be reset by the administration.
 - **No shared installs.** Two schools never share a database or a deployment; to host several, run one stack per school.
-- **The spaces are French only** (student, teacher, administration, e-mails, PDF report cards). Only the public site has
-  other languages.
+- **The platform is French only**: the public site (the school decided it, docs/i18n.md), the spaces (student, teacher,
+  administration), e-mails and PDF report cards.
 
 ## Sections: what is configurable and what is not
 

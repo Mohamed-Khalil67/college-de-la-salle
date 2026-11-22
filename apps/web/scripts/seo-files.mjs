@@ -21,7 +21,7 @@ const id = (process.env.SCHOOL || 'cdls-daher').trim();
 const profile = JSON.parse(readFileSync(join(schools, id, 'profile.json'), 'utf8'));
 const origin = siteOrigin(profile);
 
-/** The page addresses (`/`, `/histoire`, `/en/history`) of the folders that hold a prerendered index.html. */
+/** The page addresses (`/`, `/histoire`, `/bac-nationale`) of the folders that hold a prerendered index.html. */
 function pages(dir) {
   const found = [];
   for (const name of readdirSync(dir)) {
@@ -53,7 +53,7 @@ writeFileSync(
 
 // The spaces and the sign-in pages are private or useless to a search engine; the calendar feed address is a
 // credential (it also answers noindex). Everything else (the public pages, their photos) may be crawled.
-const PRIVATE = ['/api/', '/connexion', '/en/login', '/ar/login', '/premier-acces', '/eleve', '/enseignant', '/admin'];
+const PRIVATE = ['/api/', '/connexion', '/premier-acces', '/eleve', '/enseignant', '/admin'];
 writeFileSync(
   join(out, 'robots.txt'),
   ['User-agent: *', ...PRIVATE.map((path) => `Disallow: ${path}`), '', `Sitemap: ${origin}/sitemap.xml`, ''].join('\n'),

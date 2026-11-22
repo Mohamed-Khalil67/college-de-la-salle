@@ -109,7 +109,7 @@ export interface SchoolProfile {
   readonly websites: readonly SchoolWebsite[];
   /**
    * The public address of THIS platform's site, an https origin without a path (`https://www.ecole.eg`): absolute
-   * canonical and hreflang links, robots.txt and sitemap.xml. A reserved placeholder host (`.invalid`, `.example`,
+   * canonical links, robots.txt and sitemap.xml. A reserved placeholder host (`.invalid`, `.example`,
    * `.test`) is allowed while the domain is not chosen, but a release build refuses it (`siteUrlReleaseProblems`).
    * The web build's `PUBLIC_WEB_URL`, when set, overrides it.
    */

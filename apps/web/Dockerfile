@@ -20,7 +20,7 @@ COPY schools schools
 # The school this image is for (deploy/.env SCHOOL), a folder of schools/. The API container must use the same value.
 ARG SCHOOL=cdls-daher
 ENV SCHOOL=${SCHOOL}
-# The site's public address (deploy/.env PUBLIC_WEB_URL): absolute canonical and hreflang links, robots.txt and
+# The site's public address (deploy/.env PUBLIC_WEB_URL): absolute canonical links, robots.txt and
 # sitemap.xml. Empty: the pack's profile.json siteUrl. Both are read by scripts/site-origin.mjs (build args are
 # environment variables of RUN).
 ARG PUBLIC_WEB_URL=

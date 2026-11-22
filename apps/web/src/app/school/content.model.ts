@@ -1,8 +1,8 @@
 /**
  * Content model of the site. Pure types: no Angular.
  *
- * The school's own words (schools/<id>/site: content.fr.ts, content.en.ts, content.ar.ts) take these shapes; French
- * is the source language and the other two translate the same shapes (school-content.ts). These pages are
+ * The school's own words (schools/<id>/site: content.fr.ts) take these shapes; French
+ * is the only language of the site (school-content.ts). These pages are
  * institutional and static (prerendered at build time); everything that changes during the school year lives in
  * the API and is written by teachers.
  */

@@ -43,7 +43,7 @@
   "loginEmailDomain": "lasalle-daher.eg",
   "timeZone": "Africa/Cairo",
   "defaultLanguage": "fr",
-  "languages": ["fr", "en", "ar"],
+  "languages": ["fr"],
   "sections": [
     { "code": "nationale", "labels": { "fr": "Bac nationale", "en": "Egyptian Bac", "ar": "الثانوية العامة" } },
     { "code": "bac", "labels": { "fr": "Bac français", "en": "French Bac", "ar": "البكالوريا الفرنسية" } }

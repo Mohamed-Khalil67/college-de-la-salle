@@ -15,8 +15,8 @@ import type {
 } from './content.model';
 
 /**
- * Everything the public pages say about the college, in one language. French (content.fr.ts) is the source;
- * content.en.ts and content.ar.ts must give every field (a missing one does not compile), and
+ * Everything the public pages say about the college, in French (content.fr.ts, the site is French only).
+ * A pack's content must give every field (a missing one does not compile), and
  * school-content.spec.ts checks that the facts that are not words (years, photos, links, headcounts) match.
  */
 
