@@ -191,3 +191,7 @@ No Playwright test failed. No documented behaviour failed a manual check.
 - Stopping a `start:dev` watch task does not always stop the child process. After a restart with other limits, check
   `netstat` for the old PID on the API port; a new instance that fails with EADDRINUSE leaves the old one answering.
 - The API suite and the Playwright suite both expect the demo accounts on the stack; run them one after the other.
+
+## Follow-up (22 November 2026)
+
+Fixed on `main` in 6b7df1f: F1 (the reset-link check reads `PUBLIC_WEB_URL` from the app; the spec passes with 4200 and 4410), and the document mismatches M1, M2 and M3 plus the two access rules noted above are now in `docs/features-and-workflows.md`.
