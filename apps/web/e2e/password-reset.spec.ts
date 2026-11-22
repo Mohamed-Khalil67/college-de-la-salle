@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ACCOUNTS } from './accounts';
+import { disableUsers } from './cleanup';
 import { axeAtBothWidths, tokenOf } from './structure';
 
 /**
@@ -15,6 +16,12 @@ test.beforeEach(({}, testInfo) => {
 
 const MAIL_DIR = resolve(__dirname, '../../api/.dev-mail');
 const NEW_PASSWORD = 'Cedre-du-Liban-2026';
+/** The teacher accounts created here, disabled in `afterAll` (accounts are never deleted). */
+const made: string[] = [];
+
+test.afterAll(async ({ request }) => {
+  await disableUsers(request, made);
+});
 
 /** The reset link of the newest mail written for this address. */
 function linkFor(email: string): string | undefined {
@@ -33,7 +40,8 @@ test('forgot password: request, e-mailed link, new password, sign in', async ({ 
     data: { role: 'teacher', firstName: 'Oubli', lastName: `Mdp${Date.now().toString(36)}` },
   });
   expect(created.ok()).toBeTruthy();
-  const { user } = (await created.json()) as { user: { email: string } };
+  const { user } = (await created.json()) as { user: { id: string; email: string } };
+  made.push(user.id);
 
   // The login page offers the way in.
   await page.goto('/connexion');

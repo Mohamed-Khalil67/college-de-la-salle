@@ -62,7 +62,7 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 | `npm run lint` / `npm test` | oxlint and Vitest (unit) in every workspace |
 | `npm run test:e2e` | API end-to-end tests on a throwaway database (needs `npm run db:dev` running) |
 | `npm run e2e:public -w @cdls/web` | Public site only, no database: Playwright + Axe at 390 and 1440 px on every public page in French, English and Arabic, language switcher, hreflang, keyboard. Run `npm run build` first; it serves the build on :4610 (`E2E_PUBLIC_PORT`) |
-| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop and phone, with Axe at 390 and 1440 px on every screen of every space) against the running stack (`E2E_BASE_URL` for another port); needs the seeded demo accounts, a high `THROTTLE_LIMIT` (say 100000) and `LOGIN_THROTTLE_LIMIT=1000` in `apps/api/.env` (sign-in is limited to 5 attempts a minute by default)  ; the run sends 4 contact messages, so wait a minute between runs or raise `CONTACT_THROTTLE_LIMIT`; a repeated run of the roster-import tests also needs `IMPORT_THROTTLE_LIMIT` (10 a minute by default) raised |
+| `npm run e2e -w @cdls/web` | Browser tests (Playwright, desktop then phone, with Axe at 390 and 1440 px on every screen of every space) against a running, seeded stack: see « Browser tests » below |
 | `npm run db:dev` | Project-local PostgreSQL 18 on :5433 (embedded-postgres) |
 | `npm run db:migrate` | `prisma migrate dev`: applies the schema to the database |
 | `npm run db:seed` | Wipes and re-seeds the demo data (1 year, 6 classes, 10 teachers, 60 students); the passwords go to `apps/api/demo-credentials.local.md` (gitignored) |
@@ -76,6 +76,33 @@ it with `npm run build -w @cdls/shared && npm run build -w @cdls/api && node app
 5. `docker compose -f deploy/compose.yaml --env-file deploy/.env.example config -q` (the deploy file still parses; a
    broken one stops the stack, the backups and every `restore.md` command)
 6. For UI changes, the Playwright + Axe specs (`npm run e2e -w @cdls/web`)
+
+### Browser tests
+
+`npm run e2e -w @cdls/web` runs `apps/web/e2e` against a running stack (`E2E_BASE_URL`, default http://localhost:4200)
+with the seeded demo accounts. Before a run:
+
+- `apps/api/.env` raises the limits the suite would hit: `THROTTLE_LIMIT=100000`, `LOGIN_THROTTLE_LIMIT=1000` (sign-in is
+  5 a minute by default), `CONTACT_THROTTLE_LIMIT=1000` and `IMPORT_THROTTLE_LIMIT=1000`; `MAIL_TRANSPORT=log` (the
+  forgotten-password test reads the link from `apps/api/.dev-mail`), and `PUBLIC_WEB_URL` / `CORS_ORIGIN` are the site
+  under test. `e2e/global-setup.ts` checks that the API answers and the demo accounts sign in, and says what to fix.
+- **Order.** One test at a time (`workers: 1`): every test uses the same demo accounts and database. The `phone`
+  project depends on `desktop`, so it starts when the desktop pass is over (and is skipped if a desktop test failed);
+  `--project=desktop` runs one pass, `--project=phone --no-deps` the phone pass alone. Specs that set both widths
+  themselves skip the phone project.
+- **Dates.** No test picks « today + n days »: a week with lessons comes from the timetable of the stack
+  (`e2e/school-weeks.ts`: `firstTeachingWeek`, `twoTeachingWeeks`, `latestTeachingDay`), and graded work from the open
+  terms (`gradableDay`), so the suite passes on any day of the seeded year, weekends and holidays included (the
+  « Noter » tests skip, with the reason, on a holiday between terms: a quick note is dated today). Only the last
+  school week of the year has no later week to plan in.
+- **Clean-up.** Each spec leaves the database as it found it (`e2e/cleanup.ts`): what it creates carries a unique
+  name and is deleted in `afterAll` or `finally` through the API (events with their marks, posts, contact messages,
+  groups, slots, exceptions, assignments, rooms, types, calendar days, empty classes and years); accounts cannot be
+  deleted, so students are archived and other accounts disabled; subjects are archived. What the API keeps for good
+  (a class that had a student, a term closed with published report cards) is made in a fixture year,
+  `9900-9901` and after (`fixtureYear`), never in the current one; the rollover test still leaves its two
+  far-future years (archived, or with archived students only). A second full run starts from the same current-year data.
+- Coverage, workflow by workflow: `docs/qa/e2e-coverage.md`.
 
 ## The API
 

@@ -1,7 +1,10 @@
-import type { TeacherSummaryDto, TeacherSummarySection } from '@cdls/shared';
+import { addDays, type TeacherSummaryDto, type TeacherSummarySection } from '@cdls/shared';
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
-import { axeAtBothWidths, goInApp, signInAs, unique } from './structure';
+import { removeEvents } from './cleanup';
+import { schoolToday } from './school';
+import { todayIsGradable } from './school-weeks';
+import { axeAtBothWidths, goInApp, signInAs, tokenOf, unique } from './structure';
 
 /**
  * Design conformance: the built UI against what the owner agreed (`docs/workflow-redesign.md`,
@@ -534,8 +537,15 @@ test.describe('Routing of the Planificateur permission', () => {
 });
 
 test.describe('« Noter » (quick grading)', () => {
+  // The notes they start are dated today in the demo class: removed (marks first) so the averages stay as seeded.
+  test.afterAll(async ({ request }) => {
+    const day = schoolToday();
+    await removeEvents(request, ACCOUNTS.teacher, (t) => /^(Conformité|Absents) /.test(t), addDays(day, -1), addDays(day, 1));
+  });
+
   test('N1 step 1 « Quelle note ? » (new note, planned exam or draft), step 2 the grid with the agreed controls, Axe-clean', async ({ page, request }) => {
     test.setTimeout(90_000);
+    test.skip(!(await todayIsGradable(request, await tokenOf(request, ACCOUNTS.teacher))), 'No open term covers today (a holiday between terms): « Noter » dates its note today, so there is nothing to grade.');
     const login = await request.post('/api/auth/login', { data: ACCOUNTS.student });
     const pupil = ((await login.json()) as { user: { classId: string } }).user;
     await signInAs(page, ACCOUNTS.teacher);
@@ -584,6 +594,7 @@ test.describe('« Noter » (quick grading)', () => {
   // Agreed: « Abs » in the grid means the student does not count. Built: there is no « Abs » control; an empty
   // cell is an absent student (documented in rollout.md's demo script and apps/web/CLAUDE.md « Noter »).
   test.fail('N2 the grid offers an explicit « Abs » for an absent student (agreed wording)', async ({ page, request }) => {
+    test.skip(!(await todayIsGradable(request, await tokenOf(request, ACCOUNTS.teacher))), 'No open term covers today (a holiday between terms): « Noter » dates its note today, so there is nothing to grade.');
     const login = await request.post('/api/auth/login', { data: ACCOUNTS.student });
     const pupil = ((await login.json()) as { user: { classId: string } }).user;
     await signInAs(page, ACCOUNTS.teacher);

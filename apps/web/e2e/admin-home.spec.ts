@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 import { ACCOUNTS } from './accounts';
+import { removePosts } from './cleanup';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf, unique } from './structure';
 
 /**
@@ -286,8 +287,17 @@ test('Préparer les bulletins: a term with no class shows its empty state', asyn
   await axeAtBothWidths(page);
 });
 
-test('Annonces: publish one for the whole school, read it on the home page, delete it', async ({ page }) => {
+test('Annonces: publish one for the whole school, read it on the home page, delete it', async ({ page, request }) => {
   const title = unique('Annonce');
+  // Deleted through the page; the API removes it too if the test stops before.
+  try {
+    await publishReadDelete(page, title);
+  } finally {
+    await removePosts(request, (t) => t === title);
+  }
+});
+
+async function publishReadDelete(page: Page, title: string): Promise<void> {
   await signInAs(page, ACCOUNTS.admin);
   await goInApp(page, '/admin/annonces');
   await expect(page.getByRole('heading', { level: 1, name: 'Annonces' })).toBeVisible();
@@ -312,7 +322,7 @@ test('Annonces: publish one for the whole school, read it on the home page, dele
   await expect(page.getByRole('heading', { level: 2, name: 'Dernières annonces' })).toBeFocused();
   await expect(page.getByRole('heading', { level: 3, name: title })).toHaveCount(0);
   await axeAtBothWidths(page);
-});
+}
 
 test('Annonces: classes and sections that fail to load are announced, with « Réessayer »', async ({ page }) => {
   await signInAs(page, ACCOUNTS.admin);

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { addDays, type TimetableOccurrenceDto, todayIso } from '@cdls/shared';
+import { addDays, type TimetableOccurrenceDto } from '@cdls/shared';
+import { firstTeachingWeek } from './school-weeks';
 import { ACCOUNTS } from './accounts';
 import { axeAtBothWidths, goInApp, signInAs, tokenOf } from './structure';
 
@@ -57,9 +58,10 @@ test('a cancelled session reaches the student’s bell and list, and can be read
   // The maths teacher cancels one of their sessions in the student's class (the student of the demo is in 1re secondaire).
   const teacher = await tokenOf(request, ACCOUNTS.teacher);
   const me = (await (await request.get('/api/auth/me', { headers: teacher })).json()) as { teacherId: string };
-  const today = todayIso();
+  // From the first school week with lessons after this one (never « today + 28 », a holiday in December).
+  const from = await firstTeachingWeek(request, teacher, `teacherId=${me.teacherId}`);
   const sessions = (await (
-    await request.get(`/api/timetable/occurrences?teacherId=${me.teacherId}&from=${addDays(today, 28)}&to=${addDays(today, 60)}`, { headers: teacher })
+    await request.get(`/api/timetable/occurrences?teacherId=${me.teacherId}&from=${from}&to=${addDays(from, 55)}`, { headers: teacher })
   ).json()) as TimetableOccurrenceDto[];
   const target = sessions.find((s) => s.status === 'normal' && s.classLabel.includes('1re secondaire') && !s.groupId);
   expect(target, 'a future session of the student’s class').toBeTruthy();

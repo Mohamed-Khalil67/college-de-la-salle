@@ -1,11 +1,23 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type APIRequestContext, type Page, test } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
+import { archiveStudents, disableUsers, fixtureClass, fixtureYear, studentsMatching, usersMatching } from './cleanup';
 
 /**
  * Phase 4: first sign-in, student section request, admin approval, roster import, archiving.
- * Accounts are created through the API (as the admin does), then the flows run in the browser.
+ * Accounts are created through the API (as the admin does), then the flows run in the browser. Accounts cannot
+ * be deleted: `afterAll` archives every student the file created or imported (out of the class lists and the
+ * report cards) and disables the imported teachers; the class archived in the last flow lives in a fixture year.
  */
+
+/** What this file created, cleaned up in `afterAll`. */
+const made = { studentIds: [] as string[], studentSearches: [] as string[], teacherSearches: [] as string[] };
+
+test.afterAll(async ({ request }) => {
+  for (const search of made.studentSearches) made.studentIds.push(...(await studentsMatching(request, search)));
+  await archiveStudents(request, made.studentIds);
+  for (const search of made.teacherSearches) await disableUsers(request, await usersMatching(request, 'teacher', search));
+});
 
 const VIEWPORTS = [
   { width: 390, height: 844 },
@@ -67,7 +79,8 @@ async function createStudent(request: APIRequestContext, section: string, classC
     data: { role: 'student', firstName, lastName, classId: target.id },
   });
   expect(res.status()).toBe(201);
-  const body = (await res.json()) as { user: { email: string }; temporaryPassword: string };
+  const body = (await res.json()) as { user: { email: string; studentId: string }; temporaryPassword: string };
+  made.studentIds.push(body.user.studentId);
   return { email: body.user.email, temporaryPassword: body.temporaryPassword, firstName, lastName };
 }
 
@@ -266,6 +279,7 @@ test('the secretariat opens a request for a student', async ({ page, request }) 
 
 test('roster import: preview the generated e-mails, then create the accounts', async ({ page }) => {
   const last = uniqueName('Import');
+  made.studentSearches.push(last);
   const csv = [
     'lastName,firstName,section,class,studentNumber,birthDate',
     `${last},Zoé,bac,seconde,,15/03/2010`,
@@ -308,6 +322,7 @@ test('roster import: preview the generated e-mails, then create the accounts', a
 
 test('roster import: a person already present is skipped unless « créer quand même » is ticked', async ({ page }) => {
   const last = uniqueName('Doublon');
+  made.teacherSearches.push(last);
   const csv = ['lastName,firstName', `${last},Samir`].join('\n');
   const slug = last.toLowerCase();
 
@@ -372,29 +387,18 @@ test('graduating a student: confirmation first, then the account cannot sign in'
 });
 
 test('archiving a class asks for confirmation', async ({ page, request }) => {
-  // A class of its own so the seeded classes stay intact.
+  // A class of its own, in a fixture year: a class that had a student cannot be deleted, and the current year's
+  // class lists stay as seeded. Archiving the class archives its student.
   const token = await adminToken(request);
   const headers = { Authorization: `Bearer ${token}` };
-  const classes = (await (await request.get('/api/classes', { headers })).json()) as {
-    id: string;
-    code: string;
-    sectionCode: string;
-    schoolYearId: string;
-    sectionId: string;
-  }[];
-  const model = classes.find((c) => c.sectionCode === 'bac' && c.code === 'seconde')!;
   const code = `arch-${Date.now().toString(36)}`;
-  const made = await request.post('/api/classes', {
-    headers,
-    data: { schoolYearId: model.schoolYearId, sectionId: model.sectionId, code, label: `Classe ${code}` },
-  });
-  expect(made.status()).toBe(201);
-  const created = (await made.json()) as { id: string };
+  const created = await fixtureClass(request, await fixtureYear(request), 'bac', `Classe ${code}`);
   const user = await request.post('/api/users', {
     headers,
     data: { role: 'student', firstName: uniqueName('Arch'), lastName: uniqueName('Eleve'), classId: created.id },
   });
   expect(user.status()).toBe(201);
+  made.studentIds.push(((await user.json()) as { user: { studentId: string } }).user.studentId);
 
   await signIn(page, ACCOUNTS.admin);
   await page.locator('.app-bar').waitFor();

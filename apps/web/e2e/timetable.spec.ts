@@ -1,8 +1,27 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type APIRequestContext, type Page, test } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
+import { firstTeachingWeek, weeksAhead } from './school-weeks';
+import { tokenOf } from './structure';
 
-/** The timetable screens: week editor (admin), « Mon emploi du temps » (teacher), student week. */
+/**
+ * The timetable screens: week editor (admin), « Mon emploi du temps » (teacher), student week. A week to look at
+ * is the first school week with lessons after this one (`firstTeachingWeek`), never « next week », which is a
+ * holiday twice a year.
+ */
+
+/** « Semaine suivante » clicks from this week to the first school week with lessons of `scope`. */
+async function clicksToLessons(request: APIRequestContext, account: Account, scope: 'class' | 'teacher'): Promise<number> {
+  const login = await request.post('/api/auth/login', { data: account });
+  const { user } = (await login.json()) as { user: { classId: string | null; teacherId: string | null } };
+  const headers = await tokenOf(request, account);
+  const week = await firstTeachingWeek(request, headers, scope === 'class' ? `classId=${user.classId}` : `teacherId=${user.teacherId}`, { minLessons: 1 });
+  return weeksAhead(week);
+}
+
+async function nextWeeks(page: Page, clicks: number): Promise<void> {
+  for (let i = 0; i < clicks; i++) await page.getByRole('button', { name: 'Semaine suivante' }).click();
+}
 
 async function signInTo(page: Page, account: Account, path: string): Promise<void> {
   await page.goto('/connexion');
@@ -20,6 +39,8 @@ async function signInTo(page: Page, account: Account, path: string): Promise<voi
 }
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
+  // Dialog buttons fade in: measure the colours once they have settled (a run caught one mid-fade at 390 px).
+  await page.waitForTimeout(400);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa', 'best-practice'])
     .analyze();
@@ -77,7 +98,7 @@ async function cleanUp(request: APIRequestContext): Promise<void> {
     for (const s of page.items.filter((i) => i.startTime === '17:00')) await api.del(`/api/timetable/slots/${s.id}?scope=all`);
     const from = iso(0);
     const sessions = await api.get<{ exceptionId: string | null; reason: string }[]>(
-      `/api/timetable/occurrences?classId=${c.id}&from=${from}&to=${iso(55)}`,
+      `/api/timetable/occurrences?classId=${c.id}&from=${from}&to=${iso(61)}`,
     );
     for (const o of sessions.filter((s) => s.exceptionId && s.reason === 'Test Playwright'))
       await api.del(`/api/timetable/exceptions/${o.exceptionId}`);
@@ -116,8 +137,12 @@ test.describe('timetable', () => {
       const first = await addSlot('Seconde (Bac français)', 'Humanités, littérature et philosophie');
       await saveAccepting(page, first, 'Ajouter la séance');
       await expect(page.locator('.alert--success').filter({ hasText: /nregistr/ })).toBeVisible();
-      // A new series starts today, so its first Sunday may be next week: look there.
-      await page.getByRole('button', { name: 'Semaine suivante' }).click();
+      // A new series starts today, so its first Sunday may be next week: look at the first week with lessons.
+      const admin = await tokenOf(request, ACCOUNTS.admin);
+      const seconde = ((await (await request.get('/api/classes', { headers: admin })).json()) as { id: string; label: string; sectionCode: string }[]).find(
+        (c) => c.label === 'Seconde' && c.sectionCode === 'bac',
+      )!;
+      await nextWeeks(page, weeksAhead(await firstTeachingWeek(request, admin, `classId=${seconde.id}`, { minLessons: 1 })));
       await expect(page.getByRole('grid')).toContainText('Humanités, littérature et philosophie');
 
       // Second: another class, another teacher, the same room and hour: refused, with the conflict named.
@@ -170,12 +195,13 @@ test.describe('timetable', () => {
     await expect(first).toBeFocused();
   });
 
-  test('the admin cancels one session; the student sees it struck through with the reason', async ({ page }, info) => {
+  test('the admin cancels one session; the student sees it struck through with the reason', async ({ page, request }, info) => {
     test.skip(info.project.name === 'phone', 'The week editor is a desktop screen.');
+    const clicks = await clicksToLessons(request, ACCOUNTS.student, 'class');
     await signInTo(page, ACCOUNTS.admin, '/admin/emploi-du-temps');
     const grid = page.getByRole('grid');
-    // The first class (the student's), next week at the latest: a week that has sessions.
-    await page.getByRole('button', { name: 'Semaine suivante' }).click();
+    // The first class (the student's), in its first week with lessons after this one.
+    await nextWeeks(page, clicks);
     const cell = grid.getByRole('gridcell').filter({ has: page.locator('.cs') }).first();
     await expect(cell).toBeVisible();
     await cell.click();
@@ -193,7 +219,7 @@ test.describe('timetable', () => {
     await page.context().clearCookies();
     await page.goto('/');
     await signInTo(page, ACCOUNTS.student, '/eleve/emploi-du-temps');
-    await page.getByRole('button', { name: 'Semaine suivante' }).click();
+    await nextWeeks(page, clicks);
     const struck = page.locator('.session--struck:visible').first();
     await expect(struck).toBeVisible();
     await expect(struck).toContainText('Annulée');
@@ -202,10 +228,11 @@ test.describe('timetable', () => {
     expect(decoration).toBe('line-through');
   });
 
-  test('a teacher reads their week and is not offered any change: the planner does it', async ({ page }) => {
+  test('a teacher reads their week and is not offered any change: the planner does it', async ({ page, request }) => {
+    const clicks = await clicksToLessons(request, ACCOUNTS.teacher, 'teacher');
     await signInTo(page, ACCOUNTS.teacher, '/enseignant/emploi-du-temps');
     await expect(page.getByRole('heading', { level: 1, name: 'Mon emploi du temps' })).toBeVisible();
-    await page.getByRole('button', { name: 'Semaine suivante' }).click();
+    await nextWeeks(page, clicks);
     await expect(page.locator('.tt-item').first()).toBeVisible();
     await expect(page.getByText('Demandez-le au planificateur')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Modifier la séance/ })).toHaveCount(0);
@@ -213,9 +240,11 @@ test.describe('timetable', () => {
   });
 
   for (const width of [390, 1440]) {
-    test(`Axe finds nothing on the timetable screens at ${width} px`, async ({ page }, info) => {
+    test(`Axe finds nothing on the timetable screens at ${width} px`, async ({ page, request }, info) => {
       test.skip(info.project.name === 'phone' && width === 1440, 'Phone project runs the 390 px pass only.');
       await page.setViewportSize({ width, height: 900 });
+      const teacherClicks = await clicksToLessons(request, ACCOUNTS.teacher, 'teacher');
+      const studentClicks = await clicksToLessons(request, ACCOUNTS.student, 'class');
 
       await signInTo(page, ACCOUNTS.student, '/eleve/emploi-du-temps');
       await expect(page.getByRole('heading', { level: 1, name: 'Emploi du temps' })).toBeVisible();
@@ -225,7 +254,7 @@ test.describe('timetable', () => {
       await page.context().clearCookies();
       await page.goto('/');
       await signInTo(page, ACCOUNTS.teacher, '/enseignant/emploi-du-temps');
-      await page.getByRole('button', { name: 'Semaine suivante' }).click();
+      await nextWeeks(page, teacherClicks);
       await expect(page.locator('.tt-item').first()).toBeVisible();
       await expectNoAxeViolations(page);
 
@@ -235,7 +264,7 @@ test.describe('timetable', () => {
       await expect(page.getByRole('grid')).toBeVisible();
       await expectNoAxeViolations(page);
       // The cell dialog, the session dialog with its three scopes, the new-slot dialog.
-      await page.getByRole('button', { name: 'Semaine suivante' }).click();
+      await nextWeeks(page, studentClicks);
       await page.getByRole('grid').getByRole('gridcell').filter({ has: page.locator('.cs') }).first().click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await expectNoAxeViolations(page);

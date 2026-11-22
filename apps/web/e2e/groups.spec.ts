@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type APIRequestContext, type Browser, type Locator, type Page, test } from '@playwright/test';
 import { ACCOUNTS, type Account } from './accounts';
+import { gradableDay } from './school-weeks';
+import { tokenOf } from './structure';
 
 /**
  * Groups and « Assigner à »: a teacher creates groups, puts students in them, assigns a homework to one group,
@@ -123,6 +125,8 @@ async function cleanUp(request: APIRequestContext): Promise<void> {
   const api = await adminApi(request);
   const { classId } = await ids(request);
   const events = await api.get<{ id: string; title: string }[]>(`/api/events?classId=${classId}&from=${iso(-170)}&to=${iso(15)}`);
+  // A graded test of a holiday between terms is dated on the first day of the next term (`gradableDay`).
+  events.push(...(await api.get<{ id: string; title: string }[]>(`/api/events?classId=${classId}&from=${iso(16)}&to=${iso(40)}`)));
   const later = await api.get<{ id: string; title: string }[]>(`/api/events?classId=${classId}&from=${FRIDAY}&to=${FRIDAY}`);
   for (const e of [...events, ...later].filter((x) => x.title.startsWith(TITLE_PREFIX))) {
     // An evaluation with marks cannot be deleted: take the marks off first.
@@ -266,12 +270,14 @@ test.describe('groups and « Assigner à »', () => {
     const setup = await setUpGroups(request);
     const teacher = await teacherApi(request);
     const title = `${TITLE_PREFIX}contrôle du groupe A`;
+    // Today, or the first day of the next term in a holiday between terms (a graded test needs an open term).
+    const examDay = await gradableDay(request, await tokenOf(request, ACCOUNTS.teacher));
     await teacher.post('/api/events', {
       activityTypeId: setup.mathsTypeExam,
       title,
       subjectId: 'mathematiques',
       classId: setup.classId,
-      date: iso(0),
+      date: examDay,
       target: { groupIds: [setup.a], studentIds: [] },
     });
     await signInTo(page, ACCOUNTS.teacher, '/enseignant/notes');
@@ -318,15 +324,18 @@ test.describe('groups and « Assigner à »', () => {
   for (const width of [390, 1440]) {
     test(`Axe finds nothing on the new screens and dialogs at ${width} px, and the keyboard reaches them`, async ({ page, request, browser }, info) => {
       test.skip(info.project.name === 'phone' && width === 1440, 'One viewport per project is enough: the test sets its own width.');
+      // A dozen Axe passes, two people and two dialogs: well over the default 30 s on a busy machine.
+      test.setTimeout(90_000);
       const setup = await setUpGroups(request);
       const teacher = await teacherApi(request);
       const evTitle = `${TITLE_PREFIX}axe contrôle`;
+      const examDay = await gradableDay(request, await tokenOf(request, ACCOUNTS.teacher));
       await teacher.post('/api/events', {
         activityTypeId: setup.mathsTypeExam,
         title: evTitle,
         subjectId: 'mathematiques',
         classId: setup.classId,
-        date: iso(0),
+        date: examDay,
         target: { groupIds: [setup.a], studentIds: [] },
       });
       await teacher.post('/api/events', {

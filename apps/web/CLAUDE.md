@@ -143,6 +143,13 @@ A form on a prerendered page (today the contact form) has no handler until Angul
 
 (`e2e/school.ts` gives the Playwright specs the profile and `schoolToday()` of the school under test, `SCHOOL` or `cdls-daher`.)
 
+**Playwright rules** (README « Browser tests », coverage in `docs/qa/e2e-coverage.md`): never date a test « today + n days »
+(a holiday or the year's end): take a week with lessons from `e2e/school-weeks.ts` (`firstTeachingWeek`,
+`twoTeachingWeeks`, `latestTeachingDay`, `gradableDay` for graded work). Every spec removes what it creates in
+`afterAll`/`finally` with `e2e/cleanup.ts` (marks before events; students archived, other accounts disabled); data the
+API keeps for good (a class that had a student, a term with published report cards) goes in a `fixtureYear`, never the
+current year. One test at a time; the phone project runs after desktop.
+
 ## School packs
 
 The public text, photos, crest and icons of the school are `schools/<SCHOOL>/` at the repository root, not in `src/`.
