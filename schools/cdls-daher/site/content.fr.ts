@@ -12,7 +12,7 @@ import {
 import type { SchoolContent } from '../../../apps/web/src/app/school/school-content';
 import { BAC, NATIONALE } from './tracks';
 
-/** The French content: the source the other languages translate. It only gathers school-info.ts, tracks.ts and photos.ts. */
+/** The French content (the site is French only). It only gathers school-info.ts, tracks.ts and photos.ts. */
 export const CONTENT_FR: SchoolContent = {
   school: { place: 'Daher, Le Caire, depuis 1898', tagline: 'Un collège lasallien au cœur du Caire depuis 1898.', address: '6 El Beshnini St., El-Zaher, Le Caire' },
   keyFigures: KEY_FIGURES,

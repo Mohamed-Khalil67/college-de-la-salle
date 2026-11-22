@@ -3,7 +3,7 @@ import type { Photo, PhotoArchive, PhotoId, PhotoText } from '../../../apps/web/
 const CREDIT = 'Photo : Frères des Écoles Chrétiennes – Proche-Orient';
 const CREDIT_EG = 'Photo : Collège De La Salle – Égypte (archives, lasalle-eg.net)';
 
-/** The credit line of each archive, in French (content.en.ts and content.ar.ts translate it). */
+/** The credit line of each archive, in French. */
 export const PHOTO_CREDITS: Readonly<Record<PhotoArchive, string>> = { po: CREDIT, eg: CREDIT_EG };
 const ALBUM = 'http://www.lasalle-eg.net/college/album.htm';
 
@@ -106,7 +106,7 @@ export const PHOTOS: Readonly<Record<PhotoId, Photo>> = {
   },
 };
 
-/** The words of every photo in French, the shape the other languages translate. */
+/** The words of every photo in French. */
 export const PHOTO_TEXTS_FR = Object.fromEntries(
   Object.values(PHOTOS).map((p) => [p.id, { alt: p.alt, caption: p.caption }]),
 ) as Readonly<Record<PhotoId, PhotoText>>;

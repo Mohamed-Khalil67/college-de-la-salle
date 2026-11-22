@@ -33,7 +33,7 @@
   "loginEmailDomain": "ecole-exemple.example",
   "timeZone": "Europe/Paris",
   "defaultLanguage": "fr",
-  "languages": ["fr", "en", "ar"],
+  "languages": ["fr"],
   "sections": [
     { "code": "nationale", "labels": { "fr": "Filière générale", "en": "General track", "ar": "المسار العام" } },
     { "code": "bac", "labels": { "fr": "Filière internationale", "en": "International track", "ar": "المسار الدولي" } }

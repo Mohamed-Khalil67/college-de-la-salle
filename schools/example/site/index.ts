@@ -7,8 +7,6 @@ import type { SiteConfig } from '../../../apps/web/src/app/school/site-config';
 export const SITE: SiteConfig = {
   homeTitle: {
     fr: 'École Exemple — Quartier des Tilleuls · École de démonstration',
-    en: 'École Exemple — Quartier des Tilleuls · Demonstration school',
-    ar: 'مدرسة المثال — حي الزيزفون · مدرسة للعرض',
   },
   homePhones: ['standard', 'generale'],
   teaserYears: ['1950', '2000'],
