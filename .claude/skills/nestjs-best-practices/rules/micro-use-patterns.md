@@ -40,7 +40,7 @@ export class UsersService {
     const user = await this.repo.save(dto);
 
     // Blocks until notification service responds
-    await this.client.send('user.created', user).toPromise();
+    await firstValueFrom(this.client.send('user.created', user));
     // If notification service is down, user creation fails!
 
     return user;

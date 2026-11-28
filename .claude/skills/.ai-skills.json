@@ -1,0 +1,28 @@
+{
+  "note": "Skills installed by BoomAI, per pack. Re-running the installer replaces them.",
+  "packs": {
+    "frontend": [
+      "angular-developer",
+      "angular-new-app",
+      "angular-patterns",
+      "replicate-website",
+      "my-coding-habits",
+      "advanced-animations",
+      "web-animations",
+      "accessibility-review",
+      "performance-audit",
+      "css-styling",
+      "typescript-safety"
+    ],
+    "backend": [
+      "api-contract",
+      "postgresql-table-design",
+      "supabase-postgres-best-practices",
+      "nestjs-best-practices",
+      "nestjs-core",
+      "auth-jwt",
+      "security-review",
+      "nest-testing"
+    ]
+  }
+}

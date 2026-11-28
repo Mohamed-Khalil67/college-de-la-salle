@@ -1,0 +1,419 @@
+<title>CDLS Roles in Action</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: a school register. Ivory page, navy ink, gold rules; one year-long swimlane, then one page per role. */
+:root {
+  --bg: #fbf8f1; --surface: #ffffff; --ink: #13294b; --text: #2a3446; --muted: #5d6677; --line: #e2dccd; --subtle: #f3eee2;
+  --gold: #c9a13b; --gold-text: #806218;
+  --r-visit: #6e6a63; --r-eleve: #24698a; --r-ens: #2f7349; --r-plan: #8f6a12; --r-admin: #13294b;
+  --t-visit: #efede9; --t-eleve: #e1eef4; --t-ens: #e2f0e6; --t-plan: #f5ecd5; --t-admin: #e3e9f2;
+  --font-display: "Cormorant Garamond", "EB Garamond", Garamond, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1726; --surface: #152238; --ink: #e9eef7; --text: #d3d9e4; --muted: #9aa5b8; --line: #2b3a55; --subtle: #1a2a44;
+  --gold: #d8b456; --gold-text: #e0bf66;
+  --r-visit: #b5b0a7; --r-eleve: #6cb7d9; --r-ens: #74c48f; --r-plan: #e0bb5c; --r-admin: #9db7e6;
+  --t-visit: #262a31; --t-eleve: #13324a; --t-ens: #163824; --t-plan: #3a2f12; --t-admin: #1b2c4c;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e1726; --surface: #152238; --ink: #e9eef7; --text: #d3d9e4; --muted: #9aa5b8; --line: #2b3a55; --subtle: #1a2a44;
+  --gold: #d8b456; --gold-text: #e0bf66;
+  --r-visit: #b5b0a7; --r-eleve: #6cb7d9; --r-ens: #74c48f; --r-plan: #e0bb5c; --r-admin: #9db7e6;
+  --t-visit: #262a31; --t-eleve: #13324a; --t-ens: #163824; --t-plan: #3a2f12; --t-admin: #1b2c4c;
+  color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 15px/1.55 var(--font-sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 64px; }
+.wrap { max-width: 1160px; margin: 0 auto; display: grid; gap: 56px; }
+h1, h2, h3 { font-family: var(--font-display); color: var(--ink); text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(2.2rem, 1.6rem + 2.4vw, 3.4rem); font-weight: 600; }
+h2 { font-size: clamp(1.6rem, 1.3rem + 1.2vw, 2.2rem); font-weight: 600; }
+h3 { font-size: 1.35rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--gold-text); }
+.section { display: grid; gap: 20px; }
+.section > header { display: grid; gap: 8px; border-top: 2px solid var(--gold); padding-top: 18px; }
+.lede { color: var(--muted); }
+code { font: 12.5px/1.4 ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--subtle); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+q { quotes: "« " " »"; font-style: normal; }
+
+/* hero */
+.hero { padding-top: 48px; display: grid; gap: 16px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 8px; border-radius: 999px; font-size: 13px; font-weight: 500;
+  background: var(--tint); color: var(--role); border: 1px solid color-mix(in srgb, var(--role) 30%, transparent); }
+.chip::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--role); }
+[data-r="visit"] { --role: var(--r-visit); --tint: var(--t-visit); }
+[data-r="eleve"] { --role: var(--r-eleve); --tint: var(--t-eleve); }
+[data-r="ens"] { --role: var(--r-ens); --tint: var(--t-ens); }
+[data-r="plan"] { --role: var(--r-plan); --tint: var(--t-plan); }
+[data-r="admin"] { --role: var(--r-admin); --tint: var(--t-admin); }
+
+/* swimlane */
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.scroll svg { display: block; min-width: 900px; width: 100%; height: auto; }
+svg text { font-family: var(--font-sans); }
+.lane-head { font: 600 15px var(--font-display); }
+.msg { font-size: 12.5px; fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; }
+.phase { font: 600 11px var(--font-sans); letter-spacing: .1em; text-transform: uppercase; fill: var(--gold-text); }
+.wf { font: 500 10.5px ui-monospace, Consolas, monospace; fill: var(--muted); }
+
+/* role explorer */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab { font: 500 14px var(--font-sans); padding: 8px 16px; border-radius: 999px; cursor: pointer; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.tab[aria-selected="true"] { background: var(--role); border-color: var(--role); color: var(--bg); }
+.tab:focus-visible, .flow-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.role { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; align-items: start; }
+.role-intro { display: grid; gap: 14px; }
+.role-intro .route { font-size: 13px; color: var(--muted); }
+.limits { font-size: 13.5px; color: var(--muted); border-left: 3px solid var(--role); padding-left: 12px; }
+.screen { border: 1px solid var(--line); border-radius: 12px; background: var(--subtle); overflow: hidden; }
+.screen-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: var(--role); color: var(--bg); font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+.screen-bar span:last-child { font-weight: 500; opacity: .9; }
+.blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; }
+.block { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.block.wide { grid-column: 1 / -1; }
+.block.alert { border-color: var(--role); box-shadow: inset 3px 0 0 var(--role); }
+.block b { color: var(--ink); font-size: 14px; }
+.block small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.block .go { font-size: 12px; font-weight: 600; color: var(--role); }
+.wf-list { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.wf-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.wf-row code { justify-self: start; align-self: start; color: var(--role); background: var(--tint); }
+.wf-row b { color: var(--ink); font-weight: 600; }
+.wf-row div { font-size: 14px; }
+
+/* matrix */
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: center; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font: 600 13px var(--font-sans); color: var(--role, var(--ink)); background: var(--surface); position: sticky; top: 0; }
+tbody tr:hover td { background: var(--subtle); }
+.dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; }
+.full { background: var(--role); }
+.own { background: linear-gradient(90deg, var(--role) 50%, transparent 50%); border: 1.5px solid var(--role); }
+.none { width: 14px; height: 2px; border-radius: 1px; background: var(--line); }
+.mlegend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 13px; color: var(--muted); }
+.mlegend span { display: inline-flex; align-items: center; gap: 8px; --role: var(--ink); }
+
+/* flows */
+.flow-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.flow-tab { font: 500 14px var(--font-sans); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
+.flow-tab[aria-selected="true"] { border-color: var(--gold); box-shadow: inset 0 -3px 0 var(--gold); color: var(--ink); font-weight: 600; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; counter-reset: s; }
+.step { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--role); border-radius: 8px; padding: 14px; display: grid; gap: 6px; align-content: start; position: relative; }
+.step::before { content: counter(s); font: 700 1.6rem/1 var(--font-display); color: var(--role); }
+.step .who { font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--role); }
+.step b { color: var(--ink); }
+.step small { color: var(--muted); font-size: 13px; }
+.flow-note { font-size: 13.5px; color: var(--muted); }
+
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (max-width: 760px) {
+  .role { grid-template-columns: minmax(0, 1fr); }
+  .blocks { grid-template-columns: minmax(0, 1fr); }
+  .wf-row { grid-template-columns: 64px minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .role, .steps { animation: rise .28s ease-out; }
+  @keyframes rise { from { transform: translateY(6px); } to { transform: none; } }
+}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">Collège de la Salle · Daher · school platform</span>
+    <h1>How each role acts in the platform</h1>
+    <p class="lede">Five kinds of people use one install of the platform. Each signed-in role opens on a single home page of blocks, and their work hands off to one another through the school year. Everything below is taken from <code>docs/features-and-workflows.md</code>; the <code>WF-…</code> ids match the workflow test report.</p>
+    <div class="legend" aria-label="Roles">
+      <span class="chip" data-r="visit">Visiteur · public site</span>
+      <span class="chip" data-r="eleve">Élève · /eleve</span>
+      <span class="chip" data-r="ens">Enseignant · /enseignant</span>
+      <span class="chip" data-r="plan">Planificateur · permission</span>
+      <span class="chip" data-r="admin">Administration · /admin</span>
+    </div>
+  </header>
+
+  <section class="section" aria-labelledby="h-year">
+    <header>
+      <span class="eyebrow">1 · The school year</span>
+      <h2 id="h-year">Who hands what to whom</h2>
+      <p class="lede">Read top to bottom: one year from setting up the accounts to the next-year rollover. A dot is something a role does in its own space; an arrow is a hand-off that shows up in another role's page or notifications.</p>
+    </header>
+    <div class="scroll" id="lane" role="img" aria-label="Swimlane diagram of the school year across the five roles"></div>
+  </section>
+
+  <section class="section" aria-labelledby="h-roles">
+    <header>
+      <span class="eyebrow">2 · One page per role</span>
+      <h2 id="h-roles">What each role sees and does</h2>
+      <p class="lede">Pick a role: on the left its workflows, on the right the blocks of its home page as they are laid out (wide blocks span the row; each ends with one button to its detail page).</p>
+    </header>
+    <div class="tabs" role="tablist" aria-label="Roles" id="roleTabs"></div>
+    <div id="rolePanel" role="tabpanel" tabindex="0"></div>
+  </section>
+
+  <section class="section" aria-labelledby="h-matrix">
+    <header>
+      <span class="eyebrow">3 · Permissions</span>
+      <h2 id="h-matrix">Who can do what</h2>
+      <p class="lede">The API enforces every cell, not only the screens: 138 routes × 5 roles were checked, and all 63 attempts to read someone else's data were refused.</p>
+    </header>
+    <div class="mlegend">
+      <span><i class="dot full"></i>Allowed</span>
+      <span><i class="dot own"></i>Only their own (their classes, their records)</span>
+      <span><i class="dot none"></i>No access</span>
+    </div>
+    <div class="scroll" style="background:var(--surface)"><table id="matrix"></table></div>
+  </section>
+
+  <section class="section" aria-labelledby="h-flows">
+    <header>
+      <span class="eyebrow">4 · Key workflows, step by step</span>
+      <h2 id="h-flows">The four flows that cross roles</h2>
+    </header>
+    <div class="flow-tabs" role="tablist" aria-label="Workflows" id="flowTabs"></div>
+    <div id="flowPanel" role="tabpanel" tabindex="0" style="display:grid;gap:12px"></div>
+  </section>
+
+  <footer>Source: <code>docs/features-and-workflows.md</code>, <code>docs/workflow-redesign.md</code> and <code>docs/qa/workflow-test-report.md</code> on <code>main</code> (November 2026). Not in this version: parent space, push notifications, « Générer les bulletins » from the preparation page.</footer>
+</div>
+
+<script>
+const ROLES = [
+  { k: 'visit', name: 'Visiteur', short: 'Visiteur' },
+  { k: 'eleve', name: 'Élève', short: 'Élève' },
+  { k: 'ens', name: 'Enseignant', short: 'Enseignant' },
+  { k: 'plan', name: 'Planificateur', short: 'Planificateur' },
+  { k: 'admin', name: 'Administration', short: 'Admin' },
+];
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- 1. swimlane ---------- */
+// [phase?, from, to, label, wf]  from === to means an action inside one space
+const LANE = [
+  ['Set-up'],
+  ['admin', 'admin', 'Year, classes, roster import', 'WF-AD03'],
+  ['admin', 'ens', 'Accounts + temporary password', 'WF-AD02'],
+  ['admin', 'eleve', 'Accounts + temporary password', 'WF-AD02'],
+  ['eleve', 'eleve', '« Premier accès »: own password', 'WF-A02'],
+  ['admin', 'plan', 'Gives « Planificateur »', 'WF-AD04'],
+  ['admin', 'ens', 'Teaching assignments', 'WF-AD07'],
+  ['plan', 'plan', 'Subjects, rooms, terms, timetable', 'WF-PL04'],
+  ['Every week'],
+  ['visit', 'admin', 'Contact message → « Messages »', 'WF-P03'],
+  ['ens', 'eleve', 'Roll call « Appel » → Absences', 'WF-T03'],
+  ['ens', 'eleve', 'Homework → « À faire »', 'WF-T07'],
+  ['plan', 'ens', 'Exam → « Noter » list', 'WF-PL03'],
+  ['plan', 'eleve', 'Exam → « À faire »', 'WF-PL03'],
+  ['plan', 'ens', '« Professeur absent »: cover', 'WF-PL02'],
+  ['plan', 'eleve', 'Change + notification', 'WF-N01'],
+  ['eleve', 'admin', 'Section-change request', 'WF-S08'],
+  ['admin', 'eleve', 'Approved or refused', 'WF-AD06'],
+  ['End of term'],
+  ['ens', 'eleve', '« Publier aux élèves »: grades', 'WF-T04'],
+  ['ens', 'admin', 'Grades feed « Bulletins »', 'WF-AD10'],
+  ['admin', 'ens', '« Relancer » → « Notes à finir »', 'WF-AD10'],
+  ['admin', 'admin', 'Close term, generate cards', 'WF-AD12'],
+  ['admin', 'eleve', 'Report card published + PDF', 'WF-S07'],
+  ['New year'],
+  ['admin', 'admin', '« Nouvelle année » rollover', 'WF-AD13'],
+];
+function drawLane() {
+  const left = 120, lw = 196, top = 64, row = 40, phaseRow = 34;
+  const cx = (k) => left + lw / 2 + lw * ROLES.findIndex((r) => r.k === k);
+  let y = top, body = '';
+  for (const it of LANE) {
+    if (it.length === 1) {
+      y += phaseRow;
+      body += `<line x1="12" x2="${left + lw * 5 - 8}" y1="${y - 22}" y2="${y - 22}" stroke="${css('--line')}"/>`;
+      body += `<text class="phase" x="12" y="${y - 6}">${esc(it[0])}</text>`;
+      continue;
+    }
+    const [f, t, label, wf] = it, c1 = cx(f), c2 = cx(t), col = css(`--r-${f}`);
+    y += row;
+    if (f === t) {
+      body += `<circle cx="${c1}" cy="${y - 4}" r="6" fill="${col}"/>`;
+      const end = ROLES.findIndex((r) => r.k === f) >= 3; // right-hand lanes: label to the left of the dot
+      body += `<text class="msg" x="${end ? c1 - 12 : c1 + 12}" y="${y}" text-anchor="${end ? 'end' : 'start'}">${esc(label)}</text>`;
+    } else {
+      const dir = c2 > c1 ? 1 : -1, a = c1 + dir * 8, b = c2 - dir * 10;
+      body += `<circle cx="${c1}" cy="${y}" r="4.5" fill="${col}"/>`;
+      body += `<line x1="${a}" x2="${b}" y1="${y}" y2="${y}" stroke="${col}" stroke-width="2"/>`;
+      body += `<path d="M${b} ${y - 5} L${c2 - dir * 2} ${y} L${b} ${y + 5} Z" fill="${col}"/>`;
+      body += `<text class="msg" x="${(c1 + c2) / 2}" y="${y - 8}" text-anchor="middle">${esc(label)}</text>`;
+    }
+    body += `<text class="wf" x="${left - 14}" y="${y + 4}" text-anchor="end">${wf}</text>`;
+  }
+  const h = y + 30, w = left + lw * 5;
+  let lanes = '';
+  ROLES.forEach((r, i) => {
+    const x = left + lw * i, c = x + lw / 2;
+    lanes += `<rect x="${x + 4}" y="8" width="${lw - 8}" height="${h - 16}" rx="8" fill="${css(`--t-${r.k}`)}" opacity=".55"/>`;
+    lanes += `<line x1="${c}" x2="${c}" y1="48" y2="${h - 14}" stroke="${css(`--r-${r.k}`)}" stroke-width="1" stroke-dasharray="3 4" opacity=".6"/>`;
+    lanes += `<text class="lane-head" x="${c}" y="34" text-anchor="middle" fill="${css(`--r-${r.k}`)}">${r.name}</text>`;
+  });
+  document.getElementById('lane').innerHTML = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${lanes}${body}</svg>`;
+}
+
+/* ---------- 2. roles ---------- */
+const ROLE_DATA = {
+  visit: {
+    route: 'Public site, six prerendered pages, no account',
+    intro: 'Anyone on the internet. Reads about the school and writes to the secretariat. There is no public sign-up: accounts are only made by the admin.',
+    limits: 'Cannot see any space. The three « Vous êtes… » cards send students and teachers to the sign-in page and families to « Contact ».',
+    bar: ['Accueil', 'Histoire · Bac nationale · Bac français · Contact'],
+    blocks: [['Hero photo and the school', 'Text and photos come from the school pack', 1], ['« Vous êtes… »', 'Futur élève ou famille · Élève du collège · Enseignant'], ['Contact form', 'Name, e-mail, subject, message; 5 a minute'], ['Accessibility statement', 'RGAA status, what is tested, how to report', 1]],
+    wf: [['WF-P01', 'Browse the site', 'Home, Histoire, the two bac tracks, Contact, Accessibilité; phones get small WebP photos.'], ['WF-P02', '« Vous êtes… »', 'Routes each kind of visitor to the right door.'], ['WF-P03', 'Write to the secretariat', 'The send button waits until the page is ready, so no message is lost; the admin reads it in « Messages ».'], ['WF-P04', 'Accessibility statement', 'Non conforme until an independent audit.'], ['WF-P05', 'Keyboard and screen readers', 'Skip link, one h1 per page, Axe-clean at 390 and 1440 px.']],
+  },
+  eleve: {
+    route: '/eleve · signs in as prenom.nom@<school domain>',
+    intro: 'A student sees only their own records and what is addressed to their class, section or groups. Everything checked daily is on one page.',
+    limits: 'Read-only except ticking homework, asking for a section change and their own settings. Unpublished marks are never shown; another class is never visible.',
+    bar: ['Accueil élève', 'Notifications · account menu'],
+    blocks: [['Maintenant', 'Class in progress or next, room, teacher, today in a row → week timetable', 1], ['À faire', 'Homework with its tick, tests of the next two weeks → all homework'], ['Notes', 'Term average, three latest marks, « Bulletin publié » → grades and report cards'], ['Absences', 'Count for the term, latest → detail'], ['Annonces', 'Latest for the school, section or class → all announcements', 1]],
+    wf: [['WF-S01', '« Accueil »', 'Five blocks that load on their own; one failing block shows « Réessayer », the rest stays usable.'], ['WF-S02', 'Timetable', 'Cancelled sessions struck through, a moved one shown once on its new day, a replacement teacher named.'], ['WF-S03', 'Homework', 'Tick done or undo; the teacher sees the ticks.'], ['WF-S05', 'Grades', 'By subject with coefficients, subject and overall averages.'], ['WF-S06', 'Absences', 'Absent, late, excused, with day, subject and time.'], ['WF-S07', 'Report cards', 'Published terms on screen, « Imprimer », PDF of their own cards only.'], ['WF-S08', 'Section change', 'One pending request at a time, approved or refused by the admin.'], ['WF-N03', 'Calendar link', '« Synchroniser mon agenda »: a secret .ics link for Google, Apple or Outlook.']],
+  },
+  ens: {
+    route: '/enseignant · one request (GET /teacher/summary) fills the page',
+    intro: 'A teacher works only where they are assigned: their classes and subjects. They take the roll, give homework and grade straight away, without building the calendar first.',
+    limits: 'Their timetable is read-only: rooms, exams for any class and cover are the Planificateur\'s job. A teacher who also holds « Planificateur » reaches that page from « Plus ».',
+    bar: ['Accueil enseignant', '« Nouvelle note » · « Saisie des notes »'],
+    blocks: [['Mes cours aujourd\'hui', 'Each class with « Appel », « Noter », « Devoir »; En cours, Terminé, « Appel fait » → my week', 1], ['Notes à finir', 'Drafts, planned exams, « 18 / 27 », reminders from the admin → grade book'], ['Devoirs donnés', 'Homework with how many students ticked it → all homework'], ['À surveiller', 'Unfinished marks, coming exams, 3+ unexcused absences → my classes'], ['Annonces', 'Latest → write or read announcements', 1]],
+    wf: [['WF-T03', '« Appel »', 'Present, absent, late (minutes), excused, a note; only the class\'s teachers.'], ['WF-T04', '« Noter »', 'New note, a planned exam or a draft; Enter moves down, autosave with the live average; « Finir plus tard » or « Publier aux élèves ».'], ['WF-T07', 'Homework', 'For the class, a group or chosen students (« Assigner à »).'], ['WF-T06', 'Agenda events', 'With « Chaque semaine »; a busy room or class answers 409 with free times.'], ['WF-T08', 'Groups', 'By division (e.g. LV2), one group per division per student.'], ['WF-T10', 'Announcements', 'To a class or section they teach.'], ['WF-T09', 'Own timetable', '« Mon emploi du temps », read-only.']],
+  },
+  plan: {
+    route: '/admin/planification · a permission on a teacher or admin account',
+    intro: 'The Planificateur owns time and place: the annual calendar, rooms, the timetable, exams and day-to-day changes. It is one login with an extra permission, not a fourth account type.',
+    limits: 'Does not manage accounts, enrolments or report cards. Never given to a student. Hard clashes (one room or one teacher twice) are refused by the database itself.',
+    bar: ['Planification', '« Professeur absent » · « Ajouter un examen »'],
+    blocks: [['À régler', 'Timetable warnings of the next two weeks, classes missing hours → solve conflicts', 1, 1], ['Changements aujourd\'hui', 'Absences covered, room changes, whether students were told'], ['Salles maintenant', 'Free rooms and until when → room occupancy'], ['L\'année', 'Terms, exam weeks, holidays, next key date → year calendar', 1], ['Emplois du temps', 'Classes complete or not, teachers placed → open the grid', 1]],
+    wf: [['WF-PL02', '« Professeur absent »', 'Teacher and days; per lesson « Annuler », « Remplacer » or « Étude surveillée »; one transaction, then everyone concerned is told.'], ['WF-PL03', '« Ajouter un examen »', 'Any class; warns at a third assessment that day; a clash is refused.'], ['WF-PL04', 'Timetable editor', 'Per class, teacher or room; « Cette séance / Celle-ci et les suivantes / Toute la série »; suggestions in one click.'], ['WF-PL05', 'Year structure', 'Subjects, class hours and coefficients, rooms, activity types, terms, holidays, exam weeks.'], ['WF-PL01', 'Planner\'s « Accueil »', 'The five blocks on the right.']],
+  },
+  admin: {
+    route: '/admin · the secretariat and the head',
+    intro: 'The admin runs people and the year: accounts, classes and enrolments, approvals, report cards, messages and the rollover. An admin can also hold « Planificateur ».',
+    limits: 'Accounts are never deleted, only disabled or archived. The past year becomes read-only after the rollover.',
+    bar: ['Administration', '« Ajouter un compte » · « Importer une liste »'],
+    blocks: [['À valider', 'Section-change requests, accounts never activated → validate all', 0, 1], ['Messages', 'New contact-form messages → inbox'], ['Classes', 'Count, average size, students without a class'], ['Rôles', 'Who is Planificateur or admin → accounts and rights'], ['Bulletins', 'Share of subjects ready, late teachers → « Préparer les bulletins »', 1], ['Année scolaire', 'Current year, next rollover'], ['Annonces', 'Latest → write an announcement']],
+    wf: [['WF-AD02', 'Create one account', 'prenom.nom, numbered for homonyms; temporary password shown once (valid 14 days).'], ['WF-AD03', 'Import a roster', 'CSV preview, then all or nothing; the password list is downloaded once.'], ['WF-AD04', 'Accounts', 'Search, reset, disable, restore, archive; give or take « Planificateur » (audited).'], ['WF-AD06', 'Section changes', 'Approve in one step (enrolment moved, grades kept) or refuse with a reason.'], ['WF-AD10', '« Préparer les bulletins »', 'Per class, what is missing and who teaches it; « Relancer ».'], ['WF-AD11–12', 'Close a term, report cards', 'Lock the marks, generate, write appreciations, publish with PDF.'], ['WF-AD13', '« Nouvelle année »', 'Preview, then one transaction: promotions, classes, terms, optional timetable.'], ['WF-AD09', 'Messages', 'Mark handled, delete; old ones are cleaned up.']],
+  },
+};
+function renderRole(k) {
+  const r = ROLES.find((x) => x.k === k), d = ROLE_DATA[k];
+  document.querySelectorAll('#roleTabs .tab').forEach((b) => { const on = b.dataset.k === k; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; });
+  const panel = document.getElementById('rolePanel');
+  panel.dataset.r = k;
+  panel.setAttribute('aria-labelledby', `tab-${k}`);
+  panel.innerHTML = `<div class="role">
+    <div class="role-intro">
+      <h3 style="color:var(--role)">${r.name}</h3>
+      <span class="route"><code>${esc(d.route)}</code></span>
+      <p>${esc(d.intro)}</p>
+      <p class="limits">${esc(d.limits)}</p>
+      <div class="wf-list">${d.wf.map(([id, t, s]) => `<div class="wf-row"><code>${id}</code><div><b>${esc(t)}</b> · ${esc(s)}</div></div>`).join('')}</div>
+    </div>
+    <figure class="screen" style="margin:0" aria-label="Layout of the ${r.name} home page">
+      <div class="screen-bar"><span>${esc(d.bar[0])}</span><span>${esc(d.bar[1])}</span></div>
+      <div class="blocks">${d.blocks.map(([t, s, wide, alert]) => {
+        const [shows, go] = s.split(' → ');
+        return `<div class="block${wide ? ' wide' : ''}${alert ? ' alert' : ''}"><b>${esc(t)}</b><small>${esc(shows)}</small>${go ? `<span class="go">${esc(go)} →</span>` : ''}</div>`;
+      }).join('')}</div>
+    </figure>
+  </div>`;
+}
+
+/* ---------- 3. matrix ---------- */
+// F full, O own scope, - none   order: visit, eleve, ens, plan, admin
+const MATRIX = [
+  ['Read the public site, write to the secretariat', 'FFFFF'],
+  ['Timetable', '-OOFF'],
+  ['Edit the timetable, rooms, terms, holidays', '---FF'],
+  ['Plan an exam for any class', '---FF'],
+  ['« Professeur absent » (cover, study, cancel)', '---FF'],
+  ['Roll call « Appel »', '--O-F'],
+  ['Homework: give / tick', '-OO-F'],
+  ['Grades: enter and publish / read', '-OO-F'],
+  ['Groups', '-OOFF'],
+  ['Announcements', '-OO-F'],
+  ['Report cards: read / prepare and publish', '-O--F'],
+  ['Accounts, imports, permissions', '----F'],
+  ['Classes, enrolments, section changes', '-O--F'],
+  ['Contact messages inbox', '----F'],
+  ['Next-year rollover', '----F'],
+  ['Notifications and calendar link', '-OO--'],
+];
+function renderMatrix() {
+  const head = `<thead><tr><th scope="col">Capability</th>${ROLES.map((r) => `<th scope="col" data-r="${r.k}">${r.short}</th>`).join('')}</tr></thead>`;
+  const word = { F: 'allowed', O: 'own only', '-': 'no access' };
+  const rows = MATRIX.map(([cap, s]) => `<tr><th scope="row" style="font-weight:500;color:var(--text)">${esc(cap)}</th>${[...s].map((c, i) =>
+    `<td data-r="${ROLES[i].k}"><i class="dot ${c === 'F' ? 'full' : c === 'O' ? 'own' : 'none'}" role="img" aria-label="${ROLES[i].short}: ${word[c]}"></i></td>`).join('')}</tr>`).join('');
+  document.getElementById('matrix').innerHTML = head + `<tbody>${rows}</tbody>`;
+}
+
+/* ---------- 4. flows ---------- */
+const FLOWS = [
+  { name: '« Noter »: from mark to report card', note: 'WF-T04 → WF-S05 → WF-AD10 → WF-AD12. No calendar event is needed first: « Nouvelle note » creates it behind the scenes.', steps: [
+    ['ens', 'Quelle note ?', 'A new note (name, « Sur », coefficient), a planned exam or a draft.'],
+    ['ens', 'Type the marks', 'Enter goes to the next student; an empty cell is an absent student; autosave shows « Enregistré · 4 / 27 · moyenne 14,2 ».'],
+    ['ens', '« Publier aux élèves »', 'After a confirmation. « Finir plus tard » keeps it in « Notes à finir ».'],
+    ['eleve', 'Notes block updates', 'The mark and the averages appear; a notification is written in the same transaction.'],
+    ['admin', 'Bulletins progress', 'The subject counts as ready for « Préparer les bulletins ».'] ] },
+  { name: '« Professeur absent »', note: 'WF-PL02 → WF-N01. The weekly timetable, homework and tests are not touched.', steps: [
+    ['plan', 'Teacher and days', 'Up to 14 days; every lesson of that teacher is listed.'],
+    ['plan', 'One choice per lesson', '« Remplacer » (a free teacher of the subject first, never one already held), « Étude surveillée » or « Annuler ».'],
+    ['plan', '« Enregistrer et prévenir »', 'Up to 60 choices saved in one transaction with the audit rows.'],
+    ['ens', 'Covering teacher told', 'The lesson appears in their day; the absent teacher is told too.'],
+    ['eleve', 'Students see the change', '« Maintenant » and the timetable show the cover; a notification arrives.'] ] },
+  { name: '« Préparer les bulletins »', note: 'WF-AD10 → WF-T01 → WF-AD11 → WF-AD12 → WF-S07.', steps: [
+    ['admin', 'Per class, what is missing', '« no grades », « 18 / 27 », « not published », and who teaches it.'],
+    ['admin', '« Relancer »', 'One class or every late teacher; once every 12 hours per scope; audited.'],
+    ['ens', 'Reminder in « Notes à finir »', 'The teacher finishes and publishes the marks.'],
+    ['admin', 'Close the term, generate', 'Marks are locked, ranks and averages computed, appreciations written.'],
+    ['eleve', '« Bulletin publié »', 'The Notes block says so; the card opens on screen and as a PDF.'] ] },
+  { name: 'An account\'s life', note: 'WF-AD02/03 → WF-A02 → WF-A05/06 → WF-AD04. Disabling or a password change also kills the calendar link (WF-A07).', steps: [
+    ['admin', 'Create or import', 'prenom.nom@domain, numbered for homonyms; temporary password valid 14 days.'],
+    ['eleve', '« Premier accès »', 'Every page stays closed until a password is chosen; a student confirms section and class.'],
+    ['eleve', 'Daily use', 'Session restored after a reload; a busy server never signs anyone out, it retries.'],
+    ['eleve', 'Forgotten password', 'Same answer for any identifier; a single-use link valid 60 minutes.'],
+    ['admin', 'Disable, restore, archive', 'Never deleted; every session ends at once.'] ] },
+];
+function renderFlow(i) {
+  const f = FLOWS[i];
+  document.querySelectorAll('#flowTabs .flow-tab').forEach((b, j) => { b.setAttribute('aria-selected', j === i); b.tabIndex = j === i ? 0 : -1; });
+  const p = document.getElementById('flowPanel');
+  p.setAttribute('aria-labelledby', `flow-${i}`);
+  p.innerHTML = `<ol class="steps">${f.steps.map(([k, t, s]) => `<li class="step" data-r="${k}"><span class="who">${ROLES.find((r) => r.k === k).name}</span><b>${esc(t)}</b><small>${esc(s)}</small></li>`).join('')}</ol><p class="flow-note">${esc(f.note)}</p>`;
+}
+
+/* ---------- tabs with arrow keys ---------- */
+function tablist(el, items, onPick) {
+  el.innerHTML = items.join('');
+  el.addEventListener('click', (e) => { const b = e.target.closest('[role="tab"]'); if (b) onPick(b); });
+  el.addEventListener('keydown', (e) => {
+    const tabs = [...el.querySelectorAll('[role="tab"]')], i = tabs.indexOf(document.activeElement);
+    if (i < 0 || !['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const n = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[n].focus(); onPick(tabs[n]);
+  });
+}
+tablist(document.getElementById('roleTabs'), ROLES.map((r) => `<button class="tab" role="tab" id="tab-${r.k}" data-r="${r.k}" data-k="${r.k}" aria-controls="rolePanel">${r.name}</button>`), (b) => {
+  renderRole(b.dataset.k); try { localStorage.setItem('cdls-role', b.dataset.k); } catch {}
+});
+tablist(document.getElementById('flowTabs'), FLOWS.map((f, i) => `<button class="flow-tab" role="tab" id="flow-${i}" data-i="${i}" aria-controls="flowPanel">${esc(f.name)}</button>`), (b) => renderFlow(+b.dataset.i));
+
+let start = 'ens';
+try { const s = localStorage.getItem('cdls-role'); if (ROLE_DATA[s]) start = s; } catch {}
+drawLane(); renderRole(start); renderMatrix(); renderFlow(0);
+// the swimlane reads theme colours: redraw when the theme changes
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', drawLane);
+new MutationObserver(drawLane).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+</script>

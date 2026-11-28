@@ -1,6 +1,6 @@
 # apps/api — NestJS conventions
 
-NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-best-practices` skill before larger changes.
+NestJS 12 (ESM), Prisma 7 with PostgreSQL 18, Vitest. Read the `nestjs-core` and `nestjs-best-practices` skills (BoomAI) before larger changes.
 
 ## Layout
 

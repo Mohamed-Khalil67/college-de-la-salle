@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # CDLS: Collège de la Salle (Daher, Cairo)
 
 School website and platform for one school. npm workspaces: `apps/web` (Angular 22), `apps/api` (NestJS 12 + Prisma 7 +
@@ -7,12 +9,19 @@ the details of each side.
 
 ## Skills: load these first, every agent, every task
 
+The skills come from the owner's kit **BoomAI** (`github.com/Mohamed-Khalil67/BoomAI`, `all` pack, in `.claude/skills/`,
+listed in `AGENTS.md`). Use only these; update them by re-running
+`npx -y github:Mohamed-Khalil67/BoomAI all --skills=claude --claude=import --mcp`.
+
 | Part of the work | Skills |
 |---|---|
-| API, database schema, migrations, Prisma | `nestjs-best-practices` |
-| Web UI | `angular-developer`, `frontend-design` |
-| Any screen you add or change | `design:accessibility-review` (Axe at 390 and 1440 px), `design:ux-copy` for words |
-| Auth, permissions, tokens, anything public | `/security-review` |
+| API, NestJS wiring, errors | `nestjs-core`, `nestjs-best-practices`, `api-contract` |
+| Database schema, migrations, Prisma, SQL | `postgresql-table-design`, `supabase-postgres-best-practices` |
+| Web UI | `angular-developer`, `angular-patterns`, `css-styling`, `my-coding-habits`; motion: `web-animations`, `advanced-animations` |
+| TypeScript types | `typescript-safety` |
+| Any screen you add or change | `accessibility-review` (Axe at 390 and 1440 px), `performance-audit` for bundle and Web Vitals |
+| Auth, permissions, tokens, anything public | `auth-jwt`, `security-review` |
+| API tests | `nest-testing` |
 | Before you hand work back | `/code-review` |
 
 Put the skill line at the top of every brief you give an agent. The logo and crest are final: never change or fetch one.
